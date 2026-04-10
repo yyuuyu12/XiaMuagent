@@ -1,6 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const db = require('./db');
 
 const app = express();
@@ -31,14 +32,20 @@ app.use('/api/history', historyRouter);
 app.use('/api/codes', codesRouter);
 app.use('/api/video', douyinToTextRouter);
 
+// 静态文件（H5前端）
+app.use(express.static(path.join(__dirname, 'public')));
+
 // 健康检查
 app.get('/api/health', (req, res) => {
   res.json({ code: 200, msg: 'ok', time: new Date().toISOString() });
 });
 
-// 404
-app.use((req, res) => {
-  res.status(404).json({ code: 404, msg: '接口不存在' });
+// 前端路由兜底（非API请求返回index.html）
+app.get('*', (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) res.status(404).json({ code: 404, msg: '接口不存在' });
+  });
 });
 
 // 全局错误处理
