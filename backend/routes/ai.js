@@ -19,6 +19,8 @@ function getAIConfig() {
 function checkAndRecordUsage(userId, action) {
   const user = db.prepare('SELECT daily_limit, role FROM users WHERE id = ?').get(userId);
 
+  if (!user) return { ok: false, msg: '用户不存在，请重新登录' };
+
   // 管理员无限制
   if (user.role === 'admin') {
     db.prepare('INSERT INTO usage_logs (user_id, action) VALUES (?, ?)').run(userId, action);
