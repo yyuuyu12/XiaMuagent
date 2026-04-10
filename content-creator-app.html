@@ -456,9 +456,9 @@ function tExtract() {
     <div class="input-card">
       <span class="input-label">视频链接（抖音）</span>
       <textarea class="url-textarea" id="f-url" placeholder="粘贴抖音链接或分享文字..."
-        oninput="S.videoUrl=this.value">${esc(S.videoUrl)}</textarea>
+        oninput="S.videoUrl=this.value;const b=document.getElementById('btn-extract');if(b)b.classList.toggle('btn-disabled',!this.value.trim())">${esc(S.videoUrl)}</textarea>
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
-      <div class="btn-primary ${S.extractLoading||!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">
+      <div id="btn-extract" class="btn-primary ${S.extractLoading||!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">
         ${S.extractLoading?'⏳ 转录中，约1-2分钟...':'🚀 提取文案'}
       </div>
     </div>
