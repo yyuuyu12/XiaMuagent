@@ -1,869 +1,919 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>爆款文案工坊</title>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #C7D2FE; }
-    body { display: flex; justify-content: center; }
-    #root { width: 100%; }
-    input, button, textarea { -webkit-appearance: none; appearance: none; font-family: inherit; }
-    ::-webkit-scrollbar { width: 0; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
-    .modal-enter { animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1); }
-    .page-enter { animation: fadeIn 0.22s ease; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #F2F0EA; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+input, button, textarea { -webkit-appearance: none; appearance: none; font-family: inherit; border: none; outline: none; background: none; }
+::-webkit-scrollbar { width: 0; height: 0; }
+
+/* === APP WRAP === */
+#app { width: 100%; height: 100%; }
+.app-wrap {
+  display: flex; flex-direction: column;
+  height: 100vh; background: #F2F0EA; overflow: hidden;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  max-width: 480px; margin: 0 auto;
+}
+
+/* === TOP BAR === */
+.top-bar {
+  display: flex; flex-direction: row; align-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 10px;
+  background: #F2F0EA; flex-shrink: 0;
+}
+.app-name { font-size: 17px; font-weight: 700; color: #1A1814; letter-spacing: .5px; }
+.top-bar-sub { justify-content: space-between; }
+.back-btn { display: flex; flex-direction: row; align-items: center; width: 60px; cursor: pointer; user-select: none; }
+.back-icon { font-size: 26px; color: #1A1814; line-height: 1; margin-right: 2px; font-weight: 300; }
+.back-text { font-size: 14px; color: #1A1814; }
+.sub-page-title { font-size: 16px; font-weight: 600; color: #1A1814; text-align: center; }
+
+/* === CONTENT === */
+.page-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
+.tab-page { padding: 12px 16px 100px; }
+
+/* === BUTTONS === */
+.btn-primary {
+  background: #FF6B35; color: #FFFFFF; border-radius: 50px;
+  height: 46px; line-height: 46px; text-align: center;
+  font-size: 15px; font-weight: 600; cursor: pointer; user-select: none; display: block; width: 100%;
+}
+.btn-secondary {
+  background: #FFFFFF; color: #1A1814; border: 1px solid #E4E2DA;
+  border-radius: 50px; height: 46px; line-height: 46px;
+  text-align: center; font-size: 15px; flex: 1; margin-right: 8px; cursor: pointer; user-select: none;
+}
+.btn-disabled { opacity: .5; pointer-events: none; }
+.action-row { display: flex; flex-direction: row; align-items: center; margin-top: 10px; }
+.action-row .btn-primary { flex: 1.5; }
+
+/* === HOME === */
+.welcome-banner { background: linear-gradient(135deg,#FF6B35 0%,#FF8C5A 100%); border-radius: 12px; padding: 20px 18px; margin-bottom: 14px; }
+.welcome-hi { display: block; font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.welcome-sub { display: block; font-size: 13px; color: rgba(255,255,255,.85); margin-bottom: 10px; }
+.usage-bar { display: inline-flex; flex-direction: row; align-items: center; background: rgba(255,255,255,.2); border-radius: 50px; padding: 5px 10px; }
+.usage-text { font-size: 12px; color: #fff; }
+.usage-sep { font-size: 12px; color: rgba(255,255,255,.6); margin: 0 4px; }
+.usage-empty { color: #FFD4C5; }
+.feature-cards { margin-bottom: 14px; }
+.feature-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; box-shadow: 0 1px 8px rgba(0,0,0,.05); cursor: pointer; user-select: none; }
+.feature-icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; }
+.feature-icon-blue { background: rgba(99,102,241,.12); }
+.feature-icon-orange { background: rgba(255,107,53,.12); }
+.feature-icon { font-size: 18px; }
+.feature-info { flex: 1; }
+.feature-title { display: block; font-size: 15px; font-weight: 600; color: #1A1814; margin-bottom: 3px; }
+.feature-desc { display: block; font-size: 12px; color: #A8A49C; line-height: 1.5; }
+.feature-arrow { font-size: 22px; color: #C4C0B8; margin-left: 4px; }
+.stats-row { display: flex; flex-direction: row; justify-content: space-around; background: #fff; border-radius: 10px; padding: 14px 8px; }
+.stat-pill { display: flex; flex-direction: column; align-items: center; }
+.stat-pill-num { font-size: 18px; font-weight: 700; color: #FF6B35; margin-bottom: 2px; }
+.stat-pill-label { font-size: 11px; color: #A8A49C; }
+
+/* === EXTRACT === */
+.input-card { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 10px; }
+.input-label { display: block; font-size: 12px; color: #A8A49C; margin-bottom: 8px; font-weight: 500; }
+.url-textarea { background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 8px; padding: 12px 14px; font-size: 14px; color: #1A1814; width: 100%; min-height: 60px; margin-bottom: 12px; line-height: 1.6; resize: none; display: block; }
+.url-textarea::placeholder { color: #C4C0B8; }
+.err-text { display: block; color: #B83060; font-size: 12px; text-align: center; padding: 6px 0; }
+.tip-card { background: rgba(99,102,241,.06); border-radius: 8px; padding: 14px 16px; }
+.tip-title { display: block; font-size: 13px; font-weight: 600; color: #6366F1; margin-bottom: 8px; }
+.tip-line { display: block; font-size: 12px; color: #6B6E99; margin-bottom: 5px; line-height: 1.6; }
+.result-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+.result-muted { opacity: .7; }
+.result-highlight { border: 1px solid #FF6B35; }
+.result-header-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.result-label { font-size: 14px; font-weight: 600; color: #1A1814; }
+.result-label-sm { display: block; font-size: 11px; color: #A8A49C; margin-bottom: 6px; }
+.copy-btn { background: rgba(99,102,241,.1); color: #6366F1; border-radius: 50px; padding: 4px 12px; font-size: 12px; cursor: pointer; user-select: none; flex-shrink: 0; }
+.thin-divider { height: 1px; background: #ECEAE2; margin-bottom: 10px; }
+.script-text { display: block; font-size: 14px; color: #1A1814; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
+.script-text-sm { display: block; font-size: 12px; color: #A8A49C; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+
+/* === INSPIRE === */
+.section-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+.section-label { display: block; font-size: 13px; font-weight: 600; color: #1A1814; margin-bottom: 10px; }
+.industry-grid { display: flex; flex-direction: row; flex-wrap: wrap; }
+.industry-item { background: #F7F6F2; color: #1A1814; border: 1px solid #E4E2DA; border-radius: 50px; padding: 6px 14px; font-size: 13px; margin-right: 8px; margin-bottom: 8px; cursor: pointer; user-select: none; }
+.industry-active { background: #6366F1; color: #fff; border-color: #6366F1; }
+.field-input { background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 8px; height: 44px; padding: 0 14px; font-size: 14px; color: #1A1814; width: 100%; display: block; }
+.field-input::placeholder { color: #C4C0B8; }
+.inspire-action-row { display: flex; flex-direction: row; align-items: center; margin-bottom: 8px; }
+.inspire-generate-btn { flex: 1; }
+.stop-btn { background: #fff; color: #B83060; border: 1px solid #B83060; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 14px; padding: 0 18px; margin-left: 8px; flex-shrink: 0; cursor: pointer; user-select: none; }
+.section-title-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 8px; margin-top: 4px; }
+.section-title-text { font-size: 14px; font-weight: 600; color: #1A1814; }
+.matched-tag { font-size: 11px; color: #6366F1; background: rgba(99,102,241,.1); border-radius: 50px; padding: 3px 9px; }
+.inspire-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; cursor: pointer; }
+.inspire-seq { display: inline-block; background: #6366F1; color: #fff; border-radius: 50%; width: 20px; height: 20px; line-height: 20px; text-align: center; font-size: 11px; font-weight: 600; margin-bottom: 6px; }
+.inspire-hook { display: block; font-size: 15px; font-weight: 600; color: #1A1814; line-height: 1.6; margin-bottom: 6px; }
+.inspire-tags-row { display: flex; flex-direction: row; flex-wrap: wrap; margin-bottom: 4px; }
+.tag { background: rgba(99,102,241,.1); color: #6366F1; border-radius: 50px; padding: 3px 9px; font-size: 11px; margin-right: 6px; margin-bottom: 4px; }
+.inspire-expand { margin-top: 2px; }
+.inspire-full { display: block; font-size: 13.5px; color: #3A3A3A; line-height: 1.8; white-space: pre-wrap; margin-bottom: 10px; word-break: break-all; }
+.inspire-btns { display: flex; flex-direction: row; align-items: center; justify-content: flex-end; }
+.expand-btn { background: #FF6B35; color: #fff; border-radius: 50px; padding: 5px 14px; font-size: 12px; margin-left: 8px; cursor: pointer; user-select: none; }
+.toggle-hint { display: block; font-size: 11px; color: #A8A49C; text-align: right; margin-top: 6px; }
+.history-header-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.history-toggle { color: #A8A49C; font-size: 13px; padding: 8px 0; cursor: pointer; user-select: none; }
+.clear-btn { color: #B83060; font-size: 12px; padding: 6px 10px; border: 1px solid #B83060; border-radius: 50px; cursor: pointer; user-select: none; }
+.empty-tip { text-align: center; color: #C4C0B8; font-size: 13px; padding: 20px; }
+.history-card { background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 6px; cursor: pointer; }
+.history-header { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.history-track { display: block; font-size: 14px; font-weight: 500; color: #1A1814; }
+.history-time { display: block; font-size: 11px; color: #A8A49C; }
+.history-count { font-size: 11px; color: #A8A49C; background: #F0EEE8; border-radius: 50px; padding: 2px 7px; }
+.history-scripts { margin-top: 8px; border-top: 1px solid #F0EEE8; padding-top: 8px; }
+.history-script-item { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F7F6F2; }
+.history-script-hook { flex: 1; font-size: 13px; color: #1A1814; line-height: 1.5; margin-right: 8px; }
+
+/* === PROFILE === */
+.profile-hero { background: linear-gradient(135deg,#6366F1 0%,#818CF8 100%); border-radius: 12px; padding: 24px 18px 20px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; }
+.avatar-lg { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; position: relative; cursor: pointer; }
+.avatar-type-0 { background: rgba(124,58,237,.55); }
+.avatar-type-1 { background: rgba(249,115,22,.55); }
+.avatar-type-2 { background: rgba(59,130,246,.55); }
+.avatar-type-3 { background: rgba(16,185,129,.55); }
+.avatar-lg-text { font-size: 26px; line-height: 1; }
+.avatar-edit-badge { position: absolute; bottom: 0; right: 0; font-size: 12px; background: #fff; border-radius: 50%; width: 20px; height: 20px; line-height: 20px; text-align: center; }
+.profile-name { display: block; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.profile-phone { display: block; font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 14px; }
+.usage-stats { display: flex; flex-direction: row; align-items: center; background: rgba(255,255,255,.15); border-radius: 10px; padding: 10px 16px; width: 100%; justify-content: space-around; }
+.stat-item { display: flex; flex-direction: column; align-items: center; }
+.stat-num { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+.stat-label { font-size: 11px; color: rgba(255,255,255,.75); }
+.stat-empty { color: #FFD4C5; }
+.stat-divider { width: 1px; height: 30px; background: rgba(255,255,255,.3); }
+.avatar-picker { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+.avatar-options { display: flex; flex-direction: row; justify-content: space-around; margin-top: 8px; }
+.avatar-option { display: flex; flex-direction: column; align-items: center; padding: 4px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; user-select: none; }
+.avatar-option-active { border-color: #6366F1; background: rgba(99,102,241,.06); }
+.avatar-opt-circle { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.avatar-opt-0 { background: #7C3AED; }
+.avatar-opt-1 { background: #F97316; }
+.avatar-opt-2 { background: #3B82F6; }
+.avatar-opt-3 { background: #10B981; }
+.avatar-opt-emoji { font-size: 22px; }
+.profile-section { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+.profile-section-title { display: block; font-size: 12px; color: #A8A49C; font-weight: 500; margin-bottom: 10px; }
+.profile-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F0EEE8; }
+.profile-row:last-child { border-bottom: none; }
+.profile-key { font-size: 14px; color: #1A1814; }
+.profile-val { font-size: 14px; color: #A8A49C; }
+.val-green { color: #2D7A3A; font-weight: 500; }
+.code-row { display: flex; flex-direction: row; align-items: center; }
+.code-input { flex: 1; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 6px 0 0 6px; padding: 0 12px; font-size: 14px; color: #1A1814; height: 44px; }
+.code-input::placeholder { color: #C4C0B8; }
+.code-submit { background: #FF6B35; color: #fff; border-radius: 0 6px 6px 0; padding: 0 18px; height: 44px; line-height: 44px; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; flex-shrink: 0; }
+.code-msg { display: block; font-size: 12px; margin-top: 6px; }
+.code-ok { color: #2D7A3A; }
+.code-err { color: #B83060; }
+.code-activated { background: rgba(45,122,58,.06); border-radius: 6px; padding: 10px; }
+.code-activated-text { font-size: 13px; color: #2D7A3A; line-height: 1.6; }
+.vip-upgrade-card { background: linear-gradient(135deg,#FF6B35 0%,#FF8C5A 100%); border-radius: 10px; padding: 16px 14px; margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; cursor: pointer; user-select: none; }
+.vip-upgrade-left { flex: 1; }
+.vip-upgrade-title { display: block; font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.vip-upgrade-sub { display: block; font-size: 12px; color: rgba(255,255,255,.85); }
+.vip-upgrade-arrow { font-size: 22px; color: rgba(255,255,255,.8); margin-left: 4px; }
+.logout-btn { background: #fff; border: 1px solid #ECEAE2; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 8px; color: #B83060; font-size: 15px; font-weight: 500; cursor: pointer; user-select: none; }
+
+/* === VIP === */
+.vip-hero { background: linear-gradient(135deg,#1A1814 0%,#3A3530 100%); border-radius: 12px; padding: 28px 18px 24px; margin-bottom: 14px; display: flex; flex-direction: column; align-items: center; }
+.vip-hero-icon { font-size: 40px; margin-bottom: 8px; }
+.vip-hero-title { display: block; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 5px; }
+.vip-hero-sub { display: block; font-size: 13px; color: rgba(255,255,255,.6); }
+.plan-grid { display: flex; flex-direction: row; flex-wrap: wrap; margin: 0 -4px 8px; }
+.plan-card { width: calc(50% - 8px); margin: 4px; background: #fff; border: 1px solid #E4E2DA; border-radius: 10px; padding: 14px 12px; position: relative; cursor: pointer; user-select: none; }
+.plan-active { border-color: #6366F1; background: rgba(99,102,241,.04); }
+.plan-name { display: block; font-size: 14px; font-weight: 600; color: #1A1814; margin-bottom: 3px; }
+.plan-duration { display: block; font-size: 11px; color: #A8A49C; margin-bottom: 6px; }
+.plan-price { display: block; font-size: 16px; font-weight: 700; color: #FF6B35; }
+.plan-badge { position: absolute; top: -1px; right: 8px; background: #FF6B35; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 0 0 6px 6px; }
+.payment-row { display: flex; flex-direction: row; margin-bottom: 14px; }
+.payment-item { flex: 1; background: #fff; border: 1px solid #E4E2DA; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; align-items: center; margin-right: 8px; cursor: pointer; user-select: none; }
+.payment-item:last-child { margin-right: 0; }
+.payment-active { border-color: #6366F1; background: rgba(99,102,241,.04); }
+.payment-icon { font-size: 22px; margin-bottom: 4px; }
+.payment-name { font-size: 13px; color: #1A1814; }
+.pay-btn { background: #FF6B35; color: #fff; border-radius: 50px; height: 50px; line-height: 50px; text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 12px; cursor: pointer; user-select: none; }
+
+/* === BOTTOM TAB === */
+.bottom-tab { display: flex; flex-direction: row; background: #fff; border-top: 1px solid #ECEAE2; padding-bottom: env(safe-area-inset-bottom, 0px); flex-shrink: 0; }
+.tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 0 8px; cursor: pointer; user-select: none; }
+.tab-icon { font-size: 22px; margin-bottom: 4px; opacity: .35; }
+.tab-label { font-size: 11px; color: #A8A49C; }
+.tab-active .tab-icon { opacity: 1; }
+.tab-active .tab-label { color: #FF6B35; font-weight: 600; }
+
+/* === PAY MODAL === */
+.pay-modal-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.pay-modal { background: #fff; border-radius: 12px; padding: 24px 20px; width: 280px; display: flex; flex-direction: column; align-items: center; }
+.pay-modal-icon { font-size: 36px; margin-bottom: 8px; }
+.pay-modal-title { display: block; font-size: 16px; font-weight: 700; color: #1A1814; margin-bottom: 8px; }
+.pay-modal-note { display: block; font-size: 13px; color: #A8A49C; text-align: center; margin-bottom: 16px; line-height: 1.6; }
+.pay-modal-btn { background: #FF6B35; color: #fff; border-radius: 50px; padding: 0 30px; height: 44px; line-height: 44px; font-size: 15px; font-weight: 600; cursor: pointer; }
+
+/* === LOGIN === */
+.login-page { min-height: 100vh; background: #F2F0EA; overflow-y: auto; -webkit-overflow-scrolling: touch; max-width: 480px; margin: 0 auto; }
+.logo-area { display: flex; flex-direction: column; align-items: center; padding: 60px 24px 24px; }
+.logo-icon { font-size: 44px; margin-bottom: 10px; }
+.logo-title { font-size: 24px; font-weight: 700; color: #1A1814; letter-spacing: 1px; margin-bottom: 6px; }
+.logo-sub { font-size: 13px; color: #A8A49C; }
+.form-card { background: #fff; border-radius: 14px; margin: 0 16px; padding: 20px 18px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.mode-switch { display: flex; background: #F7F6F2; border-radius: 50px; padding: 3px; margin-bottom: 20px; }
+.mode-btn { flex: 1; text-align: center; height: 34px; line-height: 34px; border-radius: 50px; font-size: 14px; color: #A8A49C; cursor: pointer; user-select: none; }
+.mode-active { background: #fff; color: #1A1814; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+.field-group { margin-bottom: 14px; }
+.field-label { display: block; font-size: 12px; color: #A8A49C; margin-bottom: 6px; font-weight: 500; }
+.input-wrap { display: flex; flex-direction: row; align-items: center; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 8px; height: 48px; overflow: hidden; }
+.input-prefix { font-size: 14px; color: #A8A49C; padding: 0 10px 0 14px; flex-shrink: 0; }
+.lf-input { background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 8px; padding: 0 14px; font-size: 15px; color: #1A1814; width: 100%; height: 48px; }
+.lf-input::placeholder { color: #C4C0B8; }
+.input-wrap .lf-input { border: none; border-radius: 0; flex: 1; background: transparent; padding: 0 14px 0 0; }
+.err-msg { display: block; color: #B83060; font-size: 12px; text-align: center; margin-bottom: 8px; padding: 6px; background: rgba(184,48,96,.06); border-radius: 6px; }
+.submit-btn { background: #FF6B35; color: #fff; border-radius: 50px; height: 48px; line-height: 48px; text-align: center; font-size: 16px; font-weight: 600; margin-top: 4px; cursor: pointer; user-select: none; }
+.submit-disabled { opacity: .5; pointer-events: none; }
+.footer-tip { text-align: center; padding: 20px 16px 40px; }
+.footer-text { font-size: 11px; color: #C4C0B8; }
+
+/* === TOAST === */
+.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 200; pointer-events: none; white-space: nowrap; max-width: 480px; }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="app"></div>
+<script>
+// ===== CONFIG =====
+const API_BASE = 'http://106.14.151.37/api';
 
-  <script type="text/babel">
-    const { useState, useCallback } = React;
+// ===== STORAGE =====
+function getToken() { return localStorage.getItem('wf_token') || ''; }
+function setToken(t) { localStorage.setItem('wf_token', t); }
+function clearAuth() { localStorage.removeItem('wf_token'); localStorage.removeItem('wf_user'); }
+function getUser() { try { return JSON.parse(localStorage.getItem('wf_user') || 'null'); } catch { return null; } }
+function setUser(u) { localStorage.setItem('wf_user', JSON.stringify(u)); }
 
-    // ===================== THEME =====================
-    const BG     = "#E8EDFF";
-    const CARD   = "#FFFFFF";
-    const DARK   = "#1E1B4B";
-    const SUB    = "#6B7280";
-    const ACCENT  = "#6366F1";
-    const ACCENT2 = "#818CF8";
-    const BORDER  = "rgba(99,102,241,0.12)";
+// ===== API =====
+async function apiFetch(method, path, data, signal) {
+  const token = getToken();
+  const opts = { method, headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) } };
+  if (data) opts.body = JSON.stringify(data);
+  if (signal) opts.signal = signal;
+  const res = await fetch(API_BASE + path, opts);
+  try { return await res.json(); } catch { return { code: res.status, msg: '服务器响应异常' }; }
+}
+const api = {
+  get: (path, signal) => apiFetch('GET', path, null, signal),
+  post: (path, data, signal) => apiFetch('POST', path, data, signal),
+  del: (path) => apiFetch('DELETE', path),
+};
 
-    // ===================== CARTOON AVATARS =====================
-    // 4 preset cartoon SVG avatars (inline)
-    const AVATARS = [
-      // 0: Purple astronaut
-      <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-        <circle cx="30" cy="30" r="30" fill="#7C3AED"/>
-        <ellipse cx="30" cy="26" rx="14" ry="14" fill="#DDD6FE"/>
-        <circle cx="30" cy="26" r="10" fill="#EDE9FE"/>
-        <circle cx="26" cy="24" r="2" fill="#5B21B6"/>
-        <circle cx="34" cy="24" r="2" fill="#5B21B6"/>
-        <path d="M26 30 Q30 34 34 30" stroke="#5B21B6" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-        <rect x="18" y="38" width="24" height="10" rx="5" fill="#7C3AED"/>
-        <rect x="22" y="36" width="16" height="6" rx="3" fill="#A78BFA"/>
-      </svg>,
-      // 1: Orange fox
-      <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-        <circle cx="30" cy="30" r="30" fill="#F97316"/>
-        <polygon points="14,20 22,30 18,16" fill="#FED7AA"/>
-        <polygon points="46,20 38,30 42,16" fill="#FED7AA"/>
-        <ellipse cx="30" cy="32" rx="14" ry="12" fill="#FED7AA"/>
-        <circle cx="25" cy="30" r="2.5" fill="#7C2D12"/>
-        <circle cx="35" cy="30" r="2.5" fill="#7C2D12"/>
-        <ellipse cx="30" cy="36" rx="4" ry="2.5" fill="#FB923C"/>
-        <path d="M26 34 Q30 38 34 34" stroke="#7C2D12" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      </svg>,
-      // 2: Blue cat
-      <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-        <circle cx="30" cy="30" r="30" fill="#3B82F6"/>
-        <polygon points="14,18 20,30 12,28" fill="#BFDBFE"/>
-        <polygon points="46,18 40,30 48,28" fill="#BFDBFE"/>
-        <ellipse cx="30" cy="32" rx="14" ry="12" fill="#DBEAFE"/>
-        <circle cx="25" cy="30" r="2.5" fill="#1D4ED8"/>
-        <circle cx="35" cy="30" r="2.5" fill="#1D4ED8"/>
-        <path d="M24 35 Q27 37 30 35 Q33 37 36 35" stroke="#1D4ED8" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-        <line x1="22" y1="33" x2="16" y2="31" stroke="#93C5FD" strokeWidth="1"/>
-        <line x1="22" y1="35" x2="15" y2="35" stroke="#93C5FD" strokeWidth="1"/>
-        <line x1="38" y1="33" x2="44" y2="31" stroke="#93C5FD" strokeWidth="1"/>
-        <line x1="38" y1="35" x2="45" y2="35" stroke="#93C5FD" strokeWidth="1"/>
-      </svg>,
-      // 3: Green panda
-      <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-        <circle cx="30" cy="30" r="30" fill="#10B981"/>
-        <circle cx="20" cy="20" r="7" fill="#064E3B"/>
-        <circle cx="40" cy="20" r="7" fill="#064E3B"/>
-        <ellipse cx="30" cy="33" rx="15" ry="13" fill="#D1FAE5"/>
-        <ellipse cx="25" cy="30" rx="4" ry="4.5" fill="#064E3B"/>
-        <ellipse cx="35" cy="30" rx="4" ry="4.5" fill="#064E3B"/>
-        <circle cx="25" cy="30" r="2" fill="white"/>
-        <circle cx="35" cy="30" r="2" fill="white"/>
-        <circle cx="26" cy="29" r="1" fill="#064E3B"/>
-        <circle cx="36" cy="29" r="1" fill="#064E3B"/>
-        <path d="M26 37 Q30 41 34 37" stroke="#064E3B" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      </svg>,
-    ];
+// ===== STATE =====
+const S = {
+  page: 'login', currentTab: 'home',
+  isRegMode: false, phone: '', password: '', authErr: '', loading: false,
+  userName: '用户', userPhone: '', userInfo: null, userAvatar: 0,
+  videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
+  extractLoading: false, extractErr: '', copiedId: '',
+  industries: [], selectedIndustryId: null, selectedIndustryName: '', customTrack: '',
+  inspireScripts: [], inspireLoading: false, inspireErr: '', expandedScript: null,
+  matchedIndustry: '', showHistory: false, inspireHistory: [], historyLoaded: false, historyExpanded: null,
+  showAvatarPicker: false, authCodeInput: '', authCodeMsg: '', authCodeOk: true, authCodeLoading: false,
+  selectedPlan: 'month', selectedPayment: 'wechat', memberPlans: {}, showPayModal: false,
+};
+let inspireController = null;
 
-    // ===================== ICONS =====================
-    const I = {
-      back: (
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-          <path d="M14 5L8 11L14 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      wechat: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path d="M9.5 4C5.36 4 2 6.69 2 10c0 1.85 1.1 3.5 2.8 4.62L4 17l2.6-1.29C7.6 16 8.8 16.2 9.5 16.2c.17 0 .33 0 .5-.02A5.77 5.77 0 019 14c0-3.31 3.13-6 7-6 .34 0 .67.03 1 .07C16.07 5.57 13.07 4 9.5 4z" fill="#2DC100"/>
-          <path d="M22 14c0-2.76-2.69-5-6-5s-6 2.24-6 5 2.69 5 6 5c.85 0 1.65-.15 2.38-.4L21 20l-.7-2.1C21.23 16.85 22 15.5 22 14z" fill="#2DC100"/>
-          <circle cx="7" cy="9.5" r="0.9" fill="white"/><circle cx="12" cy="9.5" r="0.9" fill="white"/>
-          <circle cx="14" cy="13.5" r="0.7" fill="white"/><circle cx="18" cy="13.5" r="0.7" fill="white"/>
-        </svg>
-      ),
-      user: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8"/>
-          <path d="M4 20c0-4 3.58-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </svg>
-      ),
-      extract: (
-        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-          <rect x="4" y="3" width="16" height="20" rx="2" stroke="#6366F1" strokeWidth="1.8"/>
-          <path d="M8 9h8M8 13h6M8 17h4" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="20" cy="18" r="6" fill="#6366F1"/>
-          <path d="M18 18h4M20 16v4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      inspire: (
-        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-          <path d="M14 4L16.5 10.5L23 11.5L18.5 16L19.5 23L14 20L8.5 23L9.5 16L5 11.5L11.5 10.5L14 4Z" stroke="#6366F1" strokeWidth="1.8" strokeLinejoin="round" fill="rgba(99,102,241,0.12)"/>
-        </svg>
-      ),
-      chevron: (c = "#C4C9F0") => (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M6 4L10 8L6 12" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      down: (open) => (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ transition: "transform 0.25s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>
-          <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      fire: (
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-          <path d="M8 1C8 1 3 6 3 10C3 12.8 5.2 15 8 15C10.8 15 13 12.8 13 10C13 6 8 1 8 1Z" fill="#6366F1"/>
-          <path d="M8 7C8 7 6 9.5 6 11C6 12.1 6.9 13 8 13C9.1 13 10 12.1 10 11C10 9.5 8 7 8 7Z" fill="#A5B4FC"/>
-        </svg>
-      ),
-      copy: (
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-          <path d="M3 11V3.5A1.5 1.5 0 014.5 2H10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-        </svg>
-      ),
-      send: (
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-          <path d="M3 10L17 3L10 17L9 11L3 10Z" fill="white" stroke="white" strokeWidth="1" strokeLinejoin="round"/>
-        </svg>
-      ),
-      sparkle: (
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-          <path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor"/>
-        </svg>
-      ),
-      trending: (
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M2 14L7 8L10 11L16 4" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M12 4H16V8" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      edit: (
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M11 2L14 5L5 14H2V11L11 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-        </svg>
-      ),
-      close: (
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M4 4L14 14M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </svg>
-      ),
-      check: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M3 8L7 12L13 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-    };
+// ===== UTILS =====
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg) {
+  const old = document.querySelector('.toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(() => fbCopy(text));
+  } else { fbCopy(text); }
+}
+function fbCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  document.execCommand('copy'); ta.remove();
+}
 
-    // ===================== DATA =====================
-    const MOCK_SCRIPT = `各位家人们，今天给大家分享一个超级实用的收纳技巧！
+// ===== RENDER ENGINE =====
+function setState(updates) {
+  const focusId = document.activeElement && document.activeElement.id;
+  const focusSel = [document.activeElement && document.activeElement.selectionStart,
+                    document.activeElement && document.activeElement.selectionEnd];
+  Object.assign(S, updates);
+  render();
+  if (focusId) {
+    const el = document.getElementById(focusId);
+    if (el) { el.focus(); try { el.setSelectionRange(focusSel[0], focusSel[1]); } catch {} }
+  }
+}
+function render() {
+  document.getElementById('app').innerHTML = S.page === 'login' ? tLogin() : tMain();
+}
 
-你是不是也有这样的烦恼？衣柜永远都是乱的，每次找衣服都要翻半天？
+// ===== LOGIN TEMPLATE =====
+function tLogin() {
+  return `<div class="login-page">
+    <div class="logo-area">
+      <div class="logo-icon">🔥</div>
+      <span class="logo-title">爆款文案工坊</span>
+      <span class="logo-sub">AI驱动 · 一键生成爆款内容</span>
+    </div>
+    <div class="form-card">
+      <div class="mode-switch">
+        <div class="mode-btn ${!S.isRegMode?'mode-active':''}" onclick="setLoginMode()">登录</div>
+        <div class="mode-btn ${S.isRegMode?'mode-active':''}" onclick="setRegMode()">注册</div>
+      </div>
+      <div class="field-group">
+        <span class="field-label">手机号</span>
+        <div class="input-wrap">
+          <span class="input-prefix">+86</span>
+          <input id="f-phone" class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
+            value="${esc(S.phone)}" oninput="S.phone=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+        </div>
+      </div>
+      <div class="field-group">
+        <span class="field-label">密码</span>
+        <input id="f-pwd" class="lf-input" type="password"
+          placeholder="${S.isRegMode?'设置密码（至少6位）':'请输入密码'}"
+          value="${esc(S.password)}" oninput="S.password=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+      </div>
+      ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
+      <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleAuth()">
+        ${S.loading?'请稍候...':(S.isRegMode?'注册':'登录')}
+      </div>
+    </div>
+    <div class="footer-tip"><span class="footer-text">登录即表示同意用户协议和隐私政策</span></div>
+  </div>`;
+}
 
-别急，今天教你3个方法，让你的衣柜整整齐齐：
+// ===== MAIN TEMPLATE =====
+function tMain() {
+  return `<div class="app-wrap">
+    ${tTopBar()}
+    <div class="page-content">${tTabContent()}</div>
+    ${tBottomTab()}
+    ${S.showPayModal?tPayModal():''}
+  </div>`;
+}
 
-第一，学会断舍离。超过一年没穿的衣服，果断扔掉或者捐掉。
-第二，按季节分类。当季的衣服放在最顺手的位置。
-第三，善用收纳盒。内衣袜子用分格收纳盒，一目了然。
+function tTopBar() {
+  const t = S.currentTab;
+  if (t === 'home' || t === 'profile') {
+    return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span></div>`;
+  }
+  const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员' };
+  return `<div class="top-bar top-bar-sub">
+    <div class="back-btn" onclick="goBack()"><span class="back-icon">‹</span><span class="back-text">返回</span></div>
+    <span class="sub-page-title">${titles[t]||''}</span>
+    <div style="width:60px"></div>
+  </div>`;
+}
 
-学会这三招，你的衣柜再也不会乱了！赶紧试试吧~`;
+function tTabContent() {
+  switch(S.currentTab) {
+    case 'home':    return tHome();
+    case 'extract': return tExtract();
+    case 'inspire': return tInspire();
+    case 'profile': return tProfile();
+    case 'vip':     return tVip();
+    default:        return tHome();
+  }
+}
 
-    const MOCK_REWRITE = `姐妹们注意了！这个居家整理术我后悔没早点知道！
+function tBottomTab() {
+  return `<div class="bottom-tab">
+    <div class="tab-item ${S.currentTab==='home'?'tab-active':''}" onclick="switchTab('home')">
+      <span class="tab-icon">🏠</span><span class="tab-label">首页</span>
+    </div>
+    <div class="tab-item ${S.currentTab==='profile'?'tab-active':''}" onclick="switchTab('profile')">
+      <span class="tab-icon">👤</span><span class="tab-label">我的</span>
+    </div>
+  </div>`;
+}
 
-每天早上对着乱成一锅粥的衣柜发呆？上班要迟到了还在翻箱倒柜找那件外套？
+// ===== HOME =====
+function tHome() {
+  const u = S.userInfo;
+  return `<div class="tab-page">
+    <div class="welcome-banner">
+      <span class="welcome-hi">你好，${esc(S.userName)} 👋</span>
+      <span class="welcome-sub">今天想创作什么爆款内容？</span>
+      <div class="usage-bar">
+        ${u ? `<span class="usage-text">今日已用 ${u.used_today||0} 次</span>
+               <span class="usage-sep"> · </span>
+               <span class="usage-text ${u.remaining<=0?'usage-empty':''}">剩余 ${u.daily_limit>=999?'∞':u.remaining} 次</span>`
+             : `<span class="usage-text">登录后每日可免费生成5次</span>`}
+      </div>
+    </div>
+    <div class="feature-cards">
+      <div class="feature-card" onclick="switchTab('extract')">
+        <div class="feature-icon-wrap feature-icon-blue"><span class="feature-icon">📋</span></div>
+        <div class="feature-info">
+          <span class="feature-title">爆款文案克隆</span>
+          <span class="feature-desc">粘贴视频链接，提取文案并AI改写</span>
+        </div>
+        <span class="feature-arrow">›</span>
+      </div>
+      <div class="feature-card" onclick="switchTab('inspire')">
+        <div class="feature-icon-wrap feature-icon-orange"><span class="feature-icon">✨</span></div>
+        <div class="feature-info">
+          <span class="feature-title">灵感发现</span>
+          <span class="feature-desc">选择行业赛道，生成爆款文案创意</span>
+        </div>
+        <span class="feature-arrow">›</span>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-pill"><span class="stat-pill-num">128w+</span><span class="stat-pill-label">文案生成</span></div>
+      <div class="stat-pill"><span class="stat-pill-num">56w+</span><span class="stat-pill-label">用户数</span></div>
+      <div class="stat-pill"><span class="stat-pill-num">98%</span><span class="stat-pill-label">好评率</span></div>
+    </div>
+  </div>`;
+}
 
-今天把我压箱底的整理秘诀分享出来，亲测超有效：
+// ===== EXTRACT =====
+function tExtract() {
+  if (S.extractStep === 0) return `<div class="tab-page">
+    <div class="input-card">
+      <span class="input-label">视频链接（抖音）</span>
+      <textarea class="url-textarea" id="f-url" placeholder="粘贴抖音链接或分享文字..."
+        oninput="S.videoUrl=this.value">${esc(S.videoUrl)}</textarea>
+      ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
+      <div class="btn-primary ${S.extractLoading||!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">
+        ${S.extractLoading?'⏳ 转录中，约1-2分钟...':'🚀 提取文案'}
+      </div>
+    </div>
+    <div class="tip-card">
+      <span class="tip-title">📌 使用说明</span>
+      <span class="tip-line">1. 在抖音找到想参考的视频</span>
+      <span class="tip-line">2. 点击"分享"并复制链接</span>
+      <span class="tip-line">3. 粘贴到上方并点击提取</span>
+      <span class="tip-line">4. AI语音识别转录，约需1-2分钟</span>
+      <span class="tip-line">5. 提取成功后可一键AI改写</span>
+    </div>
+  </div>`;
 
-✅ 秘诀1：做个"衣柜审计官"——365天没宠幸过的衣服，该放手就放手，给新欢腾位置！
-✅ 秘诀2：给衣服安排"工位"——上班装一区、休闲装一区、约会装VIP区，取用效率翻倍！
-✅ 秘诀3：小件收纳是灵魂——入手几个蜂巢格收纳盒，袜子围巾手套各有归宿。
+  if (S.extractStep === 1) return `<div class="tab-page">
+    <div class="result-card">
+      <div class="result-header-row">
+        <span class="result-label">📝 提取的文案</span>
+        <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制'}</div>
+      </div>
+      <div class="thin-divider"></div>
+      <span class="script-text">${esc(S.extractedScript)}</span>
+    </div>
+    ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
+    <div class="action-row">
+      <div class="btn-secondary" onclick="resetExtract()">重新输入</div>
+      <div class="btn-primary ${S.extractLoading?'btn-disabled':''}" onclick="handleRewrite()">
+        ${S.extractLoading?'⏳ 改写中...':'✨ 一键原创改写'}
+      </div>
+    </div>
+  </div>`;
 
-整理完的成就感，谁试谁知道！双击❤️关注我，下期教你厨房收纳！`;
+  return `<div class="tab-page">
+    <div class="result-card result-muted">
+      <span class="result-label-sm">原始文案</span>
+      <span class="script-text-sm">${esc(S.extractedScript)}</span>
+    </div>
+    <div class="result-card result-highlight">
+      <div class="result-header-row">
+        <span class="result-label">🚀 原创改写</span>
+        <div class="copy-btn" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制'}</div>
+      </div>
+      <div class="thin-divider"></div>
+      <span class="script-text">${esc(S.rewrittenScript)}</span>
+    </div>
+    <div class="action-row">
+      <div class="btn-secondary" onclick="resetExtract()">继续提取</div>
+      <div class="btn-primary" onclick="rewriteAgain()">再次改写</div>
+    </div>
+  </div>`;
+}
 
-    const VIRAL_SCRIPTS = [
-      { hook: "家人们谁懂啊！这个收纳神器我真的哭了...", tags: ["家居收纳", "好物推荐"], likes: "12.3w", full: `家人们谁懂啊！这个收纳神器我真的哭了...\n\n用了三年的衣柜终于不像垃圾场了！就是这个蜂巢收纳格，9.9一组，往抽屉里一放，内衣袜子内裤全部站起来。\n\n以前每天早上翻半天找袜子，现在一眼就能看到。而且可以自由裁剪，什么尺寸的抽屉都能适配。\n\n我一口气买了6组，衣柜、书桌、厨房抽屉全安排上了。强迫症看了会流泪的整齐程度！\n\n姐妹们真的别犹豫直接冲，这个价格闭眼入不亏！` },
-      { hook: "被骂了也要说！这个护肤步骤千万别再做了...", tags: ["护肤技巧", "避坑指南"], likes: "9.8w", full: `被骂了也要说！这个护肤步骤千万别再做了...\n\n我知道说出来可能会得罪人，但真的忍不了了。你们还在每天敷面膜吗？皮肤科医生早就说过，天天敷面膜等于在"过度水合"，角质层会越来越薄！\n\n正确的频率是一周2-3次就够了。而且敷完一定要及时涂面霜锁住水分，不然白敷。\n\n还有那个"先乳后水"的日式护肤法，不适合所有人！油皮这么搞分分钟闷痘。\n\n记住：适合自己的才是最好的。别再跟风了，你的脸只有一张！` },
-      { hook: "连夜整理！餐饮行业内部人才知道的秘密...", tags: ["餐饮创业", "行业揭秘"], likes: "8.5w", full: `连夜整理！餐饮行业内部人才知道的秘密...\n\n做了8年餐饮，今天把压箱底的东西都说了。\n\n第一，选址不要只看人流量，要看"有效人流"。学校门口人多吧？但学生消费力有限，翻台率才是王道。\n\n第二，菜单千万别超过30个菜。菜越多，损耗越大，出餐越慢，客户体验越差。\n\n第三，外卖平台的扣点不是固定的，新店可以谈到15%以下，这个信息差值几万块。\n\n最后一条：厨师可以不是最好的，但店长一定要选对人。好店长=半个老板。` },
-      { hook: "姐妹们冲！这个穿搭公式再不学就晚了...", tags: ["穿搭技巧", "通勤穿搭"], likes: "7.2w", full: `姐妹们冲！这个穿搭公式再不学就晚了...\n\n通勤穿搭最怕两件事：太随便显得不专业，太正式又像去面试。\n\n教你一个万能公式：基础色上衣+质感配饰+一个亮点单品。\n\n比如白衬衫+西装裤，加一条金色项链和一个彩色包包，立马从路人变高级。\n\n颜色搭配记住"三色原则"：全身不超过三个颜色。黑白灰不算色，可以随便加。` },
-      { hook: "刷到这条的人有福了！自律的正确打开方式...", tags: ["自律成长", "生活习惯"], likes: "6.9w", full: `刷到这条的人有福了！自律的正确打开方式...\n\n别再逼自己5点起床了！你坚持不了三天的。\n\n真正的自律不是和自己死磕，而是设计一套"不需要意志力"的系统。\n\n第一步：把目标拆到不可能失败。不是"每天运动1小时"，而是"每天做1个俯卧撑"。\n\n第二步：绑定已有习惯。刷完牙就做俯卧撑，吃完午饭就看10分钟书。\n\n一个月后你会发现：你不是变自律了，是习惯变了。` },
-    ];
-
-    const TOPICS_DATA = [
-      { title: "极简生活方式", heat: 2847, trend: "+156%", scripts: ["30天只穿10件衣服挑战，结果衣柜反而更好看了...", "扔掉家里100件东西后，整个人都轻松了..."] },
-      { title: "一人食晚餐", heat: 1923, trend: "+89%", scripts: ["一个人也要好好吃饭！15分钟搞定的一人食晚餐...", "独居女生的治愈晚餐，花20块吃得比外卖香..."] },
-      { title: "租房改造攻略", heat: 1756, trend: "+67%", scripts: ["花500块改造出租屋，房东看了都想涨房租...", "租房党必看！不打孔不破坏的神器清单..."] },
-      { title: "通勤穿搭公式", heat: 1534, trend: "+45%", scripts: ["上班穿什么不用想！5套公式直接抄...", "月薪5千穿出月薪5万的感觉，关键看这3点..."] },
-      { title: "打工人早餐", heat: 1389, trend: "+38%", scripts: ["5分钟搞定的打工人早餐，一周不重复...", "早起10分钟，告别早餐店，省钱又健康..."] },
-    ];
-
-    const KEYWORDS_DATA = [
-      { word: "断舍离", example: "学会断舍离之后，我的生活发生了翻天覆地的变化。扔掉不需要的东西，才能给真正重要的腾出空间。这不只是整理房间，更是整理人生。" },
-      { word: "沉浸式", example: "沉浸式回家日常：开门换鞋、打开香薰机、换上家居服、泡一杯热茶。独居的快乐就是把每一个细节都安排成自己喜欢的样子。" },
-      { word: "氛围感", example: "教你打造满分氛围感房间：一盏暖光落地灯+一面照片墙+几支干花，成本不到200，效果堪比ins博主。" },
-      { word: "高级感", example: "穿出高级感的秘诀不是买贵的，而是学会配色。全身不超过三个颜色，多用莫兰迪色系，便宜的衣服也能穿出大牌感。" },
-      { word: "治愈系", example: "分享我的治愈系周末：睡到自然醒，去菜市场买新鲜食材，回家慢慢做一顿饭，下午窝在沙发看书。简单却幸福。" },
-      { word: "仪式感", example: "生活需要仪式感！每周给自己买一束花，每月尝试一家新餐厅，每年给自己写一封信。这些小事让日子不再将就。" },
-      { word: "松弛感", example: "松弛感穿搭的核心就是：看起来没怎么搭配，但每一件都刚刚好。oversized衬衫+直筒裤+帆布包，出门不用纠结。" },
-      { word: "天花板", example: "面膜界的天花板找到了！用完第二天皮肤嫩得能掐出水，关键是价格才几十块。学生党平替直接冲！" },
-    ];
-
-    const PRESET_INDUSTRIES = ["家居生活", "美妆护肤", "美食探店", "穿搭时尚", "健身运动", "母婴育儿", "数码科技", "旅行攻略", "职场成长", "情感心理"];
-
-    // ===================== APP =====================
-    function App() {
-      // Auth
-      const [isLoggedIn, setIsLoggedIn] = useState(false);
-      const [showLoginModal, setShowLoginModal] = useState(false);
-      const [loginTrigger, setLoginTrigger] = useState(null); // callback after login
-      const [phone, setPhone] = useState("");
-      const [code, setCode] = useState("");
-      const [userAvatar, setUserAvatar] = useState(0);
-      const [userName, setUserName] = useState("用户昵称");
-
-      // Navigation
-      const [page, setPage] = useState("home");
-
-      // Extract page
-      const [videoUrl, setVideoUrl] = useState("");
-      const [loading, setLoading] = useState(false);
-      const [step, setStep] = useState(0);
-      const [copied, setCopied] = useState(null);
-
-      // Inspire page
-      const [selectedIndustry, setSelectedIndustry] = useState(null);
-      const [customTrack, setCustomTrack] = useState("");
-      const [showTrending, setShowTrending] = useState(false);
-      const [activeTab, setActiveTab] = useState("viral");
-      const [expanded, setExpanded] = useState(null);
-      const [expandedTopic, setExpandedTopic] = useState(null);
-      const [expandedKw, setExpandedKw] = useState(null);
-
-      const copy = (text, id) => { navigator.clipboard?.writeText(text); setCopied(id); setTimeout(() => setCopied(null), 1500); };
-      const load = (cb, ms = 1800) => { setLoading(true); setTimeout(() => { setLoading(false); cb(); }, ms); };
-
-      // Require login before action
-      const requireLogin = (cb) => {
-        if (isLoggedIn) { cb(); return; }
-        setLoginTrigger(() => cb);
-        setShowLoginModal(true);
-      };
-
-      const handleLogin = () => {
-        if (!phone || !code) return;
-        setIsLoggedIn(true);
-        setShowLoginModal(false);
-        if (loginTrigger) { loginTrigger(); setLoginTrigger(null); }
-      };
-
-      const handleWechatLogin = () => {
-        setIsLoggedIn(true);
-        setShowLoginModal(false);
-        if (loginTrigger) { loginTrigger(); setLoginTrigger(null); }
-      };
-
-      const handleLogout = () => {
-        setIsLoggedIn(false);
-        setPhone("");
-        setCode("");
-        setPage("home");
-      };
-
-      // Which track is active (preset or custom)
-      const activeTrack = customTrack.trim() || selectedIndustry;
-
-      // ==================== LOGIN MODAL ====================
-      const LoginModal = () => (
-        <div style={st.overlay} onClick={() => setShowLoginModal(false)}>
-          <div className="modal-enter" style={st.modal} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <span style={{ fontSize: 18, fontWeight: 800, color: DARK }}>登录 / 注册</span>
-              <div style={{ cursor: "pointer", color: SUB }} onClick={() => setShowLoginModal(false)}>{I.close}</div>
-            </div>
-
-            {/* Phone section */}
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 12, color: SUB, marginBottom: 12, fontWeight: 500 }}>手机号登录</p>
-              <div style={st.phoneField}>
-                <span style={st.phonePrefix}>+86</span>
-                <input style={st.phoneInput} placeholder="请输入手机号" value={phone} onChange={e => setPhone(e.target.value)} />
+// ===== INSPIRE =====
+function tInspire() {
+  const planMap = { day:'member_plan_day_price', week:'member_plan_week_price', month:'member_plan_month_price', forever:'member_plan_forever_price' };
+  return `<div class="tab-page">
+    <div class="section-card">
+      <span class="section-label">选择你的赛道</span>
+      <div class="industry-grid">
+        ${S.industries.map(it=>`
+          <div class="industry-item ${S.selectedIndustryId===it.id?'industry-active':''}"
+               onclick="selectIndustry(${it.id},'${esc(it.name)}')">${esc(it.name)}</div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="section-card">
+      <span class="section-label">或自定义赛道</span>
+      <input class="field-input" id="f-track" placeholder="例如：宠物博主、职场干货..."
+        value="${esc(S.customTrack)}"
+        oninput="S.customTrack=this.value;if(S.selectedIndustryId){S.selectedIndustryId=null;S.selectedIndustryName='';render();}"/>
+    </div>
+    ${S.inspireErr?`<span class="err-text">${esc(S.inspireErr)}</span>`:''}
+    <div class="inspire-action-row">
+      <div class="btn-primary inspire-generate-btn ${S.inspireLoading||(!S.selectedIndustryId&&!S.customTrack.trim())?'btn-disabled':''}"
+           onclick="handleInspire()">
+        ${S.inspireLoading?'⏳ 生成中...':'🚀 获取热门灵感'}
+      </div>
+      ${S.inspireLoading?`<div class="stop-btn" onclick="stopInspire()">停止</div>`:''}
+    </div>
+    <div class="history-header-row">
+      <div class="history-toggle" onclick="toggleHistory()">📋 ${S.showHistory?'隐藏历史':'查看历史记录'}</div>
+      ${S.showHistory&&S.inspireHistory.length>0?`<div class="clear-btn" onclick="clearHistory()">清空</div>`:''}
+    </div>
+    ${S.inspireScripts.length>0?`
+      <div class="section-title-row">
+        <span class="section-title-text">生成结果（${S.inspireScripts.length}条）</span>
+        ${S.matchedIndustry?`<span class="matched-tag">✓ 已匹配「${esc(S.matchedIndustry)}」</span>`:''}
+      </div>
+      ${S.inspireScripts.map((it,i)=>`
+        <div class="inspire-card" onclick="toggleScript(${i})">
+          <span class="inspire-seq">${i+1}</span>
+          <span class="inspire-hook">${esc(it.hook)}</span>
+          ${it.tags&&it.tags.length?`<div class="inspire-tags-row">${it.tags.map(tg=>`<span class="tag">${esc(tg)}</span>`).join('')}</div>`:'' }
+          ${S.expandedScript===i?`
+            <div class="inspire-expand">
+              <div class="thin-divider"></div>
+              <span class="inspire-full">${esc(it.content)}</span>
+              <div class="inspire-btns">
+                <div class="copy-btn" onclick="cpInspire(event,${i})">${S.copiedId==='inspire_'+i?'✓ 已复制':'复制文案'}</div>
+                <div class="expand-btn" onclick="doExpand(event,${i})">按此方向继续生成 ›</div>
               </div>
-              <div style={st.codeRow}>
-                <input style={st.codeInput} placeholder="验证码" value={code} onChange={e => setCode(e.target.value)} />
-                <div style={st.codeBtn}>获取验证码</div>
-              </div>
-              <button
-                style={{ ...st.btn1, marginTop: 12, opacity: phone && code ? 1 : 0.45 }}
-                onClick={handleLogin}
-              >登录 / 注册</button>
+            </div>`:''}
+          <span class="toggle-hint">${S.expandedScript===i?'收起 ↑':'展开 ↓'}</span>
+        </div>
+      `).join('')}
+      <div class="action-row" style="margin-top:4px">
+        <div class="btn-secondary" onclick="resetInspire()">换赛道</div>
+        <div class="btn-primary ${S.inspireLoading?'btn-disabled':''}" onclick="handleInspire()">重新生成</div>
+      </div>`:''}
+    ${S.showHistory?`
+      <div class="section-title-row" style="margin-top:8px">
+        <span class="section-title-text">📖 历史记录</span>
+      </div>
+      ${S.inspireHistory.length===0?`<div class="empty-tip">暂无历史记录</div>`:
+        S.inspireHistory.map((it,i)=>`
+          <div class="history-card" onclick="toggleHistoryItem(${i})">
+            <div class="history-header">
+              <span class="history-track">${esc(it.input||it.track)}</span>
+              ${it.result?`<span class="history-count">${it.result.length}条</span>`:''}
             </div>
+            <span class="history-time">${esc(it.created_at)}</span>
+            ${S.historyExpanded===i&&it.result?`
+              <div class="history-scripts">
+                ${it.result.map((s,si)=>`
+                  <div class="history-script-item">
+                    <span class="history-script-hook">${esc(s.hook)}</span>
+                    <div class="copy-btn" onclick="cpHistory(event,${i},${si})">复制</div>
+                  </div>`).join('')}
+              </div>`:''}
+          </div>`).join('')}
+    `:''}
+  </div>`;
+}
 
-            {/* Divider */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 16px" }}>
-              <div style={{ flex: 1, height: 1, background: BORDER }} />
-              <span style={{ fontSize: 12, color: SUB }}>或者</span>
-              <div style={{ flex: 1, height: 1, background: BORDER }} />
-            </div>
-
-            {/* WeChat section */}
-            <div style={{ textAlign: "center" }}>
-              <div style={st.wxBtn} onClick={handleWechatLogin}>
-                {I.wechat}
-                <span>微信一键登录</span>
-              </div>
-              <p style={{ fontSize: 11, color: "#A5B4FC", marginTop: 10 }}>将跳转微信完成授权</p>
-            </div>
-
-            <p style={{ textAlign: "center", fontSize: 11, color: "#C4C9F0", marginTop: 20 }}>登录即同意《用户协议》和《隐私政策》</p>
+// ===== PROFILE =====
+function tProfile() {
+  const u = S.userInfo;
+  const emojis = ['👨‍🚀','🦊','🐱','🐼'];
+  const emoji = emojis[S.userAvatar] || (S.userName?S.userName[0]:'?');
+  return `<div class="tab-page">
+    <div class="profile-hero">
+      <div class="avatar-lg avatar-type-${S.userAvatar}" onclick="toggleAvatarPicker()">
+        <span class="avatar-lg-text">${emoji}</span>
+        <div class="avatar-edit-badge">✏️</div>
+      </div>
+      <span class="profile-name">${esc(S.userName)}</span>
+      ${S.userPhone?`<span class="profile-phone">+86 ${esc(S.userPhone)}</span>`:''}
+      ${u?`<div class="usage-stats">
+        <div class="stat-item"><span class="stat-num">${u.used_today||0}</span><span class="stat-label">今日已用</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat-item"><span class="stat-num ${u.remaining<=0?'stat-empty':''}">${u.daily_limit>=999?'∞':u.remaining}</span><span class="stat-label">今日剩余</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat-item"><span class="stat-num">${u.daily_limit>=999?'∞':u.daily_limit}</span><span class="stat-label">每日上限</span></div>
+      </div>`:''}
+    </div>
+    ${S.showAvatarPicker?`
+      <div class="avatar-picker">
+        <span class="profile-section-title">选择头像</span>
+        <div class="avatar-options">
+          ${[0,1,2,3].map(i=>`
+            <div class="avatar-option ${S.userAvatar===i?'avatar-option-active':''}" onclick="selectAvatar(${i})">
+              <div class="avatar-opt-circle avatar-opt-${i}"><span class="avatar-opt-emoji">${emojis[i]}</span></div>
+            </div>`).join('')}
+        </div>
+      </div>`:''}
+    ${u?`<div class="profile-section">
+      <span class="profile-section-title">账号状态</span>
+      <div class="profile-row"><span class="profile-key">账号类型</span><span class="profile-val">${u.role==='admin'?'管理员':'免费版'}</span></div>
+      ${u.role!=='admin'&&u.daily_limit<999?`
+        <div class="profile-row"><span class="profile-key">授权状态</span>
+          <span class="profile-val ${u.auth_expires_at?'val-green':''}">${u.auth_expires_at?'✓ 已授权':'未授权'}</span></div>
+        ${u.auth_expires_at?`<div class="profile-row"><span class="profile-key">授权到期</span><span class="profile-val">${esc(u.auth_expires_at)}</span></div>`:''}
+      `:''}
+    </div>`:''}
+    <div class="profile-section">
+      <span class="profile-section-title">🎫 填写授权码</span>
+      ${u&&u.auth_expires_at?`
+        <div class="code-activated">
+          <span class="code-activated-text">✓ 已激活，有效期至 ${esc(u.auth_expires_at)}，每日可用 ${u.daily_limit} 次</span>
+        </div>`:`
+        <div class="code-row">
+          <input class="code-input" id="f-code" placeholder="请输入授权码"
+            value="${esc(S.authCodeInput)}" oninput="S.authCodeInput=this.value"/>
+          <div class="code-submit ${S.authCodeLoading?'btn-disabled':''}" onclick="handleActivateCode()">
+            ${S.authCodeLoading?'...':'立即激活'}
           </div>
         </div>
-      );
+        ${S.authCodeMsg?`<span class="code-msg ${S.authCodeOk?'code-ok':'code-err'}">${esc(S.authCodeMsg)}</span>`:''}`}
+    </div>
+    <div class="vip-upgrade-card" onclick="switchTab('vip')">
+      <div class="vip-upgrade-left">
+        <span class="vip-upgrade-title">👑 升级专业版</span>
+        <span class="vip-upgrade-sub">无限次数 · 更多功能 · 优先生成</span>
+      </div>
+      <span class="vip-upgrade-arrow">›</span>
+    </div>
+    <div class="logout-btn" onclick="handleLogout()">退出登录</div>
+    <div style="height:20px"></div>
+  </div>`;
+}
 
-      // ==================== HOME ====================
-      if (page === "home") {
-        return (
-          <div style={st.root}>
-            {showLoginModal && <LoginModal />}
-            {/* Top bar */}
-            <div style={st.homeBar}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={st.logoSm}>
-                  <svg width="18" height="18" viewBox="0 0 36 36" fill="none">
-                    <path d="M18 3L22 13H32L24 19L27 30L18 23L9 30L12 19L4 13H14L18 3Z" fill="#6366F1"/>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: DARK }}>爆款文案工坊</div>
-                  <div style={{ fontSize: 10, color: SUB, letterSpacing: 0.5 }}>AI驱动 · 一键生成爆款内容</div>
-                </div>
-              </div>
-              {/* Profile button */}
-              <div style={st.profileBtn} onClick={() => isLoggedIn ? setPage("profile") : setShowLoginModal(true)}>
-                {isLoggedIn
-                  ? <div style={{ width: 32, height: 32, borderRadius: "50%", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>{AVATARS[userAvatar]}</div>
-                  : <div style={{ color: ACCENT }}>{I.user}</div>
-                }
-              </div>
-            </div>
+// ===== VIP =====
+function tVip() {
+  const p = S.memberPlans;
+  const pm = { day:p.member_plan_day_price||'--', week:p.member_plan_week_price||'--', month:p.member_plan_month_price||'--', forever:p.member_plan_forever_price||'--' };
+  const plans = [{key:'day',name:'日会员',dur:'1天'},{key:'week',name:'周会员',dur:'7天'},{key:'month',name:'月会员',dur:'30天',badge:'推荐'},{key:'forever',name:'永久会员',dur:'永久'}];
+  return `<div class="tab-page">
+    <div class="vip-hero">
+      <span class="vip-hero-icon">👑</span>
+      <span class="vip-hero-title">解锁无限创作</span>
+      <span class="vip-hero-sub">会员期间无次数限制，优先响应</span>
+    </div>
+    <span class="section-label">选择套餐</span>
+    <div class="plan-grid">
+      ${plans.map(pl=>`
+        <div class="plan-card ${S.selectedPlan===pl.key?'plan-active':''}" onclick="selectPlan('${pl.key}')">
+          ${pl.badge?`<div class="plan-badge">${pl.badge}</div>`:''}
+          <span class="plan-name">${pl.name}</span>
+          <span class="plan-duration">${pl.dur}</span>
+          <span class="plan-price">¥${pm[pl.key]}</span>
+        </div>`).join('')}
+    </div>
+    <span class="section-label" style="margin-top:12px;display:block">支付方式</span>
+    <div class="payment-row">
+      <div class="payment-item ${S.selectedPayment==='wechat'?'payment-active':''}" onclick="selectPayment('wechat')">
+        <span class="payment-icon">💚</span><span class="payment-name">微信支付</span>
+      </div>
+      <div class="payment-item ${S.selectedPayment==='alipay'?'payment-active':''}" onclick="selectPayment('alipay')">
+        <span class="payment-icon">💙</span><span class="payment-name">支付宝</span>
+      </div>
+    </div>
+    <div class="pay-btn" onclick="handlePay()">立即开通（¥${pm[S.selectedPlan]}）</div>
+    <div style="height:20px"></div>
+  </div>`;
+}
 
-            <div className="page-enter" style={{ paddingTop: 8 }}>
-              <div style={st.cards}>
-                {/* 爆款文案克隆 card */}
-                <div style={st.card} onClick={() => setPage("extract")}>
-                  <div style={st.cIcon}>{I.extract}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={st.cTitle}>爆款文案克隆</h3>
-                    <p style={st.cDesc}>粘贴爆款链接，自动提取改写</p>
-                    <div style={st.cTags}>
-                      <span style={st.cTag}>提取文案</span>
-                      <span style={st.cTag}>原创改写</span>
-                    </div>
-                  </div>
-                  <div style={{ color: "#C4C9F0" }}>{I.chevron()}</div>
-                </div>
+function tPayModal() {
+  const note = esc(S.memberPlans.member_note || '请添加客服微信咨询');
+  return `<div class="pay-modal-mask" onclick="closePayModal()">
+    <div class="pay-modal" onclick="event.stopPropagation()">
+      <span class="pay-modal-icon">🚧</span>
+      <span class="pay-modal-title">支付功能即将上线</span>
+      <span class="pay-modal-note">${note}</span>
+      <div class="pay-modal-btn" onclick="closePayModal()">我知道了</div>
+    </div>
+  </div>`;
+}
 
-                {/* 灵感发现 card */}
-                <div style={st.card} onClick={() => setPage("inspire")}>
-                  <div style={st.cIcon}>{I.inspire}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={st.cTitle}>灵感发现</h3>
-                    <p style={st.cDesc}>抖音热门文案实时抓取，AI推荐选题与爆款公式</p>
-                    <div style={st.cTags}>
-                      <span style={st.cTag}>万赞文案</span>
-                      <span style={st.cTag}>热门选题</span>
-                      <span style={st.cTag}>爆款词</span>
-                    </div>
-                  </div>
-                  <div style={{ color: "#C4C9F0" }}>{I.chevron()}</div>
-                </div>
-              </div>
+// ===== LOGIN HANDLERS =====
+function setLoginMode() { setState({ isRegMode: false, authErr: '' }); }
+function setRegMode()   { setState({ isRegMode: true,  authErr: '' }); }
 
-              <div style={st.statsRow}>
-                <div style={st.stat}><span style={st.statN}>128w+</span> 文案生成</div>
-                <div style={st.stat}><span style={st.statN}>56w+</span> 用户</div>
-                <div style={st.stat}><span style={st.statN}>98%</span> 好评</div>
-              </div>
-              <p style={{ textAlign: "center", fontSize: 12, color: "#A5B4FC", marginTop: 18, paddingBottom: 40 }}>
-                {isLoggedIn ? "✨ 今日剩余免费次数：5 / 5" : "✨ 登录后每日可免费生成 5 次"}
-              </p>
-            </div>
-          </div>
-        );
-      }
-
-      // ==================== PROFILE ====================
-      if (page === "profile") {
-        return (
-          <div style={st.root}>
-            {showLoginModal && <LoginModal />}
-            <Nav title="个人中心" onBack={() => setPage("home")} />
-            <div className="page-enter" style={st.body}>
-              {isLoggedIn ? (
-                <>
-                  {/* Avatar section */}
-                  <div style={{ textAlign: "center", padding: "24px 0 20px" }}>
-                    <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", margin: "0 auto 12px", border: `3px solid ${ACCENT}`, display: "flex", alignItems: "center", justifyContent: "center", background: "#F0F0FF" }}>
-                      {AVATARS[userAvatar]}
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: DARK }}>{userName}</div>
-                    <div style={{ fontSize: 12, color: SUB, marginTop: 2 }}>{phone ? `+86 ${phone}` : "微信账号"}</div>
-                  </div>
-
-                  {/* Choose avatar */}
-                  <div style={{ background: CARD, borderRadius: 16, padding: "16px", border: `1px solid ${BORDER}`, marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: DARK, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
-                      {I.edit} 选择头像
-                    </div>
-                    <div style={{ display: "flex", gap: 14, justifyContent: "center" }}>
-                      {AVATARS.map((av, i) => (
-                        <div
-                          key={i}
-                          onClick={() => setUserAvatar(i)}
-                          style={{
-                            width: 60, height: 60, borderRadius: "50%", overflow: "hidden", cursor: "pointer",
-                            border: userAvatar === i ? `3px solid ${ACCENT}` : "3px solid transparent",
-                            boxShadow: userAvatar === i ? `0 0 0 2px ${ACCENT}40` : "none",
-                            transition: "all 0.18s",
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                          }}
-                        >{av}</div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Account status */}
-                  <div style={{ background: CARD, borderRadius: 16, padding: "16px", border: `1px solid ${BORDER}`, marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: DARK, marginBottom: 12 }}>账号状态</div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <span style={{ fontSize: 13, color: SUB }}>会员等级</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: ACCENT, background: "rgba(99,102,241,0.08)", padding: "2px 10px", borderRadius: 20 }}>免费版</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <span style={{ fontSize: 13, color: SUB }}>今日剩余次数</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: DARK }}>5 / 5</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 13, color: SUB }}>累计生成文案</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: DARK }}>0 篇</span>
-                    </div>
-                  </div>
-
-                  {/* Upgrade */}
-                  <div style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, borderRadius: 16, padding: "16px 20px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>升级专业版</div>
-                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>无限次数 · 更多功能 · 优先生成</div>
-                    </div>
-                    <div style={{ color: "#fff" }}>{I.chevron("#fff")}</div>
-                  </div>
-
-                  {/* Logout */}
-                  <button style={{ ...st.btn2, background: "rgba(239,68,68,0.08)", color: "#EF4444", marginTop: 4 }} onClick={handleLogout}>退出登录</button>
-                </>
-              ) : (
-                <div style={{ textAlign: "center", padding: "60px 0" }}>
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>👤</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: DARK, marginBottom: 8 }}>还未登录</div>
-                  <div style={{ fontSize: 13, color: SUB, marginBottom: 28 }}>登录后可查看账号状态、修改头像</div>
-                  <button style={st.btn1} onClick={() => setShowLoginModal(true)}>立即登录</button>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      // ==================== EXTRACT ====================
-      if (page === "extract") {
-        return (
-          <div style={st.root}>
-            {showLoginModal && <LoginModal />}
-            <Nav title="爆款文案克隆" onBack={() => { setPage("home"); setStep(0); setVideoUrl(""); }} />
-            <div className="page-enter" style={st.body}>
-              {/* Steps */}
-              <div style={st.steps}>
-                {["提取文案", "原创改写"].map((l, i) => (
-                  <div key={i} style={st.sGroup}>
-                    <div style={{ ...st.sDot, ...(step >= i + (i === 0 ? 0 : 1) ? st.sDotOn : {}) }}>{i + 1}</div>
-                    <span style={{ ...st.sText, ...(step >= i + (i === 0 ? 0 : 1) ? st.sTextOn : {}) }}>{l}</span>
-                    {i < 1 && <div style={{ ...st.sLine, ...(step >= 2 ? st.sLineOn : {}) }} />}
-                  </div>
-                ))}
-              </div>
-
-              {step === 0 && (
-                <>
-                  <label style={st.label}>粘贴视频链接</label>
-                  <div style={{ position: "relative" }}>
-                    <input style={st.input} placeholder="请粘贴抖音/快手/小红书视频链接..." value={videoUrl} onChange={e => setVideoUrl(e.target.value)} />
-                    {videoUrl && <span style={st.clearX} onClick={() => setVideoUrl("")}>✕</span>}
-                  </div>
-                  <div style={st.platRow}>
-                    {["抖音", "快手", "小红书", "视频号"].map(p => <span key={p} style={st.platChip}>{p}</span>)}
-                  </div>
-                  <button
-                    style={{ ...st.btn1, marginTop: 24, opacity: videoUrl ? 1 : 0.45 }}
-                    onClick={() => { if (videoUrl) requireLogin(() => load(() => setStep(1))); }}
-                  >
-                    {loading ? "正在提取文案..." : <>{I.send} 提取文案</>}
-                  </button>
-                </>
-              )}
-
-              {step >= 1 && (
-                <TextCard label="📝 提取的文案" text={MOCK_SCRIPT} id="orig" copied={copied} onCopy={copy} />
-              )}
-
-              {step === 1 && (
-                <button style={st.btn2} onClick={() => requireLogin(() => load(() => setStep(2), 2200))}>
-                  {loading ? "AI 正在改写原创文案..." : <>{I.sparkle} 一键原创改写</>}
-                </button>
-              )}
-
-              {step === 2 && (
-                <>
-                  <TextCard label="🚀 原创改写" text={MOCK_REWRITE} id="rew" copied={copied} onCopy={copy} accent={ACCENT} />
-                  <button style={st.btn1} onClick={() => { setStep(0); setVideoUrl(""); }}>继续提取下一个</button>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      // ==================== INSPIRE ====================
-      if (page === "inspire") {
-        return (
-          <div style={st.root}>
-            {showLoginModal && <LoginModal />}
-            <Nav title="灵感发现" onBack={() => {
-              setPage("home");
-              setSelectedIndustry(null); setCustomTrack(""); setShowTrending(false);
-              setExpanded(null); setExpandedTopic(null); setExpandedKw(null);
-            }} />
-            <div className="page-enter" style={st.body}>
-              {!showTrending ? (
-                <>
-                  <div style={{ textAlign: "center", padding: "10px 0 18px" }}>
-                    {I.trending}
-                    <h2 style={{ fontSize: 19, fontWeight: 800, color: DARK, margin: "10px 0 4px" }}>选择你的赛道</h2>
-                    <p style={{ fontSize: 13, color: SUB, margin: 0 }}>基于抖音实时热门数据，精准推荐爆款方向</p>
-                  </div>
-
-                  {/* Preset industry chips */}
-                  <div style={st.indGrid}>
-                    {PRESET_INDUSTRIES.map(ind => (
-                      <div
-                        key={ind}
-                        style={{
-                          ...st.indChip,
-                          ...(selectedIndustry === ind && !customTrack.trim() ? st.indOn : {})
-                        }}
-                        onClick={() => { setSelectedIndustry(ind); setCustomTrack(""); }}
-                      >{ind}</div>
-                    ))}
-                  </div>
-
-                  {/* Custom track input */}
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ fontSize: 12, color: SUB, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ flex: 1, height: 1, background: BORDER }} />
-                      <span>或者输入自定义赛道</span>
-                      <div style={{ flex: 1, height: 1, background: BORDER }} />
-                    </div>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        style={{
-                          ...st.input,
-                          borderColor: customTrack.trim() ? ACCENT : undefined,
-                          paddingRight: customTrack ? 36 : 16,
-                        }}
-                        placeholder="例如：宠物博主、二手好物、职场副业..."
-                        value={customTrack}
-                        onChange={e => { setCustomTrack(e.target.value); if (e.target.value.trim()) setSelectedIndustry(null); }}
-                      />
-                      {customTrack && (
-                        <span style={st.clearX} onClick={() => setCustomTrack("")}>✕</span>
-                      )}
-                    </div>
-                    {customTrack.trim() && (
-                      <div style={{ marginTop: 6, fontSize: 12, color: ACCENT, display: "flex", alignItems: "center", gap: 4 }}>
-                        <span style={{ color: "#22C55E" }}>{I.check}</span> 已选择自定义赛道：{customTrack.trim()}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    style={{ ...st.btn1, marginTop: 20, opacity: activeTrack ? 1 : 0.45 }}
-                    onClick={() => { if (activeTrack) requireLogin(() => load(() => setShowTrending(true), 2000)); }}
-                  >
-                    {loading ? "正在分析热门趋势..." : "🔍 获取热门灵感"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 17, fontWeight: 800, color: DARK }}>{activeTrack}</span>
-                      {customTrack.trim() && <span style={{ fontSize: 10, color: ACCENT, background: "rgba(99,102,241,0.08)", padding: "2px 7px", borderRadius: 10, fontWeight: 600 }}>自定义</span>}
-                    </div>
-                    <span style={{ fontSize: 11, color: "#A5B4FC" }}>数据更新：2分钟前</span>
-                  </div>
-
-                  {/* Tabs */}
-                  <div style={st.tabBar}>
-                    {[{ k: "viral", l: "万赞文案" }, { k: "topics", l: "热门选题" }, { k: "keywords", l: "爆款词" }].map(t => (
-                      <div key={t.k} style={{ ...st.tab, ...(activeTab === t.k ? st.tabOn : {}) }} onClick={() => { setActiveTab(t.k); setExpanded(null); setExpandedTopic(null); setExpandedKw(null); }}>{t.l}</div>
-                    ))}
-                  </div>
-
-                  {/* 万赞文案 */}
-                  {activeTab === "viral" && (
-                    <div style={st.col}>
-                      {VIRAL_SCRIPTS.map((item, i) => {
-                        const isOpen = expanded === i;
-                        return (
-                          <div key={i} style={st.viralCard}>
-                            <div style={st.viralHead} onClick={() => setExpanded(isOpen ? null : i)}>
-                              <div style={{ flex: 1 }}>
-                                <p style={st.viralHook}>{item.hook}</p>
-                                <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-                                  {item.tags.map((t, j) => <span key={j} style={st.viralTag}>{t}</span>)}
-                                  <span style={st.viralLikes}>❤️ {item.likes}</span>
-                                </div>
-                              </div>
-                              <div style={{ color: SUB, flexShrink: 0, marginLeft: 8 }}>{I.down(isOpen)}</div>
-                            </div>
-                            {isOpen && (
-                              <div style={st.viralBody}>
-                                <p style={st.viralFull}>{item.full}</p>
-                                <div style={st.viralCopyRow}>
-                                  <span style={st.copyBtn} onClick={() => copy(item.full, `vf-${i}`)}>
-                                    {I.copy} {copied === `vf-${i}` ? "已复制" : "复制全文"}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* 热门选题 */}
-                  {activeTab === "topics" && (
-                    <div style={st.col}>
-                      {TOPICS_DATA.map((topic, i) => {
-                        const isOpen = expandedTopic === i;
-                        return (
-                          <div key={i} style={st.viralCard}>
-                            <div style={st.topicHead} onClick={() => setExpandedTopic(isOpen ? null : i)}>
-                              <div style={{ ...st.tRank, ...(i < 3 ? st.tRankHot : {}) }}>{i + 1}</div>
-                              <div style={{ flex: 1 }}>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: DARK, display: "block" }}>{topic.title}</span>
-                                <span style={{ fontSize: 11, color: SUB, display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>{I.fire} {topic.heat} 热度</span>
-                              </div>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: "#22C55E", marginRight: 8 }}>{topic.trend}</span>
-                              <div style={{ color: SUB }}>{I.down(isOpen)}</div>
-                            </div>
-                            {isOpen && (
-                              <div style={st.topicBody}>
-                                <p style={{ fontSize: 12, color: SUB, margin: "0 0 8px" }}>相关文案方向：</p>
-                                {topic.scripts.map((sc, j) => (
-                                  <div key={j} style={st.topicScript}>
-                                    <span style={{ flex: 1, fontSize: 13, color: "#555", lineHeight: 1.5 }}>{sc}</span>
-                                    <span style={st.miniCopy} onClick={() => copy(sc, `ts-${i}-${j}`)}>
-                                      {copied === `ts-${i}-${j}` ? "✓" : "复制"}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* 爆款词 */}
-                  {activeTab === "keywords" && (
-                    <div style={st.col}>
-                      <p style={{ fontSize: 12, color: SUB, margin: "0 0 12px" }}>点击展开查看文案示例</p>
-                      {KEYWORDS_DATA.map((kw, i) => {
-                        const isOpen = expandedKw === i;
-                        return (
-                          <div key={i} style={st.viralCard}>
-                            <div style={st.kwHead} onClick={() => setExpandedKw(isOpen ? null : i)}>
-                              <span style={st.kwWord}>{kw.word}</span>
-                              <div style={{ color: SUB }}>{I.down(isOpen)}</div>
-                            </div>
-                            {isOpen && (
-                              <div style={st.kwBody}>
-                                <p style={{ fontSize: 13, color: "#555", lineHeight: 1.75, margin: "0 0 10px" }}>{kw.example}</p>
-                                <span style={st.copyBtn} onClick={() => copy(kw.example, `kw-${i}`)}>
-                                  {I.copy} {copied === `kw-${i}` ? "已复制" : "复制示例"}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <button
-                    style={{ ...st.btn2, marginTop: 16 }}
-                    onClick={() => { setShowTrending(false); setSelectedIndustry(null); setCustomTrack(""); setExpanded(null); setExpandedTopic(null); setExpandedKw(null); }}
-                  >🔄 换个赛道看看</button>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      return null;
+async function handleAuth() {
+  if (S.loading) return;
+  const phone = S.phone.trim(), pwd = S.password;
+  if (!phone || !pwd)             { setState({ authErr: '请输入手机号和密码' }); return; }
+  if (!/^1[3-9]\d{9}$/.test(phone)) { setState({ authErr: '手机号格式不正确' }); return; }
+  if (pwd.length < 6)             { setState({ authErr: '密码至少6位' }); return; }
+  setState({ loading: true, authErr: '' });
+  try {
+    const r = await api.post(S.isRegMode ? '/auth/register' : '/auth/login', { phone, password: pwd });
+    if (r.code === 200) {
+      setToken(r.data.token); setUser(r.data.user);
+      showToast('登录成功');
+      setTimeout(() => {
+        Object.assign(S, {
+          page: 'main', loading: false,
+          userName: r.data.user.nickname || '用户',
+          userPhone: r.data.user.phone || '',
+          userAvatar: r.data.user.avatar || 0,
+        });
+        render(); fetchMe(); loadIndustries();
+      }, 600);
+    } else {
+      setState({ authErr: r.msg || '操作失败，请重试', loading: false });
     }
+  } catch { setState({ authErr: '网络错误，请稍后重试', loading: false }); }
+}
 
-    // ---- Reusable Components ----
-    function Nav({ title, onBack }) {
-      return (
-        <div style={st.nav}>
-          <div style={{ cursor: "pointer", padding: 4, color: DARK }} onClick={onBack}>{I.back}</div>
-          <span style={{ fontSize: 17, fontWeight: 700, color: DARK }}>{title}</span>
-          <div style={{ width: 30 }} />
-        </div>
-      );
-    }
+// ===== NAV =====
+function switchTab(tab) {
+  setState({ currentTab: tab });
+  if (tab === 'profile') fetchMe();
+  if (tab === 'vip') loadMemberPlans();
+}
+function goBack() { setState({ currentTab: 'home' }); }
 
-    function TextCard({ label, text, id, copied, onCopy, accent }) {
-      const border = accent ? `1.5px solid ${accent}25` : `1px solid ${BORDER}`;
-      const bg = accent ? `linear-gradient(135deg, ${accent}08 0%, ${CARD} 100%)` : CARD;
-      return (
-        <div style={{ background: bg, border, borderRadius: 16, padding: 16, marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: accent || "#888" }}>{label}</span>
-            <div style={st.cpBtn} onClick={() => onCopy(text, id)}>{I.copy}<span>{copied === id ? "已复制" : "复制"}</span></div>
-          </div>
-          <p style={{ fontSize: 13.5, lineHeight: 1.85, color: "#444", margin: 0, whiteSpace: "pre-wrap" }}>{text}</p>
-        </div>
-      );
-    }
+// ===== USER =====
+async function fetchMe() {
+  try {
+    const r = await api.get('/auth/me');
+    if (r.code === 200) setState({ userInfo: r.data, userName: r.data.nickname || '用户' });
+    else if (r.code === 401) { clearAuth(); setState({ page: 'login' }); }
+  } catch {}
+}
+async function loadIndustries() {
+  try {
+    const r = await api.get('/config/industries');
+    if (r.code === 200) { S.industries = r.data || []; render(); }
+  } catch {}
+}
 
-    // ===================== STYLES =====================
-    const st = {
-      root: { width: "100%", maxWidth: 430, minHeight: "100vh", margin: "0 auto", background: BG, fontFamily: "'PingFang SC','Noto Sans SC',-apple-system,sans-serif", position: "relative" },
-      nav: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 12px", background: `${BG}F0`, backdropFilter: "blur(12px)", borderBottom: `1px solid ${BORDER}`, position: "sticky", top: 0, zIndex: 10 },
-      body: { padding: "16px 16px 40px" },
+// ===== EXTRACT =====
+async function handleExtract() {
+  if (!S.videoUrl.trim() || S.extractLoading) return;
+  setState({ extractLoading: true, extractErr: '' });
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 300000);
+  try {
+    const r = await api.post('/video/douyin-to-text', { url: S.videoUrl.trim() }, ctrl.signal);
+    clearTimeout(tid);
+    if (r.code === 200) setState({ extractedScript: r.data.script, extractStep: 1, extractLoading: false });
+    else setState({ extractErr: r.msg || '提取失败，请检查链接是否正确', extractLoading: false });
+  } catch(e) {
+    clearTimeout(tid);
+    setState({ extractErr: e.name==='AbortError'?'语音识别超时，请尝试较短视频':'网络超时，请重试', extractLoading: false });
+  }
+}
+async function handleRewrite() {
+  if (!S.extractedScript || S.extractLoading) return;
+  setState({ extractLoading: true, extractErr: '' });
+  try {
+    const r = await api.post('/ai/rewrite', { text: S.extractedScript });
+    if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); }
+    else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false });
+  } catch { setState({ extractErr: '网络错误，请稍后重试', extractLoading: false }); }
+}
+function rewriteAgain() { setState({ extractStep: 1, rewrittenScript: '', extractErr: '' }); handleRewrite(); }
+function resetExtract() { setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '' }); }
+function copyExtracted() { copyText(S.extractedScript); setState({ copiedId: 'extracted' }); setTimeout(()=>setState({copiedId:''}),1500); }
+function copyRewritten() { copyText(S.rewrittenScript); setState({ copiedId: 'rewritten' }); setTimeout(()=>setState({copiedId:''}),1500); }
 
-      // Home top bar
-      homeBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px 12px", background: `${BG}F0`, backdropFilter: "blur(12px)", borderBottom: `1px solid ${BORDER}`, position: "sticky", top: 0, zIndex: 10 },
-      logoSm: { width: 36, height: 36, borderRadius: 11, background: "rgba(99,102,241,0.1)", display: "inline-flex", alignItems: "center", justifyContent: "center" },
-      profileBtn: { width: 38, height: 38, borderRadius: "50%", background: "rgba(99,102,241,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: `1.5px solid ${BORDER}` },
+// ===== INSPIRE =====
+function selectIndustry(id, name) {
+  if (S.selectedIndustryId === id) setState({ selectedIndustryId: null, selectedIndustryName: '' });
+  else setState({ selectedIndustryId: id, selectedIndustryName: name, customTrack: '' });
+}
+async function handleInspire() {
+  const track = S.customTrack.trim() || S.selectedIndustryName;
+  if (!track || S.inspireLoading) return;
+  inspireController = new AbortController();
+  setState({ inspireLoading: true, inspireErr: '', inspireScripts: [], matchedIndustry: '' });
+  const body = S.selectedIndustryId
+    ? { track: S.selectedIndustryName, industryId: S.selectedIndustryId }
+    : { track: S.customTrack.trim() };
+  try {
+    const r = await api.post('/ai/inspire', body, inspireController.signal);
+    inspireController = null;
+    if (r.code === 200) {
+      setState({ inspireScripts: r.data.scripts||[], matchedIndustry: r.data.matchedIndustry||'', expandedScript: null, inspireLoading: false });
+      fetchMe();
+    } else setState({ inspireErr: r.msg||'生成失败，请重试', inspireLoading: false });
+  } catch(e) {
+    inspireController = null;
+    if (e.name !== 'AbortError') setState({ inspireErr: '网络错误，请稍后重试', inspireLoading: false });
+    else setState({ inspireLoading: false });
+  }
+}
+function stopInspire() {
+  if (inspireController) { inspireController.abort(); inspireController = null; setState({ inspireLoading: false }); }
+}
+function resetInspire() { setState({ inspireScripts:[], selectedIndustryId:null, selectedIndustryName:'', customTrack:'', matchedIndustry:'', expandedScript:null, inspireErr:'' }); }
+function toggleScript(i) { setState({ expandedScript: S.expandedScript===i?null:i }); }
+function cpInspire(e, i) {
+  e.stopPropagation();
+  const s = S.inspireScripts[i];
+  copyText(s ? (s.content||s.hook) : '');
+  setState({ copiedId: 'inspire_'+i });
+  setTimeout(()=>setState({copiedId:''}),1500);
+}
+async function doExpand(e, i) {
+  e.stopPropagation();
+  const s = S.inspireScripts[i];
+  const track = S.customTrack.trim() || S.selectedIndustryName;
+  setState({ inspireLoading: true, inspireErr: '' });
+  try {
+    const r = await api.post('/ai/inspire-expand', { hook: s.hook, content: s.content, track });
+    if (r.code === 200) {
+      setState({ inspireScripts: [...(r.data.scripts||[]), ...S.inspireScripts], expandedScript: 0, inspireLoading: false });
+      fetchMe();
+    } else setState({ inspireErr: r.msg||'扩写失败', inspireLoading: false });
+  } catch { setState({ inspireErr: '网络错误', inspireLoading: false }); }
+}
+async function toggleHistory() {
+  if (!S.showHistory && !S.historyLoaded) await loadHistory();
+  setState({ showHistory: !S.showHistory });
+}
+async function loadHistory() {
+  try {
+    const r = await api.get('/history?type=inspire');
+    if (r.code === 200) { S.inspireHistory = r.data||[]; S.historyLoaded = true; }
+  } catch {}
+}
+async function clearHistory() {
+  if (!confirm('确定清空所有历史记录吗？')) return;
+  try { await api.del('/history?type=inspire'); setState({ inspireHistory:[], historyLoaded:false }); showToast('已清空'); }
+  catch { showToast('操作失败'); }
+}
+function toggleHistoryItem(i) { setState({ historyExpanded: S.historyExpanded===i?null:i }); }
+function cpHistory(e, hi, si) {
+  e.stopPropagation();
+  const it = S.inspireHistory[hi];
+  if (!it||!it.result) return;
+  const s = it.result[si];
+  copyText(s ? (s.content||s.hook) : '');
+  showToast('已复制');
+}
 
-      // Cards
-      cards: { padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 12 },
-      card: { display: "flex", alignItems: "center", gap: 14, background: CARD, borderRadius: 18, padding: "18px 16px", border: `1px solid ${BORDER}`, boxShadow: "0 2px 12px rgba(99,102,241,0.08)", cursor: "pointer" },
-      cIcon: { width: 48, height: 48, borderRadius: 14, background: "rgba(99,102,241,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-      cTitle: { fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 4px" },
-      cDesc: { fontSize: 12.5, color: SUB, margin: "0 0 10px", lineHeight: 1.5 },
-      cTags: { display: "flex", gap: 6, flexWrap: "wrap" },
-      cTag: { fontSize: 11, color: ACCENT, background: "rgba(99,102,241,0.08)", padding: "3px 10px", borderRadius: 20, fontWeight: 500 },
-      statsRow: { display: "flex", justifyContent: "center", gap: 8, padding: "22px 18px 0" },
-      stat: { fontSize: 11, color: SUB, background: "rgba(99,102,241,0.05)", padding: "6px 14px", borderRadius: 20, display: "flex", alignItems: "center", gap: 4 },
-      statN: { fontWeight: 700, color: ACCENT, fontSize: 12 },
+// ===== PROFILE =====
+function toggleAvatarPicker() { setState({ showAvatarPicker: !S.showAvatarPicker }); }
+async function selectAvatar(i) {
+  setState({ userAvatar: i, showAvatarPicker: false });
+  try {
+    await api.post('/auth/update-avatar', { avatar: i });
+    const user = getUser()||{}; setUser({...user, avatar:i});
+    if (S.userInfo) { S.userInfo = {...S.userInfo, avatar:i}; }
+  } catch {}
+}
+async function handleActivateCode() {
+  const code = S.authCodeInput.trim();
+  if (!code || S.authCodeLoading) return;
+  setState({ authCodeLoading: true, authCodeMsg: '' });
+  try {
+    const r = await api.post('/auth/activate-code', { code });
+    if (r.code === 200) { setState({ authCodeMsg: r.msg||'激活成功！', authCodeOk:true, authCodeInput:'', authCodeLoading:false }); fetchMe(); }
+    else setState({ authCodeMsg: r.msg||'激活失败', authCodeOk:false, authCodeLoading:false });
+  } catch { setState({ authCodeMsg:'网络错误，请稍后重试', authCodeOk:false, authCodeLoading:false }); }
+}
+function handleLogout() {
+  if (!confirm('确定要退出登录吗？')) return;
+  clearAuth();
+  setState({ page:'login', currentTab:'home', userInfo:null, userName:'用户', userPhone:'', phone:'', password:'' });
+}
 
-      // Login modal
-      overlay: { position: "fixed", inset: 0, background: "rgba(30,27,75,0.45)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" },
-      modal: { width: "100%", maxWidth: 430, background: CARD, borderRadius: "24px 24px 0 0", padding: "24px 24px 40px" },
-      phoneField: { display: "flex", alignItems: "center", background: BG, borderRadius: 14, border: `2px solid ${BORDER}`, overflow: "hidden", marginBottom: 10 },
-      phonePrefix: { padding: "13px 14px", fontSize: 14, fontWeight: 600, color: DARK, borderRight: `1px solid ${BORDER}`, background: "rgba(99,102,241,0.03)" },
-      phoneInput: { flex: 1, border: "none", outline: "none", padding: "13px 16px", fontSize: 14, color: DARK, background: "transparent" },
-      codeRow: { display: "flex", gap: 10 },
-      codeInput: { flex: 1, border: `2px solid ${BORDER}`, borderRadius: 14, padding: "13px 16px", fontSize: 14, color: DARK, outline: "none", background: BG },
-      codeBtn: { padding: "13px 14px", borderRadius: 14, background: "rgba(99,102,241,0.08)", color: ACCENT, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center" },
-      wxBtn: { display: "inline-flex", alignItems: "center", gap: 10, background: "#2DC100", color: "#fff", fontSize: 15, fontWeight: 700, padding: "13px 36px", borderRadius: 14, cursor: "pointer", boxShadow: "0 4px 16px rgba(45,193,0,0.25)" },
+// ===== VIP =====
+async function loadMemberPlans() {
+  try {
+    const r = await api.get('/config/member-plans');
+    if (r.code === 200) { S.memberPlans = r.data; render(); }
+  } catch {}
+}
+function selectPlan(plan) { setState({ selectedPlan: plan }); }
+function selectPayment(m) { setState({ selectedPayment: m }); }
+function handlePay() { setState({ showPayModal: true }); }
+function closePayModal() { setState({ showPayModal: false }); }
 
-      // Extract
-      steps: { display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 },
-      sGroup: { display: "flex", alignItems: "center", gap: 6 },
-      sDot: { width: 24, height: 24, borderRadius: "50%", background: "rgba(99,102,241,0.1)", color: SUB, fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" },
-      sDotOn: { background: ACCENT, color: "#fff" },
-      sText: { fontSize: 12, color: SUB, fontWeight: 500 },
-      sTextOn: { color: ACCENT },
-      sLine: { width: 36, height: 2, background: "rgba(99,102,241,0.1)", margin: "0 8px", borderRadius: 1 },
-      sLineOn: { background: ACCENT },
-      label: { fontSize: 14, fontWeight: 600, color: DARK, marginBottom: 10, display: "block" },
-      input: { width: "100%", padding: "14px 40px 14px 16px", borderRadius: 14, border: `2px solid ${BORDER}`, fontSize: 14, color: DARK, background: CARD, outline: "none", boxSizing: "border-box" },
-      clearX: { position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: SUB, cursor: "pointer", fontSize: 14 },
-      platRow: { display: "flex", gap: 8, marginTop: 10 },
-      platChip: { fontSize: 11, color: SUB, background: "rgba(99,102,241,0.06)", padding: "4px 12px", borderRadius: 20 },
-
-      // Buttons
-      btn1: { width: "100%", padding: "15px 0", borderRadius: 14, background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "#fff", fontSize: 15, fontWeight: 700, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 16px rgba(99,102,241,0.30)", transition: "opacity 0.2s" },
-      btn2: { width: "100%", padding: "14px 0", borderRadius: 14, background: DARK, color: "#fff", fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 },
-      cpBtn: { display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: SUB, cursor: "pointer", padding: "4px 8px", borderRadius: 8, background: "rgba(99,102,241,0.05)" },
-
-      // Inspire
-      indGrid: { display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" },
-      indChip: { padding: "9px 16px", borderRadius: 24, background: CARD, border: `2px solid ${BORDER}`, fontSize: 13, color: "#666", cursor: "pointer", fontWeight: 500 },
-      indOn: { borderColor: ACCENT, color: ACCENT, background: "rgba(99,102,241,0.06)" },
-      tabBar: { display: "flex", background: "rgba(99,102,241,0.07)", borderRadius: 12, padding: 3, marginBottom: 16 },
-      tab: { flex: 1, textAlign: "center", padding: "10px 0", borderRadius: 10, fontSize: 13, fontWeight: 600, color: SUB, cursor: "pointer" },
-      tabOn: { background: CARD, color: DARK, boxShadow: "0 1px 4px rgba(99,102,241,0.12)" },
-      col: { display: "flex", flexDirection: "column", gap: 10 },
-
-      // Viral scripts
-      viralCard: { background: CARD, borderRadius: 16, border: `1px solid ${BORDER}`, overflow: "hidden" },
-      viralHead: { display: "flex", alignItems: "center", padding: "14px 16px", cursor: "pointer" },
-      viralHook: { fontSize: 14, fontWeight: 600, color: DARK, margin: 0, lineHeight: 1.5 },
-      viralTag: { fontSize: 11, color: ACCENT, background: "rgba(99,102,241,0.08)", padding: "2px 8px", borderRadius: 12, fontWeight: 500 },
-      viralLikes: { fontSize: 11, color: SUB, marginLeft: 4 },
-      viralBody: { padding: "0 16px 14px", borderTop: `1px solid ${BORDER}` },
-      viralFull: { fontSize: 13, lineHeight: 1.8, color: "#555", margin: "12px 0 0", whiteSpace: "pre-wrap" },
-      viralCopyRow: { display: "flex", justifyContent: "flex-end", marginTop: 10 },
-      copyBtn: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: ACCENT, fontWeight: 600, cursor: "pointer", padding: "5px 14px", borderRadius: 8, background: "rgba(99,102,241,0.06)", border: `1px solid rgba(99,102,241,0.18)` },
-
-      // Topics
-      topicHead: { display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", cursor: "pointer" },
-      tRank: { width: 28, height: 28, borderRadius: 8, background: "rgba(99,102,241,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: SUB, flexShrink: 0 },
-      tRankHot: { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "#fff" },
-      topicBody: { padding: "0 16px 14px", borderTop: `1px solid ${BORDER}` },
-      topicScript: { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${BORDER}` },
-      miniCopy: { fontSize: 11, color: ACCENT, fontWeight: 600, cursor: "pointer", padding: "3px 10px", borderRadius: 6, background: "rgba(99,102,241,0.06)", flexShrink: 0 },
-
-      // Keywords
-      kwHead: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", cursor: "pointer" },
-      kwWord: { fontSize: 15, fontWeight: 700, color: ACCENT },
-      kwBody: { padding: "12px 16px 14px", borderTop: `1px solid ${BORDER}` },
-    };
-
-    // ===================== MOUNT =====================
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+// ===== INIT =====
+(function init() {
+  const token = getToken();
+  if (token) {
+    const user = getUser();
+    if (user) { S.userName = user.nickname||'用户'; S.userPhone = user.phone||''; S.userAvatar = user.avatar||0; }
+    S.page = 'main';
+    render(); fetchMe(); loadIndustries();
+  } else { render(); }
+})();
+</script>
 </body>
 </html>

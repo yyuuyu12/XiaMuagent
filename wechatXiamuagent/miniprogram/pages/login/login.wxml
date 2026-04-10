@@ -1,0 +1,84 @@
+<!--pages/login/login.wxml-->
+<scroll-view class="login-page" scroll-y>
+
+  <!-- Logo区 -->
+  <view class="logo-area">
+    <view class="logo-icon">🔥</view>
+    <text class="logo-title">爆款文案工坊</text>
+    <text class="logo-sub">AI驱动 · 一键生成爆款内容</text>
+  </view>
+
+  <!-- 微信快捷登录 -->
+  <view class="wx-login-section">
+    <button
+      class="wx-login-btn {{wxLoading ? 'wx-login-btn-disabled' : ''}}"
+      bindtap="handleWxLogin"
+    >
+      <text class="wx-login-icon">💬</text>
+      <text class="wx-login-text">{{wxLoading ? '授权中...' : '微信一键登录'}}</text>
+    </button>
+  </view>
+
+  <!-- 分隔线 -->
+  <view class="divider-row">
+    <view class="divider-line"/>
+    <text class="divider-text">或使用手机号登录</text>
+    <view class="divider-line"/>
+  </view>
+
+  <!-- 表单卡片 -->
+  <view class="form-card">
+    <!-- 模式切换 -->
+    <view class="mode-switch">
+      <view class="mode-btn {{!isRegMode ? 'mode-active' : ''}}" bindtap="setLoginMode">登录</view>
+      <view class="mode-btn {{isRegMode ? 'mode-active' : ''}}" bindtap="setRegMode">注册</view>
+    </view>
+
+    <!-- 手机号 -->
+    <view class="field-group">
+      <text class="field-label">手机号</text>
+      <view class="input-wrap">
+        <text class="input-prefix">+86</text>
+        <input
+          class="field-input"
+          type="number"
+          maxlength="11"
+          placeholder="请输入手机号"
+          placeholder-class="field-placeholder"
+          value="{{phone}}"
+          bindinput="onPhoneInput"
+          confirm-type="next"
+        />
+      </view>
+    </view>
+
+    <!-- 密码 -->
+    <view class="field-group">
+      <text class="field-label">密码</text>
+      <input
+        class="field-input"
+        password
+        placeholder="{{isRegMode ? '设置密码（至少6位）' : '请输入密码'}}"
+        placeholder-class="field-placeholder"
+        value="{{password}}"
+        bindinput="onPasswordInput"
+        confirm-type="done"
+        bindconfirm="handleAuth"
+      />
+    </view>
+
+    <!-- 错误提示 -->
+    <text class="err-msg" wx:if="{{authErr}}">{{authErr}}</text>
+
+    <!-- 提交按钮 -->
+    <view class="submit-btn {{loading ? 'submit-disabled' : ''}}" bindtap="handleAuth">
+      <text>{{loading ? '请稍候...' : (isRegMode ? '注册' : '登录')}}</text>
+    </view>
+  </view>
+
+  <!-- 底部说明 -->
+  <view class="footer-tip">
+    <text class="footer-text">登录即表示同意用户协议和隐私政策</text>
+  </view>
+
+</scroll-view>

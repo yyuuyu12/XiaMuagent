@@ -1,0 +1,104 @@
+/**app.wxss - 爆款文案工坊全局样式**/
+page {
+  background: #F2F0EA;
+  font-family: -apple-system, PingFang SC, Helvetica Neue, sans-serif;
+  color: #1A1814;
+  font-size: 28rpx;
+}
+
+.container {
+  min-height: 100vh;
+  background: #F2F0EA;
+}
+
+/* 通用卡片 */
+.card {
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  margin: 0 0 24rpx;
+}
+
+/* 通用按钮 */
+.btn-primary {
+  background: #FF6B35;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 100rpx;
+  padding: 0 48rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+}
+
+.btn-secondary {
+  background: #FFFFFF;
+  color: #1A1814;
+  border: 2rpx solid #E4E2DA;
+  border-radius: 100rpx;
+  padding: 0 48rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  font-size: 30rpx;
+  text-align: center;
+}
+
+.btn-ghost {
+  background: rgba(99,102,241,0.08);
+  color: #6366F1;
+  border: none;
+  border-radius: 100rpx;
+  padding: 0 40rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 27rpx;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* 通用输入框 */
+.input-field {
+  background: #F7F6F2;
+  border: 2rpx solid #E4E2DA;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  font-size: 28rpx;
+  color: #1A1814;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 错误文字 */
+.err-text {
+  color: #B83060;
+  font-size: 24rpx;
+  text-align: center;
+  padding: 12rpx 0;
+}
+
+/* 分割线 */
+.divider {
+  height: 2rpx;
+  background: #ECEAE2;
+  margin: 24rpx 0;
+}
+
+/* 标签 */
+.tag {
+  background: rgba(99,102,241,0.1);
+  color: #6366F1;
+  border-radius: 100rpx;
+  padding: 6rpx 18rpx;
+  font-size: 22rpx;
+  display: inline-block;
+}
+
+/* loading */
+.loading-text {
+  color: #A8A49C;
+  font-size: 26rpx;
+  text-align: center;
+  padding: 24rpx;
+}

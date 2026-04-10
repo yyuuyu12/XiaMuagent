@@ -1,0 +1,445 @@
+<!--pages/index/index.wxml-->
+<view class="app-wrap">
+
+  <!-- ============ 顶部导航 ============ -->
+  <!-- 主页/我的：只显示标题 -->
+  <view class="top-bar" wx:if="{{currentTab === 'home' || currentTab === 'profile'}}">
+    <text class="app-name">🔥 爆款文案工坊</text>
+  </view>
+  <!-- 子页面：显示返回按钮 -->
+  <view class="top-bar top-bar-sub" wx:else>
+    <view class="back-btn" bindtap="goBack">
+      <text class="back-icon">‹</text>
+      <text class="back-text">返回</text>
+    </view>
+    <text class="sub-page-title">
+      {{currentTab === 'extract' ? '爆款文案克隆' : currentTab === 'inspire' ? '灵感发现' : '开通会员'}}
+    </text>
+    <view style="width: 120rpx;"/>
+  </view>
+
+  <!-- ============ 页面内容 ============ -->
+  <scroll-view class="page-content" scroll-y>
+
+    <!-- ====== 首页 ====== -->
+    <view wx:if="{{currentTab === 'home'}}" class="tab-page">
+      <view class="welcome-banner">
+        <text class="welcome-hi">你好，{{userName}} 👋</text>
+        <text class="welcome-sub">今天想创作什么爆款内容？</text>
+        <view class="usage-bar" wx:if="{{userInfo}}">
+          <text class="usage-text">今日已用 {{userInfo.used_today || 0}} 次</text>
+          <text class="usage-sep"> · </text>
+          <text class="usage-text {{userInfo.remaining <= 0 ? 'usage-empty' : ''}}">剩余 {{userInfo.daily_limit >= 999 ? '∞' : userInfo.remaining}} 次</text>
+        </view>
+        <view class="usage-bar" wx:else>
+          <text class="usage-text">登录后每日可免费生成5次</text>
+        </view>
+      </view>
+
+      <!-- 功能卡片 -->
+      <view class="feature-cards">
+        <view class="feature-card" bindtap="switchToExtract">
+          <view class="feature-icon-wrap feature-icon-blue">
+            <text class="feature-icon">📋</text>
+          </view>
+          <view class="feature-info">
+            <text class="feature-title">爆款文案克隆</text>
+            <text class="feature-desc">粘贴视频链接，提取文案并AI改写</text>
+          </view>
+          <text class="feature-arrow">›</text>
+        </view>
+        <view class="feature-card" bindtap="switchToInspire">
+          <view class="feature-icon-wrap feature-icon-orange">
+            <text class="feature-icon">✨</text>
+          </view>
+          <view class="feature-info">
+            <text class="feature-title">灵感发现</text>
+            <text class="feature-desc">选择行业赛道，生成爆款文案创意</text>
+          </view>
+          <text class="feature-arrow">›</text>
+        </view>
+      </view>
+
+      <!-- 平台统计 -->
+      <view class="stats-row">
+        <view class="stat-pill">
+          <text class="stat-pill-num">128w+</text>
+          <text class="stat-pill-label">文案生成</text>
+        </view>
+        <view class="stat-pill">
+          <text class="stat-pill-num">56w+</text>
+          <text class="stat-pill-label">用户数</text>
+        </view>
+        <view class="stat-pill">
+          <text class="stat-pill-num">98%</text>
+          <text class="stat-pill-label">好评率</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- ====== 提取改写 ====== -->
+    <view wx:elif="{{currentTab === 'extract'}}" class="tab-page">
+      <!-- Step 0 -->
+      <view wx:if="{{extractStep === 0}}">
+        <view class="input-card">
+          <text class="input-label">视频链接（抖音）</text>
+          <textarea
+            class="url-textarea"
+            placeholder="粘贴抖音链接或分享文字..."
+            placeholder-class="field-placeholder"
+            value="{{videoUrl}}"
+            bindinput="onVideoUrlInput"
+            auto-height
+            maxlength="500"
+          />
+          <text class="err-text" wx:if="{{extractErr}}">{{extractErr}}</text>
+          <view class="btn-primary {{extractLoading || !videoUrl ? 'btn-disabled' : ''}}" bindtap="handleExtract">
+            <text>{{extractLoading ? '⏳ 转录中，约1-2分钟...' : '🚀 提取文案'}}</text>
+          </view>
+        </view>
+        <view class="tip-card">
+          <text class="tip-title">📌 使用说明</text>
+          <text class="tip-line">1. 在抖音找到想参考的视频</text>
+          <text class="tip-line">2. 点击"分享"并复制链接</text>
+          <text class="tip-line">3. 粘贴到上方并点击提取</text>
+          <text class="tip-line">4. AI语音识别转录，约需1-2分钟</text>
+          <text class="tip-line">5. 提取成功后可一键AI改写</text>
+        </view>
+      </view>
+
+      <!-- Step 1 -->
+      <view wx:elif="{{extractStep === 1}}">
+        <view class="result-card">
+          <view class="result-header-row">
+            <text class="result-label">📝 提取的文案</text>
+            <view class="copy-btn" bindtap="copyExtracted">
+              <text>{{copiedId === 'extracted' ? '✓ 已复制' : '复制'}}</text>
+            </view>
+          </view>
+          <view class="thin-divider"/>
+          <text class="script-text" selectable>{{extractedScript}}</text>
+        </view>
+        <text class="err-text" wx:if="{{extractErr}}">{{extractErr}}</text>
+        <view class="action-row">
+          <view class="btn-secondary" bindtap="resetExtract">重新输入</view>
+          <view class="btn-primary {{extractLoading ? 'btn-disabled' : ''}}" bindtap="handleRewrite">
+            <text>{{extractLoading ? '⏳ 改写中...' : '✨ 一键原创改写'}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Step 2 -->
+      <view wx:elif="{{extractStep === 2}}">
+        <view class="result-card result-muted">
+          <text class="result-label-sm">原始文案</text>
+          <text class="script-text-sm" selectable>{{extractedScript}}</text>
+        </view>
+        <view class="result-card result-highlight">
+          <view class="result-header-row">
+            <text class="result-label">🚀 原创改写</text>
+            <view class="copy-btn" bindtap="copyRewritten">
+              <text>{{copiedId === 'rewritten' ? '✓ 已复制' : '复制'}}</text>
+            </view>
+          </view>
+          <view class="thin-divider"/>
+          <text class="script-text" selectable>{{rewrittenScript}}</text>
+        </view>
+        <view class="action-row">
+          <view class="btn-secondary" bindtap="resetExtract">继续提取</view>
+          <view class="btn-primary" bindtap="rewriteAgain">再次改写</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ====== 灵感发现 ====== -->
+    <view wx:elif="{{currentTab === 'inspire'}}" class="tab-page">
+      <view class="section-card">
+        <text class="section-label">选择你的赛道</text>
+        <view class="industry-grid">
+          <view
+            class="industry-item {{selectedIndustryId === item.id ? 'industry-active' : ''}}"
+            wx:for="{{industries}}"
+            wx:key="id"
+            bindtap="selectIndustry"
+            data-id="{{item.id}}"
+            data-name="{{item.name}}"
+          >{{item.name}}</view>
+        </view>
+      </view>
+
+      <view class="section-card">
+        <text class="section-label">或自定义赛道</text>
+        <input
+          class="field-input"
+          placeholder="例如：宠物博主、职场干货..."
+          placeholder-class="field-placeholder"
+          value="{{customTrack}}"
+          bindinput="onCustomTrackInput"
+        />
+      </view>
+
+      <text class="err-text" wx:if="{{inspireErr}}">{{inspireErr}}</text>
+
+      <view class="inspire-action-row">
+        <view
+          class="btn-primary inspire-generate-btn {{inspireLoading || (!selectedIndustryId && !customTrack) ? 'btn-disabled' : ''}}"
+          bindtap="handleInspire"
+        >
+          <text>{{inspireLoading ? '⏳ 生成中...' : '🚀 获取热门灵感'}}</text>
+        </view>
+        <view class="stop-btn" wx:if="{{inspireLoading}}" bindtap="stopInspire">
+          <text>停止</text>
+        </view>
+      </view>
+
+      <view class="history-header-row">
+        <view class="history-toggle" bindtap="toggleHistory">
+          <text>📋 {{showHistory ? '隐藏历史' : '查看历史记录'}}</text>
+        </view>
+        <view class="clear-btn" wx:if="{{showHistory && inspireHistory.length > 0}}" bindtap="clearHistory">
+          <text>清空</text>
+        </view>
+      </view>
+
+      <!-- 生成结果 -->
+      <view wx:if="{{inspireScripts.length > 0}}">
+        <view class="section-title-row">
+          <text class="section-title-text">生成结果（{{inspireScripts.length}}条）</text>
+          <text wx:if="{{matchedIndustry}}" class="matched-tag">✓ 已匹配「{{matchedIndustry}}」</text>
+        </view>
+        <view
+          class="inspire-card"
+          wx:for="{{inspireScripts}}"
+          wx:key="index"
+          bindtap="toggleScript"
+          data-index="{{index}}"
+        >
+          <text class="inspire-seq">{{index + 1}}</text>
+          <text class="inspire-hook">{{item.hook}}</text>
+          <view class="inspire-tags-row" wx:if="{{item.tags && item.tags.length > 0}}">
+            <text class="tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="index">{{tag}}</text>
+          </view>
+          <view wx:if="{{expandedScript === index}}" class="inspire-expand">
+            <view class="thin-divider"/>
+            <text class="inspire-full" selectable>{{item.content}}</text>
+            <view class="inspire-btns">
+              <view class="copy-btn" catchtap="copyInspireItem" data-index="{{index}}">
+                <text>{{copiedId === 'inspire_'+index ? '✓ 已复制' : '复制文案'}}</text>
+              </view>
+              <view class="expand-btn" catchtap="handleExpand" data-index="{{index}}">
+                <text>按此方向继续生成 ›</text>
+              </view>
+            </view>
+          </view>
+          <text class="toggle-hint">{{expandedScript === index ? '收起 ↑' : '展开 ↓'}}</text>
+        </view>
+        <view class="action-row" style="margin-top: 8rpx;">
+          <view class="btn-secondary" bindtap="resetInspire">换赛道</view>
+          <view class="btn-primary {{inspireLoading ? 'btn-disabled' : ''}}" bindtap="handleInspire">重新生成</view>
+        </view>
+      </view>
+
+      <!-- 历史记录 -->
+      <view wx:if="{{showHistory}}">
+        <view class="section-title-row" style="margin-top: 16rpx;">
+          <text class="section-title-text">📖 历史记录</text>
+        </view>
+        <view wx:if="{{inspireHistory.length === 0}}" class="empty-tip">
+          <text>暂无历史记录</text>
+        </view>
+        <view class="history-card" wx:for="{{inspireHistory}}" wx:key="id" bindtap="toggleHistoryItem" data-index="{{index}}">
+          <view class="history-header">
+            <text class="history-track">{{item.input || item.track}}</text>
+            <text class="history-count" wx:if="{{item.result}}">{{item.result.length}}条</text>
+          </view>
+          <text class="history-time">{{item.created_at}}</text>
+          <view wx:if="{{historyExpanded === index && item.result}}" class="history-scripts">
+            <view class="history-script-item" wx:for="{{item.result}}" wx:for-item="s" wx:key="index">
+              <text class="history-script-hook" selectable>{{s.hook}}</text>
+              <view class="copy-btn" catchtap="copyHistoryItem" data-hook="{{s.hook}}" data-content="{{s.content}}">
+                <text>复制</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ====== 我的 ====== -->
+    <view wx:elif="{{currentTab === 'profile'}}" class="tab-page">
+      <view class="profile-hero">
+        <view class="avatar-lg avatar-type-{{userAvatar}}" bindtap="toggleAvatarPicker">
+          <text class="avatar-lg-text">{{userAvatar === 0 ? '👨‍🚀' : userAvatar === 1 ? '🦊' : userAvatar === 2 ? '🐱' : userAvatar === 3 ? '🐼' : userName.slice(0,1)}}</text>
+          <view class="avatar-edit-badge">✏️</view>
+        </view>
+        <text class="profile-name">{{userName}}</text>
+        <text class="profile-phone" wx:if="{{userPhone}}">+86 {{userPhone}}</text>
+        <view class="usage-stats" wx:if="{{userInfo}}">
+          <view class="stat-item">
+            <text class="stat-num">{{userInfo.used_today || 0}}</text>
+            <text class="stat-label">今日已用</text>
+          </view>
+          <view class="stat-divider"/>
+          <view class="stat-item">
+            <text class="stat-num {{userInfo.remaining <= 0 ? 'stat-empty' : ''}}">{{userInfo.daily_limit >= 999 ? '∞' : userInfo.remaining}}</text>
+            <text class="stat-label">今日剩余</text>
+          </view>
+          <view class="stat-divider"/>
+          <view class="stat-item">
+            <text class="stat-num">{{userInfo.daily_limit >= 999 ? '∞' : userInfo.daily_limit}}</text>
+            <text class="stat-label">每日上限</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 头像选择面板 -->
+      <view class="avatar-picker" wx:if="{{showAvatarPicker}}">
+        <text class="profile-section-title">选择头像</text>
+        <view class="avatar-options">
+          <view class="avatar-option {{userAvatar === 0 ? 'avatar-option-active' : ''}}" bindtap="selectAvatar" data-index="0">
+            <view class="avatar-opt-circle avatar-opt-0"><text class="avatar-opt-emoji">👨‍🚀</text></view>
+          </view>
+          <view class="avatar-option {{userAvatar === 1 ? 'avatar-option-active' : ''}}" bindtap="selectAvatar" data-index="1">
+            <view class="avatar-opt-circle avatar-opt-1"><text class="avatar-opt-emoji">🦊</text></view>
+          </view>
+          <view class="avatar-option {{userAvatar === 2 ? 'avatar-option-active' : ''}}" bindtap="selectAvatar" data-index="2">
+            <view class="avatar-opt-circle avatar-opt-2"><text class="avatar-opt-emoji">🐱</text></view>
+          </view>
+          <view class="avatar-option {{userAvatar === 3 ? 'avatar-option-active' : ''}}" bindtap="selectAvatar" data-index="3">
+            <view class="avatar-opt-circle avatar-opt-3"><text class="avatar-opt-emoji">🐼</text></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 账号状态 -->
+      <view class="profile-section" wx:if="{{userInfo}}">
+        <text class="profile-section-title">账号状态</text>
+        <view class="profile-row">
+          <text class="profile-key">账号类型</text>
+          <text class="profile-val">{{userInfo.role === 'admin' ? '管理员' : '免费版'}}</text>
+        </view>
+        <!-- 管理员/专业版会员不展示授权状态 -->
+        <view class="profile-row" wx:if="{{userInfo.role !== 'admin' && userInfo.daily_limit < 999}}">
+          <text class="profile-key">授权状态</text>
+          <text class="profile-val {{userInfo.auth_expires_at ? 'val-green' : 'val-gray'}}">{{userInfo.auth_expires_at ? '✓ 已授权' : '未授权'}}</text>
+        </view>
+        <view class="profile-row" wx:if="{{userInfo.role !== 'admin' && userInfo.daily_limit < 999 && userInfo.auth_expires_at}}">
+          <text class="profile-key">授权到期</text>
+          <text class="profile-val">{{userInfo.auth_expires_at}}</text>
+        </view>
+      </view>
+
+      <!-- 激活授权码 -->
+      <view class="profile-section">
+        <text class="profile-section-title">🎫 填写授权码</text>
+        <view wx:if="{{userInfo && userInfo.auth_expires_at}}" class="code-activated">
+          <text class="code-activated-text">✓ 已激活，有效期至 {{userInfo.auth_expires_at}}，每日可用 {{userInfo.daily_limit}} 次</text>
+        </view>
+        <view wx:else>
+          <view class="code-row">
+            <input
+              class="code-input"
+              placeholder="请输入授权码"
+              placeholder-class="field-placeholder"
+              value="{{authCodeInput}}"
+              bindinput="onAuthCodeInput"
+            />
+            <view class="code-submit {{authCodeLoading ? 'btn-disabled' : ''}}" bindtap="handleActivateCode">
+              <text>{{authCodeLoading ? '...' : '立即激活'}}</text>
+            </view>
+          </view>
+          <text class="code-msg {{authCodeOk ? 'code-ok' : 'code-err'}}" wx:if="{{authCodeMsg}}">{{authCodeMsg}}</text>
+        </view>
+      </view>
+
+      <!-- 升级会员 -->
+      <view class="vip-upgrade-card" bindtap="goVip">
+        <view class="vip-upgrade-left">
+          <text class="vip-upgrade-title">👑 升级专业版</text>
+          <text class="vip-upgrade-sub">无限次数 · 更多功能 · 优先生成</text>
+        </view>
+        <text class="vip-upgrade-arrow">›</text>
+      </view>
+
+      <view class="logout-btn" bindtap="handleLogout">
+        <text>退出登录</text>
+      </view>
+      <view style="height: 40rpx;"/>
+    </view>
+
+    <!-- ====== VIP ====== -->
+    <view wx:elif="{{currentTab === 'vip'}}" class="tab-page">
+      <view class="vip-hero">
+        <text class="vip-hero-icon">👑</text>
+        <text class="vip-hero-title">解锁无限创作</text>
+        <text class="vip-hero-sub">会员期间无次数限制，优先响应</text>
+      </view>
+
+      <text class="section-label">选择套餐</text>
+      <view class="plan-grid">
+        <view class="plan-card {{selectedPlan === 'day' ? 'plan-active' : ''}}" bindtap="selectPlan" data-plan="day">
+          <text class="plan-name">日会员</text>
+          <text class="plan-duration">1天</text>
+          <text class="plan-price">¥{{memberPlans.member_plan_day_price || '--'}}</text>
+        </view>
+        <view class="plan-card {{selectedPlan === 'week' ? 'plan-active' : ''}}" bindtap="selectPlan" data-plan="week">
+          <text class="plan-name">周会员</text>
+          <text class="plan-duration">7天</text>
+          <text class="plan-price">¥{{memberPlans.member_plan_week_price || '--'}}</text>
+        </view>
+        <view class="plan-card {{selectedPlan === 'month' ? 'plan-active' : ''}}" bindtap="selectPlan" data-plan="month">
+          <text class="plan-name">月会员</text>
+          <text class="plan-duration">30天</text>
+          <text class="plan-price">¥{{memberPlans.member_plan_month_price || '--'}}</text>
+          <view class="plan-badge">推荐</view>
+        </view>
+        <view class="plan-card {{selectedPlan === 'forever' ? 'plan-active' : ''}}" bindtap="selectPlan" data-plan="forever">
+          <text class="plan-name">永久会员</text>
+          <text class="plan-duration">永久</text>
+          <text class="plan-price">¥{{memberPlans.member_plan_forever_price || '--'}}</text>
+        </view>
+      </view>
+
+      <text class="section-label" style="margin-top: 24rpx; display: block;">支付方式</text>
+      <view class="payment-row">
+        <view class="payment-item {{selectedPayment === 'wechat' ? 'payment-active' : ''}}" bindtap="selectPayment" data-method="wechat">
+          <text class="payment-icon">💚</text>
+          <text class="payment-name">微信支付</text>
+        </view>
+        <view class="payment-item {{selectedPayment === 'alipay' ? 'payment-active' : ''}}" bindtap="selectPayment" data-method="alipay">
+          <text class="payment-icon">💙</text>
+          <text class="payment-name">支付宝</text>
+        </view>
+      </view>
+
+      <view class="pay-btn" bindtap="handlePay">
+        <text>立即开通（¥{{currentPlanPrice}}）</text>
+      </view>
+
+      <!-- 支付弹窗 -->
+      <view class="pay-modal-mask" wx:if="{{showPayModal}}" bindtap="closePayModal">
+        <view class="pay-modal" catchtap="noop">
+          <text class="pay-modal-icon">🚧</text>
+          <text class="pay-modal-title">支付功能即将上线</text>
+          <text class="pay-modal-note">{{memberPlans.member_note || '请添加客服微信咨询'}}</text>
+          <view class="pay-modal-btn" bindtap="closePayModal"><text>我知道了</text></view>
+        </view>
+      </view>
+      <view style="height: 40rpx;"/>
+    </view>
+
+  </scroll-view>
+
+  <!-- ============ 底部Tab（仅首页和我的） ============ -->
+  <view class="bottom-tab">
+    <view class="tab-item {{currentTab === 'home' ? 'tab-active' : ''}}" bindtap="onTabTap" data-tab="home">
+      <text class="tab-icon">🏠</text>
+      <text class="tab-label">首页</text>
+    </view>
+    <view class="tab-item {{currentTab === 'profile' ? 'tab-active' : ''}}" bindtap="onTabTap" data-tab="profile">
+      <text class="tab-icon">👤</text>
+      <text class="tab-label">我的</text>
+    </view>
+  </view>
+
+</view>

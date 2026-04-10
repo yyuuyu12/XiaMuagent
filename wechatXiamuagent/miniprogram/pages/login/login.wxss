@@ -1,0 +1,224 @@
+/* pages/login/login.wxss */
+page {
+  background: #F2F0EA;
+}
+
+.login-page {
+  height: 100vh;
+  background: #F2F0EA;
+}
+
+.logo-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100rpx 48rpx 48rpx;
+}
+
+.logo-icon {
+  font-size: 88rpx;
+  margin-bottom: 20rpx;
+}
+
+.logo-title {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #1A1814;
+  letter-spacing: 2rpx;
+  margin-bottom: 12rpx;
+}
+
+.logo-sub {
+  font-size: 26rpx;
+  color: #A8A49C;
+}
+
+/* ===== 微信登录 ===== */
+.wx-login-section {
+  padding: 0 32rpx 0;
+}
+
+.wx-login-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background: #07C160;
+  border-radius: 100rpx;
+  height: 96rpx;
+  border: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.wx-login-btn-disabled {
+  opacity: 0.6;
+}
+
+.wx-login-icon {
+  font-size: 36rpx;
+  margin-right: 12rpx;
+}
+
+.wx-login-text {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+/* ===== 分隔线 ===== */
+.divider-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 36rpx 32rpx;
+}
+
+.divider-line {
+  flex: 1;
+  height: 2rpx;
+  background: #E4E2DA;
+}
+
+.divider-text {
+  font-size: 24rpx;
+  color: #A8A49C;
+  padding: 0 24rpx;
+  white-space: nowrap;
+}
+
+/* ===== 表单卡片 ===== */
+.form-card {
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  margin: 0 32rpx;
+  padding: 40rpx 36rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.06);
+}
+
+.mode-switch {
+  display: flex;
+  background: #F7F6F2;
+  border-radius: 100rpx;
+  padding: 6rpx;
+  margin-bottom: 40rpx;
+}
+
+.mode-btn {
+  flex: 1;
+  text-align: center;
+  height: 68rpx;
+  line-height: 68rpx;
+  border-radius: 100rpx;
+  font-size: 28rpx;
+  color: #A8A49C;
+}
+
+.mode-active {
+  background: #FFFFFF;
+  color: #1A1814;
+  font-weight: 600;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.08);
+}
+
+.field-group {
+  margin-bottom: 28rpx;
+}
+
+.field-label {
+  display: block;
+  font-size: 24rpx;
+  color: #A8A49C;
+  margin-bottom: 12rpx;
+  font-weight: 500;
+}
+
+/* ===== 关键修复：输入框高度 ===== */
+.input-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background: #F7F6F2;
+  border: 2rpx solid #E4E2DA;
+  border-radius: 16rpx;
+  height: 96rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.input-prefix {
+  font-size: 28rpx;
+  color: #A8A49C;
+  padding: 0 20rpx 0 28rpx;
+  flex-shrink: 0;
+  line-height: 96rpx;
+  height: 96rpx;
+}
+
+.field-input {
+  background: #F7F6F2;
+  border: 2rpx solid #E4E2DA;
+  border-radius: 16rpx;
+  padding: 0 28rpx;
+  font-size: 30rpx;
+  color: #1A1814;
+  width: 100%;
+  box-sizing: border-box;
+  /* 关键：固定行高和高度，防止文字被截断 */
+  height: 96rpx;
+  line-height: 96rpx;
+}
+
+/* 手机号输入框在 input-wrap 里，去掉独立边框 */
+.input-wrap .field-input {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+  background: transparent;
+  padding: 0 28rpx 0 0;
+  height: 96rpx;
+  line-height: 96rpx;
+}
+
+.field-placeholder {
+  color: #C4C0B8;
+  font-size: 28rpx;
+}
+
+.err-msg {
+  display: block;
+  color: #B83060;
+  font-size: 24rpx;
+  text-align: center;
+  margin-bottom: 16rpx;
+  padding: 12rpx 8rpx;
+  background: rgba(184,48,96,0.06);
+  border-radius: 12rpx;
+}
+
+.submit-btn {
+  background: #FF6B35;
+  color: #FFFFFF;
+  border-radius: 100rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-top: 8rpx;
+  letter-spacing: 2rpx;
+}
+
+.submit-disabled {
+  opacity: 0.5;
+}
+
+.footer-tip {
+  text-align: center;
+  padding: 40rpx 32rpx 80rpx;
+}
+
+.footer-text {
+  font-size: 22rpx;
+  color: #C4C0B8;
+}
