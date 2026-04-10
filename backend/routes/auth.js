@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db');
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.JWTSECRET || 'default-secret-change-me';
+const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 const JWT_EXPIRES = '7d'; // token 有效期 7 天
 
 // ==================== 注册 ====================
@@ -132,8 +132,8 @@ router.post('/wx-login', (req, res) => {
   const { code, nickname } = req.body;
   if (!code) return res.status(400).json({ code: 400, msg: '缺少登录code' });
 
-  const APPID  = process.env.WX_APPID  || process.env.WXAPPID;
-  const SECRET = process.env.WX_SECRET || process.env.WXSECRET;
+  const APPID  = process.env.WX_APPID;
+  const SECRET = process.env.WX_SECRET;
   if (!APPID || !SECRET) {
     return res.status(500).json({ code: 500, msg: '服务器未配置微信AppID/Secret，请联系管理员' });
   }
