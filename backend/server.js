@@ -48,6 +48,7 @@ initDb()
   })
   .catch(err => {
     console.error('❌ 数据库初始化失败:', err?.message || err?.code || String(err));
-    console.error('DATABASE_URL:', process.env.DATABASE_URL ? '已设置' : '【未设置！】');
+    const connStr = process.env.DATABASE_URL || process.env.POSTGRES_URI || process.env.POSTGRES_CONNECTION_STRING;
+    console.error('DB连接串:', connStr ? '已设置' : '【未设置！请检查POSTGRES_URI变量】');
     process.exit(1);
   });
