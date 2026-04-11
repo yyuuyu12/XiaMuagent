@@ -45,7 +45,7 @@ router.post('/douyin-to-text', requireAuth, async (req, res) => {
     const tikhubKey = cfgRows[0]?.value;
 
     const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'asr_url'");
-    const asrUrl = String(asrRows[0]?.value || process.env.ASR_URL || '').trim();
+    const asrUrl = asrRows[0]?.value;
 
     if (!tikhubKey) {
       return res.status(503).json({ code: 503, msg: '视频解析服务未配置，请联系管理员配置 TikHub API Key' });
