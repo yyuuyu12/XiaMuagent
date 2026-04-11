@@ -141,8 +141,14 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .avatar-type-3 { background: rgba(16,185,129,.55); }
 .avatar-lg-text { font-size: 26px; line-height: 1; }
 .avatar-edit-badge { position: absolute; bottom: 0; right: 0; font-size: 12px; background: #fff; border-radius: 50%; width: 20px; height: 20px; line-height: 20px; text-align: center; }
-.profile-name { display: block; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.profile-name { display: block; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 4px; cursor: pointer; user-select: none; }
+.profile-name-edit-hint { font-size: 13px; opacity: .8; }
 .profile-phone { display: block; font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 14px; }
+.nickname-edit-wrap { display: flex; flex-direction: row; align-items: center; margin-bottom: 12px; gap: 6px; }
+.nickname-edit-input { flex: 1; background: rgba(255,255,255,.25); border: 1px solid rgba(255,255,255,.5); border-radius: 8px; height: 36px; padding: 0 10px; font-size: 14px; color: #fff; }
+.nickname-edit-input::placeholder { color: rgba(255,255,255,.6); }
+.nickname-edit-save { background: #fff; color: #6366F1; border-radius: 8px; height: 36px; line-height: 36px; padding: 0 14px; font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; flex-shrink: 0; }
+.nickname-edit-cancel { background: rgba(255,255,255,.2); color: #fff; border-radius: 8px; height: 36px; line-height: 36px; padding: 0 12px; font-size: 13px; cursor: pointer; user-select: none; flex-shrink: 0; }
 .usage-stats { display: flex; flex-direction: row; align-items: center; background: rgba(255,255,255,.15); border-radius: 10px; padding: 10px 16px; width: 100%; justify-content: space-around; }
 .stat-item { display: flex; flex-direction: column; align-items: center; }
 .stat-num { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 3px; }
@@ -355,6 +361,7 @@ async function apiFetch(method, path, data, signal) {
 const api = {
   get: (path, signal) => apiFetch('GET', path, null, signal),
   post: (path, data, signal) => apiFetch('POST', path, data, signal),
+  put: (path, data) => apiFetch('PUT', path, data),
   del: (path) => apiFetch('DELETE', path),
 };
 
@@ -372,6 +379,7 @@ const S = {
   selectedPlan: 'month', selectedPayment: 'wechat', memberPlans: {}, showPayModal: false,
   recentHistory: [], recentHistoryLoaded: false,
   nicknamePrompt: false, nicknameInput: '', nicknamePromptDismissed: false,
+  nicknameEditing: false, nicknameEditInput: '',
   historyPageExpanded: null,
   showTipExpanded: false, rewriteStyle: '', extractHistory: [], extractHistoryLoaded: false,
 };
@@ -505,11 +513,27 @@ function tBottomTab() {
 }
 
 // ===== HOME =====
+function getCuteGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return '早上好，创意人 ☀️';
+  if (h >= 12 && h < 18) return '下午好，创意人 ⛅';
+  if (h >= 18 && h < 22) return '晚上好，创意人 🌙';
+  return '夜深了，还在创作 🌟';
+}
+
 function tHome() {
   const u = S.userInfo;
+  // 欢迎语：有昵称显示昵称，无昵称显示可爱称呼
+  const hasNickname = !!(u?.nickname && u.nickname.trim());
+  const greetText = hasNickname ? `你好，${esc(u.nickname)} 👋` : getCuteGreeting();
+
+  // 用次进度条：已登录但数据未加载时显示空进度条
   let usageSection;
   if (!u) {
-    usageSection = `<div class="usage-bar"><span class="usage-text">登录后每日可免费生成5次</span></div>`;
+    usageSection = `<div class="usage-progress-wrap">
+      <div class="usage-progress-bar"><div class="usage-progress-fill" style="width:0%"></div></div>
+      <span class="usage-progress-text">加载中...</span>
+    </div>`;
   } else if (u.daily_limit >= 999) {
     usageSection = `<div class="usage-bar"><span class="usage-text">次数：无限制 ∞</span></div>`;
   } else {
@@ -523,9 +547,15 @@ function tHome() {
       <span class="usage-progress-text">${used}/${limit}次</span>
     </div>`;
   }
+
+  // 热门行业：优先读后端数据，兜底用默认
+  const hotTags = S.industries.length > 0
+    ? S.industries
+    : [{name:'美妆'},{name:'母婴'},{name:'数码'},{name:'食品'},{name:'服装'},{name:'宠物'},{name:'家居'}];
+
   return `<div class="tab-page">
     <div class="welcome-banner">
-      <span class="welcome-hi">你好，${esc(S.userName)} 👋</span>
+      <span class="welcome-hi">${greetText}</span>
       <span class="welcome-sub">今天想创作什么爆款内容？</span>
       ${usageSection}
     </div>
@@ -538,11 +568,13 @@ function tHome() {
         </div>
         <span class="feature-arrow-orange">›</span>
       </div>
-      <div class="feature-row-light" onclick="switchTab('inspire')">
-        <span class="feature-row-icon">✨</span>
-        <span class="feature-row-title">灵感发现</span>
-        <span class="feature-row-desc">选择行业赛道，生成爆款创意</span>
-        <span class="feature-row-arrow">›</span>
+      <div class="feature-card-main" onclick="switchTab('inspire')">
+        <div class="feature-icon-wrap feature-icon-orange"><span class="feature-icon">✨</span></div>
+        <div class="feature-info">
+          <span class="feature-title">灵感发现</span>
+          <span class="feature-desc">选择行业赛道，生成爆款文案创意</span>
+        </div>
+        <span class="feature-arrow-orange">›</span>
       </div>
     </div>
     ${tRecentSection()}
@@ -559,8 +591,7 @@ function tHome() {
         <span class="home-section-title">热门行业</span>
       </div>
       <div class="hot-tags-scroll">
-        ${['美妆','母婴','数码','食品','服装','宠物','家居'].map(t=>`
-          <div class="hot-tag-chip" onclick="goInspireWithTag('${t}')">${t}</div>`).join('')}
+        ${hotTags.map(t=>`<div class="hot-tag-chip" onclick="goInspireWithTag('${esc(t.name)}')">${esc(t.name)}</div>`).join('')}
       </div>
     </div>
   </div>`;
@@ -574,7 +605,7 @@ function tRecentSection() {
       <span class="home-section-more" onclick="switchTab('history')">查看全部 ›</span>
     </div>
     ${items.length === 0
-      ? `<div class="recent-empty-line">还没有克隆记录，<a onclick="switchTab('extract')">去克隆第一条</a></div>`
+      ? `<div class="recent-empty-line">还没有爆款克隆记录，<a onclick="switchTab('extract')">去克隆</a></div>`
       : `<div class="recent-list">
           ${items.slice(0,5).map((it,i)=>{
             const text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
@@ -780,8 +811,15 @@ function tProfile() {
         <span class="avatar-lg-text">${emoji}</span>
         <div class="avatar-edit-badge">✏️</div>
       </div>
-      <span class="profile-name">${esc(S.userName)}</span>
-      ${S.userPhone?`<span class="profile-phone">+86 ${esc(S.userPhone)}</span>`:''}
+      ${S.nicknameEditing ? `
+        <div class="nickname-edit-wrap">
+          <input class="nickname-edit-input" id="f-nick-edit" placeholder="输入新昵称" maxlength="20"
+            value="${esc(S.nicknameEditInput)}" oninput="S.nicknameEditInput=this.value"/>
+          <div class="nickname-edit-save" onclick="saveNickname()">保存</div>
+          <div class="nickname-edit-cancel" onclick="setState({nicknameEditing:false})">取消</div>
+        </div>` : `
+        <span class="profile-name" onclick="startEditNickname()">${esc(S.userName)} <span class="profile-name-edit-hint">✏️</span></span>`}
+      ${S.userPhone && !S.userPhone.startsWith('wx_') ? `<span class="profile-phone">+86 ${esc(S.userPhone)}</span>` : ''}
       ${u?`<div class="usage-stats">
         <div class="stat-item"><span class="stat-num">${u.used_today||0}</span><span class="stat-label">今日已用</span></div>
         <div class="stat-divider"></div>
@@ -1191,13 +1229,34 @@ function tNicknamePrompt() {
   </div>`;
 }
 
-function confirmNickname() {
+async function confirmNickname() {
   const name = S.nicknameInput.trim();
   if (!name) { showToast('请输入昵称'); return; }
+  try {
+    await api.put('/auth/profile', { nickname: name });
+  } catch {}
   const user = getUser() || {};
   setUser({ ...user, nickname: name });
   setState({ nicknamePrompt: false, nicknamePromptDismissed: true, userName: name, nicknameInput: '' });
   showToast('昵称已设置');
+}
+
+function startEditNickname() {
+  setState({ nicknameEditing: true, nicknameEditInput: S.userName === '创作者' ? '' : S.userName });
+  setTimeout(() => { const el = document.getElementById('f-nick-edit'); if (el) el.focus(); }, 50);
+}
+
+async function saveNickname() {
+  const name = S.nicknameEditInput.trim();
+  if (!name) { showToast('昵称不能为空'); return; }
+  try {
+    const r = await api.put('/auth/profile', { nickname: name });
+    if (r.code !== 200) { showToast(r.msg || '保存失败'); return; }
+  } catch { showToast('网络错误'); return; }
+  const user = getUser() || {};
+  setUser({ ...user, nickname: name });
+  setState({ nicknameEditing: false, userName: name });
+  showToast('昵称已更新');
 }
 
 function dismissNicknamePrompt() {
