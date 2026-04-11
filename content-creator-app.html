@@ -561,19 +561,11 @@ function tBottomTab() {
 }
 
 // ===== HOME =====
-function getCuteGreeting() {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 12) return '早上好，创意人 ☀️';
-  if (h >= 12 && h < 18) return '下午好，创意人 ⛅';
-  if (h >= 18 && h < 22) return '晚上好，创意人 🌙';
-  return '夜深了，还在创作 🌟';
-}
-
 function tHome() {
   const u = S.userInfo;
-  // 欢迎语：有昵称显示昵称，无昵称显示可爱称呼
+  // 欢迎语：有昵称显示昵称，无昵称显示「你好，老板」
   const hasNickname = !!(u?.nickname && u.nickname.trim());
-  const greetText = hasNickname ? `你好，${esc(u.nickname)} 👋` : getCuteGreeting();
+  const greetText = hasNickname ? `你好，${esc(u.nickname)} 👋` : '你好，老板';
 
   // 用次进度条：已登录但数据未加载时显示空进度条
   let usageSection;
