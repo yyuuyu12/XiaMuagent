@@ -19,10 +19,19 @@ XiaMuagent/
 └── docs/                   ← 需求/设计文档
 ```
 
-## ⚠️ 重要规则
+## ⚠️ 操作规范（每次必须遵守）
+
+### 开始前
+1. **必须先 `git pull`**，确保本地是最新版本，再读文件、再改代码
+2. 如果 pull 之后发现有冲突，先报告给用户，不要自己解决合并
+
+### 编辑中
 - H5 前端唯一编辑文件：`backend/public/index.html`
 - 根目录已不再有 content-creator-app.html，不要重建它
-- 改完直接 git add + git push，Zeabur 自动部署
+
+### 提交时
+- 改完 git add + commit + push，Zeabur 自动部署
+- commit message 要清楚描述改了什么
 
 ## 服务器信息（阿里云，已弃用）
 - 服务器IP：106.14.151.37
