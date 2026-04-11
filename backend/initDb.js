@@ -130,6 +130,15 @@ async function initDb() {
     }
   }
 
+  // 启动时将指定手机号设为管理员（已注册用户才会被更新；可多号逗号分隔）
+  const adminPhones = (process.env.ADMIN_PHONES || '18201285539')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const phone of adminPhones) {
+    await db.query('UPDATE users SET role = ? WHERE phone = ?', ['admin', phone]);
+  }
+
   console.log('✅ 数据库初始化完成');
 }
 
