@@ -148,6 +148,7 @@ async function initDb() {
   const uiDefaults = [
     ['h5_show_profile_phone', '0'],
     ['h5_show_account_type', '0'],
+    ['asr_url', 'https://baculitic-derivable-sherilyn.ngrok-free.dev'],
   ];
   for (const [k, v] of uiDefaults) {
     await db.query('INSERT IGNORE INTO system_config (config_key, value) VALUES (?, ?)', [k, v]);
