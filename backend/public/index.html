@@ -61,7 +61,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .usage-sep { font-size: 12px; color: rgba(255,255,255,.6); margin: 0 4px; }
 .usage-empty { color: #FFD4C5; }
 .feature-cards { margin-bottom: 14px; }
-.feature-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; box-shadow: 0 1px 8px rgba(0,0,0,.05); cursor: pointer; user-select: none; }
+.feature-card { background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; display: flex; flex-direction: row; align-items: center; box-shadow: 0 1px 8px rgba(0,0,0,.05); cursor: pointer; user-select: none; }
 .feature-icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; }
 .feature-icon-blue { background: rgba(99,102,241,.12); }
 .feature-icon-orange { background: rgba(255,107,53,.12); }
@@ -69,10 +69,10 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .feature-info { flex: 1; }
 .feature-title { display: block; font-size: 15px; font-weight: 600; color: #1A1814; margin-bottom: 3px; }
 .feature-desc { display: block; font-size: 12px; color: #A8A49C; line-height: 1.5; }
-.feature-arrow { font-size: 22px; color: #C4C0B8; margin-left: 4px; }
-.stats-row { display: flex; flex-direction: row; justify-content: space-around; background: #fff; border-radius: 10px; padding: 14px 8px; }
+.feature-arrow { font-size: 22px; color: #CCCCCC; margin-left: 4px; }
+.stats-row { display: flex; flex-direction: row; justify-content: space-around; background: #F5F4F1; border-radius: 10px; padding: 14px 8px; }
 .stat-pill { display: flex; flex-direction: column; align-items: center; }
-.stat-pill-num { font-size: 18px; font-weight: 700; color: #FF6B35; margin-bottom: 2px; }
+.stat-pill-num { font-size: 20px; font-weight: 700; color: #FF6B35; margin-bottom: 2px; }
 .stat-pill-label { font-size: 11px; color: #A8A49C; }
 
 /* === EXTRACT === */
@@ -208,7 +208,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .tab-icon { font-size: 22px; margin-bottom: 4px; opacity: .35; }
 .tab-label { font-size: 11px; color: #A8A49C; }
 .tab-active .tab-icon { opacity: 1; }
-.tab-active .tab-label { color: #FF6B35; font-weight: 600; }
+.tab-active .tab-label { color: #F97316; font-weight: 600; }
 
 /* === PAY MODAL === */
 .pay-modal-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
@@ -243,13 +243,55 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 
 /* === TOAST === */
 .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 200; pointer-events: none; white-space: nowrap; max-width: 480px; }
+
+/* === USAGE PROGRESS BAR === */
+.usage-progress-wrap { display: flex; flex-direction: row; align-items: center; }
+.usage-progress-bar { flex: 1; height: 8px; background: rgba(255,255,255,.25); border-radius: 50px; overflow: hidden; margin-right: 8px; }
+.usage-progress-fill { height: 100%; background: #fff; border-radius: 50px; transition: width .3s; }
+.usage-progress-warn { background: #FFD580; }
+.usage-progress-text { font-size: 12px; color: #fff; white-space: nowrap; flex-shrink: 0; }
+
+/* === STATS WRAP === */
+.stats-wrap { margin-bottom: 14px; }
+.stats-source { text-align: right; font-size: 10px; color: #CCCCCC; padding: 4px 8px 0; }
+
+/* === RECENT HISTORY (HOME) === */
+.home-section-header { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.home-section-title { font-size: 14px; font-weight: 600; color: #1A1814; }
+.home-section-more { font-size: 12px; color: #A8A49C; cursor: pointer; user-select: none; }
+.recent-list { display: flex; flex-direction: row; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px 4px; }
+.recent-item { flex-shrink: 0; width: 160px; background: #fff; border-radius: 10px; padding: 12px; margin-right: 10px; position: relative; cursor: pointer; user-select: none; box-shadow: 0 1px 6px rgba(0,0,0,.05); }
+.recent-item-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: #1A1814; line-height: 1.5; margin-bottom: 6px; }
+.recent-item-time { display: block; font-size: 11px; color: #A8A49C; }
+.recent-copy { position: absolute; top: 8px; right: 8px; font-size: 14px; color: #A8A49C; cursor: pointer; user-select: none; padding: 2px; }
+.recent-empty { background: #fff; border-radius: 10px; padding: 24px; display: flex; flex-direction: column; align-items: center; }
+.recent-empty-icon { font-size: 32px; margin-bottom: 8px; }
+.recent-empty-text { font-size: 13px; color: #A8A49C; margin-bottom: 12px; text-align: center; line-height: 1.6; }
+.recent-empty-btn { background: #FF6B35; color: #fff; border-radius: 50px; padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; }
+
+/* === NICKNAME PROMPT === */
+.nickname-prompt { position: fixed; bottom: calc(env(safe-area-inset-bottom,0px) + 70px); left: 50%; transform: translateX(-50%); background: #fff; border-radius: 14px; padding: 14px 16px; width: calc(100% - 32px); max-width: 448px; box-shadow: 0 4px 24px rgba(0,0,0,.18); z-index: 50; }
+.nickname-prompt-text { display: block; font-size: 14px; font-weight: 500; color: #1A1814; margin-bottom: 10px; }
+.nickname-prompt-row { display: flex; flex-direction: row; align-items: center; }
+.nickname-prompt-input { flex: 1; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 8px; height: 40px; padding: 0 12px; font-size: 14px; color: #1A1814; margin-right: 8px; }
+.nickname-prompt-input::placeholder { color: #C4C0B8; }
+.nickname-prompt-confirm { background: #FF6B35; color: #fff; border-radius: 8px; height: 40px; line-height: 40px; padding: 0 16px; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; flex-shrink: 0; }
+.nickname-prompt-skip { text-align: right; font-size: 12px; color: #A8A49C; margin-top: 8px; cursor: pointer; user-select: none; }
+
+/* === HISTORY PAGE === */
+.history-page-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer; user-select: none; }
+.history-page-track { display: block; font-size: 14px; font-weight: 600; color: #1A1814; margin-bottom: 4px; }
+.history-page-hook { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 6px; }
+.history-page-meta { display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+.history-page-time { font-size: 11px; color: #A8A49C; }
+.history-page-count { font-size: 11px; color: #A8A49C; background: #F0EEE8; border-radius: 50px; padding: 2px 7px; }
   </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
 // ===== CONFIG =====
-const API_BASE = '/api';
+const API_BASE = 'http://106.14.151.37/api';
 
 // ===== STORAGE =====
 function getToken() { return localStorage.getItem('wf_token') || ''; }
@@ -277,7 +319,7 @@ const api = {
 const S = {
   page: 'login', currentTab: 'home',
   isRegMode: false, phone: '', password: '', authErr: '', loading: false,
-  userName: '用户', userPhone: '', userInfo: null, userAvatar: 0,
+  userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
   extractLoading: false, extractErr: '', copiedId: '',
   industries: [], selectedIndustryId: null, selectedIndustryName: '', customTrack: '',
@@ -285,6 +327,9 @@ const S = {
   matchedIndustry: '', showHistory: false, inspireHistory: [], historyLoaded: false, historyExpanded: null,
   showAvatarPicker: false, authCodeInput: '', authCodeMsg: '', authCodeOk: true, authCodeLoading: false,
   selectedPlan: 'month', selectedPayment: 'wechat', memberPlans: {}, showPayModal: false,
+  recentHistory: [], recentHistoryLoaded: false,
+  nicknamePrompt: false, nicknameInput: '', nicknamePromptDismissed: false,
+  historyPageExpanded: null,
 };
 let inspireController = null;
 
@@ -372,12 +417,13 @@ function tMain() {
     <div class="page-content">${tTabContent()}</div>
     ${tBottomTab()}
     ${S.showPayModal?tPayModal():''}
+    ${S.nicknamePrompt?tNicknamePrompt():''}
   </div>`;
 }
 
 function tTopBar() {
   const t = S.currentTab;
-  if (t === 'home' || t === 'profile') {
+  if (t === 'home' || t === 'profile' || t === 'history') {
     return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span></div>`;
   }
   const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员' };
@@ -395,34 +441,49 @@ function tTabContent() {
     case 'inspire': return tInspire();
     case 'profile': return tProfile();
     case 'vip':     return tVip();
+    case 'history': return tHistory();
     default:        return tHome();
   }
 }
 
 function tBottomTab() {
+  const tabs = [
+    { key: 'home',    icon: '🏠', label: '首页' },
+    { key: 'history', icon: '📄', label: '历史' },
+    { key: 'profile', icon: '👤', label: '我的' },
+  ];
   return `<div class="bottom-tab">
-    <div class="tab-item ${S.currentTab==='home'?'tab-active':''}" onclick="switchTab('home')">
-      <span class="tab-icon">🏠</span><span class="tab-label">首页</span>
-    </div>
-    <div class="tab-item ${S.currentTab==='profile'?'tab-active':''}" onclick="switchTab('profile')">
-      <span class="tab-icon">👤</span><span class="tab-label">我的</span>
-    </div>
+    ${tabs.map(t=>`
+    <div class="tab-item ${S.currentTab===t.key?'tab-active':''}" onclick="switchTab('${t.key}')">
+      <span class="tab-icon">${t.icon}</span><span class="tab-label">${t.label}</span>
+    </div>`).join('')}
   </div>`;
 }
 
 // ===== HOME =====
 function tHome() {
   const u = S.userInfo;
+  let usageSection;
+  if (!u) {
+    usageSection = `<div class="usage-bar"><span class="usage-text">登录后每日可免费生成5次</span></div>`;
+  } else if (u.daily_limit >= 999) {
+    usageSection = `<div class="usage-bar"><span class="usage-text">次数：无限制 ∞</span></div>`;
+  } else {
+    const used = u.used_today || 0;
+    const limit = u.daily_limit || 5;
+    const pct = limit > 0 ? Math.round((used / limit) * 100) : 0;
+    usageSection = `<div class="usage-progress-wrap">
+      <div class="usage-progress-bar">
+        <div class="usage-progress-fill ${pct>=80?'usage-progress-warn':''}" style="width:${Math.min(pct,100)}%"></div>
+      </div>
+      <span class="usage-progress-text">${used}/${limit}次</span>
+    </div>`;
+  }
   return `<div class="tab-page">
     <div class="welcome-banner">
       <span class="welcome-hi">你好，${esc(S.userName)} 👋</span>
       <span class="welcome-sub">今天想创作什么爆款内容？</span>
-      <div class="usage-bar">
-        ${u ? `<span class="usage-text">今日已用 ${u.used_today||0} 次</span>
-               <span class="usage-sep"> · </span>
-               <span class="usage-text ${u.remaining<=0?'usage-empty':''}">剩余 ${u.daily_limit>=999?'∞':u.remaining} 次</span>`
-             : `<span class="usage-text">登录后每日可免费生成5次</span>`}
-      </div>
+      ${usageSection}
     </div>
     <div class="feature-cards">
       <div class="feature-card" onclick="switchTab('extract')">
@@ -442,11 +503,41 @@ function tHome() {
         <span class="feature-arrow">›</span>
       </div>
     </div>
-    <div class="stats-row">
-      <div class="stat-pill"><span class="stat-pill-num">128w+</span><span class="stat-pill-label">文案生成</span></div>
-      <div class="stat-pill"><span class="stat-pill-num">56w+</span><span class="stat-pill-label">用户数</span></div>
-      <div class="stat-pill"><span class="stat-pill-num">98%</span><span class="stat-pill-label">好评率</span></div>
+    ${tRecentSection()}
+    <div class="stats-wrap">
+      <div class="stats-row">
+        <div class="stat-pill"><span class="stat-pill-num">128w+</span><span class="stat-pill-label">文案生成</span></div>
+        <div class="stat-pill"><span class="stat-pill-num">56w+</span><span class="stat-pill-label">用户数</span></div>
+        <div class="stat-pill"><span class="stat-pill-num">98%</span><span class="stat-pill-label">好评率</span></div>
+      </div>
+      <div class="stats-source">数据来源：平台累计统计</div>
     </div>
+  </div>`;
+}
+
+function tRecentSection() {
+  const items = S.recentHistory;
+  return `<div style="margin-bottom:14px">
+    <div class="home-section-header">
+      <span class="home-section-title">最近创作</span>
+      <span class="home-section-more" onclick="switchTab('history')">查看全部 ›</span>
+    </div>
+    ${items.length === 0
+      ? `<div class="recent-empty">
+          <span class="recent-empty-icon">✍️</span>
+          <span class="recent-empty-text">还没有创作记录<br>快去生成第一条文案吧</span>
+          <div class="recent-empty-btn" onclick="switchTab('inspire')">去创作第一条文案</div>
+        </div>`
+      : `<div class="recent-list">
+          ${items.slice(0,5).map((it,i)=>{
+            const text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
+            return `<div class="recent-item" onclick="switchTab('history')">
+              <div class="recent-copy" onclick="cpRecentItem(event,${i})">⧉</div>
+              <div class="recent-item-text">${esc(text)}</div>
+              <span class="recent-item-time">${esc(it.created_at||'')}</span>
+            </div>`;
+          }).join('')}
+        </div>`}
   </div>`;
 }
 
@@ -725,7 +816,7 @@ async function handleAuth() {
       setTimeout(() => {
         Object.assign(S, {
           page: 'main', loading: false,
-          userName: r.data.user.nickname || '用户',
+          userName: r.data.user.nickname || '创作者',
           userPhone: r.data.user.phone || '',
           userAvatar: r.data.user.avatar || 0,
         });
@@ -739,9 +830,12 @@ async function handleAuth() {
 
 // ===== NAV =====
 function switchTab(tab) {
-  setState({ currentTab: tab });
+  setState({ currentTab: tab, nicknamePrompt: false });
   if (tab === 'profile') fetchMe();
   if (tab === 'vip') loadMemberPlans();
+  if (tab === 'history' || tab === 'home') {
+    if (!S.recentHistoryLoaded) loadRecentHistory(); else render();
+  }
 }
 function goBack() { setState({ currentTab: 'home' }); }
 
@@ -749,9 +843,16 @@ function goBack() { setState({ currentTab: 'home' }); }
 async function fetchMe() {
   try {
     const r = await api.get('/auth/me');
-    if (r.code === 200) setState({ userInfo: r.data, userName: r.data.nickname || '用户' });
-    else if (r.code === 401) { clearAuth(); setState({ page: 'login' }); }
+    if (r.code === 200) {
+      const hasNickname = !!(r.data.nickname && r.data.nickname.trim());
+      setState({
+        userInfo: r.data,
+        userName: r.data.nickname || '创作者',
+        nicknamePrompt: !hasNickname && !S.nicknamePromptDismissed && S.currentTab === 'home',
+      });
+    } else if (r.code === 401) { clearAuth(); setState({ page: 'login' }); }
   } catch {}
+  if (!S.recentHistoryLoaded) loadRecentHistory();
 }
 async function loadIndustries() {
   try {
@@ -889,7 +990,7 @@ async function handleActivateCode() {
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
   clearAuth();
-  setState({ page:'login', currentTab:'home', userInfo:null, userName:'用户', userPhone:'', phone:'', password:'' });
+  setState({ page:'login', currentTab:'home', userInfo:null, userName:'创作者', userPhone:'', phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false });
 }
 
 // ===== VIP =====
@@ -904,12 +1005,98 @@ function selectPayment(m) { setState({ selectedPayment: m }); }
 function handlePay() { setState({ showPayModal: true }); }
 function closePayModal() { setState({ showPayModal: false }); }
 
+// ===== RECENT HISTORY =====
+async function loadRecentHistory() {
+  try {
+    const r = await api.get('/history?type=inspire');
+    if (r.code === 200) { S.recentHistory = r.data || []; S.recentHistoryLoaded = true; render(); }
+  } catch {}
+}
+
+function cpRecentItem(e, i) {
+  e.stopPropagation();
+  const it = S.recentHistory[i];
+  if (!it||!it.result||!it.result[0]) return;
+  copyText(it.result[0].content || it.result[0].hook || '');
+  showToast('已复制');
+}
+
+// ===== HISTORY PAGE =====
+function tHistory() {
+  const items = S.recentHistory;
+  if (items.length === 0) {
+    return `<div class="tab-page">
+      <div style="display:flex;flex-direction:column;align-items:center;padding-top:60px">
+        <div style="font-size:40px;margin-bottom:12px">📄</div>
+        <div style="font-size:14px;color:#A8A49C;margin-bottom:20px">还没有创作记录</div>
+        <div class="btn-primary" style="width:auto;padding:0 32px" onclick="switchTab('inspire')">去创作</div>
+      </div>
+    </div>`;
+  }
+  return `<div class="tab-page">
+    ${items.map((it,i)=>`
+      <div class="history-page-card" onclick="toggleHistoryPage(${i})">
+        <span class="history-page-track">${esc(it.input||it.track||'历史记录')}</span>
+        ${it.result&&it.result[0]?`<div class="history-page-hook">${esc(it.result[0].hook||'')}</div>`:''}
+        <div class="history-page-meta">
+          <span class="history-page-time">${esc(it.created_at||'')}</span>
+          ${it.result?`<span class="history-page-count">${it.result.length}条</span>`:''}
+        </div>
+        ${S.historyPageExpanded===i&&it.result?`
+          <div class="history-scripts">
+            ${it.result.map((s,si)=>`
+              <div class="history-script-item">
+                <span class="history-script-hook">${esc(s.hook)}</span>
+                <div class="copy-btn" onclick="cpHistoryPage(event,${i},${si})">复制</div>
+              </div>`).join('')}
+          </div>`:''}
+      </div>`).join('')}
+  </div>`;
+}
+
+function toggleHistoryPage(i) { setState({ historyPageExpanded: S.historyPageExpanded===i?null:i }); }
+
+function cpHistoryPage(e, hi, si) {
+  e.stopPropagation();
+  const it = S.recentHistory[hi];
+  if (!it||!it.result) return;
+  const s = it.result[si];
+  copyText(s ? (s.content||s.hook) : '');
+  showToast('已复制');
+}
+
+// ===== NICKNAME PROMPT =====
+function tNicknamePrompt() {
+  return `<div class="nickname-prompt">
+    <span class="nickname-prompt-text">你叫什么？设置一个昵称吧 😊</span>
+    <div class="nickname-prompt-row">
+      <input class="nickname-prompt-input" id="f-nickname" placeholder="输入你的昵称" maxlength="20"
+        value="${esc(S.nicknameInput)}" oninput="S.nicknameInput=this.value"/>
+      <div class="nickname-prompt-confirm" onclick="confirmNickname()">确认</div>
+    </div>
+    <div class="nickname-prompt-skip" onclick="dismissNicknamePrompt()">跳过</div>
+  </div>`;
+}
+
+function confirmNickname() {
+  const name = S.nicknameInput.trim();
+  if (!name) { showToast('请输入昵称'); return; }
+  const user = getUser() || {};
+  setUser({ ...user, nickname: name });
+  setState({ nicknamePrompt: false, nicknamePromptDismissed: true, userName: name, nicknameInput: '' });
+  showToast('昵称已设置');
+}
+
+function dismissNicknamePrompt() {
+  setState({ nicknamePrompt: false, nicknamePromptDismissed: true });
+}
+
 // ===== INIT =====
 (function init() {
   const token = getToken();
   if (token) {
     const user = getUser();
-    if (user) { S.userName = user.nickname||'用户'; S.userPhone = user.phone||''; S.userAvatar = user.avatar||0; }
+    if (user) { S.userName = user.nickname||'创作者'; S.userPhone = user.phone||''; S.userAvatar = user.avatar||0; }
     S.page = 'main';
     render(); fetchMe(); loadIndustries();
   } else { render(); }
