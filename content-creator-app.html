@@ -29,8 +29,8 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .app-name { font-size: 17px; font-weight: 700; color: #1A1814; letter-spacing: .5px; }
 .top-bar-sub { justify-content: space-between; }
 .back-btn { display: flex; flex-direction: row; align-items: center; width: 60px; cursor: pointer; user-select: none; }
-.back-icon { font-size: 26px; color: #1A1814; line-height: 1; margin-right: 2px; font-weight: 300; }
-.back-text { font-size: 14px; color: #1A1814; }
+.back-icon { font-size: 20px; color: #1A1814; line-height: 1; margin-right: 4px; font-weight: 400; display: flex; align-items: center; }
+.back-text { font-size: 14px; color: #1A1814; line-height: 1; }
 .sub-page-title { font-size: 16px; font-weight: 600; color: #1A1814; text-align: center; }
 
 /* === CONTENT === */
@@ -530,10 +530,7 @@ function tHome() {
   // 用次进度条：已登录但数据未加载时显示空进度条
   let usageSection;
   if (!u) {
-    usageSection = `<div class="usage-progress-wrap">
-      <div class="usage-progress-bar"><div class="usage-progress-fill" style="width:0%"></div></div>
-      <span class="usage-progress-text">加载中...</span>
-    </div>`;
+    usageSection = '';
   } else if (u.daily_limit >= 999) {
     usageSection = `<div class="usage-bar"><span class="usage-text">次数：无限制 ∞</span></div>`;
   } else {
@@ -641,18 +638,13 @@ function tExtract() {
           ${S.extractLoading?'⏳ 转录中，约1-2分钟...':'🚀 提取文案'}
         </div>
       </div>
-      <div class="tip-toggle" onclick="setState({showTipExpanded:!S.showTipExpanded})">
-        <span class="tip-toggle-text">📌 使用说明</span>
-        <span class="tip-toggle-icon ${S.showTipExpanded?'open':''}">▾</span>
+      <div class="tip-card-v2">
+        <span class="tip-line">1. 在抖音找到想参考的视频</span>
+        <span class="tip-line">2. 点击"分享"并复制链接</span>
+        <span class="tip-line">3. 粘贴到上方并点击提取</span>
+        <span class="tip-line">4. AI语音识别转录，约需1-2分钟</span>
+        <span class="tip-line">5. 提取成功后可一键AI改写</span>
       </div>
-      ${S.showTipExpanded?`
-        <div class="tip-card-v2">
-          <span class="tip-line">1. 在抖音找到想参考的视频</span>
-          <span class="tip-line">2. 点击"分享"并复制链接</span>
-          <span class="tip-line">3. 粘贴到上方并点击提取</span>
-          <span class="tip-line">4. AI语音识别转录，约需1-2分钟</span>
-          <span class="tip-line">5. 提取成功后可一键AI改写</span>
-        </div>`:''}
       ${recentItems.length>0?`
         <div class="home-section-header" style="margin-top:4px">
           <span class="home-section-title">最近提取</span>
