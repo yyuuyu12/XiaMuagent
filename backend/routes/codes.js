@@ -10,54 +10,62 @@ function requireAdmin(req, res, next) {
 }
 
 function genCode() {
-  return crypto.randomBytes(5).toString('hex').toUpperCase(); // 10位
+  return crypto.randomBytes(5).toString('hex').toUpperCase();
 }
 
-// 获取授权码列表（管理员）
-router.get('/', requireAuth, requireAdmin, (req, res) => {
-  const rows = db.prepare(`
+// 获取授权码列表
+router.get('/', requireAuth, requireAdmin, async (req, res) => {
+  const { rows } = await db.query(`
     SELECT c.*, u.phone, u.nickname
     FROM auth_codes c
     LEFT JOIN users u ON c.user_id = u.id
     ORDER BY c.created_at DESC
-  `).all();
+  `);
   res.json({ code: 200, data: rows });
 });
 
 // 批量生成授权码
-router.post('/batch', requireAuth, requireAdmin, (req, res) => {
+router.post('/batch', requireAuth, requireAdmin, async (req, res) => {
   const { count = 1, days = 30, daily_limit = 30 } = req.body;
   const n = Math.min(Math.max(1, parseInt(count) || 1), 100);
   const codes = [];
-  const insert = db.prepare('INSERT INTO auth_codes (code, days, daily_limit) VALUES (?,?,?)');
+
   for (let i = 0; i < n; i++) {
     let code;
-    do { code = genCode(); } while (db.prepare('SELECT id FROM auth_codes WHERE code=?').get(code));
-    insert.run(code, parseInt(days), parseInt(daily_limit));
+    let exists = true;
+    while (exists) {
+      code = genCode();
+      const { rows } = await db.query('SELECT id FROM auth_codes WHERE code=$1', [code]);
+      exists = rows.length > 0;
+    }
+    await db.query('INSERT INTO auth_codes (code, days, daily_limit) VALUES ($1,$2,$3)',
+      [code, parseInt(days), parseInt(daily_limit)]);
     codes.push(code);
   }
+
   res.json({ code: 200, msg: `已生成 ${n} 个授权码`, data: codes });
 });
 
-// 更新授权码配置
-router.put('/:id', requireAuth, requireAdmin, (req, res) => {
+// 更新授权码
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   const { days, daily_limit, status } = req.body;
-  db.prepare('UPDATE auth_codes SET days=?, daily_limit=?, status=? WHERE id=?')
-    .run(parseInt(days), parseInt(daily_limit), status, req.params.id);
-  // 关闭授权：同步降级绑定用户
+  await db.query('UPDATE auth_codes SET days=$1, daily_limit=$2, status=$3 WHERE id=$4',
+    [parseInt(days), parseInt(daily_limit), status, req.params.id]);
+
   if (status === 'disabled') {
-    const authCode = db.prepare('SELECT user_id FROM auth_codes WHERE id=?').get(req.params.id);
-    if (authCode?.user_id) {
-      db.prepare('UPDATE users SET daily_limit=5, auth_code_id=NULL, auth_expires_at=NULL WHERE id=?')
-        .run(authCode.user_id);
+    const { rows } = await db.query('SELECT user_id FROM auth_codes WHERE id=$1', [req.params.id]);
+    const uid = rows[0]?.user_id;
+    if (uid) {
+      await db.query('UPDATE users SET daily_limit=5, auth_code_id=NULL, auth_expires_at=NULL WHERE id=$1', [uid]);
     }
   }
+
   res.json({ code: 200, msg: '更新成功' });
 });
 
 // 删除授权码
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM auth_codes WHERE id=?').run(req.params.id);
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+  await db.query('DELETE FROM auth_codes WHERE id=$1', [req.params.id]);
   res.json({ code: 200, msg: '删除成功' });
 });
 

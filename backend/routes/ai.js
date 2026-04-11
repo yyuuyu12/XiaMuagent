@@ -1,79 +1,62 @@
-// AI 功能路由：文案改写、灵感生成
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('./auth');
 const router = express.Router();
 
 // ==================== 获取 AI 配置 ====================
-function getAIConfig() {
-  const keys = ['ai_provider', 'openai_api_key', 'openai_base_url', 'openai_model',
-    'claude_api_key', 'claude_model', 'qwen_api_key', 'qwen_model'];
+async function getAIConfig() {
+  const keys = ['ai_provider','openai_api_key','openai_base_url','openai_model',
+    'claude_api_key','claude_model','qwen_api_key','qwen_model'];
   const cfg = {};
   for (const k of keys) {
-    cfg[k] = db.prepare('SELECT value FROM system_config WHERE key = ?').get(k)?.value || '';
+    const { rows } = await db.query('SELECT value FROM system_config WHERE key = $1', [k]);
+    cfg[k] = rows[0]?.value || '';
   }
   return cfg;
 }
 
 // ==================== 每日次数检查 ====================
-function checkAndRecordUsage(userId, action) {
-  const user = db.prepare('SELECT daily_limit, role FROM users WHERE id = ?').get(userId);
-
+async function checkAndRecordUsage(userId, action) {
+  const { rows } = await db.query('SELECT daily_limit, role FROM users WHERE id = $1', [userId]);
+  const user = rows[0];
   if (!user) return { ok: false, msg: '用户不存在，请重新登录' };
 
-  // 管理员无限制
   if (user.role === 'admin') {
-    db.prepare('INSERT INTO usage_logs (user_id, action) VALUES (?, ?)').run(userId, action);
+    await db.query('INSERT INTO usage_logs (user_id, action) VALUES ($1, $2)', [userId, action]);
     return { ok: true, remaining: 999 };
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const used = db.prepare(
-    `SELECT COUNT(*) as cnt FROM usage_logs WHERE user_id = ? AND created_at LIKE ?`
-  ).get(userId, `${today}%`);
+  const { rows: usageRows } = await db.query(
+    'SELECT COUNT(*) AS cnt FROM usage_logs WHERE user_id = $1 AND DATE(created_at) = CURRENT_DATE',
+    [userId]
+  );
+  const used = parseInt(usageRows[0].cnt);
 
-  if (used.cnt >= user.daily_limit) {
+  if (used >= user.daily_limit) {
     return { ok: false, msg: `今日免费次数已用完（${user.daily_limit}次），明日再来~` };
   }
 
-  db.prepare('INSERT INTO usage_logs (user_id, action) VALUES (?, ?)').run(userId, action);
-  return { ok: true, remaining: user.daily_limit - used.cnt - 1 };
+  await db.query('INSERT INTO usage_logs (user_id, action) VALUES ($1, $2)', [userId, action]);
+  return { ok: true, remaining: user.daily_limit - used - 1 };
 }
 
 // ==================== 调用 AI ====================
 async function callAI(prompt) {
-  const cfg = getAIConfig();
+  const cfg = await getAIConfig();
   const provider = cfg.ai_provider || 'openai';
 
   if (provider === 'openai' || provider === 'qwen') {
-    // OpenAI 兼容接口（通义千问也兼容 OpenAI 格式）
     const apiKey = provider === 'openai' ? cfg.openai_api_key : cfg.qwen_api_key;
     const baseUrl = cfg.openai_base_url || 'https://api.openai.com/v1';
-    const model = provider === 'openai'
-      ? (cfg.openai_model || 'gpt-3.5-turbo')
-      : (cfg.qwen_model || 'qwen-turbo');
-
+    const model = provider === 'openai' ? (cfg.openai_model || 'gpt-3.5-turbo') : (cfg.qwen_model || 'qwen-turbo');
     if (!apiKey) throw new Error('AI Key 未配置，请联系管理员');
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.8,
-        max_tokens: 1000
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.8, max_tokens: 1000 })
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`AI 接口错误: ${err}`);
-    }
-
+    if (!response.ok) throw new Error(`AI 接口错误: ${await response.text()}`);
     const data = await response.json();
     return data.choices[0].message.content;
   }
@@ -85,23 +68,10 @@ async function callAI(prompt) {
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Claude 接口错误: ${err}`);
-    }
-
+    if (!response.ok) throw new Error(`Claude 接口错误: ${await response.text()}`);
     const data = await response.json();
     return data.content[0].text;
   }
@@ -114,20 +84,18 @@ router.post('/rewrite', requireAuth, async (req, res) => {
   const { text } = req.body;
   if (!text?.trim()) return res.status(400).json({ code: 400, msg: '请输入文案内容' });
 
-  const usage = checkAndRecordUsage(req.userId, 'rewrite');
+  const usage = await checkAndRecordUsage(req.userId, 'rewrite');
   if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
 
   try {
-    const tpl = db.prepare(
+    const { rows } = await db.query(
       `SELECT content FROM prompt_templates WHERE type = 'rewrite' AND is_default = 1`
-    ).get();
-    const prompt = (tpl?.content || '请将以下文案改写为抖音爆款风格：\n{input}').replace('{input}', text);
-
+    );
+    const prompt = (rows[0]?.content || '请将以下文案改写为抖音爆款风格：\n{input}').replace('{input}', text);
     const result = await callAI(prompt);
 
-    // 存历史
-    db.prepare('INSERT INTO history (user_id, type, input, result) VALUES (?,?,?,?)')
-      .run(req.userId, 'rewrite', text.slice(0, 200), JSON.stringify(result));
+    await db.query('INSERT INTO history (user_id, type, input, result) VALUES ($1,$2,$3,$4)',
+      [req.userId, 'rewrite', text.slice(0, 200), JSON.stringify(result)]);
 
     res.json({ code: 200, data: { result, remaining: usage.remaining } });
   } catch (err) {
@@ -135,12 +103,12 @@ router.post('/rewrite', requireAuth, async (req, res) => {
   }
 });
 
-// ==================== 灵感生成（返回 JSON 结构化文案列表）====================
+// ==================== 灵感生成 ====================
 router.post('/inspire', requireAuth, async (req, res) => {
   const { track, industryId } = req.body;
   if (!track?.trim() && !industryId) return res.status(400).json({ code: 400, msg: '请输入行业/赛道' });
 
-  const usage = checkAndRecordUsage(req.userId, 'inspire');
+  const usage = await checkAndRecordUsage(req.userId, 'inspire');
   if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
 
   try {
@@ -148,14 +116,11 @@ router.post('/inspire', requireAuth, async (req, res) => {
     let matchedIndustry = null;
     const inputTrack = track?.trim() || '';
 
-    // 1. 确定行业风格
     if (industryId) {
-      // 直接点标签：使用该行业的风格提示
-      const ind = db.prepare('SELECT * FROM industries WHERE id=?').get(industryId);
-      if (ind) { styleHint = ind.style_hint || ''; matchedIndustry = ind.name; }
+      const { rows } = await db.query('SELECT * FROM industries WHERE id=$1', [industryId]);
+      if (rows[0]) { styleHint = rows[0].style_hint || ''; matchedIndustry = rows[0].name; }
     } else if (inputTrack) {
-      // 手动输入：语义分析匹配行业
-      const industries = db.prepare('SELECT * FROM industries ORDER BY sort_order ASC, id ASC').all();
+      const { rows: industries } = await db.query('SELECT * FROM industries ORDER BY sort_order ASC, id ASC');
       if (industries.length > 0) {
         const names = industries.map(i => i.name).join('、');
         const matchPrompt = `行业列表：${names}\n\n用户输入："${inputTrack}"\n\n判断最匹配哪个行业，只回复行业名称。不匹配则回复"无"。`;
@@ -186,7 +151,6 @@ ${styleSection}
 - 只返回JSON数组，不要markdown代码块，不要其他文字`;
 
     const raw = await callAI(prompt);
-
     let scripts = [];
     try {
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -196,8 +160,8 @@ ${styleSection}
       scripts = [{ hook: finalTrack + ' 爆款文案', content: raw }];
     }
 
-    db.prepare('INSERT INTO history (user_id, type, input, result) VALUES (?,?,?,?)')
-      .run(req.userId, 'inspire', inputTrack || matchedIndustry, JSON.stringify(scripts));
+    await db.query('INSERT INTO history (user_id, type, input, result) VALUES ($1,$2,$3,$4)',
+      [req.userId, 'inspire', inputTrack || matchedIndustry, JSON.stringify(scripts)]);
 
     res.json({ code: 200, data: { scripts, remaining: usage.remaining, matchedIndustry } });
   } catch (err) {
@@ -205,12 +169,12 @@ ${styleSection}
   }
 });
 
-// ==================== 按指定方向继续生成 ====================
+// ==================== 按方向扩展 ====================
 router.post('/inspire-expand', requireAuth, async (req, res) => {
   const { hook, content, track } = req.body;
   if (!hook) return res.status(400).json({ code: 400, msg: '参数缺失' });
 
-  const usage = checkAndRecordUsage(req.userId, 'inspire');
+  const usage = await checkAndRecordUsage(req.userId, 'inspire');
   if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
 
   try {
@@ -233,8 +197,8 @@ router.post('/inspire-expand', requireAuth, async (req, res) => {
       scripts = [{ hook: '变体文案', content: raw }];
     }
 
-    db.prepare('INSERT INTO history (user_id, type, input, result) VALUES (?,?,?,?)')
-      .run(req.userId, 'inspire', `按方向扩展: ${hook}`, JSON.stringify(scripts));
+    await db.query('INSERT INTO history (user_id, type, input, result) VALUES ($1,$2,$3,$4)',
+      [req.userId, 'inspire', `按方向扩展: ${hook}`, JSON.stringify(scripts)]);
 
     res.json({ code: 200, data: { scripts, remaining: usage.remaining } });
   } catch (err) {

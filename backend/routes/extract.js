@@ -1,82 +1,63 @@
-// 抖音文案提取路由
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('./auth');
 const router = express.Router();
 
-function checkAndRecordUsage(userId, action) {
-  const user = db.prepare('SELECT daily_limit, role FROM users WHERE id = ?').get(userId);
-
+async function checkAndRecordUsage(userId, action) {
+  const { rows } = await db.query('SELECT daily_limit, role FROM users WHERE id = $1', [userId]);
+  const user = rows[0];
   if (!user) return { ok: false, msg: '用户不存在，请重新登录' };
 
   if (user.role === 'admin') {
-    db.prepare('INSERT INTO usage_logs (user_id, action) VALUES (?, ?)').run(userId, action);
+    await db.query('INSERT INTO usage_logs (user_id, action) VALUES ($1, $2)', [userId, action]);
     return { ok: true, remaining: 999 };
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const used = db.prepare(
-    `SELECT COUNT(*) as cnt FROM usage_logs WHERE user_id = ? AND created_at LIKE ?`
-  ).get(userId, `${today}%`);
+  const { rows: usageRows } = await db.query(
+    'SELECT COUNT(*) AS cnt FROM usage_logs WHERE user_id = $1 AND DATE(created_at) = CURRENT_DATE',
+    [userId]
+  );
+  const used = parseInt(usageRows[0].cnt);
 
-  if (used.cnt >= user.daily_limit) {
+  if (used >= user.daily_limit) {
     return { ok: false, msg: `今日免费次数已用完（${user.daily_limit}次），明日再来~` };
   }
 
-  db.prepare('INSERT INTO usage_logs (user_id, action) VALUES (?, ?)').run(userId, action);
-  return { ok: true, remaining: user.daily_limit - used.cnt - 1 };
+  await db.query('INSERT INTO usage_logs (user_id, action) VALUES ($1, $2)', [userId, action]);
+  return { ok: true, remaining: user.daily_limit - used - 1 };
 }
 
-// ==================== 提取抖音视频文案 ====================
 router.post('/video', requireAuth, async (req, res) => {
   const { url } = req.body;
   if (!url?.trim()) return res.status(400).json({ code: 400, msg: '请输入视频链接' });
 
-  const usage = checkAndRecordUsage(req.userId, 'extract');
+  const usage = await checkAndRecordUsage(req.userId, 'extract');
   if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
 
   try {
-    // 获取 Tikhub API Key
-    const tikhubKey = db.prepare("SELECT value FROM system_config WHERE key = 'tikhub_api_key'").get()?.value;
+    const { rows } = await db.query("SELECT value FROM system_config WHERE key = 'tikhub_api_key'");
+    const tikhubKey = rows[0]?.value;
 
     if (!tikhubKey) {
-      // 没有配置 Key 时返回提示
-      return res.status(503).json({
-        code: 503,
-        msg: '抖音解析服务未配置，请联系管理员配置 Tikhub API Key'
-      });
+      return res.status(503).json({ code: 503, msg: '抖音解析服务未配置，请联系管理员配置 Tikhub API Key' });
     }
 
-    // 解析短链接获取真实链接
     const cleanUrl = url.trim();
-
-    // 调用 Tikhub API 获取视频信息和字幕
     const videoResponse = await fetch(
       `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?aweme_id=&url=${encodeURIComponent(cleanUrl)}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${tikhubKey}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { 'Authorization': `Bearer ${tikhubKey}`, 'Content-Type': 'application/json' } }
     );
 
-    if (!videoResponse.ok) {
-      const err = await videoResponse.text();
-      throw new Error(`视频解析失败: ${err}`);
-    }
+    if (!videoResponse.ok) throw new Error(`视频解析失败: ${await videoResponse.text()}`);
 
     const videoData = await videoResponse.json();
     const item = videoData?.data?.aweme_detail;
-
     if (!item) throw new Error('无法获取视频信息，请检查链接是否正确');
 
-    // 提取文案内容
     const desc = item.desc || '';
     const awemeId = item.aweme_id;
-
-    // 尝试获取字幕（如果有）
     let subtitle = '';
+
     if (awemeId) {
       try {
         const subtitleResp = await fetch(
@@ -94,7 +75,6 @@ router.post('/video', requireAuth, async (req, res) => {
     }
 
     const script = subtitle || desc || '未能提取到文案内容';
-
     res.json({
       code: 200,
       data: {
@@ -105,7 +85,6 @@ router.post('/video', requireAuth, async (req, res) => {
         remaining: usage.remaining
       }
     });
-
   } catch (err) {
     res.status(500).json({ code: 500, msg: err.message });
   }
