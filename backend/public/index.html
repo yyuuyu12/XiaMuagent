@@ -808,14 +808,7 @@ function tExtract() {
         <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制'}</div>
       </div>
     </div>
-    <div class="style-selector">
-      <span class="style-selector-label">改写风格（可选）</span>
-      <div class="style-options">
-        ${['口播带货','情感共鸣','干货科普','悬念钩子','轻松幽默'].map(s=>`
-          <div class="style-option ${S.rewriteStyle===s?'style-option-active':''}" onclick="selectStyle('${s}')">${s}</div>`).join('')}
-      </div>
-    </div>
-    ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
+${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
     <div class="action-row">
       <div class="btn-action-sec" onclick="resetExtract()">重新输入</div>
       <div class="btn-action-main ${S.extractLoading?'btn-disabled':''}" onclick="handleRewrite()">
@@ -831,7 +824,7 @@ function tExtract() {
     </div>
     <div class="result-card result-highlight">
       <div class="result-header-row">
-        <span class="result-label">🚀 原创改写${S.rewriteStyle?' · '+esc(S.rewriteStyle):''}</span>
+        <span class="result-label">🚀 原创改写</span>
       </div>
       <div class="thin-divider"></div>
       <div class="result-scroll-area">
