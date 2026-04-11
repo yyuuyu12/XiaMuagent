@@ -22,11 +22,12 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 
 /* === TOP BAR === */
 .top-bar {
-  display: flex; flex-direction: row; align-items: center;
+  display: flex; flex-direction: row; align-items: center; justify-content: space-between;
   padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 10px;
   background: #F2F0EA; flex-shrink: 0;
 }
 .app-name { font-size: 17px; font-weight: 700; color: #1A1814; letter-spacing: .5px; }
+.top-bar-login { font-size: 14px; font-weight: 600; color: #F97316; padding: 6px 4px; cursor: pointer; user-select: none; flex-shrink: 0; }
 .top-bar-sub { justify-content: space-between; }
 .back-btn { display: flex; flex-direction: row; align-items: center; width: 60px; cursor: pointer; user-select: none; }
 .back-icon { font-size: 20px; color: #1A1814; line-height: 1; margin-right: 4px; font-weight: 400; display: flex; align-items: center; }
@@ -131,6 +132,9 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .history-scripts { margin-top: 8px; border-top: 1px solid #F0EEE8; padding-top: 8px; }
 .history-script-item { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F7F6F2; }
 .history-script-hook { flex: 1; font-size: 13px; color: #1A1814; line-height: 1.5; margin-right: 8px; }
+.history-script-col { flex: 1; min-width: 0; margin-right: 8px; display: flex; flex-direction: column; align-items: stretch; }
+.history-script-col .history-script-hook { flex: none; }
+.history-script-content { display: block; font-size: 13px; color: #555; line-height: 1.75; white-space: pre-wrap; word-break: break-word; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ECEAE2; }
 
 /* === PROFILE === */
 .profile-hero { background: linear-gradient(135deg,#6366F1 0%,#818CF8 100%); border-radius: 12px; padding: 24px 18px 20px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; }
@@ -181,12 +185,14 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .code-err { color: #B83060; }
 .code-activated { background: rgba(45,122,58,.06); border-radius: 6px; padding: 10px; }
 .code-activated-text { font-size: 13px; color: #2D7A3A; line-height: 1.6; }
-.vip-upgrade-card { background: linear-gradient(135deg,#FF6B35 0%,#FF8C5A 100%); border-radius: 10px; padding: 16px 14px; margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; cursor: pointer; user-select: none; }
+.vip-upgrade-card { background: linear-gradient(135deg,#FF6B35 0%,#FF8C5A 100%); border-radius: 10px; padding: 22px 18px; min-height: 92px; margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; cursor: pointer; user-select: none; }
 .vip-upgrade-left { flex: 1; }
 .vip-upgrade-title { display: block; font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
 .vip-upgrade-sub { display: block; font-size: 12px; color: rgba(255,255,255,.85); }
 .vip-upgrade-arrow { font-size: 22px; color: rgba(255,255,255,.8); margin-left: 4px; }
 .logout-btn { background: #fff; border: 1px solid #ECEAE2; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 8px; color: #B83060; font-size: 15px; font-weight: 500; cursor: pointer; user-select: none; }
+.profile-tab-page { display: flex; flex-direction: column; min-height: calc(100dvh - 132px); }
+.profile-logout { margin-top: auto; margin-bottom: 4px; }
 
 /* === VIP === */
 .vip-hero { background: linear-gradient(135deg,#1A1814 0%,#3A3530 100%); border-radius: 12px; padding: 28px 18px 24px; margin-bottom: 14px; display: flex; flex-direction: column; align-items: center; }
@@ -224,13 +230,35 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .pay-modal-note { display: block; font-size: 13px; color: #A8A49C; text-align: center; margin-bottom: 16px; line-height: 1.6; }
 .pay-modal-btn { background: #FF6B35; color: #fff; border-radius: 50px; padding: 0 30px; height: 44px; line-height: 44px; font-size: 15px; font-weight: 600; cursor: pointer; }
 
-/* === LOGIN === */
-.login-page { min-height: 100vh; background: #F2F0EA; overflow-y: auto; -webkit-overflow-scrolling: touch; max-width: 480px; margin: 0 auto; }
+/* === AUTH BOTTOM SHEET === */
+.auth-sheet-mask {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 220;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.auth-sheet {
+  width: 100%; max-width: 480px; background: #F2F0EA;
+  border-radius: 18px 18px 0 0;
+  padding: 0 0 calc(12px + env(safe-area-inset-bottom, 0px));
+  max-height: min(90vh, 720px);
+  overflow: hidden; display: flex; flex-direction: column;
+  box-shadow: 0 -8px 32px rgba(0,0,0,.12);
+}
+.auth-sheet-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 16px 8px; flex: 1; min-height: 0; }
+.auth-sheet-handle { width: 40px; height: 5px; background: #D4D0C8; border-radius: 3px; margin: 10px auto 6px; cursor: pointer; }
+.auth-sheet-head { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 4px 16px 8px; }
+.auth-sheet-title { font-size: 17px; font-weight: 700; color: #1A1814; }
+.auth-sheet-close { font-size: 22px; color: #A8A49C; line-height: 1; padding: 8px; margin: -4px -8px -4px 0; cursor: pointer; user-select: none; }
+.auth-sheet-sub { font-size: 13px; color: #A8A49C; padding: 0 16px 12px; line-height: 1.5; }
+.profile-guest-cta { display: block; margin: 12px auto 0; background: #fff; color: #6366F1; font-size: 15px; font-weight: 600; text-align: center; border-radius: 50px; padding: 12px 20px; cursor: pointer; user-select: none; width: 100%; max-width: 260px; }
+.profile-guest-hint { display: block; font-size: 12px; color: rgba(255,255,255,.85); text-align: center; margin-top: 8px; line-height: 1.5; }
+
+/* === LOGIN FORM (sheet + legacy classes) === */
 .logo-area { display: flex; flex-direction: column; align-items: center; padding: 60px 24px 24px; }
 .logo-icon { font-size: 44px; margin-bottom: 10px; }
 .logo-title { font-size: 24px; font-weight: 700; color: #1A1814; letter-spacing: 1px; margin-bottom: 6px; }
 .logo-sub { font-size: 13px; color: #A8A49C; }
 .form-card { background: #fff; border-radius: 14px; margin: 0 16px; padding: 20px 18px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.form-card-sheet { margin: 0; box-shadow: 0 1px 8px rgba(0,0,0,.06); }
 .mode-switch { display: flex; background: #F7F6F2; border-radius: 50px; padding: 3px; margin-bottom: 20px; }
 .mode-btn { flex: 1; text-align: center; height: 34px; line-height: 34px; border-radius: 50px; font-size: 14px; color: #A8A49C; cursor: pointer; user-select: none; }
 .mode-active { background: #fff; color: #1A1814; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
@@ -244,11 +272,11 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .err-msg { display: block; color: #B83060; font-size: 12px; text-align: center; margin-bottom: 8px; padding: 6px; background: rgba(184,48,96,.06); border-radius: 6px; }
 .submit-btn { background: #FF6B35; color: #fff; border-radius: 50px; height: 48px; line-height: 48px; text-align: center; font-size: 16px; font-weight: 600; margin-top: 4px; cursor: pointer; user-select: none; }
 .submit-disabled { opacity: .5; pointer-events: none; }
-.footer-tip { text-align: center; padding: 20px 16px 40px; }
+.footer-tip { text-align: center; padding: 12px 8px 8px; }
 .footer-text { font-size: 11px; color: #C4C0B8; }
 
 /* === TOAST === */
-.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 200; pointer-events: none; white-space: nowrap; max-width: 480px; }
+.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 260; pointer-events: none; white-space: nowrap; max-width: 480px; }
 
 /* === USAGE PROGRESS BAR === */
 .usage-progress-wrap { display: flex; flex-direction: row; align-items: center; }
@@ -367,7 +395,8 @@ const api = {
 
 // ===== STATE =====
 const S = {
-  page: 'login', currentTab: 'home',
+  currentTab: 'home',
+  showAuthSheet: false,
   isRegMode: false, phone: '', password: '', authErr: '', loading: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
@@ -423,42 +452,69 @@ function setState(updates) {
   }
 }
 function render() {
-  document.getElementById('app').innerHTML = S.page === 'login' ? tLogin() : tMain();
+  document.getElementById('app').innerHTML = tMain();
 }
 
-// ===== LOGIN TEMPLATE =====
-function tLogin() {
-  return `<div class="login-page">
-    <div class="logo-area">
-      <div class="logo-icon">🔥</div>
-      <span class="logo-title">爆款文案工坊</span>
-      <span class="logo-sub">AI驱动 · 一键生成爆款内容</span>
-    </div>
-    <div class="form-card">
-      <div class="mode-switch">
-        <div class="mode-btn ${!S.isRegMode?'mode-active':''}" onclick="setLoginMode()">登录</div>
-        <div class="mode-btn ${S.isRegMode?'mode-active':''}" onclick="setRegMode()">注册</div>
+function openAuthSheet() { setState({ showAuthSheet: true, authErr: '' }); }
+function closeAuthSheet() { setState({ showAuthSheet: false, authErr: '', loading: false }); }
+
+/** 需要登录的操作入口：未登录则弹出底部登录层 */
+function ensureLoggedIn() {
+  if (getToken()) return true;
+  openAuthSheet();
+  showToast('请先登录');
+  return false;
+}
+
+function apiUnauthorized(r) {
+  if (r && r.code === 401) {
+    const had = !!getToken();
+    clearAuth();
+    setState({ userInfo: null, userName: '创作者', userPhone: '', userAvatar: 0, recentHistory: [], recentHistoryLoaded: false, inspireHistory: [], historyLoaded: false });
+    if (had) { openAuthSheet(); showToast('登录已过期，请重新登录'); }
+    return true;
+  }
+  return false;
+}
+
+// ===== AUTH BOTTOM SHEET =====
+function tAuthSheet() {
+  return `<div class="auth-sheet-mask" onclick="closeAuthSheet()">
+    <div class="auth-sheet" onclick="event.stopPropagation()">
+      <div class="auth-sheet-handle" onclick="closeAuthSheet()" title="关闭"></div>
+      <div class="auth-sheet-head">
+        <span class="auth-sheet-title">登录 / 注册</span>
+        <span class="auth-sheet-close" onclick="closeAuthSheet()">✕</span>
       </div>
-      <div class="field-group">
-        <span class="field-label">手机号</span>
-        <div class="input-wrap">
-          <span class="input-prefix">+86</span>
-          <input id="f-phone" class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
-            value="${esc(S.phone)}" oninput="S.phone=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+      <span class="auth-sheet-sub">登录后可保存创作记录、同步历史并使用 AI 生成</span>
+      <div class="auth-sheet-scroll">
+        <div class="form-card form-card-sheet">
+          <div class="mode-switch">
+            <div class="mode-btn ${!S.isRegMode?'mode-active':''}" onclick="setLoginMode()">登录</div>
+            <div class="mode-btn ${S.isRegMode?'mode-active':''}" onclick="setRegMode()">注册</div>
+          </div>
+          <div class="field-group">
+            <span class="field-label">手机号</span>
+            <div class="input-wrap">
+              <span class="input-prefix">+86</span>
+              <input id="f-phone" class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
+                value="${esc(S.phone)}" oninput="S.phone=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+            </div>
+          </div>
+          <div class="field-group">
+            <span class="field-label">密码</span>
+            <input id="f-pwd" class="lf-input" type="password"
+              placeholder="${S.isRegMode?'设置密码（至少6位）':'请输入密码'}"
+              value="${esc(S.password)}" oninput="S.password=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+          </div>
+          ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
+          <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleAuth()">
+            ${S.loading?'请稍候...':(S.isRegMode?'注册':'登录')}
+          </div>
         </div>
-      </div>
-      <div class="field-group">
-        <span class="field-label">密码</span>
-        <input id="f-pwd" class="lf-input" type="password"
-          placeholder="${S.isRegMode?'设置密码（至少6位）':'请输入密码'}"
-          value="${esc(S.password)}" oninput="S.password=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
-      </div>
-      ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
-      <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleAuth()">
-        ${S.loading?'请稍候...':(S.isRegMode?'注册':'登录')}
+        <div class="footer-tip"><span class="footer-text">登录即表示同意用户协议和隐私政策</span></div>
       </div>
     </div>
-    <div class="footer-tip"><span class="footer-text">登录即表示同意用户协议和隐私政策</span></div>
   </div>`;
 }
 
@@ -470,19 +526,22 @@ function tMain() {
     ${tBottomTab()}
     ${S.showPayModal?tPayModal():''}
     ${S.nicknamePrompt?tNicknamePrompt():''}
+    ${S.showAuthSheet?tAuthSheet():''}
   </div>`;
 }
 
 function tTopBar() {
   const t = S.currentTab;
   if (t === 'home' || t === 'profile' || t === 'history') {
-    return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span></div>`;
+    const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '';
+    return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span>${loginHint}</div>`;
   }
   const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员' };
+  const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:60px"></div>';
   return `<div class="top-bar top-bar-sub">
     <div class="back-btn" onclick="goBack()"><span class="back-icon">‹</span><span class="back-text">返回</span></div>
     <span class="sub-page-title">${titles[t]||''}</span>
-    <div style="width:60px"></div>
+    ${loginHint}
   </div>`;
 }
 
@@ -783,7 +842,11 @@ function tInspire() {
               <div class="history-scripts">
                 ${it.result.map((s,si)=>`
                   <div class="history-script-item">
-                    <span class="history-script-hook">${esc(s.hook)}</span>
+                    <div class="history-script-col">
+                      ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
+                      ${s.content && String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
+                      ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
+                    </div>
                     <div class="copy-btn" onclick="cpHistory(event,${i},${si})">复制</div>
                   </div>`).join('')}
               </div>`:''}
@@ -795,9 +858,18 @@ function tInspire() {
 // ===== PROFILE =====
 function tProfile() {
   const u = S.userInfo;
+  const loggedIn = !!getToken();
   const emojis = ['👨‍🚀','🦊','🐱','🐼'];
   const emoji = emojis[S.userAvatar] || (S.userName?S.userName[0]:'?');
-  return `<div class="tab-page">
+  const heroBlock = !loggedIn ? `
+    <div class="profile-hero">
+      <div class="avatar-lg avatar-type-0" onclick="openAuthSheet()">
+        <span class="avatar-lg-text">👤</span>
+      </div>
+      <span class="profile-name" style="cursor:default">未登录</span>
+      <span class="profile-guest-hint">登录后可保存创作记录、查看历史与次数</span>
+      <div class="profile-guest-cta" onclick="openAuthSheet()">登录 / 注册</div>
+    </div>` : `
     <div class="profile-hero">
       <div class="avatar-lg avatar-type-${S.userAvatar}" onclick="toggleAvatarPicker()">
         <span class="avatar-lg-text">${emoji}</span>
@@ -819,8 +891,10 @@ function tProfile() {
         <div class="stat-divider"></div>
         <div class="stat-item"><span class="stat-num">${u.daily_limit>=999?'∞':u.daily_limit}</span><span class="stat-label">每日上限</span></div>
       </div>`:''}
-    </div>
-    ${S.showAvatarPicker?`
+    </div>`;
+  return `<div class="tab-page profile-tab-page">
+    ${heroBlock}
+    ${loggedIn && S.showAvatarPicker?`
       <div class="avatar-picker">
         <span class="profile-section-title">选择头像</span>
         <div class="avatar-options">
@@ -861,8 +935,8 @@ function tProfile() {
       </div>
       <span class="vip-upgrade-arrow">›</span>
     </div>
-    <div class="logout-btn" onclick="handleLogout()">退出登录</div>
-    <div style="height:20px"></div>
+    ${loggedIn?`<div class="logout-btn profile-logout" onclick="handleLogout()">退出登录</div>`:''}
+    <div style="height:12px"></div>
   </div>`;
 }
 
@@ -928,16 +1002,16 @@ async function handleAuth() {
     const r = await api.post(S.isRegMode ? '/auth/register' : '/auth/login', { phone, password: pwd });
     if (r.code === 200) {
       setToken(r.data.token); setUser(r.data.user);
-      showToast('登录成功');
-      setTimeout(() => {
-        Object.assign(S, {
-          page: 'main', loading: false,
-          userName: r.data.user.nickname || '创作者',
-          userPhone: r.data.user.phone || '',
-          userAvatar: r.data.user.avatar || 0,
-        });
-        render(); fetchMe(); loadIndustries();
-      }, 600);
+      showToast(S.isRegMode ? '注册成功' : '登录成功');
+      setState({
+        showAuthSheet: false,
+        loading: false,
+        authErr: '',
+        userName: r.data.user.nickname || '创作者',
+        userPhone: r.data.user.phone || '',
+        userAvatar: r.data.user.avatar || 0,
+      });
+      fetchMe(); loadIndustries();
     } else {
       setState({ authErr: r.msg || '操作失败，请重试', loading: false });
     }
@@ -958,6 +1032,10 @@ function goBack() { setState({ currentTab: 'home' }); }
 
 // ===== USER =====
 async function fetchMe() {
+  if (!getToken()) {
+    setState({ userInfo: null });
+    return;
+  }
   try {
     const r = await api.get('/auth/me');
     if (r.code === 200) {
@@ -967,7 +1045,7 @@ async function fetchMe() {
         userName: r.data.nickname || '创作者',
         nicknamePrompt: !hasNickname && !S.nicknamePromptDismissed && S.currentTab === 'home',
       });
-    } else if (r.code === 401) { clearAuth(); setState({ page: 'login' }); }
+    } else if (r.code === 401) { apiUnauthorized(r); }
   } catch {}
   if (!S.recentHistoryLoaded) loadRecentHistory();
 }
@@ -980,6 +1058,7 @@ async function loadIndustries() {
 
 // ===== EXTRACT =====
 async function handleExtract() {
+  if (!ensureLoggedIn()) return;
   if (!S.videoUrl.trim() || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   const ctrl = new AbortController();
@@ -987,7 +1066,8 @@ async function handleExtract() {
   try {
     const r = await api.post('/video/douyin-to-text', { url: S.videoUrl.trim() }, ctrl.signal);
     clearTimeout(tid);
-    if (r.code === 200) setState({ extractedScript: r.data.script, extractStep: 1, extractLoading: false });
+    if (apiUnauthorized(r)) setState({ extractLoading: false });
+    else if (r.code === 200) setState({ extractedScript: r.data.script, extractStep: 1, extractLoading: false });
     else setState({ extractErr: r.msg || '提取失败，请检查链接是否正确', extractLoading: false });
   } catch(e) {
     clearTimeout(tid);
@@ -995,13 +1075,15 @@ async function handleExtract() {
   }
 }
 async function handleRewrite() {
+  if (!ensureLoggedIn()) return;
   if (!S.extractedScript || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   try {
     const body = { text: S.extractedScript };
     if (S.rewriteStyle) body.style = S.rewriteStyle;
     const r = await api.post('/ai/rewrite', body);
-    if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); }
+    if (apiUnauthorized(r)) setState({ extractLoading: false });
+    else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); }
     else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false });
   } catch { setState({ extractErr: '网络错误，请稍后重试', extractLoading: false }); }
 }
@@ -1023,6 +1105,7 @@ function selectIndustry(id, name) {
   else setState({ selectedIndustryId: id, selectedIndustryName: name, customTrack: '' });
 }
 async function handleInspire() {
+  if (!ensureLoggedIn()) return;
   const track = S.customTrack.trim() || S.selectedIndustryName;
   if (!track || S.inspireLoading) return;
   inspireController = new AbortController();
@@ -1033,7 +1116,8 @@ async function handleInspire() {
   try {
     const r = await api.post('/ai/inspire', body, inspireController.signal);
     inspireController = null;
-    if (r.code === 200) {
+    if (apiUnauthorized(r)) setState({ inspireLoading: false });
+    else if (r.code === 200) {
       setState({ inspireScripts: r.data.scripts||[], matchedIndustry: r.data.matchedIndustry||'', expandedScript: null, inspireLoading: false });
       fetchMe();
     } else setState({ inspireErr: r.msg||'生成失败，请重试', inspireLoading: false });
@@ -1057,45 +1141,63 @@ function cpInspire(e, i) {
 }
 async function doExpand(e, i) {
   e.stopPropagation();
+  if (!ensureLoggedIn()) return;
   const s = S.inspireScripts[i];
   const track = S.customTrack.trim() || S.selectedIndustryName;
   setState({ inspireLoading: true, inspireErr: '' });
   try {
     const r = await api.post('/ai/inspire-expand', { hook: s.hook, content: s.content, track });
-    if (r.code === 200) {
+    if (apiUnauthorized(r)) setState({ inspireLoading: false });
+    else if (r.code === 200) {
       setState({ inspireScripts: [...(r.data.scripts||[]), ...S.inspireScripts], expandedScript: 0, inspireLoading: false });
       fetchMe();
     } else setState({ inspireErr: r.msg||'扩写失败', inspireLoading: false });
   } catch { setState({ inspireErr: '网络错误', inspireLoading: false }); }
 }
 async function toggleHistory() {
-  if (!S.showHistory && !S.historyLoaded) await loadHistory();
+  if (!S.showHistory) {
+    if (!ensureLoggedIn()) return;
+    if (!S.historyLoaded) await loadHistory();
+  }
   setState({ showHistory: !S.showHistory });
 }
 async function loadHistory() {
+  if (!getToken()) return;
   try {
     const r = await api.get('/history?type=inspire');
+    if (apiUnauthorized(r)) return;
     if (r.code === 200) { S.inspireHistory = r.data||[]; S.historyLoaded = true; }
   } catch {}
 }
 async function clearHistory() {
+  if (!ensureLoggedIn()) return;
   if (!confirm('确定清空所有历史记录吗？')) return;
   try { await api.del('/history?type=inspire'); setState({ inspireHistory:[], historyLoaded:false }); showToast('已清空'); }
   catch { showToast('操作失败'); }
 }
 function toggleHistoryItem(i) { setState({ historyExpanded: S.historyExpanded===i?null:i }); }
+function scriptCopyText(s) {
+  if (!s) return '';
+  const hook = String(s.hook || '').trim();
+  const body = String(s.content || '').trim();
+  if (body && hook && body !== hook) return hook + '\n\n' + body;
+  return body || hook;
+}
 function cpHistory(e, hi, si) {
   e.stopPropagation();
   const it = S.inspireHistory[hi];
   if (!it||!it.result) return;
-  const s = it.result[si];
-  copyText(s ? (s.content||s.hook) : '');
+  copyText(scriptCopyText(it.result[si]));
   showToast('已复制');
 }
 
 // ===== PROFILE =====
-function toggleAvatarPicker() { setState({ showAvatarPicker: !S.showAvatarPicker }); }
+function toggleAvatarPicker() {
+  if (!getToken()) { openAuthSheet(); showToast('请先登录'); return; }
+  setState({ showAvatarPicker: !S.showAvatarPicker });
+}
 async function selectAvatar(i) {
+  if (!ensureLoggedIn()) return;
   setState({ userAvatar: i, showAvatarPicker: false });
   try {
     await api.post('/auth/update-avatar', { avatar: i });
@@ -1104,6 +1206,7 @@ async function selectAvatar(i) {
   } catch {}
 }
 async function handleActivateCode() {
+  if (!ensureLoggedIn()) return;
   const code = S.authCodeInput.trim();
   if (!code || S.authCodeLoading) return;
   setState({ authCodeLoading: true, authCodeMsg: '' });
@@ -1116,7 +1219,24 @@ async function handleActivateCode() {
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
   clearAuth();
-  setState({ page:'login', currentTab:'home', userInfo:null, userName:'创作者', userPhone:'', phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false });
+  setState({
+    currentTab: 'home',
+    showAuthSheet: false,
+    userInfo: null,
+    userName: '创作者',
+    userPhone: '',
+    userAvatar: 0,
+    phone: '',
+    password: '',
+    recentHistory: [],
+    recentHistoryLoaded: false,
+    extractHistory: [],
+    extractHistoryLoaded: false,
+    inspireHistory: [],
+    historyLoaded: false,
+    nicknamePrompt: false,
+    nicknamePromptDismissed: false,
+  });
 }
 
 // ===== VIP =====
@@ -1133,15 +1253,29 @@ function closePayModal() { setState({ showPayModal: false }); }
 
 // ===== RECENT HISTORY =====
 async function loadRecentHistory() {
+  if (!getToken()) {
+    S.recentHistory = [];
+    S.recentHistoryLoaded = true;
+    render();
+    return;
+  }
   try {
     const r = await api.get('/history?type=inspire');
+    if (apiUnauthorized(r)) { S.recentHistory = []; S.recentHistoryLoaded = true; render(); return; }
     if (r.code === 200) { S.recentHistory = r.data || []; S.recentHistoryLoaded = true; render(); }
   } catch {}
 }
 
 async function loadExtractHistory() {
+  if (!getToken()) {
+    S.extractHistory = [];
+    S.extractHistoryLoaded = true;
+    render();
+    return;
+  }
   try {
     const r = await api.get('/history?type=extract');
+    if (apiUnauthorized(r)) { S.extractHistory = []; S.extractHistoryLoaded = true; render(); return; }
     if (r.code === 200) { S.extractHistory = r.data || []; S.extractHistoryLoaded = true; render(); }
   } catch {}
 }
@@ -1160,7 +1294,7 @@ function cpRecentItem(e, i) {
   e.stopPropagation();
   const it = S.recentHistory[i];
   if (!it||!it.result||!it.result[0]) return;
-  copyText(it.result[0].content || it.result[0].hook || '');
+  copyText(scriptCopyText(it.result[0]));
   showToast('已复制');
 }
 
@@ -1189,7 +1323,11 @@ function tHistory() {
           <div class="history-scripts">
             ${it.result.map((s,si)=>`
               <div class="history-script-item">
-                <span class="history-script-hook">${esc(s.hook)}</span>
+                <div class="history-script-col">
+                  ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
+                  ${s.content && String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
+                  ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
+                </div>
                 <div class="copy-btn" onclick="cpHistoryPage(event,${i},${si})">复制</div>
               </div>`).join('')}
           </div>`:''}
@@ -1203,8 +1341,7 @@ function cpHistoryPage(e, hi, si) {
   e.stopPropagation();
   const it = S.recentHistory[hi];
   if (!it||!it.result) return;
-  const s = it.result[si];
-  copyText(s ? (s.content||s.hook) : '');
+  copyText(scriptCopyText(it.result[si]));
   showToast('已复制');
 }
 
@@ -1234,11 +1371,13 @@ async function confirmNickname() {
 }
 
 function startEditNickname() {
+  if (!getToken()) { openAuthSheet(); showToast('请先登录'); return; }
   setState({ nicknameEditing: true, nicknameEditInput: S.userName === '创作者' ? '' : S.userName });
   setTimeout(() => { const el = document.getElementById('f-nick-edit'); if (el) el.focus(); }, 50);
 }
 
 async function saveNickname() {
+  if (!ensureLoggedIn()) return;
   const name = S.nicknameEditInput.trim();
   if (!name) { showToast('昵称不能为空'); return; }
   try {
@@ -1261,9 +1400,10 @@ function dismissNicknamePrompt() {
   if (token) {
     const user = getUser();
     if (user) { S.userName = user.nickname||'创作者'; S.userPhone = user.phone||''; S.userAvatar = user.avatar||0; }
-    S.page = 'main';
-    render(); fetchMe(); loadIndustries();
-  } else { render(); }
+    fetchMe();
+  }
+  render();
+  loadIndustries();
 })();
 </script>
 </body>
