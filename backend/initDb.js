@@ -153,11 +153,13 @@ async function initDb() {
     await db.query('INSERT IGNORE INTO system_config (config_key, value) VALUES (?, ?)', [k, v]);
   }
 
-  // asr_url 强制写入正确值（带 https://），覆盖历史错误记录
+  // asr_url：若不存在则插入，若已存在但缺少协议头则修正
   await db.query(
-    `INSERT INTO system_config (config_key, value) VALUES (?, ?)
-     ON DUPLICATE KEY UPDATE value = IF(value NOT LIKE 'http%', VALUES(value), value)`,
-    ['asr_url', 'https://baculitic-derivable-sherilyn.ngrok-free.dev']
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('asr_url', 'https://baculitic-derivable-sherilyn.ngrok-free.dev')`
+  );
+  await db.query(
+    `UPDATE system_config SET value = 'https://baculitic-derivable-sherilyn.ngrok-free.dev'
+     WHERE config_key = 'asr_url' AND value NOT LIKE 'http%'`
   );
 
   console.log('✅ 数据库初始化完成');
