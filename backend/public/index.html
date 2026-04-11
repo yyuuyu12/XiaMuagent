@@ -208,7 +208,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .payment-item { flex: 1; background: #fff; border: 1px solid #E4E2DA; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; align-items: center; margin-right: 8px; cursor: pointer; user-select: none; }
 .payment-item:last-child { margin-right: 0; }
 .payment-active { border-color: #6366F1; background: rgba(99,102,241,.04); }
-.payment-icon { font-size: 22px; margin-bottom: 4px; }
+.payment-icon { width: 36px; height: 36px; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; }
 .payment-name { font-size: 13px; color: #1A1814; }
 .pay-btn { background: #FF6B35; color: #fff; border-radius: 50px; height: 50px; line-height: 50px; text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 12px; cursor: pointer; user-select: none; }
 
@@ -1113,10 +1113,12 @@ function tVip() {
     <span class="section-label" style="margin-top:12px;display:block">支付方式</span>
     <div class="payment-row">
       <div class="payment-item ${S.selectedPayment==='wechat'?'payment-active':''}" onclick="selectPayment('wechat')">
-        <span class="payment-icon">💚</span><span class="payment-name">微信支付</span>
+        <div class="payment-icon"><svg viewBox="0 0 48 48" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="10" fill="#07C160"/><path d="M20.3 13C13.5 13 8 17.6 8 23.3c0 3.2 1.7 6 4.4 7.9l-1.1 3.3 3.8-1.9c1.3.4 2.7.6 4.2.6.4 0 .8 0 1.2-.1-.3-.8-.4-1.6-.4-2.5 0-5.2 4.9-9.4 11-9.4.4 0 .8 0 1.2.1C31.5 17 26.4 13 20.3 13z" fill="#fff"/><circle cx="16.5" cy="23" r="1.8" fill="#07C160"/><circle cx="23.5" cy="23" r="1.8" fill="#07C160"/><path d="M28.5 20.5c-5.5 0-10 3.6-10 8.1 0 4.5 4.5 8.1 10 8.1 1.2 0 2.3-.2 3.4-.5l3.1 1.6-.9-2.8c2.3-1.6 3.8-4 3.8-6.5 0-4.4-4.5-8-9.4-8z" fill="#fff"/><circle cx="25.5" cy="28.5" r="1.5" fill="#07C160"/><circle cx="31.5" cy="28.5" r="1.5" fill="#07C160"/></svg></div>
+        <span class="payment-name">微信支付</span>
       </div>
       <div class="payment-item ${S.selectedPayment==='alipay'?'payment-active':''}" onclick="selectPayment('alipay')">
-        <span class="payment-icon">💙</span><span class="payment-name">支付宝</span>
+        <div class="payment-icon"><svg viewBox="0 0 48 48" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="10" fill="#1677FF"/><path d="M37.9 31.3c-2.8-1-6.5-2.4-9.6-3.6 1.7-2.3 2.9-5.2 3.3-8.4H25v-2.1h8v-2H25V11h-4.5v4.2H12v2h8.5v2.1H13v2h13.8c-.4 2.2-1.3 4.2-2.6 5.8-2.8-1-5.6-1.9-7.7-2.3-4.6-.9-7.5 1-7.5 4.3 0 3.4 3.1 5.5 8.1 5.5 3.5 0 7-1.5 9.6-4.1 3.5 1.5 7.5 3.3 9.4 4.2l1.8-3.4z" fill="#fff"/><path d="M17.2 32.2c-3.2 0-4.9-1.1-4.9-2.8 0-1.6 1.4-2.4 3.7-2 1.8.3 3.9 1 6.1 1.9-1.6 1.8-3.3 2.9-4.9 2.9z" fill="#1677FF"/></svg></div>
+        <span class="payment-name">支付宝</span>
       </div>
     </div>
     <div class="pay-btn" onclick="handlePay()">立即开通（¥${pm[S.selectedPlan]}）</div>
