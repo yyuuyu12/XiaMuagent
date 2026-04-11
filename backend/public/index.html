@@ -93,6 +93,10 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .thin-divider { height: 1px; background: #ECEAE2; margin-bottom: 10px; }
 .script-text { display: block; font-size: 14px; color: #1A1814; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
 .script-text-sm { display: block; font-size: 12px; color: #A8A49C; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+.editable-script-textarea { width: 100%; min-height: 180px; max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 10px; padding: 12px; font-size: 14px; color: #1A1814; line-height: 1.8; resize: vertical; }
+.editable-script-textarea:focus { border-color: #F97316; outline: none; }
+.copy-btn-lg-wrap { display: flex; justify-content: center; margin: 10px 0 2px; }
+.copy-btn-lg { background: #6366F1; color: #fff; border-radius: 50px; padding: 0 28px; height: 42px; line-height: 42px; font-size: 15px; font-weight: 600; cursor: pointer; user-select: none; min-width: 170px; text-align: center; }
 
 /* === INSPIRE === */
 .section-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
@@ -444,8 +448,10 @@ const S = {
   profileView: 'main',
   appH5: { showProfilePhone: false, showAccountType: false },
   avatarCropOpen: false, avatarCropDataUrl: '',
+  extractController: null,
 };
 let inspireController = null;
+let extractController = null;
 
 // ===== UTILS =====
 function esc(s) {
@@ -810,12 +816,10 @@ function tExtract() {
   if (S.extractStep === 1) return `<div class="tab-page">
     <div class="result-card">
       <div class="result-header-row">
-        <span class="result-label">📝 提取的文案</span>
+        <span class="result-label">📝 提取的文案（可编辑）</span>
       </div>
       <div class="thin-divider"></div>
-      <div class="result-scroll-area">
-        <span class="script-text">${esc(S.extractedScript)}</span>
-      </div>
+      <textarea class="editable-script-textarea" id="f-extracted-script" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
       <div class="result-action-bottom">
         <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制'}</div>
       </div>
@@ -823,32 +827,35 @@ function tExtract() {
 ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
     <div class="action-row">
       <div class="btn-action-sec" onclick="resetExtract()">重新输入</div>
-      <div class="btn-action-main ${S.extractLoading?'btn-disabled':''}" onclick="handleRewrite()">
-        ${S.extractLoading?'⏳ 改写中...':'✨ 一键原创改写'}
-      </div>
+      ${S.extractLoading
+        ? `<div class="btn-action-main" style="background:#B83060" onclick="stopExtractRewrite()">⏹ 停止改写</div>`
+        : `<div class="btn-action-main ${!S.extractedScript.trim()?'btn-disabled':''}" onclick="handleRewrite()">✨ 一键原创改写</div>`}
     </div>
   </div>`;
 
   return `<div class="tab-page">
     <div class="result-card result-muted">
-      <span class="result-label-sm">原始文案</span>
-      <span class="script-text-sm">${esc(S.extractedScript)}</span>
+      <span class="result-label-sm">原始文案（可编辑）</span>
+      <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
+      <div class="result-action-bottom">
+        <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制原文'}</div>
+      </div>
     </div>
     <div class="result-card result-highlight">
       <div class="result-header-row">
-        <span class="result-label">🚀 原创改写</span>
+        <span class="result-label">🚀 原创改写（可编辑）</span>
       </div>
       <div class="thin-divider"></div>
-      <div class="result-scroll-area">
-        <span class="script-text">${esc(S.rewrittenScript)}</span>
-      </div>
-      <div class="result-action-bottom">
-        <div class="copy-btn" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制'}</div>
+      <textarea class="editable-script-textarea" id="f-rewritten-script" oninput="S.rewrittenScript=this.value">${esc(S.rewrittenScript)}</textarea>
+      <div class="copy-btn-lg-wrap">
+        <div class="copy-btn-lg" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制改写文案'}</div>
       </div>
     </div>
     <div class="action-row">
       <div class="btn-action-sec" onclick="resetExtract()">继续提取</div>
-      <div class="btn-action-main" onclick="rewriteAgain()">再次改写</div>
+      ${S.extractLoading
+        ? `<div class="btn-action-main" style="background:#B83060" onclick="stopExtractRewrite()">⏹ 停止改写</div>`
+        : `<div class="btn-action-main" onclick="rewriteAgain()">再次改写</div>`}
     </div>
   </div>`;
 }
@@ -1252,18 +1259,46 @@ async function handleExtract() {
 async function handleRewrite() {
   if (!ensureLoggedIn()) return;
   if (!S.extractedScript || S.extractLoading) return;
+  extractController = new AbortController();
+  S.extractController = extractController;
   setState({ extractLoading: true, extractErr: '' });
   try {
     const body = { text: S.extractedScript };
     if (S.rewriteStyle) body.style = S.rewriteStyle;
-    const r = await api.post('/ai/rewrite', body);
+    const r = await api.post('/ai/rewrite', body, extractController.signal);
+    extractController = null;
+    S.extractController = null;
     if (apiUnauthorized(r)) setState({ extractLoading: false });
     else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); refreshHistory(); }
     else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false });
-  } catch { setState({ extractErr: '网络错误，请稍后重试', extractLoading: false }); }
+  } catch (e) {
+    extractController = null;
+    S.extractController = null;
+    if (e && e.name === 'AbortError') setState({ extractErr: '', extractLoading: false });
+    else setState({ extractErr: '网络错误，请稍后重试', extractLoading: false });
+  }
 }
-function rewriteAgain() { setState({ extractStep: 1, rewrittenScript: '', extractErr: '' }); handleRewrite(); }
-function resetExtract() { setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '' }); }
+function stopExtractRewrite() {
+  if (extractController) {
+    extractController.abort();
+    extractController = null;
+    S.extractController = null;
+  }
+  setState({ extractLoading: false });
+}
+function rewriteAgain() {
+  // 保留当前已生成改写内容，仅重新触发一次改写请求
+  setState({ extractErr: '' });
+  handleRewrite();
+}
+function resetExtract() {
+  if (extractController) {
+    extractController.abort();
+    extractController = null;
+    S.extractController = null;
+  }
+  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '' });
+}
 function selectStyle(s) { setState({ rewriteStyle: S.rewriteStyle === s ? '' : s }); }
 async function pasteFromClipboard() {
   try {
