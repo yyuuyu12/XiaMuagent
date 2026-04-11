@@ -155,7 +155,7 @@ router.post('/inspire', requireAuth, async (req, res) => {
     const finalTrack = inputTrack || matchedIndustry || '通用';
     const styleSection = styleHint ? `\n创作风格要求：${styleHint}\n` : '';
 
-    const prompt = `你是抖音顶级爆款文案创作者。请为"${finalTrack}"赛道生成8篇可以直接发布的爆款文案。
+    const prompt = `你是抖音顶级爆款文案创作者。请为"${finalTrack}"赛道生成4篇可以直接发布的爆款文案。
 ${styleSection}
 严格按照以下JSON格式返回，不要返回任何其他内容：
 [
@@ -168,7 +168,7 @@ ${styleSection}
 要求：
 - content字段是完整的、可直接发布的文案全文，不是摘要或标题
 - content第一句话就是hook内容，文案要连贯
-- 8篇文案风格各异：疑问式、故事式、干货列表式、对比式、情绪共鸣式等轮换
+- 4篇文案风格各异：疑问式、故事式、干货列表式、情绪共鸣式
 - 适当使用emoji增加活泼感
 - 只返回JSON数组，不要markdown代码块，不要其他文字`;
 
