@@ -47,6 +47,7 @@ initDb()
     });
   })
   .catch(err => {
-    console.error('❌ 数据库初始化失败:', err.message);
+    console.error('❌ 数据库初始化失败:', err?.message || err?.code || String(err));
+    console.error('DATABASE_URL:', process.env.DATABASE_URL ? '已设置' : '【未设置！】');
     process.exit(1);
   });
