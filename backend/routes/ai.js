@@ -6,7 +6,8 @@ const router = express.Router();
 // ==================== 获取 AI 配置 ====================
 async function getAIConfig() {
   const keys = ['ai_provider','openai_api_key','openai_base_url','openai_model',
-    'claude_api_key','claude_model','qwen_api_key','qwen_model'];
+    'claude_api_key','claude_model','qwen_api_key','qwen_model',
+    'zhipu_api_key','zhipu_model'];
   const cfg = {};
   for (const k of keys) {
     const { rows } = await db.query('SELECT value FROM system_config WHERE config_key = $1', [k]);
@@ -58,7 +59,9 @@ async function callAI(prompt) {
     });
     if (!response.ok) throw new Error(`AI 接口错误: ${await response.text()}`);
     const data = await response.json();
-    return data.choices[0].message.content;
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error(`AI 返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
+    return content;
   }
 
   if (provider === 'claude') {
@@ -73,10 +76,29 @@ async function callAI(prompt) {
     });
     if (!response.ok) throw new Error(`Claude 接口错误: ${await response.text()}`);
     const data = await response.json();
-    return data.content[0].text;
+    const text = data.content?.[0]?.text;
+    if (!text) throw new Error(`Claude 返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
+    return text;
   }
 
-  throw new Error(`不支持的 AI 提供商: ${provider}`);
+  if (provider === 'zhipu' || provider === 'glm') {
+    const apiKey = cfg.zhipu_api_key;
+    const model = cfg.zhipu_model || 'glm-4-flash';
+    if (!apiKey) throw new Error('智谱 AI Key 未配置，请在后台填写 zhipu_api_key');
+
+    const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!response.ok) throw new Error(`智谱接口错误: ${await response.text()}`);
+    const data = await response.json();
+    const zc = data.choices?.[0]?.message?.content;
+    if (!zc) throw new Error(`智谱返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
+    return zc;
+  }
+
+  throw new Error(`不支持的 AI 提供商: ${provider}，请在后台选择 openai / qwen / claude / zhipu 并配置对应 Key`);
 }
 
 // ==================== 文案改写 ====================

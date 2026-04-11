@@ -51,7 +51,7 @@ router.post('/login', async (req, res) => {
     if (!match) return res.status(401).json({ code: 401, msg: '密码错误' });
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-    const { password: _, ...safeUser } = user;
+    const { password: _, avatar_image: _ai, ...safeUser } = user;
     res.json({ code: 200, msg: '登录成功', data: { token, user: safeUser } });
   } catch (err) {
     console.error('/login error:', err.message);
@@ -63,7 +63,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, phone, nickname, avatar, role, daily_limit, auth_code_id, auth_expires_at, created_at FROM users WHERE id = $1',
+      'SELECT id, phone, nickname, avatar, avatar_image, role, daily_limit, auth_code_id, auth_expires_at, created_at FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows[0]) return res.status(404).json({ code: 404, msg: '用户不存在' });
@@ -74,10 +74,13 @@ router.get('/me', requireAuth, async (req, res) => {
       [req.userId]
     );
     const usedToday = parseInt(usageRows[0].cnt);
+    const isAdmin = user.role === 'admin';
+    const remaining = isAdmin ? 999 : Math.max(0, user.daily_limit - usedToday);
+    const dailyLimitOut = isAdmin ? 999 : user.daily_limit;
 
     res.json({
       code: 200,
-      data: { ...user, used_today: usedToday, remaining: Math.max(0, user.daily_limit - usedToday) }
+      data: { ...user, daily_limit: dailyLimitOut, used_today: usedToday, remaining }
     });
   } catch (err) {
     console.error('/me error:', err.message);
@@ -165,7 +168,7 @@ router.post('/wx-login', async (req, res) => {
           );
           user = newRows[0];
         } else {
-          const { password: _, ...safe } = user;
+          const { password: _, avatar_image: _aim, ...safe } = user;
           user = safe;
         }
 
@@ -182,16 +185,46 @@ router.post('/wx-login', async (req, res) => {
 // ==================== 修改头像 ====================
 router.post('/update-avatar', requireAuth, async (req, res) => {
   const { avatar } = req.body;
-  await db.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatar ?? 0, req.userId]);
+  await db.query('UPDATE users SET avatar = $1, avatar_image = NULL WHERE id = $2', [avatar ?? 0, req.userId]);
   res.json({ code: 200, msg: '更新成功' });
 });
 
-// ==================== 修改昵称/头像 ====================
+// ==================== 修改昵称 / 头像 / 自定义头像图 ====================
 router.put('/profile', requireAuth, async (req, res) => {
-  const { nickname, avatar } = req.body;
-  await db.query('UPDATE users SET nickname = $1, avatar = $2 WHERE id = $3',
-    [nickname || '用户', avatar ?? 0, req.userId]);
-  res.json({ code: 200, msg: '更新成功' });
+  try {
+    const { nickname, avatar, avatar_image } = req.body || {};
+    const parts = [];
+    const vals = [];
+
+    if (nickname !== undefined) {
+      parts.push('nickname = ?');
+      vals.push(String(nickname || '用户').trim().slice(0, 50) || '用户');
+    }
+    if (avatar !== undefined) {
+      parts.push('avatar = ?');
+      vals.push(parseInt(avatar, 10) || 0);
+    }
+    if (avatar_image !== undefined) {
+      if (avatar_image === null || avatar_image === '') {
+        parts.push('avatar_image = ?');
+        vals.push(null);
+      } else if (typeof avatar_image === 'string' && avatar_image.startsWith('data:image')) {
+        if (avatar_image.length > 900000) {
+          return res.status(400).json({ code: 400, msg: '图片过大，请换一张较小的图片' });
+        }
+        parts.push('avatar_image = ?');
+        vals.push(avatar_image);
+      }
+    }
+
+    if (!parts.length) return res.status(400).json({ code: 400, msg: '无更新项' });
+    vals.push(req.userId);
+    await db.query(`UPDATE users SET ${parts.join(', ')} WHERE id = ?`, vals);
+    res.json({ code: 200, msg: '更新成功' });
+  } catch (err) {
+    console.error('/profile error:', err.message);
+    res.status(500).json({ code: 500, msg: '更新失败' });
+  }
 });
 
 // ==================== JWT 中间件 ====================

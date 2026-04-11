@@ -22,17 +22,14 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 
 /* === TOP BAR === */
 .top-bar {
-  display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+  display: flex; flex-direction: row; align-items: center;
   padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 10px;
   background: #F2F0EA; flex-shrink: 0;
 }
 .app-name { font-size: 17px; font-weight: 700; color: #1A1814; letter-spacing: .5px; }
-.top-bar-login { font-size: 14px; font-weight: 600; color: #F97316; padding: 6px 4px; cursor: pointer; user-select: none; flex-shrink: 0; }
-.top-bar-sub { justify-content: space-between; }
-.back-btn { display: flex; flex-direction: row; align-items: center; width: 60px; cursor: pointer; user-select: none; }
-.back-icon { font-size: 20px; color: #1A1814; line-height: 1; margin-right: 4px; font-weight: 400; display: flex; align-items: center; }
-.back-text { font-size: 14px; color: #1A1814; line-height: 1; }
-.sub-page-title { font-size: 16px; font-weight: 600; color: #1A1814; text-align: center; }
+.top-bar-sub { justify-content: space-between; align-items: center; }
+.back-btn { border: none; background: transparent; padding: 6px 0; margin: 0; font-size: 15px; font-weight: 500; color: #1A1814; cursor: pointer; user-select: none; display: inline-flex; align-items: center; line-height: 1.25; min-width: 56px; font-family: inherit; }
+.sub-page-title { font-size: 16px; font-weight: 600; color: #1A1814; text-align: center; flex: 1; }
 
 /* === CONTENT === */
 .page-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
@@ -132,22 +129,21 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .history-scripts { margin-top: 8px; border-top: 1px solid #F0EEE8; padding-top: 8px; }
 .history-script-item { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F7F6F2; }
 .history-script-hook { flex: 1; font-size: 13px; color: #1A1814; line-height: 1.5; margin-right: 8px; }
-.history-script-col { flex: 1; min-width: 0; margin-right: 8px; display: flex; flex-direction: column; align-items: stretch; }
-.history-script-col .history-script-hook { flex: none; }
-.history-script-content { display: block; font-size: 13px; color: #555; line-height: 1.75; white-space: pre-wrap; word-break: break-word; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ECEAE2; }
 
 /* === PROFILE === */
-.profile-hero { background: linear-gradient(135deg,#6366F1 0%,#818CF8 100%); border-radius: 12px; padding: 24px 18px 20px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; }
-.avatar-lg { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; position: relative; cursor: pointer; }
+.profile-hero { background: linear-gradient(135deg,#6366F1 0%,#818CF8 100%); border-radius: 12px; padding: 18px 16px 16px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: stretch; }
+.profile-hero-top { display: flex; flex-direction: row; align-items: center; width: 100%; margin-bottom: 14px; }
+.profile-hero-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 0 10px 0 12px; }
+.profile-phone-inline { display: block; font-size: 12px; color: rgba(255,255,255,.72); margin-top: 4px; }
+.avatar-lg { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 0; position: relative; overflow: hidden; flex-shrink: 0; }
 .avatar-type-0 { background: rgba(124,58,237,.55); }
 .avatar-type-1 { background: rgba(249,115,22,.55); }
 .avatar-type-2 { background: rgba(59,130,246,.55); }
 .avatar-type-3 { background: rgba(16,185,129,.55); }
-.avatar-lg-text { font-size: 26px; line-height: 1; }
-.avatar-edit-badge { position: absolute; bottom: 0; right: 0; font-size: 12px; background: #fff; border-radius: 50%; width: 20px; height: 20px; line-height: 20px; text-align: center; }
-.profile-name { display: block; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 4px; cursor: pointer; user-select: none; }
-.profile-name-edit-hint { font-size: 13px; opacity: .8; }
-.profile-phone { display: block; font-size: 12px; color: rgba(255,255,255,.75); margin-bottom: 14px; }
+.avatar-lg-text { font-size: 28px; line-height: 1; }
+.avatar-lg-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.profile-name { display: block; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 0; user-select: none; line-height: 1.25; word-break: break-all; }
+.profile-edit-entry { flex-shrink: 0; align-self: center; font-size: 13px; font-weight: 600; color: #4F46E5; padding: 8px 12px; border-radius: 50px; background: #fff; cursor: pointer; user-select: none; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .nickname-edit-wrap { display: flex; flex-direction: row; align-items: center; margin-bottom: 12px; gap: 6px; }
 .nickname-edit-input { flex: 1; background: rgba(255,255,255,.25); border: 1px solid rgba(255,255,255,.5); border-radius: 8px; height: 36px; padding: 0 10px; font-size: 14px; color: #fff; }
 .nickname-edit-input::placeholder { color: rgba(255,255,255,.6); }
@@ -179,20 +175,18 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .code-row { display: flex; flex-direction: row; align-items: center; }
 .code-input { flex: 1; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 6px 0 0 6px; padding: 0 12px; font-size: 14px; color: #1A1814; height: 44px; }
 .code-input::placeholder { color: #C4C0B8; }
-.code-submit { background: #FF6B35; color: #fff; border-radius: 0 6px 6px 0; padding: 0 18px; height: 44px; line-height: 44px; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; flex-shrink: 0; }
+.code-submit { background: #FFD8C4; color: #9A3412; border-radius: 0 6px 6px 0; padding: 0 16px; height: 44px; line-height: 44px; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; flex-shrink: 0; }
 .code-msg { display: block; font-size: 12px; margin-top: 6px; }
 .code-ok { color: #2D7A3A; }
 .code-err { color: #B83060; }
 .code-activated { background: rgba(45,122,58,.06); border-radius: 6px; padding: 10px; }
 .code-activated-text { font-size: 13px; color: #2D7A3A; line-height: 1.6; }
-.vip-upgrade-card { background: linear-gradient(135deg,#FF6B35 0%,#FF8C5A 100%); border-radius: 10px; padding: 22px 18px; min-height: 92px; margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; cursor: pointer; user-select: none; }
+.vip-upgrade-card { background: linear-gradient(135deg,#FF6B35 0%,#FF8C5A 100%); border-radius: 12px; padding: 20px 16px; margin-bottom: 10px; display: flex; flex-direction: row; align-items: center; cursor: pointer; user-select: none; }
 .vip-upgrade-left { flex: 1; }
-.vip-upgrade-title { display: block; font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-.vip-upgrade-sub { display: block; font-size: 12px; color: rgba(255,255,255,.85); }
-.vip-upgrade-arrow { font-size: 22px; color: rgba(255,255,255,.8); margin-left: 4px; }
-.logout-btn { background: #fff; border: 1px solid #ECEAE2; border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 8px; color: #B83060; font-size: 15px; font-weight: 500; cursor: pointer; user-select: none; }
-.profile-tab-page { display: flex; flex-direction: column; min-height: calc(100dvh - 132px); }
-.profile-logout { margin-top: auto; margin-bottom: 4px; }
+.vip-upgrade-title { display: block; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.vip-upgrade-sub { display: block; font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.45; }
+.vip-upgrade-arrow { font-size: 24px; color: rgba(255,255,255,.85); margin-left: 6px; }
+.logout-btn { background: #fff; border: 1px solid #E4E2DA; border-radius: 10px; padding: 14px 16px; text-align: center; margin-top: 18px; margin-bottom: 8px; color: #6B6560; font-size: 15px; font-weight: 500; cursor: pointer; user-select: none; }
 
 /* === VIP === */
 .vip-hero { background: linear-gradient(135deg,#1A1814 0%,#3A3530 100%); border-radius: 12px; padding: 28px 18px 24px; margin-bottom: 14px; display: flex; flex-direction: column; align-items: center; }
@@ -230,35 +224,13 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .pay-modal-note { display: block; font-size: 13px; color: #A8A49C; text-align: center; margin-bottom: 16px; line-height: 1.6; }
 .pay-modal-btn { background: #FF6B35; color: #fff; border-radius: 50px; padding: 0 30px; height: 44px; line-height: 44px; font-size: 15px; font-weight: 600; cursor: pointer; }
 
-/* === AUTH BOTTOM SHEET === */
-.auth-sheet-mask {
-  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 220;
-  display: flex; align-items: flex-end; justify-content: center;
-}
-.auth-sheet {
-  width: 100%; max-width: 480px; background: #F2F0EA;
-  border-radius: 18px 18px 0 0;
-  padding: 0 0 calc(12px + env(safe-area-inset-bottom, 0px));
-  max-height: min(90vh, 720px);
-  overflow: hidden; display: flex; flex-direction: column;
-  box-shadow: 0 -8px 32px rgba(0,0,0,.12);
-}
-.auth-sheet-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 16px 8px; flex: 1; min-height: 0; }
-.auth-sheet-handle { width: 40px; height: 5px; background: #D4D0C8; border-radius: 3px; margin: 10px auto 6px; cursor: pointer; }
-.auth-sheet-head { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 4px 16px 8px; }
-.auth-sheet-title { font-size: 17px; font-weight: 700; color: #1A1814; }
-.auth-sheet-close { font-size: 22px; color: #A8A49C; line-height: 1; padding: 8px; margin: -4px -8px -4px 0; cursor: pointer; user-select: none; }
-.auth-sheet-sub { font-size: 13px; color: #A8A49C; padding: 0 16px 12px; line-height: 1.5; }
-.profile-guest-cta { display: block; margin: 12px auto 0; background: #fff; color: #6366F1; font-size: 15px; font-weight: 600; text-align: center; border-radius: 50px; padding: 12px 20px; cursor: pointer; user-select: none; width: 100%; max-width: 260px; }
-.profile-guest-hint { display: block; font-size: 12px; color: rgba(255,255,255,.85); text-align: center; margin-top: 8px; line-height: 1.5; }
-
-/* === LOGIN FORM (sheet + legacy classes) === */
+/* === LOGIN === */
+.login-page { min-height: 100vh; background: #F2F0EA; overflow-y: auto; -webkit-overflow-scrolling: touch; max-width: 480px; margin: 0 auto; }
 .logo-area { display: flex; flex-direction: column; align-items: center; padding: 60px 24px 24px; }
 .logo-icon { font-size: 44px; margin-bottom: 10px; }
 .logo-title { font-size: 24px; font-weight: 700; color: #1A1814; letter-spacing: 1px; margin-bottom: 6px; }
 .logo-sub { font-size: 13px; color: #A8A49C; }
 .form-card { background: #fff; border-radius: 14px; margin: 0 16px; padding: 20px 18px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-.form-card-sheet { margin: 0; box-shadow: 0 1px 8px rgba(0,0,0,.06); }
 .mode-switch { display: flex; background: #F7F6F2; border-radius: 50px; padding: 3px; margin-bottom: 20px; }
 .mode-btn { flex: 1; text-align: center; height: 34px; line-height: 34px; border-radius: 50px; font-size: 14px; color: #A8A49C; cursor: pointer; user-select: none; }
 .mode-active { background: #fff; color: #1A1814; font-weight: 600; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
@@ -272,11 +244,11 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .err-msg { display: block; color: #B83060; font-size: 12px; text-align: center; margin-bottom: 8px; padding: 6px; background: rgba(184,48,96,.06); border-radius: 6px; }
 .submit-btn { background: #FF6B35; color: #fff; border-radius: 50px; height: 48px; line-height: 48px; text-align: center; font-size: 16px; font-weight: 600; margin-top: 4px; cursor: pointer; user-select: none; }
 .submit-disabled { opacity: .5; pointer-events: none; }
-.footer-tip { text-align: center; padding: 12px 8px 8px; }
+.footer-tip { text-align: center; padding: 20px 16px 40px; }
 .footer-text { font-size: 11px; color: #C4C0B8; }
 
 /* === TOAST === */
-.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 260; pointer-events: none; white-space: nowrap; max-width: 480px; }
+.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 200; pointer-events: none; white-space: nowrap; max-width: 480px; }
 
 /* === USAGE PROGRESS BAR === */
 .usage-progress-wrap { display: flex; flex-direction: row; align-items: center; }
@@ -294,10 +266,25 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .home-section-title { font-size: 14px; font-weight: 600; color: #1A1814; }
 .home-section-more { font-size: 12px; color: #A8A49C; cursor: pointer; user-select: none; }
 .recent-list { display: flex; flex-direction: row; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px 4px; }
-.recent-item { flex-shrink: 0; width: 160px; background: #fff; border-radius: 10px; padding: 12px; margin-right: 10px; position: relative; cursor: pointer; user-select: none; box-shadow: 0 1px 6px rgba(0,0,0,.05); }
-.recent-item-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: #1A1814; line-height: 1.5; margin-bottom: 6px; }
-.recent-item-time { display: block; font-size: 11px; color: #A8A49C; }
-.recent-copy { position: absolute; top: 8px; right: 8px; font-size: 14px; color: #A8A49C; cursor: pointer; user-select: none; padding: 2px; }
+.recent-item { flex-shrink: 0; width: 168px; background: #fff; border-radius: 10px; padding: 10px 12px 10px; margin-right: 10px; cursor: pointer; user-select: none; box-shadow: 0 1px 6px rgba(0,0,0,.05); display: flex; flex-direction: column; align-items: stretch; }
+.recent-item-head { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.recent-item-text { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: #1A1814; line-height: 1.45; }
+.recent-copy { flex-shrink: 0; font-size: 12px; color: #A8A49C; cursor: pointer; user-select: none; padding: 2px 4px; margin-top: -1px; border-radius: 4px; background: #F7F6F2; }
+.recent-item-time { display: block; font-size: 11px; color: #A8A49C; margin-top: auto; }
+.profile-edit-page { padding-bottom: 24px; }
+.profile-field { margin-bottom: 16px; }
+.profile-field-label { display: block; font-size: 12px; color: #A8A49C; margin-bottom: 6px; }
+.profile-field-hint { font-size: 12px; color: #A8A49C; margin-top: 6px; line-height: 1.5; }
+.profile-phone-muted { background: #F3F2EE !important; color: #B8B4AC !important; border: 1px solid #E8E4DC !important; cursor: default !important; pointer-events: none; }
+input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; font-size: 14px; width: 100%; -webkit-text-fill-color: #B8B4AC; opacity: 1; }
+.crop-modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.crop-modal { background: #fff; border-radius: 14px; padding: 18px; width: 100%; max-width: 320px; }
+.crop-modal-title { font-size: 16px; font-weight: 600; color: #1A1814; margin-bottom: 12px; text-align: center; }
+.crop-preview-wrap { width: 200px; height: 200px; margin: 0 auto 14px; border-radius: 12px; overflow: hidden; background: #F7F6F2; }
+.crop-preview-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.crop-modal-actions { display: flex; flex-direction: row; gap: 10px; }
+.crop-modal-actions .btn-secondary { flex: 1; text-align: center; border-radius: 50px; height: 44px; line-height: 44px; background: #F0EDE8; color: #555; font-size: 14px; cursor: pointer; user-select: none; }
+.crop-modal-actions .btn-primary { flex: 1; text-align: center; border-radius: 50px; height: 44px; line-height: 44px; background: #FF6B35; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; }
 .recent-empty { background: #fff; border-radius: 10px; padding: 24px; display: flex; flex-direction: column; align-items: center; }
 .recent-empty-icon { font-size: 32px; margin-bottom: 8px; }
 .recent-empty-text { font-size: 13px; color: #A8A49C; margin-bottom: 12px; text-align: center; line-height: 1.6; }
@@ -368,7 +355,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 <div id="app"></div>
 <script>
 // ===== CONFIG =====
-const API_BASE = 'http://106.14.151.37/api';
+const API_BASE = (location.protocol === 'http:' || location.protocol === 'https:') ? `${location.origin}/api` : 'http://106.14.151.37/api';
 
 // ===== STORAGE =====
 function getToken() { return localStorage.getItem('wf_token') || ''; }
@@ -384,7 +371,17 @@ async function apiFetch(method, path, data, signal) {
   if (data) opts.body = JSON.stringify(data);
   if (signal) opts.signal = signal;
   const res = await fetch(API_BASE + path, opts);
-  try { return await res.json(); } catch { return { code: res.status, msg: '服务器响应异常' }; }
+  const raw = await res.text();
+  if (!raw.trim()) {
+    return { code: res.status || 500, msg: res.status >= 500 ? '服务器无响应内容，请稍后重试' : '请求失败' };
+  }
+  try {
+    const j = JSON.parse(raw);
+    if (j && typeof j.msg === 'string' && j.msg.length > 200) j.msg = j.msg.slice(0, 200) + '…';
+    return j;
+  } catch {
+    return { code: res.status || 500, msg: `服务器返回非 JSON（${res.status}），请检查网关或部署日志` };
+  }
 }
 const api = {
   get: (path, signal) => apiFetch('GET', path, null, signal),
@@ -395,8 +392,7 @@ const api = {
 
 // ===== STATE =====
 const S = {
-  currentTab: 'home',
-  showAuthSheet: false,
+  page: 'login', currentTab: 'home',
   isRegMode: false, phone: '', password: '', authErr: '', loading: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
@@ -411,6 +407,9 @@ const S = {
   nicknameEditing: false, nicknameEditInput: '',
   historyPageExpanded: null,
   showTipExpanded: false, rewriteStyle: '', extractHistory: [], extractHistoryLoaded: false,
+  profileView: 'main',
+  appH5: { showProfilePhone: false, showAccountType: false },
+  avatarCropOpen: false, avatarCropDataUrl: '',
 };
 let inspireController = null;
 
@@ -439,6 +438,20 @@ function fbCopy(text) {
   document.execCommand('copy'); ta.remove();
 }
 
+function formatDisplayTime(iso) {
+  if (iso == null || iso === '') return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).replace('T', ' ').slice(0, 16);
+  const p = (n) => (n < 10 ? '0' : '') + n;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function maskPhone(phone) {
+  const s = String(phone || '');
+  if (s.length < 7) return s;
+  return s.slice(0, 3) + '****' + s.slice(-4);
+}
+
 // ===== RENDER ENGINE =====
 function setState(updates) {
   const focusId = document.activeElement && document.activeElement.id;
@@ -452,69 +465,42 @@ function setState(updates) {
   }
 }
 function render() {
-  document.getElementById('app').innerHTML = tMain();
+  document.getElementById('app').innerHTML = S.page === 'login' ? tLogin() : tMain();
 }
 
-function openAuthSheet() { setState({ showAuthSheet: true, authErr: '' }); }
-function closeAuthSheet() { setState({ showAuthSheet: false, authErr: '', loading: false }); }
-
-/** 需要登录的操作入口：未登录则弹出底部登录层 */
-function ensureLoggedIn() {
-  if (getToken()) return true;
-  openAuthSheet();
-  showToast('请先登录');
-  return false;
-}
-
-function apiUnauthorized(r) {
-  if (r && r.code === 401) {
-    const had = !!getToken();
-    clearAuth();
-    setState({ userInfo: null, userName: '创作者', userPhone: '', userAvatar: 0, recentHistory: [], recentHistoryLoaded: false, inspireHistory: [], historyLoaded: false });
-    if (had) { openAuthSheet(); showToast('登录已过期，请重新登录'); }
-    return true;
-  }
-  return false;
-}
-
-// ===== AUTH BOTTOM SHEET =====
-function tAuthSheet() {
-  return `<div class="auth-sheet-mask" onclick="closeAuthSheet()">
-    <div class="auth-sheet" onclick="event.stopPropagation()">
-      <div class="auth-sheet-handle" onclick="closeAuthSheet()" title="关闭"></div>
-      <div class="auth-sheet-head">
-        <span class="auth-sheet-title">登录 / 注册</span>
-        <span class="auth-sheet-close" onclick="closeAuthSheet()">✕</span>
+// ===== LOGIN TEMPLATE =====
+function tLogin() {
+  return `<div class="login-page">
+    <div class="logo-area">
+      <div class="logo-icon">🔥</div>
+      <span class="logo-title">爆款文案工坊</span>
+      <span class="logo-sub">AI驱动 · 一键生成爆款内容</span>
+    </div>
+    <div class="form-card">
+      <div class="mode-switch">
+        <div class="mode-btn ${!S.isRegMode?'mode-active':''}" onclick="setLoginMode()">登录</div>
+        <div class="mode-btn ${S.isRegMode?'mode-active':''}" onclick="setRegMode()">注册</div>
       </div>
-      <span class="auth-sheet-sub">登录后可保存创作记录、同步历史并使用 AI 生成</span>
-      <div class="auth-sheet-scroll">
-        <div class="form-card form-card-sheet">
-          <div class="mode-switch">
-            <div class="mode-btn ${!S.isRegMode?'mode-active':''}" onclick="setLoginMode()">登录</div>
-            <div class="mode-btn ${S.isRegMode?'mode-active':''}" onclick="setRegMode()">注册</div>
-          </div>
-          <div class="field-group">
-            <span class="field-label">手机号</span>
-            <div class="input-wrap">
-              <span class="input-prefix">+86</span>
-              <input id="f-phone" class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
-                value="${esc(S.phone)}" oninput="S.phone=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
-            </div>
-          </div>
-          <div class="field-group">
-            <span class="field-label">密码</span>
-            <input id="f-pwd" class="lf-input" type="password"
-              placeholder="${S.isRegMode?'设置密码（至少6位）':'请输入密码'}"
-              value="${esc(S.password)}" oninput="S.password=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
-          </div>
-          ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
-          <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleAuth()">
-            ${S.loading?'请稍候...':(S.isRegMode?'注册':'登录')}
-          </div>
+      <div class="field-group">
+        <span class="field-label">手机号</span>
+        <div class="input-wrap">
+          <span class="input-prefix">+86</span>
+          <input id="f-phone" class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
+            value="${esc(S.phone)}" oninput="S.phone=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
         </div>
-        <div class="footer-tip"><span class="footer-text">登录即表示同意用户协议和隐私政策</span></div>
+      </div>
+      <div class="field-group">
+        <span class="field-label">密码</span>
+        <input id="f-pwd" class="lf-input" type="password"
+          placeholder="${S.isRegMode?'设置密码（至少6位）':'请输入密码'}"
+          value="${esc(S.password)}" oninput="S.password=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+      </div>
+      ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
+      <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleAuth()">
+        ${S.loading?'请稍候...':(S.isRegMode?'注册':'登录')}
       </div>
     </div>
+    <div class="footer-tip"><span class="footer-text">登录即表示同意用户协议和隐私政策</span></div>
   </div>`;
 }
 
@@ -526,22 +512,27 @@ function tMain() {
     ${tBottomTab()}
     ${S.showPayModal?tPayModal():''}
     ${S.nicknamePrompt?tNicknamePrompt():''}
-    ${S.showAuthSheet?tAuthSheet():''}
+    ${S.avatarCropOpen?tAvatarCropModal():''}
   </div>`;
 }
 
 function tTopBar() {
   const t = S.currentTab;
+  if (t === 'profile' && S.profileView === 'edit') {
+    return `<div class="top-bar top-bar-sub">
+      <button type="button" class="back-btn" onclick="goProfileEditBack()">← 返回</button>
+      <span class="sub-page-title">编辑资料</span>
+      <div style="width:56px;flex-shrink:0"></div>
+    </div>`;
+  }
   if (t === 'home' || t === 'profile' || t === 'history') {
-    const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '';
-    return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span>${loginHint}</div>`;
+    return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span></div>`;
   }
   const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员' };
-  const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:60px"></div>';
   return `<div class="top-bar top-bar-sub">
-    <div class="back-btn" onclick="goBack()"><span class="back-icon">‹</span><span class="back-text">返回</span></div>
+    <button type="button" class="back-btn" onclick="goBack()">← 返回</button>
     <span class="sub-page-title">${titles[t]||''}</span>
-    ${loginHint}
+    <div style="width:56px;flex-shrink:0"></div>
   </div>`;
 }
 
@@ -572,25 +563,17 @@ function tBottomTab() {
 }
 
 // ===== HOME =====
-function getCuteGreeting() {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 12) return '早上好，创意人 ☀️';
-  if (h >= 12 && h < 18) return '下午好，创意人 ⛅';
-  if (h >= 18 && h < 22) return '晚上好，创意人 🌙';
-  return '夜深了，还在创作 🌟';
-}
-
 function tHome() {
   const u = S.userInfo;
-  // 欢迎语：有昵称显示昵称，无昵称显示可爱称呼
+  // 欢迎语：有昵称显示昵称，无昵称显示「你好，老板」
   const hasNickname = !!(u?.nickname && u.nickname.trim());
-  const greetText = hasNickname ? `你好，${esc(u.nickname)} 👋` : getCuteGreeting();
+  const greetText = hasNickname ? `你好，${esc(u.nickname)} 👋` : '你好，老板';
 
   // 用次进度条：已登录但数据未加载时显示空进度条
   let usageSection;
   if (!u) {
     usageSection = '';
-  } else if (u.daily_limit >= 999) {
+  } else if (u.role === 'admin' || u.daily_limit >= 999) {
     usageSection = `<div class="usage-bar"><span class="usage-text">次数：无限制 ∞</span></div>`;
   } else {
     const used = u.used_today || 0;
@@ -666,9 +649,11 @@ function tRecentSection() {
           ${items.slice(0,5).map((it,i)=>{
             const text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
             return `<div class="recent-item" onclick="switchTab('history')">
-              <div class="recent-copy" onclick="cpRecentItem(event,${i})">⧉</div>
-              <div class="recent-item-text">${esc(text)}</div>
-              <span class="recent-item-time">${esc(it.created_at||'')}</span>
+              <div class="recent-item-head">
+                <div class="recent-item-text">${esc(text)}</div>
+                <div class="recent-copy" onclick="cpRecentItem(event,${i})" title="复制">复制</div>
+              </div>
+              <span class="recent-item-time">${esc(formatDisplayTime(it.created_at))}</span>
             </div>`;
           }).join('')}
         </div>`}
@@ -786,7 +771,7 @@ function tInspire() {
       <span class="section-label">或自定义赛道</span>
       <input class="field-input" id="f-track" placeholder="例如：宠物博主、职场干货..."
         value="${esc(S.customTrack)}"
-        oninput="S.customTrack=this.value;if(S.selectedIndustryId){S.selectedIndustryId=null;S.selectedIndustryName='';render();}"/>
+        oninput="S.customTrack=this.value;if(S.selectedIndustryId){S.selectedIndustryId=null;S.selectedIndustryName='';}render();"/>
     </div>
     ${S.inspireErr?`<span class="err-text">${esc(S.inspireErr)}</span>`:''}
     <div class="inspire-action-row">
@@ -837,16 +822,12 @@ function tInspire() {
               <span class="history-track">${esc(it.input||it.track)}</span>
               ${it.result?`<span class="history-count">${it.result.length}条</span>`:''}
             </div>
-            <span class="history-time">${esc(it.created_at)}</span>
+            <span class="history-time">${esc(formatDisplayTime(it.created_at))}</span>
             ${S.historyExpanded===i&&it.result?`
               <div class="history-scripts">
                 ${it.result.map((s,si)=>`
                   <div class="history-script-item">
-                    <div class="history-script-col">
-                      ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
-                      ${s.content && String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
-                      ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
-                    </div>
+                    <span class="history-script-hook">${esc(s.hook)}</span>
                     <div class="copy-btn" onclick="cpHistory(event,${i},${si})">复制</div>
                   </div>`).join('')}
               </div>`:''}
@@ -857,57 +838,39 @@ function tInspire() {
 
 // ===== PROFILE =====
 function tProfile() {
+  if (S.profileView === 'edit') return tProfileEdit();
   const u = S.userInfo;
-  const loggedIn = !!getToken();
   const emojis = ['👨‍🚀','🦊','🐱','🐼'];
-  const emoji = emojis[S.userAvatar] || (S.userName?S.userName[0]:'?');
-  const heroBlock = !loggedIn ? `
+  const emoji = emojis[S.userAvatar] || (S.userName ? S.userName[0] : '?');
+  const hasImg = u && u.avatar_image;
+  const showPhone = S.appH5 && S.appH5.showProfilePhone;
+  const showAcc = S.appH5 && S.appH5.showAccountType;
+  const hasAuthRows = u && u.role !== 'admin' && (u.daily_limit || 5) < 999;
+  const showAccountSection = u && (showAcc || hasAuthRows);
+  return `<div class="tab-page">
     <div class="profile-hero">
-      <div class="avatar-lg avatar-type-0" onclick="openAuthSheet()">
-        <span class="avatar-lg-text">👤</span>
+      <div class="profile-hero-top">
+        <div class="avatar-lg avatar-type-${S.userAvatar}">
+          ${hasImg ? `<img class="avatar-lg-img" src="${esc(u.avatar_image)}" alt=""/>` : `<span class="avatar-lg-text">${emoji}</span>`}
+        </div>
+        <div class="profile-hero-mid">
+          <span class="profile-name">${esc(S.userName)}</span>
+          ${showPhone && S.userPhone && !S.userPhone.startsWith('wx_') ? `<span class="profile-phone-inline">+86 ${esc(S.userPhone)}</span>` : ''}
+        </div>
+        <div class="profile-edit-entry" onclick="openProfileEdit()">编辑资料</div>
       </div>
-      <span class="profile-name" style="cursor:default">未登录</span>
-      <span class="profile-guest-hint">登录后可保存创作记录、查看历史与次数</span>
-      <div class="profile-guest-cta" onclick="openAuthSheet()">登录 / 注册</div>
-    </div>` : `
-    <div class="profile-hero">
-      <div class="avatar-lg avatar-type-${S.userAvatar}" onclick="toggleAvatarPicker()">
-        <span class="avatar-lg-text">${emoji}</span>
-        <div class="avatar-edit-badge">✏️</div>
-      </div>
-      ${S.nicknameEditing ? `
-        <div class="nickname-edit-wrap">
-          <input class="nickname-edit-input" id="f-nick-edit" placeholder="输入新昵称" maxlength="20"
-            value="${esc(S.nicknameEditInput)}" oninput="S.nicknameEditInput=this.value"/>
-          <div class="nickname-edit-save" onclick="saveNickname()">保存</div>
-          <div class="nickname-edit-cancel" onclick="setState({nicknameEditing:false})">取消</div>
-        </div>` : `
-        <span class="profile-name" onclick="startEditNickname()">${esc(S.userName)} <span class="profile-name-edit-hint">✏️</span></span>`}
-      ${S.userPhone && !S.userPhone.startsWith('wx_') ? `<span class="profile-phone">+86 ${esc(S.userPhone)}</span>` : ''}
       ${u?`<div class="usage-stats">
         <div class="stat-item"><span class="stat-num">${u.used_today||0}</span><span class="stat-label">今日已用</span></div>
         <div class="stat-divider"></div>
-        <div class="stat-item"><span class="stat-num ${u.remaining<=0?'stat-empty':''}">${u.daily_limit>=999?'∞':u.remaining}</span><span class="stat-label">今日剩余</span></div>
+        <div class="stat-item"><span class="stat-num ${u.role!=='admin'&&u.daily_limit<999&&u.remaining<=0?'stat-empty':''}">${u.role==='admin'||u.daily_limit>=999?'∞':u.remaining}</span><span class="stat-label">今日剩余</span></div>
         <div class="stat-divider"></div>
-        <div class="stat-item"><span class="stat-num">${u.daily_limit>=999?'∞':u.daily_limit}</span><span class="stat-label">每日上限</span></div>
+        <div class="stat-item"><span class="stat-num">${u.role==='admin'||u.daily_limit>=999?'∞':(u.daily_limit||5)}</span><span class="stat-label">每日上限</span></div>
       </div>`:''}
-    </div>`;
-  return `<div class="tab-page profile-tab-page">
-    ${heroBlock}
-    ${loggedIn && S.showAvatarPicker?`
-      <div class="avatar-picker">
-        <span class="profile-section-title">选择头像</span>
-        <div class="avatar-options">
-          ${[0,1,2,3].map(i=>`
-            <div class="avatar-option ${S.userAvatar===i?'avatar-option-active':''}" onclick="selectAvatar(${i})">
-              <div class="avatar-opt-circle avatar-opt-${i}"><span class="avatar-opt-emoji">${emojis[i]}</span></div>
-            </div>`).join('')}
-        </div>
-      </div>`:''}
-    ${u?`<div class="profile-section">
+    </div>
+    ${showAccountSection?`<div class="profile-section">
       <span class="profile-section-title">账号状态</span>
-      <div class="profile-row"><span class="profile-key">账号类型</span><span class="profile-val">${u.role==='admin'?'管理员':'免费版'}</span></div>
-      ${u.role!=='admin'&&u.daily_limit<999?`
+      ${showAcc ? `<div class="profile-row"><span class="profile-key">账号类型</span><span class="profile-val">${u.role==='admin'?'管理员':'免费版'}</span></div>` : ''}
+      ${hasAuthRows?`
         <div class="profile-row"><span class="profile-key">授权状态</span>
           <span class="profile-val ${u.auth_expires_at?'val-green':''}">${u.auth_expires_at?'✓ 已授权':'未授权'}</span></div>
         ${u.auth_expires_at?`<div class="profile-row"><span class="profile-key">授权到期</span><span class="profile-val">${esc(u.auth_expires_at)}</span></div>`:''}
@@ -935,8 +898,60 @@ function tProfile() {
       </div>
       <span class="vip-upgrade-arrow">›</span>
     </div>
-    ${loggedIn?`<div class="logout-btn profile-logout" onclick="handleLogout()">退出登录</div>`:''}
-    <div style="height:12px"></div>
+    <div class="logout-btn" onclick="handleLogout()">退出登录</div>
+    <div style="height:20px"></div>
+  </div>`;
+}
+
+function tProfileEdit() {
+  const u = S.userInfo;
+  const emojis = ['👨‍🚀','🦊','🐱','🐼'];
+  const emoji = emojis[S.userAvatar] || '?';
+  const hasImg = u && u.avatar_image;
+  return `<div class="tab-page profile-edit-page">
+    <div class="profile-section">
+      <span class="profile-section-title">头像</span>
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:8px">
+        <div class="avatar-lg avatar-type-${S.userAvatar}" style="width:72px;height:72px">
+          ${hasImg ? `<img class="avatar-lg-img" src="${esc(u.avatar_image)}" alt=""/>` : `<span class="avatar-lg-text">${emoji}</span>`}
+        </div>
+        <input type="file" id="f-avatar-file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="onAvatarFile(event)"/>
+        <div class="btn-secondary" style="margin-top:10px;padding:8px 20px;border-radius:50px;font-size:13px;text-align:center" onclick="document.getElementById('f-avatar-file').click()">上传本地图片</div>
+      </div>
+      <span class="profile-section-title" style="margin-top:4px">预设头像</span>
+      <div class="avatar-options" style="justify-content:flex-start;flex-wrap:wrap;gap:10px">
+        ${[0,1,2,3].map(i=>`
+          <div class="avatar-option ${S.userAvatar===i && !hasImg ? 'avatar-option-active' : ''}" onclick="selectAvatar(${i})">
+            <div class="avatar-opt-circle avatar-opt-${i}"><span class="avatar-opt-emoji">${emojis[i]}</span></div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="profile-section">
+      <span class="profile-field-label">昵称</span>
+      <input class="field-input" id="f-profile-nick" placeholder="2–20 个字" maxlength="20"
+        value="${esc(S.nicknameEditInput)}" oninput="S.nicknameEditInput=this.value"/>
+    </div>
+    <div class="profile-section">
+      <span class="profile-field-label">手机号</span>
+      <input type="text" class="field-input profile-phone-muted" readonly tabindex="-1" aria-readonly="true"
+        value="${esc(u && u.phone && !String(u.phone).startsWith('wx_') ? '+86 ' + maskPhone(u.phone) : (u && u.phone ? u.phone : '—'))}" />
+      <p class="profile-field-hint">手机号不可修改。换绑请联系管理员或客服。</p>
+    </div>
+    <div class="btn-primary" style="margin-top:4px" onclick="saveProfileEdit()">保存资料</div>
+  </div>`;
+}
+
+function tAvatarCropModal() {
+  return `<div class="crop-modal-mask" onclick="if(event.target===event.currentTarget)cancelAvatarCrop()">
+    <div class="crop-modal" onclick="event.stopPropagation()">
+      <div class="crop-modal-title">头像预览</div>
+      <div class="crop-preview-wrap"><img src="${esc(S.avatarCropDataUrl)}" alt=""/></div>
+      <p class="profile-field-hint" style="text-align:center;margin-bottom:12px">已按中心区域裁成方形并压缩，确认后保存为头像</p>
+      <div class="crop-modal-actions">
+        <div class="btn-secondary" onclick="cancelAvatarCrop()">重选</div>
+        <div class="btn-primary" onclick="confirmAvatarCrop()">确认使用</div>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1002,16 +1017,16 @@ async function handleAuth() {
     const r = await api.post(S.isRegMode ? '/auth/register' : '/auth/login', { phone, password: pwd });
     if (r.code === 200) {
       setToken(r.data.token); setUser(r.data.user);
-      showToast(S.isRegMode ? '注册成功' : '登录成功');
-      setState({
-        showAuthSheet: false,
-        loading: false,
-        authErr: '',
-        userName: r.data.user.nickname || '创作者',
-        userPhone: r.data.user.phone || '',
-        userAvatar: r.data.user.avatar || 0,
-      });
-      fetchMe(); loadIndustries();
+      showToast('登录成功');
+      setTimeout(() => {
+        Object.assign(S, {
+          page: 'main', loading: false,
+          userName: r.data.user.nickname || '创作者',
+          userPhone: r.data.user.phone || '',
+          userAvatar: r.data.user.avatar || 0,
+        });
+        render(); fetchMe(); loadIndustries();
+      }, 600);
     } else {
       setState({ authErr: r.msg || '操作失败，请重试', loading: false });
     }
@@ -1020,7 +1035,12 @@ async function handleAuth() {
 
 // ===== NAV =====
 function switchTab(tab) {
-  setState({ currentTab: tab, nicknamePrompt: false });
+  const resetProfile = tab !== 'profile';
+  setState({
+    currentTab: tab,
+    nicknamePrompt: false,
+    ...(resetProfile ? { profileView: 'main', avatarCropOpen: false, avatarCropDataUrl: '' } : {}),
+  });
   if (tab === 'profile') fetchMe();
   if (tab === 'vip') loadMemberPlans();
   if (tab === 'history' || tab === 'home') {
@@ -1032,10 +1052,6 @@ function goBack() { setState({ currentTab: 'home' }); }
 
 // ===== USER =====
 async function fetchMe() {
-  if (!getToken()) {
-    setState({ userInfo: null });
-    return;
-  }
   try {
     const r = await api.get('/auth/me');
     if (r.code === 200) {
@@ -1045,7 +1061,7 @@ async function fetchMe() {
         userName: r.data.nickname || '创作者',
         nicknamePrompt: !hasNickname && !S.nicknamePromptDismissed && S.currentTab === 'home',
       });
-    } else if (r.code === 401) { apiUnauthorized(r); }
+    } else if (r.code === 401) { clearAuth(); setState({ page: 'login' }); }
   } catch {}
   if (!S.recentHistoryLoaded) loadRecentHistory();
 }
@@ -1058,7 +1074,6 @@ async function loadIndustries() {
 
 // ===== EXTRACT =====
 async function handleExtract() {
-  if (!ensureLoggedIn()) return;
   if (!S.videoUrl.trim() || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   const ctrl = new AbortController();
@@ -1066,8 +1081,7 @@ async function handleExtract() {
   try {
     const r = await api.post('/video/douyin-to-text', { url: S.videoUrl.trim() }, ctrl.signal);
     clearTimeout(tid);
-    if (apiUnauthorized(r)) setState({ extractLoading: false });
-    else if (r.code === 200) setState({ extractedScript: r.data.script, extractStep: 1, extractLoading: false });
+    if (r.code === 200) setState({ extractedScript: r.data.script, extractStep: 1, extractLoading: false });
     else setState({ extractErr: r.msg || '提取失败，请检查链接是否正确', extractLoading: false });
   } catch(e) {
     clearTimeout(tid);
@@ -1075,15 +1089,13 @@ async function handleExtract() {
   }
 }
 async function handleRewrite() {
-  if (!ensureLoggedIn()) return;
   if (!S.extractedScript || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   try {
     const body = { text: S.extractedScript };
     if (S.rewriteStyle) body.style = S.rewriteStyle;
     const r = await api.post('/ai/rewrite', body);
-    if (apiUnauthorized(r)) setState({ extractLoading: false });
-    else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); }
+    if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); }
     else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false });
   } catch { setState({ extractErr: '网络错误，请稍后重试', extractLoading: false }); }
 }
@@ -1105,7 +1117,6 @@ function selectIndustry(id, name) {
   else setState({ selectedIndustryId: id, selectedIndustryName: name, customTrack: '' });
 }
 async function handleInspire() {
-  if (!ensureLoggedIn()) return;
   const track = S.customTrack.trim() || S.selectedIndustryName;
   if (!track || S.inspireLoading) return;
   inspireController = new AbortController();
@@ -1116,8 +1127,7 @@ async function handleInspire() {
   try {
     const r = await api.post('/ai/inspire', body, inspireController.signal);
     inspireController = null;
-    if (apiUnauthorized(r)) setState({ inspireLoading: false });
-    else if (r.code === 200) {
+    if (r.code === 200) {
       setState({ inspireScripts: r.data.scripts||[], matchedIndustry: r.data.matchedIndustry||'', expandedScript: null, inspireLoading: false });
       fetchMe();
     } else setState({ inspireErr: r.msg||'生成失败，请重试', inspireLoading: false });
@@ -1141,72 +1151,135 @@ function cpInspire(e, i) {
 }
 async function doExpand(e, i) {
   e.stopPropagation();
-  if (!ensureLoggedIn()) return;
   const s = S.inspireScripts[i];
   const track = S.customTrack.trim() || S.selectedIndustryName;
   setState({ inspireLoading: true, inspireErr: '' });
   try {
     const r = await api.post('/ai/inspire-expand', { hook: s.hook, content: s.content, track });
-    if (apiUnauthorized(r)) setState({ inspireLoading: false });
-    else if (r.code === 200) {
+    if (r.code === 200) {
       setState({ inspireScripts: [...(r.data.scripts||[]), ...S.inspireScripts], expandedScript: 0, inspireLoading: false });
       fetchMe();
     } else setState({ inspireErr: r.msg||'扩写失败', inspireLoading: false });
   } catch { setState({ inspireErr: '网络错误', inspireLoading: false }); }
 }
 async function toggleHistory() {
-  if (!S.showHistory) {
-    if (!ensureLoggedIn()) return;
-    if (!S.historyLoaded) await loadHistory();
-  }
+  if (!S.showHistory && !S.historyLoaded) await loadHistory();
   setState({ showHistory: !S.showHistory });
 }
 async function loadHistory() {
-  if (!getToken()) return;
   try {
     const r = await api.get('/history?type=inspire');
-    if (apiUnauthorized(r)) return;
     if (r.code === 200) { S.inspireHistory = r.data||[]; S.historyLoaded = true; }
   } catch {}
 }
 async function clearHistory() {
-  if (!ensureLoggedIn()) return;
   if (!confirm('确定清空所有历史记录吗？')) return;
   try { await api.del('/history?type=inspire'); setState({ inspireHistory:[], historyLoaded:false }); showToast('已清空'); }
   catch { showToast('操作失败'); }
 }
 function toggleHistoryItem(i) { setState({ historyExpanded: S.historyExpanded===i?null:i }); }
-function scriptCopyText(s) {
-  if (!s) return '';
-  const hook = String(s.hook || '').trim();
-  const body = String(s.content || '').trim();
-  if (body && hook && body !== hook) return hook + '\n\n' + body;
-  return body || hook;
-}
 function cpHistory(e, hi, si) {
   e.stopPropagation();
   const it = S.inspireHistory[hi];
   if (!it||!it.result) return;
-  copyText(scriptCopyText(it.result[si]));
+  const s = it.result[si];
+  copyText(s ? (s.content||s.hook) : '');
   showToast('已复制');
 }
 
 // ===== PROFILE =====
-function toggleAvatarPicker() {
-  if (!getToken()) { openAuthSheet(); showToast('请先登录'); return; }
-  setState({ showAvatarPicker: !S.showAvatarPicker });
-}
+function toggleAvatarPicker() { openProfileEdit(); }
 async function selectAvatar(i) {
-  if (!ensureLoggedIn()) return;
   setState({ userAvatar: i, showAvatarPicker: false });
   try {
     await api.post('/auth/update-avatar', { avatar: i });
     const user = getUser()||{}; setUser({...user, avatar:i});
-    if (S.userInfo) { S.userInfo = {...S.userInfo, avatar:i}; }
+    if (S.userInfo) { S.userInfo = {...S.userInfo, avatar:i, avatar_image:null}; }
+    fetchMe();
+  } catch {}
+}
+function openProfileEdit() {
+  setState({
+    profileView: 'edit',
+    showAvatarPicker: false,
+    nicknameEditInput: S.userName === '创作者' ? '' : S.userName,
+  });
+  setTimeout(() => { const el = document.getElementById('f-profile-nick'); if (el) el.focus(); }, 80);
+}
+function goProfileEditBack() {
+  setState({ profileView: 'main', avatarCropOpen: false, avatarCropDataUrl: '' });
+}
+function onAvatarFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!f) return;
+  if (f.size > 5 * 1024 * 1024) { showToast('图片需小于 5MB'); return; }
+  applyCenterSquareCrop(f).then((dataUrl) => {
+    setState({ avatarCropOpen: true, avatarCropDataUrl: dataUrl });
+  }).catch(() => showToast('图片处理失败'));
+}
+function applyCenterSquareCrop(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const sw = Math.min(img.width, img.height);
+        const sx = (img.width - sw) / 2;
+        const sy = (img.height - sw) / 2;
+        const canvas = document.createElement('canvas');
+        const out = 320;
+        canvas.width = out; canvas.height = out;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, sw, sw, 0, 0, out, out);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.88));
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+    img.src = url;
+  });
+}
+function cancelAvatarCrop() {
+  setState({ avatarCropOpen: false, avatarCropDataUrl: '' });
+}
+async function confirmAvatarCrop() {
+  if (!S.avatarCropDataUrl) return;
+  try {
+    const r = await api.put('/auth/profile', { avatar_image: S.avatarCropDataUrl });
+    if (r.code !== 200) { showToast(r.msg || '上传失败'); return; }
+  } catch { showToast('网络错误'); return; }
+  setState({ avatarCropOpen: false, avatarCropDataUrl: '' });
+  await fetchMe();
+  showToast('头像已更新');
+}
+async function saveProfileEdit() {
+  const name = S.nicknameEditInput.trim();
+  if (!name) { showToast('请输入昵称'); return; }
+  try {
+    const r = await api.put('/auth/profile', { nickname: name });
+    if (r.code !== 200) { showToast(r.msg || '保存失败'); return; }
+  } catch { showToast('网络错误'); return; }
+  const user = getUser() || {};
+  setUser({ ...user, nickname: name });
+  if (S.userInfo) S.userInfo = { ...S.userInfo, nickname: name };
+  setState({ userName: name, profileView: 'main' });
+  showToast('已保存');
+  fetchMe();
+}
+async function loadAppH5Settings() {
+  try {
+    const r = await api.get('/config/app-h5-settings');
+    if (r.code === 200 && r.data) {
+      S.appH5 = { showProfilePhone: !!r.data.showProfilePhone, showAccountType: !!r.data.showAccountType };
+      render();
+    }
   } catch {}
 }
 async function handleActivateCode() {
-  if (!ensureLoggedIn()) return;
   const code = S.authCodeInput.trim();
   if (!code || S.authCodeLoading) return;
   setState({ authCodeLoading: true, authCodeMsg: '' });
@@ -1219,24 +1292,7 @@ async function handleActivateCode() {
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
   clearAuth();
-  setState({
-    currentTab: 'home',
-    showAuthSheet: false,
-    userInfo: null,
-    userName: '创作者',
-    userPhone: '',
-    userAvatar: 0,
-    phone: '',
-    password: '',
-    recentHistory: [],
-    recentHistoryLoaded: false,
-    extractHistory: [],
-    extractHistoryLoaded: false,
-    inspireHistory: [],
-    historyLoaded: false,
-    nicknamePrompt: false,
-    nicknamePromptDismissed: false,
-  });
+  setState({ page:'login', currentTab:'home', userInfo:null, userName:'创作者', userPhone:'', phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
 }
 
 // ===== VIP =====
@@ -1253,29 +1309,15 @@ function closePayModal() { setState({ showPayModal: false }); }
 
 // ===== RECENT HISTORY =====
 async function loadRecentHistory() {
-  if (!getToken()) {
-    S.recentHistory = [];
-    S.recentHistoryLoaded = true;
-    render();
-    return;
-  }
   try {
     const r = await api.get('/history?type=inspire');
-    if (apiUnauthorized(r)) { S.recentHistory = []; S.recentHistoryLoaded = true; render(); return; }
     if (r.code === 200) { S.recentHistory = r.data || []; S.recentHistoryLoaded = true; render(); }
   } catch {}
 }
 
 async function loadExtractHistory() {
-  if (!getToken()) {
-    S.extractHistory = [];
-    S.extractHistoryLoaded = true;
-    render();
-    return;
-  }
   try {
     const r = await api.get('/history?type=extract');
-    if (apiUnauthorized(r)) { S.extractHistory = []; S.extractHistoryLoaded = true; render(); return; }
     if (r.code === 200) { S.extractHistory = r.data || []; S.extractHistoryLoaded = true; render(); }
   } catch {}
 }
@@ -1294,7 +1336,7 @@ function cpRecentItem(e, i) {
   e.stopPropagation();
   const it = S.recentHistory[i];
   if (!it||!it.result||!it.result[0]) return;
-  copyText(scriptCopyText(it.result[0]));
+  copyText(it.result[0].content || it.result[0].hook || '');
   showToast('已复制');
 }
 
@@ -1316,18 +1358,14 @@ function tHistory() {
         <span class="history-page-track">${esc(it.input||it.track||'历史记录')}</span>
         ${it.result&&it.result[0]?`<div class="history-page-hook">${esc(it.result[0].hook||'')}</div>`:''}
         <div class="history-page-meta">
-          <span class="history-page-time">${esc(it.created_at||'')}</span>
+          <span class="history-page-time">${esc(formatDisplayTime(it.created_at))}</span>
           ${it.result?`<span class="history-page-count">${it.result.length}条</span>`:''}
         </div>
         ${S.historyPageExpanded===i&&it.result?`
           <div class="history-scripts">
             ${it.result.map((s,si)=>`
               <div class="history-script-item">
-                <div class="history-script-col">
-                  ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
-                  ${s.content && String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
-                  ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
-                </div>
+                <span class="history-script-hook">${esc(s.hook)}</span>
                 <div class="copy-btn" onclick="cpHistoryPage(event,${i},${si})">复制</div>
               </div>`).join('')}
           </div>`:''}
@@ -1341,7 +1379,8 @@ function cpHistoryPage(e, hi, si) {
   e.stopPropagation();
   const it = S.recentHistory[hi];
   if (!it||!it.result) return;
-  copyText(scriptCopyText(it.result[si]));
+  const s = it.result[si];
+  copyText(s ? (s.content||s.hook) : '');
   showToast('已复制');
 }
 
@@ -1370,26 +1409,6 @@ async function confirmNickname() {
   showToast('昵称已设置');
 }
 
-function startEditNickname() {
-  if (!getToken()) { openAuthSheet(); showToast('请先登录'); return; }
-  setState({ nicknameEditing: true, nicknameEditInput: S.userName === '创作者' ? '' : S.userName });
-  setTimeout(() => { const el = document.getElementById('f-nick-edit'); if (el) el.focus(); }, 50);
-}
-
-async function saveNickname() {
-  if (!ensureLoggedIn()) return;
-  const name = S.nicknameEditInput.trim();
-  if (!name) { showToast('昵称不能为空'); return; }
-  try {
-    const r = await api.put('/auth/profile', { nickname: name });
-    if (r.code !== 200) { showToast(r.msg || '保存失败'); return; }
-  } catch { showToast('网络错误'); return; }
-  const user = getUser() || {};
-  setUser({ ...user, nickname: name });
-  setState({ nicknameEditing: false, userName: name });
-  showToast('昵称已更新');
-}
-
 function dismissNicknamePrompt() {
   setState({ nicknamePrompt: false, nicknamePromptDismissed: true });
 }
@@ -1400,10 +1419,9 @@ function dismissNicknamePrompt() {
   if (token) {
     const user = getUser();
     if (user) { S.userName = user.nickname||'创作者'; S.userPhone = user.phone||''; S.userAvatar = user.avatar||0; }
-    fetchMe();
-  }
-  render();
-  loadIndustries();
+    S.page = 'main';
+    render(); fetchMe(); loadIndustries(); loadAppH5Settings();
+  } else { render(); }
 })();
 </script>
 </body>

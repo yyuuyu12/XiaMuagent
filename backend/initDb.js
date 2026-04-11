@@ -130,6 +130,29 @@ async function initDb() {
     }
   }
 
+  // 启动时将指定手机号设为管理员（已注册用户才会被更新；可多号逗号分隔）
+  const adminPhones = (process.env.ADMIN_PHONES || '18201285539')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const phone of adminPhones) {
+    await db.query('UPDATE users SET role = ? WHERE phone = ?', ['admin', phone]);
+  }
+
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN avatar_image MEDIUMTEXT NULL');
+  } catch (e) {
+    if (!String(e.message || e).includes('Duplicate column name')) console.warn('[initDb] avatar_image:', e.message || e);
+  }
+
+  const uiDefaults = [
+    ['h5_show_profile_phone', '0'],
+    ['h5_show_account_type', '0'],
+  ];
+  for (const [k, v] of uiDefaults) {
+    await db.query('INSERT IGNORE INTO system_config (config_key, value) VALUES (?, ?)', [k, v]);
+  }
+
   console.log('✅ 数据库初始化完成');
 }
 
