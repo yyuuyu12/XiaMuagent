@@ -340,7 +340,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 <div id="app"></div>
 <script>
 // ===== CONFIG =====
-const API_BASE = 'http://106.14.151.37/api';
+const API_BASE = (location.protocol === 'http:' || location.protocol === 'https:') ? `${location.origin}/api` : 'http://106.14.151.37/api';
 
 // ===== STORAGE =====
 function getToken() { return localStorage.getItem('wf_token') || ''; }
