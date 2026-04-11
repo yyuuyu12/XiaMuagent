@@ -1241,7 +1241,7 @@ async function handleRewrite() {
     if (S.rewriteStyle) body.style = S.rewriteStyle;
     const r = await api.post('/ai/rewrite', body);
     if (apiUnauthorized(r)) setState({ extractLoading: false });
-    else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); }
+    else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); refreshHistory(); }
     else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false });
   } catch { setState({ extractErr: '网络错误，请稍后重试', extractLoading: false }); }
 }
@@ -1277,7 +1277,7 @@ async function handleInspire() {
     if (apiUnauthorized(r)) setState({ inspireLoading: false });
     else if (r.code === 200) {
       setState({ inspireScripts: r.data.scripts||[], matchedIndustry: r.data.matchedIndustry||'', expandedScript: null, inspireLoading: false });
-      fetchMe();
+      fetchMe(); refreshHistory();
     } else setState({ inspireErr: r.msg||'生成失败，请重试', inspireLoading: false });
   } catch(e) {
     inspireController = null;
@@ -1308,7 +1308,7 @@ async function doExpand(e, i) {
     if (apiUnauthorized(r)) setState({ inspireLoading: false });
     else if (r.code === 200) {
       setState({ inspireScripts: [...(r.data.scripts||[]), ...S.inspireScripts], expandedScript: 0, inspireLoading: false });
-      fetchMe();
+      fetchMe(); refreshHistory();
     } else setState({ inspireErr: r.msg||'扩写失败', inspireLoading: false });
   } catch { setState({ inspireErr: '网络错误', inspireLoading: false }); }
 }
@@ -1464,6 +1464,12 @@ function handlePay() { setState({ showPayModal: true }); }
 function closePayModal() { setState({ showPayModal: false }); }
 
 // ===== RECENT HISTORY =====
+function refreshHistory() {
+  S.recentHistoryLoaded = false;
+  S.historyLoaded = false;
+  loadRecentHistory();
+}
+
 async function loadRecentHistory() {
   if (!getToken()) {
     S.recentHistory = [];
