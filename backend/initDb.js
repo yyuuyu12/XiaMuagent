@@ -148,11 +148,17 @@ async function initDb() {
   const uiDefaults = [
     ['h5_show_profile_phone', '0'],
     ['h5_show_account_type', '0'],
-    ['asr_url', 'https://baculitic-derivable-sherilyn.ngrok-free.dev'],
   ];
   for (const [k, v] of uiDefaults) {
     await db.query('INSERT IGNORE INTO system_config (config_key, value) VALUES (?, ?)', [k, v]);
   }
+
+  // asr_url 强制写入正确值（带 https://），覆盖历史错误记录
+  await db.query(
+    `INSERT INTO system_config (config_key, value) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE value = IF(value NOT LIKE 'http%', VALUES(value), value)`,
+    ['asr_url', 'https://baculitic-derivable-sherilyn.ngrok-free.dev']
+  );
 
   console.log('✅ 数据库初始化完成');
 }
