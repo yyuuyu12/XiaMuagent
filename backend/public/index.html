@@ -438,7 +438,7 @@ const S = {
   nicknamePrompt: false, nicknameInput: '', nicknamePromptDismissed: false,
   nicknameEditing: false, nicknameEditInput: '',
   historyPageExpanded: null,
-  historyTab: 'inspire',
+  historyTab: 'clone',
   cloneHistory: [], cloneHistoryLoaded: false,
   showTipExpanded: false, rewriteStyle: '', extractHistory: [], extractHistoryLoaded: false,
   profileView: 'main',
@@ -1577,8 +1577,8 @@ function cpHomeItem(e, i) {
 // ===== HISTORY PAGE =====
 function tHistory() {
   const tabs = `<div class="history-tabs">
-    <div class="history-tab-btn ${S.historyTab==='inspire'?'history-tab-btn-active':''}" onclick="switchHistoryTab('inspire')">✨ 灵感发现</div>
     <div class="history-tab-btn ${S.historyTab==='clone'?'history-tab-btn-active':''}" onclick="switchHistoryTab('clone')">📋 文案克隆</div>
+    <div class="history-tab-btn ${S.historyTab==='inspire'?'history-tab-btn-active':''}" onclick="switchHistoryTab('inspire')">✨ 灵感发现</div>
   </div>`;
 
   if (S.historyTab === 'inspire') {
