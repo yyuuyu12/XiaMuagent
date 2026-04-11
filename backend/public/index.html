@@ -327,6 +327,9 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .nickname-prompt-skip { text-align: right; font-size: 12px; color: #A8A49C; margin-top: 8px; cursor: pointer; user-select: none; }
 
 /* === HISTORY PAGE === */
+.history-tabs { display: flex; background: #fff; border-radius: 10px; padding: 4px; margin-bottom: 12px; gap: 4px; }
+.history-tab-btn { flex: 1; text-align: center; height: 34px; line-height: 34px; border-radius: 8px; font-size: 13px; color: #A8A49C; cursor: pointer; user-select: none; }
+.history-tab-btn-active { background: #FFF1E8; color: #F97316; font-weight: 600; }
 .history-page-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer; user-select: none; }
 .history-page-track { display: block; font-size: 14px; font-weight: 600; color: #1A1814; margin-bottom: 4px; }
 .history-page-hook { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 6px; }
@@ -434,6 +437,8 @@ const S = {
   nicknamePrompt: false, nicknameInput: '', nicknamePromptDismissed: false,
   nicknameEditing: false, nicknameEditInput: '',
   historyPageExpanded: null,
+  historyTab: 'inspire',
+  cloneHistory: [], cloneHistoryLoaded: false,
   showTipExpanded: false, rewriteStyle: '', extractHistory: [], extractHistoryLoaded: false,
   profileView: 'main',
   appH5: { showProfilePhone: false, showAccountType: false },
@@ -1187,6 +1192,7 @@ function switchTab(tab) {
   if (tab === 'vip') loadMemberPlans();
   if (tab === 'history' || tab === 'home') {
     if (!S.recentHistoryLoaded) loadRecentHistory(); else render();
+    if (tab === 'history' && S.historyTab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
   }
   if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
 }
@@ -1448,7 +1454,7 @@ async function handleActivateCode() {
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
   clearAuth();
-  setState({ page:'login', currentTab:'home', showAuthSheet:false, userInfo:null, userName:'创作者', userPhone:'', userAvatar:0, phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, extractHistory:[], extractHistoryLoaded:false, inspireHistory:[], historyLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
+  setState({ page:'login', currentTab:'home', showAuthSheet:false, userInfo:null, userName:'创作者', userPhone:'', userAvatar:0, phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, extractHistory:[], extractHistoryLoaded:false, inspireHistory:[], historyLoaded:false, cloneHistory:[], cloneHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
 }
 
 // ===== VIP =====
@@ -1467,7 +1473,9 @@ function closePayModal() { setState({ showPayModal: false }); }
 function refreshHistory() {
   S.recentHistoryLoaded = false;
   S.historyLoaded = false;
+  S.cloneHistoryLoaded = false;
   loadRecentHistory();
+  if (S.historyTab === 'clone') loadCloneHistory();
 }
 
 async function loadRecentHistory() {
@@ -1498,6 +1506,20 @@ async function loadExtractHistory() {
   } catch {}
 }
 
+async function loadCloneHistory() {
+  if (!getToken()) {
+    S.cloneHistory = [];
+    S.cloneHistoryLoaded = true;
+    render();
+    return;
+  }
+  try {
+    const r = await api.get('/history?type=rewrite');
+    if (apiUnauthorized(r)) { S.cloneHistory = []; S.cloneHistoryLoaded = true; render(); return; }
+    if (r.code === 200) { S.cloneHistory = r.data || []; S.cloneHistoryLoaded = true; render(); }
+  } catch {}
+}
+
 function reuseExtractUrl(i) {
   const it = S.extractHistory[i];
   if (!it) return;
@@ -1518,42 +1540,92 @@ function cpRecentItem(e, i) {
 
 // ===== HISTORY PAGE =====
 function tHistory() {
-  const items = S.recentHistory;
-  if (items.length === 0) {
-    return `<div class="tab-page">
-      <div style="display:flex;flex-direction:column;align-items:center;padding-top:60px">
-        <div style="font-size:40px;margin-bottom:12px">📄</div>
-        <div style="font-size:14px;color:#A8A49C;margin-bottom:20px">还没有创作记录</div>
-        <div class="btn-primary" style="width:auto;padding:0 32px" onclick="switchTab('inspire')">去创作</div>
-      </div>
+  const tabs = `<div class="history-tabs">
+    <div class="history-tab-btn ${S.historyTab==='inspire'?'history-tab-btn-active':''}" onclick="switchHistoryTab('inspire')">✨ 灵感发现</div>
+    <div class="history-tab-btn ${S.historyTab==='clone'?'history-tab-btn-active':''}" onclick="switchHistoryTab('clone')">📋 文案克隆</div>
+  </div>`;
+
+  if (S.historyTab === 'inspire') {
+    const items = S.recentHistory;
+    if (items.length === 0) return `<div class="tab-page">${tabs}
+      <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
+        <div style="font-size:36px;margin-bottom:10px">✨</div>
+        <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有灵感记录</div>
+        <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('inspire')">去创作</div>
+      </div></div>`;
+    return `<div class="tab-page">${tabs}
+      ${items.map((it,i)=>`
+        <div class="history-page-card" onclick="toggleHistoryPage(${i})">
+          <span class="history-page-track">${esc(it.input||it.track||'历史记录')}</span>
+          ${it.result&&it.result[0]?`<div class="history-page-hook">${esc(it.result[0].hook||'')}</div>`:''}
+          <div class="history-page-meta">
+            <span class="history-page-time">${esc(formatDisplayTime(it.created_at))}</span>
+            ${Array.isArray(it.result)?`<span class="history-page-count">${it.result.length}条</span>`:''}
+          </div>
+          ${S.historyPageExpanded===i&&Array.isArray(it.result)?`
+            <div class="history-scripts">
+              ${it.result.map((s,si)=>`
+                <div class="history-script-item">
+                  <div class="history-script-col">
+                    ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
+                    ${s.content&&String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
+                    ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
+                  </div>
+                  <div class="copy-btn" onclick="cpHistoryPage(event,${i},${si})">复制</div>
+                </div>`).join('')}
+            </div>`:''}
+        </div>`).join('')}
     </div>`;
   }
-  return `<div class="tab-page">
-    ${items.map((it,i)=>`
-      <div class="history-page-card" onclick="toggleHistoryPage(${i})">
-        <span class="history-page-track">${esc(it.input||it.track||'历史记录')}</span>
-        ${it.result&&it.result[0]?`<div class="history-page-hook">${esc(it.result[0].hook||'')}</div>`:''}
+
+  // 文案克隆 tab
+  const citems = S.cloneHistory;
+  if (citems.length === 0) return `<div class="tab-page">${tabs}
+    <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
+      <div style="font-size:36px;margin-bottom:10px">📋</div>
+      <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有克隆记录</div>
+      <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('extract')">去克隆</div>
+    </div></div>`;
+  return `<div class="tab-page">${tabs}
+    ${citems.map((it,i)=>{
+      const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
+      const expanded = S.historyPageExpanded === ('c'+i);
+      return `<div class="history-page-card" onclick="toggleClonePage(${i})">
+        <span class="history-page-track" style="font-size:13px;font-weight:400;color:#A8A49C">原文</span>
+        <div class="history-page-hook" style="-webkit-line-clamp:1">${esc(it.input||'')}</div>
         <div class="history-page-meta">
           <span class="history-page-time">${esc(formatDisplayTime(it.created_at))}</span>
-          ${it.result?`<span class="history-page-count">${it.result.length}条</span>`:''}
+          <span class="history-page-count">改写</span>
         </div>
-        ${S.historyPageExpanded===i&&it.result?`
-          <div class="history-scripts">
-            ${it.result.map((s,si)=>`
-              <div class="history-script-item">
-                <div class="history-script-col">
-                  ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
-                  ${s.content && String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
-                  ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
-                </div>
-                <div class="copy-btn" onclick="cpHistoryPage(event,${i},${si})">复制</div>
-              </div>`).join('')}
+        ${expanded?`
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F0EEE8">
+            <div style="font-size:11px;color:#A8A49C;margin-bottom:6px">改写结果</div>
+            <div style="font-size:13px;color:#1A1814;line-height:1.8;white-space:pre-wrap;word-break:break-all">${esc(text)}</div>
+            <div style="display:flex;justify-content:flex-end;margin-top:10px">
+              <div class="copy-btn" onclick="cpClonePage(event,${i})">复制全文</div>
+            </div>
           </div>`:''}
-      </div>`).join('')}
+      </div>`;
+    }).join('')}
   </div>`;
 }
 
 function toggleHistoryPage(i) { setState({ historyPageExpanded: S.historyPageExpanded===i?null:i }); }
+function toggleClonePage(i) { const key='c'+i; setState({ historyPageExpanded: S.historyPageExpanded===key?null:key }); }
+
+function cpClonePage(e, i) {
+  e.stopPropagation();
+  const it = S.cloneHistory[i];
+  if (!it) return;
+  const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
+  copyText(text);
+  showToast('已复制');
+}
+
+function switchHistoryTab(tab) {
+  setState({ historyTab: tab, historyPageExpanded: null });
+  if (tab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
+}
 
 function scriptCopyText(s) {
   if (!s) return '';
