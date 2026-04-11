@@ -160,6 +160,11 @@
         <input id="tikhub_api_key" type="password" placeholder="注册 tikhub.io 获取" />
         <div class="hint">注册 tikhub.io 可获得免费额度</div>
       </div>
+      <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
+        <label>🎙️ ASR 语音识别服务地址</label>
+        <input id="asr_url" placeholder="例如：http://your-server:9000" />
+        <div class="hint">本地 Whisper 服务地址，用于抖音视频转文字。留空则禁用该功能。</div>
+      </div>
       <button class="btn-primary" onclick="saveKeys()">保存配置</button>
     </div>
 
@@ -407,6 +412,7 @@ async function loadKeys() {
   document.getElementById('zhipu_api_key').value = d.zhipu_api_key || '';
   document.getElementById('zhipu_model').value = d.zhipu_model || '';
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
+  document.getElementById('asr_url').value = d.asr_url || '';
 }
 
 async function saveKeys() {
@@ -418,6 +424,7 @@ async function saveKeys() {
     zhipu_api_key: document.getElementById('zhipu_api_key').value,
     zhipu_model: document.getElementById('zhipu_model').value,
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
+    asr_url: document.getElementById('asr_url').value,
   };
   const r = await req('/config/ai-keys', { method:'POST', body: JSON.stringify(body) });
   if (r.code===200) showMsg('key-msg','配置已保存'); else showMsg('key-msg',r.msg||'保存失败','error');

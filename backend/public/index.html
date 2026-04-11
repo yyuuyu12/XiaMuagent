@@ -612,7 +612,7 @@ function tTopBar() {
   const t = S.currentTab;
   if (t === 'profile' && S.profileView === 'edit') {
     return `<div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="goProfileEditBack()">← 返回</button>
+      <button type="button" class="back-btn" onclick="goProfileEditBack()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
       <span class="sub-page-title">编辑资料</span>
       <div style="width:56px;flex-shrink:0"></div>
     </div>`;
@@ -624,7 +624,7 @@ function tTopBar() {
   const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员' };
   const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:56px;flex-shrink:0"></div>';
   return `<div class="top-bar top-bar-sub">
-    <button type="button" class="back-btn" onclick="goBack()">← 返回</button>
+    <button type="button" class="back-btn" onclick="goBack()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
     <span class="sub-page-title">${titles[t]||''}</span>
     ${loginHint}
   </div>`;
