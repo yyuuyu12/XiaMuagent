@@ -28,9 +28,9 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 }
 .app-name { font-size: 17px; font-weight: 700; color: #1A1814; letter-spacing: .5px; }
 .top-bar-sub { justify-content: space-between; }
-.back-btn { display: flex; flex-direction: row; align-items: center; width: 60px; cursor: pointer; user-select: none; }
-.back-icon { font-size: 20px; color: #1A1814; line-height: 1; margin-right: 4px; font-weight: 400; display: flex; align-items: center; }
-.back-text { font-size: 14px; color: #1A1814; line-height: 1; }
+.back-btn { display: inline-flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 2px; width: 60px; cursor: pointer; user-select: none; }
+.back-icon { font-size: 20px; color: #1A1814; font-weight: 400; line-height: 1; height: 20px; display: inline-flex; align-items: center; justify-content: center; transform: translateY(1px); }
+.back-text { font-size: 14px; color: #1A1814; line-height: 20px; height: 20px; display: inline-flex; align-items: center; }
 .sub-page-title { font-size: 16px; font-weight: 600; color: #1A1814; text-align: center; }
 
 /* === CONTENT === */
@@ -531,7 +531,7 @@ function tHome() {
   let usageSection;
   if (!u) {
     usageSection = '';
-  } else if (u.daily_limit >= 999) {
+  } else if (u.role === 'admin' || u.daily_limit >= 999) {
     usageSection = `<div class="usage-bar"><span class="usage-text">次数：无限制 ∞</span></div>`;
   } else {
     const used = u.used_today || 0;
@@ -727,7 +727,7 @@ function tInspire() {
       <span class="section-label">或自定义赛道</span>
       <input class="field-input" id="f-track" placeholder="例如：宠物博主、职场干货..."
         value="${esc(S.customTrack)}"
-        oninput="S.customTrack=this.value;if(S.selectedIndustryId){S.selectedIndustryId=null;S.selectedIndustryName='';render();}"/>
+        oninput="S.customTrack=this.value;if(S.selectedIndustryId){S.selectedIndustryId=null;S.selectedIndustryName='';}render();"/>
     </div>
     ${S.inspireErr?`<span class="err-text">${esc(S.inspireErr)}</span>`:''}
     <div class="inspire-action-row">
@@ -815,9 +815,9 @@ function tProfile() {
       ${u?`<div class="usage-stats">
         <div class="stat-item"><span class="stat-num">${u.used_today||0}</span><span class="stat-label">今日已用</span></div>
         <div class="stat-divider"></div>
-        <div class="stat-item"><span class="stat-num ${u.remaining<=0?'stat-empty':''}">${u.daily_limit>=999?'∞':u.remaining}</span><span class="stat-label">今日剩余</span></div>
+        <div class="stat-item"><span class="stat-num ${u.role!=='admin'&&u.daily_limit<999&&u.remaining<=0?'stat-empty':''}">${u.role==='admin'||u.daily_limit>=999?'∞':u.remaining}</span><span class="stat-label">今日剩余</span></div>
         <div class="stat-divider"></div>
-        <div class="stat-item"><span class="stat-num">${u.daily_limit>=999?'∞':u.daily_limit}</span><span class="stat-label">每日上限</span></div>
+        <div class="stat-item"><span class="stat-num">${u.role==='admin'||u.daily_limit>=999?'∞':(u.daily_limit||5)}</span><span class="stat-label">每日上限</span></div>
       </div>`:''}
     </div>
     ${S.showAvatarPicker?`

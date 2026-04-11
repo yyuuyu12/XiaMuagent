@@ -74,10 +74,13 @@ router.get('/me', requireAuth, async (req, res) => {
       [req.userId]
     );
     const usedToday = parseInt(usageRows[0].cnt);
+    const isAdmin = user.role === 'admin';
+    const remaining = isAdmin ? 999 : Math.max(0, user.daily_limit - usedToday);
+    const dailyLimitOut = isAdmin ? 999 : user.daily_limit;
 
     res.json({
       code: 200,
-      data: { ...user, used_today: usedToday, remaining: Math.max(0, user.daily_limit - usedToday) }
+      data: { ...user, daily_limit: dailyLimitOut, used_today: usedToday, remaining }
     });
   } catch (err) {
     console.error('/me error:', err.message);
