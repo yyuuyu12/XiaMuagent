@@ -285,6 +285,49 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .history-page-meta { display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
 .history-page-time { font-size: 11px; color: #A8A49C; }
 .history-page-count { font-size: 11px; color: #A8A49C; background: #F0EEE8; border-radius: 50px; padding: 2px 7px; }
+
+/* === HOME v1.1 === */
+.feature-card-main { background: #fff; border-radius: 12px; padding: 0 16px; height: 72px; display: flex; flex-direction: row; align-items: center; box-shadow: 0 1px 8px rgba(0,0,0,.06); cursor: pointer; user-select: none; margin-bottom: 10px; }
+.feature-arrow-orange { font-size: 26px; color: #F97316; margin-left: 4px; font-weight: 400; }
+.feature-row-light { display: flex; flex-direction: row; align-items: center; height: 44px; padding: 0 4px; cursor: pointer; user-select: none; margin-bottom: 12px; }
+.feature-row-icon { font-size: 17px; margin-right: 8px; }
+.feature-row-title { font-size: 14px; font-weight: 500; color: #555; margin-right: 6px; }
+.feature-row-desc { font-size: 12px; color: #A8A49C; flex: 1; }
+.feature-row-arrow { font-size: 16px; color: #CCCCCC; }
+.recent-empty-line { height: 48px; display: flex; align-items: center; font-size: 13px; color: #A8A49C; }
+.recent-empty-line a { color: #F97316; cursor: pointer; user-select: none; text-decoration: none; }
+.hot-tags-section { margin-bottom: 14px; }
+.hot-tags-scroll { display: flex; flex-direction: row; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px 4px; }
+.hot-tag-chip { flex-shrink: 0; background: #fff; border: 1px solid #E4E2DA; border-radius: 50px; padding: 7px 16px; font-size: 13px; color: #555; margin-right: 8px; cursor: pointer; user-select: none; white-space: nowrap; }
+
+/* === EXTRACT v2 === */
+.platform-tabs { display: flex; flex-direction: row; background: #fff; border-radius: 10px; padding: 6px; margin-bottom: 12px; gap: 6px; }
+.platform-tab { flex: 1; text-align: center; height: 36px; line-height: 36px; border-radius: 8px; font-size: 13px; color: #A8A49C; cursor: pointer; user-select: none; position: relative; }
+.platform-tab-active { background: #FFF1E8; color: #F97316; font-weight: 600; }
+.platform-tab-disabled { pointer-events: none; }
+.coming-soon-badge { position: absolute; top: 4px; right: 4px; background: #E4E2DA; color: #A8A49C; font-size: 9px; border-radius: 50px; padding: 1px 5px; line-height: 1.4; }
+.url-input-wrap { position: relative; margin-bottom: 12px; }
+.url-textarea-v2 { background: #F7F6F2; border: 1.5px solid #E4E2DA; border-radius: 12px; padding: 14px; font-size: 14px; color: #1A1814; width: 100%; height: 108px; line-height: 1.6; resize: none; display: block; transition: border-color .2s; }
+.url-textarea-v2::placeholder { color: #C4C0B8; }
+.url-textarea-v2:focus { border-color: #F97316; outline: none; }
+.paste-btn { position: absolute; bottom: 10px; right: 10px; background: #F97316; color: #fff; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; }
+.tip-toggle { display: flex; flex-direction: row; align-items: center; padding: 2px 0 8px; cursor: pointer; user-select: none; }
+.tip-toggle-text { font-size: 13px; color: #A8A49C; flex: 1; }
+.tip-toggle-icon { font-size: 12px; color: #A8A49C; transition: transform .2s; }
+.tip-toggle-icon.open { transform: rotate(180deg); }
+.tip-card-v2 { background: #fff; border-radius: 10px; padding: 14px 16px; border-left: 3px solid #F97316; margin-bottom: 12px; }
+.extract-hist-item { background: #fff; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; cursor: pointer; user-select: none; }
+.extract-hist-url { flex: 1; font-size: 13px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px; }
+.extract-hist-time { font-size: 11px; color: #A8A49C; flex-shrink: 0; }
+.result-scroll-area { max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: 10px; }
+.result-action-bottom { display: flex; flex-direction: row; align-items: center; justify-content: flex-end; padding-top: 10px; border-top: 1px solid #F0EEE8; }
+.style-selector { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.style-selector-label { display: block; font-size: 12px; color: #A8A49C; margin-bottom: 8px; }
+.style-options { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+.style-option { background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 50px; padding: 6px 14px; font-size: 12px; color: #555; cursor: pointer; user-select: none; }
+.style-option-active { background: #FFF1E8; color: #F97316; border-color: #F97316; }
+.btn-action-sec { background: #F0EDE8; color: #555; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 14px; flex: 1; margin-right: 8px; cursor: pointer; user-select: none; }
+.btn-action-main { background: #F97316; color: #fff; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 15px; font-weight: 600; flex: 2; cursor: pointer; user-select: none; }
   </style>
 </head>
 <body>
@@ -330,6 +373,7 @@ const S = {
   recentHistory: [], recentHistoryLoaded: false,
   nicknamePrompt: false, nicknameInput: '', nicknamePromptDismissed: false,
   historyPageExpanded: null,
+  showTipExpanded: false, rewriteStyle: '', extractHistory: [], extractHistoryLoaded: false,
 };
 let inspireController = null;
 
@@ -486,21 +530,19 @@ function tHome() {
       ${usageSection}
     </div>
     <div class="feature-cards">
-      <div class="feature-card" onclick="switchTab('extract')">
+      <div class="feature-card-main" onclick="switchTab('extract')">
         <div class="feature-icon-wrap feature-icon-blue"><span class="feature-icon">📋</span></div>
         <div class="feature-info">
           <span class="feature-title">爆款文案克隆</span>
           <span class="feature-desc">粘贴视频链接，提取文案并AI改写</span>
         </div>
-        <span class="feature-arrow">›</span>
+        <span class="feature-arrow-orange">›</span>
       </div>
-      <div class="feature-card" onclick="switchTab('inspire')">
-        <div class="feature-icon-wrap feature-icon-orange"><span class="feature-icon">✨</span></div>
-        <div class="feature-info">
-          <span class="feature-title">灵感发现</span>
-          <span class="feature-desc">选择行业赛道，生成爆款文案创意</span>
-        </div>
-        <span class="feature-arrow">›</span>
+      <div class="feature-row-light" onclick="switchTab('inspire')">
+        <span class="feature-row-icon">✨</span>
+        <span class="feature-row-title">灵感发现</span>
+        <span class="feature-row-desc">选择行业赛道，生成爆款创意</span>
+        <span class="feature-row-arrow">›</span>
       </div>
     </div>
     ${tRecentSection()}
@@ -511,6 +553,15 @@ function tHome() {
         <div class="stat-pill"><span class="stat-pill-num">98%</span><span class="stat-pill-label">好评率</span></div>
       </div>
       <div class="stats-source">数据来源：平台累计统计</div>
+    </div>
+    <div class="hot-tags-section">
+      <div class="home-section-header">
+        <span class="home-section-title">热门行业</span>
+      </div>
+      <div class="hot-tags-scroll">
+        ${['美妆','母婴','数码','食品','服装','宠物','家居'].map(t=>`
+          <div class="hot-tag-chip" onclick="goInspireWithTag('${t}')">${t}</div>`).join('')}
+      </div>
     </div>
   </div>`;
 }
@@ -523,11 +574,7 @@ function tRecentSection() {
       <span class="home-section-more" onclick="switchTab('history')">查看全部 ›</span>
     </div>
     ${items.length === 0
-      ? `<div class="recent-empty">
-          <span class="recent-empty-icon">✍️</span>
-          <span class="recent-empty-text">还没有创作记录<br>快去生成第一条文案吧</span>
-          <div class="recent-empty-btn" onclick="switchTab('inspire')">去创作第一条文案</div>
-        </div>`
+      ? `<div class="recent-empty-line">还没有克隆记录，<a onclick="switchTab('extract')">去克隆第一条</a></div>`
       : `<div class="recent-list">
           ${items.slice(0,5).map((it,i)=>{
             const text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
@@ -543,39 +590,74 @@ function tRecentSection() {
 
 // ===== EXTRACT =====
 function tExtract() {
-  if (S.extractStep === 0) return `<div class="tab-page">
-    <div class="input-card">
-      <span class="input-label">视频链接（抖音）</span>
-      <textarea class="url-textarea" id="f-url" placeholder="粘贴抖音链接或分享文字..."
-        oninput="S.videoUrl=this.value;const b=document.getElementById('btn-extract');if(b)b.classList.toggle('btn-disabled',!this.value.trim())">${esc(S.videoUrl)}</textarea>
-      ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
-      <div id="btn-extract" class="btn-primary ${S.extractLoading||!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">
-        ${S.extractLoading?'⏳ 转录中，约1-2分钟...':'🚀 提取文案'}
+  if (S.extractStep === 0) {
+    const recentItems = S.extractHistory.slice(0, 3);
+    return `<div class="tab-page">
+      <div class="platform-tabs">
+        <div class="platform-tab platform-tab-active">抖音</div>
+        <div class="platform-tab platform-tab-disabled">快手<span class="coming-soon-badge">即将上线</span></div>
+        <div class="platform-tab platform-tab-disabled">小红书<span class="coming-soon-badge">即将上线</span></div>
       </div>
-    </div>
-    <div class="tip-card">
-      <span class="tip-title">📌 使用说明</span>
-      <span class="tip-line">1. 在抖音找到想参考的视频</span>
-      <span class="tip-line">2. 点击"分享"并复制链接</span>
-      <span class="tip-line">3. 粘贴到上方并点击提取</span>
-      <span class="tip-line">4. AI语音识别转录，约需1-2分钟</span>
-      <span class="tip-line">5. 提取成功后可一键AI改写</span>
-    </div>
-  </div>`;
+      <div class="input-card">
+        <span class="input-label">粘贴抖音视频链接或分享文字</span>
+        <div class="url-input-wrap">
+          <textarea class="url-textarea-v2" id="f-url" placeholder="例如：https://v.douyin.com/xxx 或直接粘贴分享文字..."
+            oninput="S.videoUrl=this.value;render()">${esc(S.videoUrl)}</textarea>
+          <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
+        </div>
+        ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
+        <div class="btn-primary ${S.extractLoading||!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">
+          ${S.extractLoading?'⏳ 转录中，约1-2分钟...':'🚀 提取文案'}
+        </div>
+      </div>
+      <div class="tip-toggle" onclick="setState({showTipExpanded:!S.showTipExpanded})">
+        <span class="tip-toggle-text">📌 使用说明</span>
+        <span class="tip-toggle-icon ${S.showTipExpanded?'open':''}">▾</span>
+      </div>
+      ${S.showTipExpanded?`
+        <div class="tip-card-v2">
+          <span class="tip-line">1. 在抖音找到想参考的视频</span>
+          <span class="tip-line">2. 点击"分享"并复制链接</span>
+          <span class="tip-line">3. 粘贴到上方并点击提取</span>
+          <span class="tip-line">4. AI语音识别转录，约需1-2分钟</span>
+          <span class="tip-line">5. 提取成功后可一键AI改写</span>
+        </div>`:''}
+      ${recentItems.length>0?`
+        <div class="home-section-header" style="margin-top:4px">
+          <span class="home-section-title">最近提取</span>
+        </div>
+        ${recentItems.map((it,i)=>`
+          <div class="extract-hist-item" onclick="reuseExtractUrl(${i})">
+            <span class="extract-hist-url">${esc(it.url||it.input||'')}</span>
+            <span class="extract-hist-time">${esc(it.created_at||'')}</span>
+          </div>`).join('')}`:''}
+    </div>`;
+  }
 
   if (S.extractStep === 1) return `<div class="tab-page">
     <div class="result-card">
       <div class="result-header-row">
         <span class="result-label">📝 提取的文案</span>
-        <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制'}</div>
       </div>
       <div class="thin-divider"></div>
-      <span class="script-text">${esc(S.extractedScript)}</span>
+      <div class="result-scroll-area">
+        <span class="script-text">${esc(S.extractedScript)}</span>
+      </div>
+      <div class="result-action-bottom">
+        <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制'}</div>
+      </div>
+    </div>
+    <div class="style-selector">
+      <span class="style-selector-label">改写风格（可选）</span>
+      <div class="style-options">
+        ${['口播带货','情感共鸣','干货科普','悬念钩子','轻松幽默'].map(s=>`
+          <div class="style-option ${S.rewriteStyle===s?'style-option-active':''}" onclick="selectStyle('${s}')">${s}</div>`).join('')}
+      </div>
     </div>
     ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
     <div class="action-row">
-      <div class="btn-secondary" onclick="resetExtract()">重新输入</div>
-      <div class="btn-primary ${S.extractLoading?'btn-disabled':''}" onclick="handleRewrite()">
+      <div class="btn-action-sec" onclick="resetExtract()">重新输入</div>
+      <div class="btn-action-main ${S.extractLoading?'btn-disabled':''}" onclick="handleRewrite()">
         ${S.extractLoading?'⏳ 改写中...':'✨ 一键原创改写'}
       </div>
     </div>
@@ -588,15 +670,19 @@ function tExtract() {
     </div>
     <div class="result-card result-highlight">
       <div class="result-header-row">
-        <span class="result-label">🚀 原创改写</span>
-        <div class="copy-btn" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制'}</div>
+        <span class="result-label">🚀 原创改写${S.rewriteStyle?' · '+esc(S.rewriteStyle):''}</span>
       </div>
       <div class="thin-divider"></div>
-      <span class="script-text">${esc(S.rewrittenScript)}</span>
+      <div class="result-scroll-area">
+        <span class="script-text">${esc(S.rewrittenScript)}</span>
+      </div>
+      <div class="result-action-bottom">
+        <div class="copy-btn" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制'}</div>
+      </div>
     </div>
     <div class="action-row">
-      <div class="btn-secondary" onclick="resetExtract()">继续提取</div>
-      <div class="btn-primary" onclick="rewriteAgain()">再次改写</div>
+      <div class="btn-action-sec" onclick="resetExtract()">继续提取</div>
+      <div class="btn-action-main" onclick="rewriteAgain()">再次改写</div>
     </div>
   </div>`;
 }
@@ -836,6 +922,7 @@ function switchTab(tab) {
   if (tab === 'history' || tab === 'home') {
     if (!S.recentHistoryLoaded) loadRecentHistory(); else render();
   }
+  if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
 }
 function goBack() { setState({ currentTab: 'home' }); }
 
@@ -881,13 +968,22 @@ async function handleRewrite() {
   if (!S.extractedScript || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   try {
-    const r = await api.post('/ai/rewrite', { text: S.extractedScript });
+    const body = { text: S.extractedScript };
+    if (S.rewriteStyle) body.style = S.rewriteStyle;
+    const r = await api.post('/ai/rewrite', body);
     if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); }
     else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false });
   } catch { setState({ extractErr: '网络错误，请稍后重试', extractLoading: false }); }
 }
 function rewriteAgain() { setState({ extractStep: 1, rewrittenScript: '', extractErr: '' }); handleRewrite(); }
-function resetExtract() { setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '' }); }
+function resetExtract() { setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '' }); }
+function selectStyle(s) { setState({ rewriteStyle: S.rewriteStyle === s ? '' : s }); }
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    setState({ videoUrl: text });
+  } catch { showToast('请手动长按粘贴'); }
+}
 function copyExtracted() { copyText(S.extractedScript); setState({ copiedId: 'extracted' }); setTimeout(()=>setState({copiedId:''}),1500); }
 function copyRewritten() { copyText(S.rewrittenScript); setState({ copiedId: 'rewritten' }); setTimeout(()=>setState({copiedId:''}),1500); }
 
@@ -1011,6 +1107,23 @@ async function loadRecentHistory() {
     const r = await api.get('/history?type=inspire');
     if (r.code === 200) { S.recentHistory = r.data || []; S.recentHistoryLoaded = true; render(); }
   } catch {}
+}
+
+async function loadExtractHistory() {
+  try {
+    const r = await api.get('/history?type=extract');
+    if (r.code === 200) { S.extractHistory = r.data || []; S.extractHistoryLoaded = true; render(); }
+  } catch {}
+}
+
+function reuseExtractUrl(i) {
+  const it = S.extractHistory[i];
+  if (!it) return;
+  setState({ videoUrl: it.url || it.input || '' });
+}
+
+function goInspireWithTag(tag) {
+  setState({ currentTab: 'inspire', selectedIndustryId: null, selectedIndustryName: '', customTrack: tag });
 }
 
 function cpRecentItem(e, i) {
