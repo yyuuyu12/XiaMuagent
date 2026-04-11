@@ -434,6 +434,7 @@ const S = {
   showAvatarPicker: false, authCodeInput: '', authCodeMsg: '', authCodeOk: true, authCodeLoading: false,
   selectedPlan: 'month', selectedPayment: 'wechat', memberPlans: {}, showPayModal: false,
   recentHistory: [], recentHistoryLoaded: false,
+  homeHistory: [], homeHistoryLoaded: false,
   nicknamePrompt: false, nicknameInput: '', nicknamePromptDismissed: false,
   nicknameEditing: false, nicknameEditInput: '',
   historyPageExpanded: null,
@@ -736,21 +737,27 @@ function tHome() {
 }
 
 function tRecentSection() {
-  const items = S.recentHistory;
+  const items = S.homeHistory;
   return `<div style="margin-bottom:14px">
     <div class="home-section-header">
       <span class="home-section-title">最近创作</span>
       <span class="home-section-more" onclick="switchTab('history')">查看全部 ›</span>
     </div>
     ${items.length === 0
-      ? `<div class="recent-empty-line">还没有爆款克隆记录，<a onclick="switchTab('extract')">去克隆</a></div>`
+      ? `<div class="recent-empty-line">还没有创作记录，快去试试吧</div>`
       : `<div class="recent-list">
           ${items.slice(0,5).map((it,i)=>{
-            const text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
+            let text = '';
+            if (it.type === 'rewrite') {
+              text = it.input || '';
+            } else {
+              text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
+            }
+            const tag = it.type === 'rewrite' ? '克隆' : '灵感';
             return `<div class="recent-item" onclick="switchTab('history')">
               <div class="recent-item-head">
-                <div class="recent-item-text">${esc(text)}</div>
-                <div class="recent-copy" onclick="cpRecentItem(event,${i})" title="复制">复制</div>
+                <div class="recent-item-text"><span style="font-size:10px;color:#F97316;background:#FFF1E8;border-radius:4px;padding:1px 5px;margin-right:5px;flex-shrink:0">${tag}</span>${esc(text)}</div>
+                <div class="recent-copy" onclick="cpHomeItem(event,${i})" title="复制">复制</div>
               </div>
               <span class="recent-item-time">${esc(formatDisplayTime(it.created_at))}</span>
             </div>`;
@@ -1190,9 +1197,12 @@ function switchTab(tab) {
   });
   if (tab === 'profile') fetchMe();
   if (tab === 'vip') loadMemberPlans();
-  if (tab === 'history' || tab === 'home') {
+  if (tab === 'home') {
+    if (!S.homeHistoryLoaded) loadHomeHistory(); else render();
+  }
+  if (tab === 'history') {
     if (!S.recentHistoryLoaded) loadRecentHistory(); else render();
-    if (tab === 'history' && S.historyTab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
+    if (S.historyTab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
   }
   if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
 }
@@ -1212,6 +1222,7 @@ async function fetchMe() {
     } else if (r.code === 401) { apiUnauthorized(r); }
   } catch {}
   if (!S.recentHistoryLoaded) loadRecentHistory();
+  if (!S.homeHistoryLoaded) loadHomeHistory();
 }
 async function loadIndustries() {
   try {
@@ -1454,7 +1465,7 @@ async function handleActivateCode() {
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
   clearAuth();
-  setState({ page:'login', currentTab:'home', showAuthSheet:false, userInfo:null, userName:'创作者', userPhone:'', userAvatar:0, phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, extractHistory:[], extractHistoryLoaded:false, inspireHistory:[], historyLoaded:false, cloneHistory:[], cloneHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
+  setState({ page:'login', currentTab:'home', showAuthSheet:false, userInfo:null, userName:'创作者', userPhone:'', userAvatar:0, phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, homeHistory:[], homeHistoryLoaded:false, extractHistory:[], extractHistoryLoaded:false, inspireHistory:[], historyLoaded:false, cloneHistory:[], cloneHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
 }
 
 // ===== VIP =====
@@ -1474,7 +1485,9 @@ function refreshHistory() {
   S.recentHistoryLoaded = false;
   S.historyLoaded = false;
   S.cloneHistoryLoaded = false;
+  S.homeHistoryLoaded = false;
   loadRecentHistory();
+  loadHomeHistory();
   if (S.historyTab === 'clone') loadCloneHistory();
 }
 
@@ -1489,6 +1502,15 @@ async function loadRecentHistory() {
     const r = await api.get('/history?type=inspire');
     if (apiUnauthorized(r)) { S.recentHistory = []; S.recentHistoryLoaded = true; render(); return; }
     if (r.code === 200) { S.recentHistory = r.data || []; S.recentHistoryLoaded = true; render(); }
+  } catch {}
+}
+
+async function loadHomeHistory() {
+  if (!getToken()) { S.homeHistory = []; S.homeHistoryLoaded = true; render(); return; }
+  try {
+    const r = await api.get('/history');
+    if (apiUnauthorized(r)) { S.homeHistory = []; S.homeHistoryLoaded = true; render(); return; }
+    if (r.code === 200) { S.homeHistory = r.data || []; S.homeHistoryLoaded = true; render(); }
   } catch {}
 }
 
@@ -1535,6 +1557,20 @@ function cpRecentItem(e, i) {
   const it = S.recentHistory[i];
   if (!it||!it.result||!it.result[0]) return;
   copyText(it.result[0].content || it.result[0].hook || '');
+  showToast('已复制');
+}
+
+function cpHomeItem(e, i) {
+  e.stopPropagation();
+  const it = S.homeHistory[i];
+  if (!it) return;
+  if (it.type === 'rewrite') {
+    const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
+    copyText(text);
+  } else {
+    if (!it.result||!it.result[0]) return;
+    copyText(it.result[0].content || it.result[0].hook || '');
+  }
   showToast('已复制');
 }
 
