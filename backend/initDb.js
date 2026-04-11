@@ -6,9 +6,9 @@ async function initDb() {
       id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
       phone           VARCHAR(255) UNIQUE NOT NULL,
       password        TEXT NOT NULL,
-      nickname        TEXT DEFAULT '用户',
+      nickname        VARCHAR(100) DEFAULT '用户',
       avatar          INTEGER DEFAULT 0,
-      role            TEXT DEFAULT 'user',
+      role            VARCHAR(50) DEFAULT 'user',
       daily_limit     INTEGER DEFAULT 5,
       auth_code_id    INTEGER,
       auth_expires_at TEXT,
@@ -62,7 +62,7 @@ async function initDb() {
       code         VARCHAR(255) UNIQUE NOT NULL,
       days         INTEGER NOT NULL DEFAULT 30,
       daily_limit  INTEGER NOT NULL DEFAULT 30,
-      status       TEXT DEFAULT 'unused',
+      status       VARCHAR(50) DEFAULT 'unused',
       user_id      INTEGER,
       activated_at TEXT,
       created_at   TIMESTAMP DEFAULT NOW()
@@ -73,7 +73,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS industries (
       id         INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
       name       TEXT NOT NULL,
-      style_hint TEXT DEFAULT '',
+      style_hint VARCHAR(500) DEFAULT '',
       sort_order INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     ) CHARACTER SET utf8mb4
