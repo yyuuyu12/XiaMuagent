@@ -35,7 +35,7 @@ router.post('/video', requireAuth, async (req, res) => {
   if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
 
   try {
-    const { rows } = await db.query("SELECT value FROM system_config WHERE key = 'tikhub_api_key'");
+    const { rows } = await db.query("SELECT value FROM system_config WHERE config_key = 'tikhub_api_key'");
     const tikhubKey = rows[0]?.value;
 
     if (!tikhubKey) {

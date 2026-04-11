@@ -20,9 +20,13 @@ router.post('/register', async (req, res) => {
 
     const hashed = bcrypt.hashSync(password, 10);
     const name = nickname || `用户${phone.slice(-4)}`;
-    const { rows } = await db.query(
-      'INSERT INTO users (phone, password, nickname) VALUES ($1, $2, $3) RETURNING id, phone, nickname, avatar, role',
+    const { rows: ins } = await db.query(
+      'INSERT INTO users (phone, password, nickname) VALUES ($1, $2, $3)',
       [phone, hashed, name]
+    );
+    const { rows } = await db.query(
+      'SELECT id, phone, nickname, avatar, role FROM users WHERE id = $1',
+      [ins[0].id]
     );
     const user = rows[0];
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
@@ -151,9 +155,13 @@ router.post('/wx-login', async (req, res) => {
           const wxPhone = `wx_${openid}`;
           const wxPassword = bcrypt.hashSync(openid.slice(0, 12), 6);
           const wxNickname = nickname || `微信用户${openid.slice(-4)}`;
-          const { rows: newRows } = await db.query(
-            'INSERT INTO users (phone, password, nickname, openid) VALUES ($1,$2,$3,$4) RETURNING id, phone, nickname, avatar, role, daily_limit, auth_code_id, auth_expires_at',
+          const { rows: ins2 } = await db.query(
+            'INSERT INTO users (phone, password, nickname, openid) VALUES ($1,$2,$3,$4)',
             [wxPhone, wxPassword, wxNickname, openid]
+          );
+          const { rows: newRows } = await db.query(
+            'SELECT id, phone, nickname, avatar, role, daily_limit, auth_code_id, auth_expires_at FROM users WHERE id = $1',
+            [ins2[0].id]
           );
           user = newRows[0];
         } else {

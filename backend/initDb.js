@@ -3,8 +3,8 @@ const db = require('./db');
 async function initDb() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id              SERIAL PRIMARY KEY,
-      phone           TEXT UNIQUE NOT NULL,
+      id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      phone           VARCHAR(255) UNIQUE NOT NULL,
       password        TEXT NOT NULL,
       nickname        TEXT DEFAULT '用户',
       avatar          INTEGER DEFAULT 0,
@@ -12,71 +12,71 @@ async function initDb() {
       daily_limit     INTEGER DEFAULT 5,
       auth_code_id    INTEGER,
       auth_expires_at TEXT,
-      openid          TEXT UNIQUE,
+      openid          VARCHAR(255) UNIQUE,
       created_at      TIMESTAMP DEFAULT NOW()
-    )
+    ) CHARACTER SET utf8mb4
   `);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS usage_logs (
-      id         SERIAL PRIMARY KEY,
-      user_id    INTEGER NOT NULL REFERENCES users(id),
+      id         INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id    INTEGER NOT NULL,
       action     TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW()
-    )
+    ) CHARACTER SET utf8mb4
   `);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS system_config (
-      key        TEXT PRIMARY KEY,
+      config_key VARCHAR(255) PRIMARY KEY,
       value      TEXT,
       updated_at TIMESTAMP DEFAULT NOW()
-    )
+    ) CHARACTER SET utf8mb4
   `);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS prompt_templates (
-      id         SERIAL PRIMARY KEY,
+      id         INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
       name       TEXT NOT NULL,
       type       TEXT NOT NULL,
-      content    TEXT NOT NULL,
+      content    MEDIUMTEXT NOT NULL,
       is_default INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
-    )
+    ) CHARACTER SET utf8mb4
   `);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS history (
-      id         SERIAL PRIMARY KEY,
-      user_id    INTEGER NOT NULL REFERENCES users(id),
+      id         INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id    INTEGER NOT NULL,
       type       TEXT NOT NULL,
       input      TEXT,
-      result     TEXT,
+      result     MEDIUMTEXT,
       created_at TIMESTAMP DEFAULT NOW()
-    )
+    ) CHARACTER SET utf8mb4
   `);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS auth_codes (
-      id           SERIAL PRIMARY KEY,
-      code         TEXT UNIQUE NOT NULL,
+      id           INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      code         VARCHAR(255) UNIQUE NOT NULL,
       days         INTEGER NOT NULL DEFAULT 30,
       daily_limit  INTEGER NOT NULL DEFAULT 30,
       status       TEXT DEFAULT 'unused',
       user_id      INTEGER,
       activated_at TEXT,
       created_at   TIMESTAMP DEFAULT NOW()
-    )
+    ) CHARACTER SET utf8mb4
   `);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS industries (
-      id         SERIAL PRIMARY KEY,
+      id         INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
       name       TEXT NOT NULL,
       style_hint TEXT DEFAULT '',
       sort_order INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
-    )
+    ) CHARACTER SET utf8mb4
   `);
 
   // 默认会员价格
@@ -89,7 +89,7 @@ async function initDb() {
   ];
   for (const [k, v] of memberDefaults) {
     await db.query(
-      `INSERT INTO system_config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+      `INSERT IGNORE INTO system_config (config_key, value) VALUES (?, ?)`,
       [k, v]
     );
   }
@@ -99,7 +99,7 @@ async function initDb() {
   if (parseInt(indRows[0].cnt) === 0) {
     const defaultInds = ['家居生活','美妆护肤','美食探店','穿搭时尚','健身运动','母婴育儿','数码科技','旅行攻略','职场成长','情感心理'];
     for (let i = 0; i < defaultInds.length; i++) {
-      await db.query('INSERT INTO industries (name, sort_order) VALUES ($1, $2)', [defaultInds[i], i]);
+      await db.query('INSERT INTO industries (name, sort_order) VALUES (?, ?)', [defaultInds[i], i]);
     }
   }
 
@@ -120,11 +120,11 @@ async function initDb() {
   ];
   for (const p of defaultPrompts) {
     const { rows } = await db.query(
-      'SELECT id FROM prompt_templates WHERE type=$1 AND is_default=1', [p.type]
+      'SELECT id FROM prompt_templates WHERE type=? AND is_default=1', [p.type]
     );
     if (rows.length === 0) {
       await db.query(
-        'INSERT INTO prompt_templates (name, type, content, is_default) VALUES ($1,$2,$3,1)',
+        'INSERT INTO prompt_templates (name, type, content, is_default) VALUES (?,?,?,1)',
         [p.name, p.type, p.content]
       );
     }

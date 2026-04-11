@@ -14,7 +14,7 @@ router.get('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
     'claude_api_key','claude_model','qwen_api_key','qwen_model','zhipu_api_key','zhipu_model','tikhub_api_key'];
   const result = {};
   for (const k of keys) {
-    const { rows } = await db.query('SELECT value FROM system_config WHERE key = $1', [k]);
+    const { rows } = await db.query('SELECT value FROM system_config WHERE config_key = $1', [k]);
     let val = rows[0]?.value || '';
     if (k.includes('key') && val.length > 8) val = val.slice(0, 4) + '****' + val.slice(-4);
     result[k] = val;
@@ -29,8 +29,8 @@ router.post('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
     if (allowedKeys.includes(k) && v !== undefined) {
       if (typeof v === 'string' && v.includes('****')) continue;
       await db.query(
-        `INSERT INTO system_config (key, value, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        `INSERT INTO system_config (config_key, value, updated_at) VALUES ($1, $2, NOW())
+         ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()`,
         [k, v]
       );
     }
@@ -59,7 +59,7 @@ router.post('/prompts', requireAuth, requireAdmin, async (req, res) => {
     res.json({ code: 200, msg: '更新成功' });
   } else {
     const { rows } = await db.query(
-      'INSERT INTO prompt_templates (name, type, content) VALUES ($1,$2,$3) RETURNING id', [name, type, content]
+      'INSERT INTO prompt_templates (name, type, content) VALUES ($1,$2,$3)', [name, type, content]
     );
     res.json({ code: 200, msg: '创建成功', data: { id: rows[0].id } });
   }
@@ -78,7 +78,7 @@ router.get('/member-plans', async (req, res) => {
   const keys = ['member_plan_day_price','member_plan_week_price','member_plan_month_price','member_plan_forever_price','member_note'];
   const result = {};
   for (const k of keys) {
-    const { rows } = await db.query('SELECT value FROM system_config WHERE key=$1', [k]);
+    const { rows } = await db.query('SELECT value FROM system_config WHERE config_key=$1', [k]);
     result[k] = rows[0]?.value || '';
   }
   res.json({ code: 200, data: result });
@@ -89,8 +89,8 @@ router.post('/member-plans', requireAuth, requireAdmin, async (req, res) => {
   for (const [k, v] of Object.entries(req.body)) {
     if (allowed.includes(k)) {
       await db.query(
-        `INSERT INTO system_config (key, value, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        `INSERT INTO system_config (config_key, value, updated_at) VALUES ($1, $2, NOW())
+         ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()`,
         [k, v]
       );
     }
@@ -114,7 +114,7 @@ router.post('/industries', requireAuth, requireAdmin, async (req, res) => {
     const { rows } = await db.query('SELECT MAX(sort_order) AS m FROM industries');
     const maxOrder = rows[0].m || 0;
     const { rows: newRows } = await db.query(
-      'INSERT INTO industries (name, style_hint, sort_order) VALUES ($1,$2,$3) RETURNING id',
+      'INSERT INTO industries (name, style_hint, sort_order) VALUES ($1,$2,$3)',
       [name.trim(), style_hint || '', maxOrder + 1]
     );
     res.json({ code: 200, msg: '创建成功', data: { id: newRows[0].id } });

@@ -9,7 +9,7 @@ async function getAIConfig() {
     'claude_api_key','claude_model','qwen_api_key','qwen_model'];
   const cfg = {};
   for (const k of keys) {
-    const { rows } = await db.query('SELECT value FROM system_config WHERE key = $1', [k]);
+    const { rows } = await db.query('SELECT value FROM system_config WHERE config_key = $1', [k]);
     cfg[k] = rows[0]?.value || '';
   }
   return cfg;
