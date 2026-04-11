@@ -120,20 +120,40 @@
     <div class="section">
       <h2>🔑 模型配置</h2>
       <div id="key-msg" class="msg"></div>
+      <div class="form-row">
+        <label>当前 AI 提供商</label>
+        <select id="ai_provider">
+          <option value="openai">OpenAI 兼容（含自建代理）</option>
+          <option value="qwen">通义千问（OpenAI 兼容地址）</option>
+          <option value="claude">Anthropic Claude</option>
+          <option value="zhipu">智谱 GLM（bigmodel.cn）</option>
+        </select>
+        <div class="hint">保存时会写入数据库，请勿随意切换未配置 Key 的提供商</div>
+      </div>
       <div class="grid-2">
         <div class="form-row">
-          <label>API Key</label>
+          <label>OpenAI / 兼容 API Key</label>
           <input id="openai_api_key" type="password" placeholder="sk-..." />
         </div>
         <div class="form-row">
           <label>模型名称</label>
-          <input id="openai_model" placeholder="gpt-5.4" />
+          <input id="openai_model" placeholder="gpt-4o-mini" />
         </div>
       </div>
       <div class="form-row">
-        <label>Base URL（兼容接口填写，OpenAI 官方可留空）</label>
-        <input id="openai_base_url" placeholder="https://api.xxx.com/v1" />
-        <div class="hint">示例：https://api.xcode.best/v1</div>
+        <label>Base URL（OpenAI 兼容，官方可留空）</label>
+        <input id="openai_base_url" placeholder="https://api.openai.com/v1" />
+        <div class="hint">千问兼容示例：https://dashscope.aliyuncs.com/compatible-mode/v1</div>
+      </div>
+      <div class="grid-2" style="padding-top:12px;border-top:1px solid #E8EDFF;margin-top:8px">
+        <div class="form-row">
+          <label>智谱 API Key</label>
+          <input id="zhipu_api_key" type="password" placeholder="智谱开放平台" />
+        </div>
+        <div class="form-row">
+          <label>智谱模型</label>
+          <input id="zhipu_model" placeholder="glm-4-flash" />
+        </div>
       </div>
       <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
         <label>🎵 Tikhub API Key（抖音文案提取）</label>
@@ -141,6 +161,25 @@
         <div class="hint">注册 tikhub.io 可获得免费额度</div>
       </div>
       <button class="btn-primary" onclick="saveKeys()">保存配置</button>
+    </div>
+
+    <!-- H5 客户端「我的」页展示 -->
+    <div class="section">
+      <h2>📱 H5「我的」页展示</h2>
+      <div id="h5-msg" class="msg"></div>
+      <div class="form-row">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="h5_show_profile_phone" /> 在个人中心展示手机号
+        </label>
+        <div class="hint">默认关闭；开启后用户在「我的」主页可见完整手机号</div>
+      </div>
+      <div class="form-row">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="h5_show_account_type" /> 展示「账号类型」一行（管理员/免费版）
+        </label>
+        <div class="hint">默认关闭；便于运营排查时可临时打开</div>
+      </div>
+      <button class="btn-primary" onclick="saveH5Settings()">保存 H5 展示设置</button>
     </div>
 
     <!-- 授权码配置 -->
@@ -343,7 +382,7 @@ function doLogout() {
 async function showAdmin() {
   document.getElementById('login-view').style.display = 'none';
   document.getElementById('admin-view').style.display = '';
-  await loadKeys(); await loadMemberPlans(); await loadCodes(); await loadPrompts();
+  await loadKeys(); await loadMemberPlans(); await loadCodes(); await loadPrompts(); await loadH5Settings();
 }
 
 // ---- 主 Tab ----
@@ -359,22 +398,45 @@ async function loadKeys() {
   const r = await req('/config/ai-keys');
   if (r.code !== 200) return;
   const d = r.data;
+  const prov = (d.ai_provider || 'openai').trim();
+  const sel = document.getElementById('ai_provider');
+  if ([...sel.options].some(o => o.value === prov)) sel.value = prov;
   document.getElementById('openai_api_key').value = d.openai_api_key || '';
   document.getElementById('openai_base_url').value = d.openai_base_url || '';
   document.getElementById('openai_model').value = d.openai_model || '';
+  document.getElementById('zhipu_api_key').value = d.zhipu_api_key || '';
+  document.getElementById('zhipu_model').value = d.zhipu_model || '';
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
 }
 
 async function saveKeys() {
   const body = {
-    ai_provider: 'openai',
+    ai_provider: document.getElementById('ai_provider').value,
     openai_api_key: document.getElementById('openai_api_key').value,
     openai_base_url: document.getElementById('openai_base_url').value,
     openai_model: document.getElementById('openai_model').value,
+    zhipu_api_key: document.getElementById('zhipu_api_key').value,
+    zhipu_model: document.getElementById('zhipu_model').value,
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
   };
   const r = await req('/config/ai-keys', { method:'POST', body: JSON.stringify(body) });
   if (r.code===200) showMsg('key-msg','配置已保存'); else showMsg('key-msg',r.msg||'保存失败','error');
+}
+
+async function loadH5Settings() {
+  const r = await fetch(API + '/config/app-h5-settings').then(x => x.json());
+  if (r.code !== 200 || !r.data) return;
+  document.getElementById('h5_show_profile_phone').checked = !!r.data.showProfilePhone;
+  document.getElementById('h5_show_account_type').checked = !!r.data.showAccountType;
+}
+
+async function saveH5Settings() {
+  const body = {
+    showProfilePhone: document.getElementById('h5_show_profile_phone').checked,
+    showAccountType: document.getElementById('h5_show_account_type').checked,
+  };
+  const r = await req('/config/app-h5-settings', { method:'POST', body: JSON.stringify(body) });
+  if (r.code===200) showMsg('h5-msg','已保存'); else showMsg('h5-msg',r.msg||'保存失败','error');
 }
 
 // ---- 会员套餐 ----

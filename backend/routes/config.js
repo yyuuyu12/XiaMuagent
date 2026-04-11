@@ -126,4 +126,40 @@ router.delete('/industries/:id', requireAuth, requireAdmin, async (req, res) => 
   res.json({ code: 200, msg: '删除成功' });
 });
 
+// ==================== H5「我的」页展示开关（默认关闭，后台可打开）====================
+router.get('/app-h5-settings', async (req, res) => {
+  const out = { showProfilePhone: false, showAccountType: false };
+  try {
+    const { rows: r1 } = await db.query('SELECT value FROM system_config WHERE config_key=$1', ['h5_show_profile_phone']);
+    const { rows: r2 } = await db.query('SELECT value FROM system_config WHERE config_key=$1', ['h5_show_account_type']);
+    const v1 = (r1[0]?.value || '').trim();
+    const v2 = (r2[0]?.value || '').trim();
+    out.showProfilePhone = v1 === '1' || v1 === 'true';
+    out.showAccountType = v2 === '1' || v2 === 'true';
+  } catch (err) {
+    console.error('/app-h5-settings:', err.message);
+  }
+  res.json({ code: 200, data: out });
+});
+
+router.post('/app-h5-settings', requireAuth, requireAdmin, async (req, res) => {
+  const { showProfilePhone, showAccountType } = req.body || {};
+  const pairs = [];
+  if (typeof showProfilePhone === 'boolean') {
+    pairs.push(['h5_show_profile_phone', showProfilePhone ? '1' : '0']);
+  }
+  if (typeof showAccountType === 'boolean') {
+    pairs.push(['h5_show_account_type', showAccountType ? '1' : '0']);
+  }
+  if (!pairs.length) return res.status(400).json({ code: 400, msg: '无有效参数' });
+  for (const [k, v] of pairs) {
+    await db.query(
+      `INSERT INTO system_config (config_key, value, updated_at) VALUES ($1, $2, NOW())
+       ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()`,
+      [k, v]
+    );
+  }
+  res.json({ code: 200, msg: '已保存' });
+});
+
 module.exports = router;

@@ -139,6 +139,20 @@ async function initDb() {
     await db.query('UPDATE users SET role = ? WHERE phone = ?', ['admin', phone]);
   }
 
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN avatar_image MEDIUMTEXT NULL');
+  } catch (e) {
+    if (!String(e.message || e).includes('Duplicate column name')) console.warn('[initDb] avatar_image:', e.message || e);
+  }
+
+  const uiDefaults = [
+    ['h5_show_profile_phone', '0'],
+    ['h5_show_account_type', '0'],
+  ];
+  for (const [k, v] of uiDefaults) {
+    await db.query('INSERT IGNORE INTO system_config (config_key, value) VALUES (?, ?)', [k, v]);
+  }
+
   console.log('✅ 数据库初始化完成');
 }
 
