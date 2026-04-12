@@ -211,7 +211,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 
 /* === VIP === */
 .vip-hero { background: linear-gradient(135deg,#1A1814 0%,#3A3530 100%); border-radius: 12px; padding: 28px 18px 24px; margin-bottom: 14px; display: flex; flex-direction: column; align-items: center; }
-.vip-hero-icon { font-size: 40px; margin-bottom: 8px; }
+.vip-hero-icon { display:flex; align-items:center; justify-content:center; margin-bottom: 10px; }
 .vip-hero-title { display: block; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 5px; }
 .vip-hero-sub { display: block; font-size: 13px; color: rgba(255,255,255,.6); }
 .plan-grid { display: flex; flex-direction: row; flex-wrap: wrap; margin: 0 -4px 8px; }
@@ -526,7 +526,7 @@ const S = {
   authMode: 'sms',       // 'sms' | 'pwd'
   smsCode: '', smsSent: false, smsCountdown: 0,
   pwdOld: '', pwdNew: '', pwdNew2: '', pwdErr: '', pwdOk: false, pwdLoading: false,
-  showAuthCodeInput: false,
+  showAuthCodeInput: false, showAuthCodeSheet: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
   extractLoading: false, extractErr: '', copiedId: '',
@@ -561,7 +561,7 @@ const S = {
   tasksList: [], tasksLoaded: false,
   tasksView: 'list',          // 'list'|'detail'
   viewingTask: null,
-  tasksDetailFromHome: false, historyFromProfile: false,
+  tasksDetailFromHome: false, historyFromProfile: false, prevTab: 'home',
   tasksCopiedId: '',
   appH5: { showProfilePhone: false, showAccountType: false },
   avatarCropOpen: false, avatarCropDataUrl: '',
@@ -745,6 +745,45 @@ function tLogin() {
   </div>`;
 }
 
+// ===== 授权码底部弹层 =====
+function tAuthCodeSheet() {
+  const u = S.userInfo;
+  const activated = u && u.auth_expires_at;
+  return `<div class="auth-sheet-mask" onclick="setState({showAuthCodeSheet:false});render()">
+    <div class="auth-sheet" onclick="event.stopPropagation()">
+      <div class="auth-sheet-handle" onclick="setState({showAuthCodeSheet:false});render()"></div>
+      <div class="auth-sheet-head">
+        <span class="auth-sheet-title">填写授权码</span>
+        <span class="auth-sheet-close" onclick="setState({showAuthCodeSheet:false});render()">✕</span>
+      </div>
+      ${activated ? `
+        <div style="text-align:center;padding:24px 0 32px">
+          <div style="width:52px;height:52px;background:#EDFAF4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div style="font-size:16px;font-weight:700;color:#1A1814;margin-bottom:6px">已激活</div>
+          <div style="font-size:13px;color:#6B6860">有效期至 ${esc(u.auth_expires_at)}</div>
+          <div style="font-size:13px;color:#6B6860;margin-top:4px">每日可用 ${u.daily_limit} 次</div>
+        </div>
+      ` : `
+        <div class="auth-sheet-scroll" style="padding-bottom:32px">
+          <span class="auth-sheet-sub">输入授权码后可解锁更多每日使用次数</span>
+          <div class="field-group" style="margin-top:16px">
+            <div class="input-wrap">
+              <input class="lf-input" type="text" placeholder="请输入授权码（字母+数字）" style="padding-left:14px;text-transform:uppercase"
+                value="${esc(S.authCodeInput)}" oninput="S.authCodeInput=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')handleActivateCode()"/>
+            </div>
+          </div>
+          ${S.authCodeMsg?`<span class="err-msg ${S.authCodeOk?'':'err-msg'}" style="${S.authCodeOk?'color:#10B981;background:rgba(16,185,129,.08)':''}">${esc(S.authCodeMsg)}</span>`:''}
+          <div class="submit-btn ${S.authCodeLoading||!S.authCodeInput.trim()?'submit-disabled':''}" style="margin-top:12px" onclick="handleActivateCode()">
+            ${S.authCodeLoading?'激活中...':'立即激活'}
+          </div>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
 // ===== AUTH BOTTOM SHEET =====
 function tAuthSheet() {
   return `<div class="auth-sheet-mask" onclick="closeAuthSheet()">
@@ -812,6 +851,7 @@ function tMain() {
     ${S.nicknamePrompt?tNicknamePrompt():''}
     ${S.avatarCropOpen?tAvatarCropModal():''}
     ${S.showAuthSheet?tAuthSheet():''}
+    ${S.showAuthCodeSheet?tAuthCodeSheet():''}
   </div>`;
 }
 
@@ -872,6 +912,7 @@ function tTopBar() {
     if (S.extractFromHistory) backAction = "stopClonePoller();setState({currentTab:'history',extractFromHistory:false});render()";
   } else if (t === 'vip') {
     title = '开通会员';
+    backAction = `setState({currentTab:S.prevTab||'home'});render()`;
   }
 
   const isDeepSub = !!(S.inspireMode || (t === 'history' && S.tasksView === 'detail'));
@@ -1448,21 +1489,15 @@ function tProfile() {
         </div>
         <div style="color:#A8A49C;font-size:18px">›</div>
       </div>
-      <div class="profile-section">
-        <span class="profile-section-title">🎫 填写授权码</span>
-        <div class="code-row">
-          <input class="code-input" id="f-code" placeholder="请输入授权码"
-            value="${esc(S.authCodeInput)}" oninput="S.authCodeInput=this.value"/>
-          <div class="code-submit ${S.authCodeLoading?'btn-disabled':''}" onclick="handleActivateCode()">
-            ${S.authCodeLoading?'...':'立即激活'}
-          </div>
-        </div>
-        ${S.authCodeMsg?`<span class="code-msg ${S.authCodeOk?'code-ok':'code-err'}">${esc(S.authCodeMsg)}</span>`:''}
-      </div>
       <div class="vip-upgrade-card" onclick="switchTab('vip')">
         <div class="vip-upgrade-left">
-          <span class="vip-upgrade-title">👑 升级专业版</span>
-          <span class="vip-upgrade-sub">无限次数 · 更多功能 · 优先生成</span>
+          <div>
+            <span class="vip-upgrade-title">
+              <svg width="16" height="16" viewBox="0 0 44 44" fill="none"><path d="M10 30h24M12 28l4-10 6 6 6-10 4 10" stroke="rgba(255,255,255,0.9)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="28" r="2" fill="rgba(255,255,255,0.9)"/><circle cx="22" cy="18" r="2" fill="rgba(255,255,255,0.9)"/><circle cx="32" cy="28" r="2" fill="rgba(255,255,255,0.9)"/></svg>
+              升级专业版
+            </span>
+            <span class="vip-upgrade-sub">无限次数 · 更多功能 · 优先生成</span>
+          </div>
         </div>
         <span class="vip-upgrade-arrow">›</span>
       </div>
@@ -1521,13 +1556,13 @@ function tProfile() {
         </div>
         <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <div class="profile-menu-item" onclick="setState({showAuthCodeInput:true});render();setTimeout(()=>{const el=document.getElementById('f-code');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.focus();}},200)">
+      <div class="profile-menu-item" onclick="setState({showAuthCodeSheet:true,authCodeInput:'',authCodeMsg:''});render()">
         <div class="profile-menu-icon pmi-green">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 00-8 0v2"/><line x1="12" y1="12" x2="12" y2="16"/><circle cx="12" cy="12" r="1" fill="#10B981"/></svg>
         </div>
         <div class="profile-menu-body">
           <span class="profile-menu-title">填写授权码</span>
-          <span class="profile-menu-sub">${u&&u.auth_expires_at?`已激活，到期 ${esc(u.auth_expires_at)}`:'激活后获得更多每日次数'}</span>
+          ${u&&u.auth_expires_at?`<span class="profile-menu-sub" style="color:#10B981">已激活 · 到期 ${esc(u.auth_expires_at)}</span>`:`<span class="profile-menu-sub">激活后获得更多每日次数</span>`}
         </div>
         <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -1542,17 +1577,6 @@ function tProfile() {
         <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </div>
-    ${(S.showAuthCodeInput||S.authCodeMsg)?`<div class="profile-section" id="auth-code-section">
-      ${u&&u.auth_expires_at?`<div class="code-activated"><span class="code-activated-text">✓ 已激活，有效期至 ${esc(u.auth_expires_at)}，每日可用 ${u.daily_limit} 次</span></div>`:`
-      <div class="code-row">
-        <input class="code-input" id="f-code" placeholder="请输入授权码"
-          value="${esc(S.authCodeInput)}" oninput="S.authCodeInput=this.value"/>
-        <div class="code-submit ${S.authCodeLoading?'btn-disabled':''}" onclick="handleActivateCode()">
-          ${S.authCodeLoading?'...':'立即激活'}
-        </div>
-      </div>
-      ${S.authCodeMsg?`<span class="code-msg ${S.authCodeOk?'code-ok':'code-err'}">${esc(S.authCodeMsg)}</span>`:''}`}
-    </div>`:''}
     <div class="logout-btn" onclick="handleLogout()">退出登录</div>
     <div style="height:20px"></div>
   </div>`;
@@ -1670,7 +1694,15 @@ function tVip() {
   const plans = [{key:'day',name:'日会员',dur:'1天'},{key:'week',name:'周会员',dur:'7天'},{key:'month',name:'月会员',dur:'30天',badge:'推荐'},{key:'forever',name:'永久会员',dur:'永久'}];
   return `<div class="tab-page">
     <div class="vip-hero">
-      <span class="vip-hero-icon">👑</span>
+      <div class="vip-hero-icon">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="22" cy="22" r="22" fill="rgba(255,255,255,0.1)"/>
+          <path d="M10 30h24M12 28l4-10 6 6 6-10 4 10" stroke="#FFD766" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="28" r="2" fill="#FFD766"/>
+          <circle cx="22" cy="18" r="2" fill="#FFD766"/>
+          <circle cx="32" cy="28" r="2" fill="#FFD766"/>
+        </svg>
+      </div>
       <span class="vip-hero-title">解锁无限创作</span>
       <span class="vip-hero-sub">会员期间无次数限制，优先响应</span>
     </div>
@@ -1820,6 +1852,7 @@ async function handleAuth() {
 function switchTab(tab) {
   const resetProfile = tab !== 'profile';
   setState({
+    prevTab: S.currentTab,
     currentTab: tab,
     nicknamePrompt: false,
     ...(resetProfile ? { profileView: 'main', avatarCropOpen: false, avatarCropDataUrl: '' } : {}),
@@ -2257,8 +2290,12 @@ async function handleActivateCode() {
   setState({ authCodeLoading: true, authCodeMsg: '' });
   try {
     const r = await api.post('/auth/activate-code', { code });
-    if (r.code === 200) { setState({ authCodeMsg: r.msg||'激活成功！', authCodeOk:true, authCodeInput:'', authCodeLoading:false }); fetchMe(); }
-    else setState({ authCodeMsg: r.msg||'激活失败', authCodeOk:false, authCodeLoading:false });
+    if (r.code === 200) {
+      setState({ authCodeLoading: false, authCodeInput: '' });
+      await fetchMe();
+      showToast('激活成功！');
+      setTimeout(() => setState({ showAuthCodeSheet: false }), 1200);
+    } else setState({ authCodeMsg: r.msg||'激活失败', authCodeOk:false, authCodeLoading:false });
   } catch { setState({ authCodeMsg:'网络错误，请稍后重试', authCodeOk:false, authCodeLoading:false }); }
 }
 function handleLogout() {
