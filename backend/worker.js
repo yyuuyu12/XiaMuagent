@@ -205,18 +205,25 @@ async function processSingleVideoAnalyze(taskId) {
   );
 }
 
+const TASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 分钟上限
+
 // ===== 注册任务处理器 =====
 taskRunner.setHandler(async (job) => {
   const { taskId, type } = job;
   console.log(`[Worker] 开始处理任务 ${taskId} (${type})`);
+
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('任务超时，已超过10分钟，请稍后重试')), TASK_TIMEOUT_MS)
+  );
+
+  const processPromise = (async () => {
+    if (type === 'profile_analyze') await processProfileAnalyze(taskId);
+    else if (type === 'single_video_analyze') await processSingleVideoAnalyze(taskId);
+    else throw new Error(`未知任务类型: ${type}`);
+  })();
+
   try {
-    if (type === 'profile_analyze') {
-      await processProfileAnalyze(taskId);
-    } else if (type === 'single_video_analyze') {
-      await processSingleVideoAnalyze(taskId);
-    } else {
-      throw new Error(`未知任务类型: ${type}`);
-    }
+    await Promise.race([processPromise, timeoutPromise]);
     console.log(`[Worker] 任务完成: ${taskId}`);
   } catch (err) {
     console.error(`[Worker] 任务失败: ${taskId}`, err.message);
@@ -227,5 +234,27 @@ taskRunner.setHandler(async (job) => {
     throw err;
   }
 });
+
+// ===== 启动时清理卡住的任务 =====
+(async () => {
+  try {
+    const { rows } = await db.query(
+      `UPDATE tasks SET status = 'failed', error_msg = '服务重启，任务中断，请重新生成'
+       WHERE status IN ('pending', 'running')
+       RETURNING id`
+    );
+    if (rows.length > 0) {
+      console.log(`[Worker] 清理了 ${rows.length} 个中断任务`);
+    }
+  } catch (e) {
+    // MySQL 不支持 RETURNING，用两步
+    try {
+      await db.query(
+        `UPDATE tasks SET status = 'failed', error_msg = '服务重启，任务中断，请重新生成'
+         WHERE status IN ('pending', 'running')`
+      );
+    } catch {}
+  }
+})();
 
 console.log('✅ TaskRunner Worker 已就绪');
