@@ -1128,7 +1128,11 @@ function tProfileEdit() {
 
 function tAvatarCropModal() {
   const percent = Number(S.avatarCropScale || 100);
-  const sc = Math.max(0.2, percent / 100);
+  const userScale = Math.max(0.2, percent / 100);
+  const meta = S.avatarCropMeta || { width: 220, height: 220 };
+  const previewSize = 220;
+  const base = Math.max(previewSize / meta.width, previewSize / meta.height);
+  const sc = base * userScale;
   const tx = Number(S.avatarCropX || 0);
   const ty = Number(S.avatarCropY || 0);
   return `<div class="crop-modal-mask" onclick="if(event.target===event.currentTarget)cancelAvatarCrop()">
@@ -1141,14 +1145,14 @@ function tAvatarCropModal() {
         onpointercancel="endAvatarDrag(event)"
         onpointerleave="endAvatarDrag(event)">
         <img class="crop-preview-img" src="${esc(S.avatarCropDataUrl)}" alt="" draggable="false"
-          style="transform:translate(${tx}px, ${ty}px) scale(${sc});"/>
+          style="transform:translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(${sc});"/>
       </div>
       <div class="crop-slider-row">
         <span>缩小</span>
         <input class="crop-slider" type="range" min="20" max="220" step="1" value="${Math.round(percent)}" oninput="setAvatarCropScale(this.value)" />
         <span>${Math.round(percent)}%</span>
       </div>
-      <p class="profile-field-hint" style="text-align:center;margin-bottom:12px">默认按原图完整显示（100%），可拖拽与缩放，裁剪比例固定 1:1</p>
+      <p class="profile-field-hint" style="text-align:center;margin-bottom:12px">默认填满裁剪框（100%），可拖拽与缩放，裁剪比例固定 1:1</p>
       <div class="crop-modal-actions">
         <div class="btn-secondary" onclick="cancelAvatarCrop()">重选</div>
         <div class="btn-primary" onclick="confirmAvatarCrop()">确认使用</div>
