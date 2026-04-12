@@ -219,7 +219,9 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .plan-active { border-color: #6366F1; background: rgba(99,102,241,.04); }
 .plan-name { display: block; font-size: 14px; font-weight: 600; color: #1A1814; margin-bottom: 3px; }
 .plan-duration { display: block; font-size: 11px; color: #A8A49C; margin-bottom: 6px; }
-.plan-price { display: block; font-size: 16px; font-weight: 700; color: #FF6B35; }
+.plan-price { display: block; color: #FF6B35; margin-top: 2px; }
+.plan-price-unit { font-size: 12px; font-weight: 400; vertical-align: middle; }
+.plan-price-num { font-size: 20px; font-weight: 500; letter-spacing: -0.5px; vertical-align: middle; }
 .plan-badge { position: absolute; top: -1px; right: 8px; background: #FF6B35; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 0 0 6px 6px; }
 .payment-row { display: flex; flex-direction: row; margin-bottom: 14px; }
 .payment-item { flex: 1; background: #fff; border: 1px solid #E4E2DA; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; align-items: center; margin-right: 8px; cursor: pointer; user-select: none; }
@@ -526,7 +528,7 @@ const S = {
   authMode: 'sms',       // 'sms' | 'pwd'
   smsCode: '', smsSent: false, smsCountdown: 0,
   pwdOld: '', pwdNew: '', pwdNew2: '', pwdErr: '', pwdOk: false, pwdLoading: false,
-  showAuthCodeInput: false, showAuthCodeSheet: false,
+  showAuthCodeInput: false, showAuthCodeSheet: false, showSetPwdSheet: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
   extractLoading: false, extractErr: '', copiedId: '',
@@ -852,6 +854,7 @@ function tMain() {
     ${S.avatarCropOpen?tAvatarCropModal():''}
     ${S.showAuthSheet?tAuthSheet():''}
     ${S.showAuthCodeSheet?tAuthCodeSheet():''}
+    ${S.showSetPwdSheet?tSetPasswordSheet():''}
   </div>`;
 }
 
@@ -861,13 +864,6 @@ function tTopBar() {
     return `<div class="top-bar top-bar-sub">
       <button type="button" class="back-btn" onclick="goProfileEditBack()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
       <span class="sub-page-title">编辑资料</span>
-      <div style="width:56px;flex-shrink:0"></div>
-    </div>`;
-  }
-  if (t === 'profile' && S.profileView === 'setPassword') {
-    return `<div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="setState({profileView:'main'});render()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
-      <span class="sub-page-title">${S.userInfo?.has_password?'修改密码':'设置密码'}</span>
       <div style="width:56px;flex-shrink:0"></div>
     </div>`;
   }
@@ -1458,7 +1454,6 @@ function tInspireIndustry() {
 // ===== PROFILE =====
 function tProfile() {
   if (S.profileView === 'edit') return tProfileEdit();
-  if (S.profileView === 'setPassword') return tSetPassword();
   const u = S.userInfo;
   const loggedIn = !!getToken();
   const emojis = ['👨‍🚀','🦊','🐱','🐼'];
@@ -1566,7 +1561,7 @@ function tProfile() {
         </div>
         <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <div class="profile-menu-item" onclick="setState({profileView:'setPassword',pwdOld:'',pwdNew:'',pwdNew2:'',pwdErr:'',pwdOk:false});render()">
+      <div class="profile-menu-item" onclick="setState({showSetPwdSheet:true,pwdOld:'',pwdNew:'',pwdNew2:'',pwdErr:'',pwdOk:false});render()">
         <div class="profile-menu-icon pmi-gray">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
         </div>
@@ -1626,28 +1621,38 @@ function tProfileEdit() {
   </div>`;
 }
 
-function tSetPassword() {
+function tSetPasswordSheet() {
   const hasPwd = S.userInfo?.has_password;
-  return `<div class="tab-page">
-    <div class="profile-section">
-      ${hasPwd?`
-      <span class="profile-field-label">原密码</span>
-      <input class="field-input" type="password" placeholder="请输入原密码"
-        value="${esc(S.pwdOld)}" oninput="S.pwdOld=this.value"/>
-      <div style="height:12px"></div>
-      `:''}
-      <span class="profile-field-label">新密码</span>
-      <input class="field-input" type="password" placeholder="至少6位"
-        value="${esc(S.pwdNew)}" oninput="S.pwdNew=this.value"/>
-      <div style="height:12px"></div>
-      <span class="profile-field-label">确认新密码</span>
-      <input class="field-input" type="password" placeholder="再次输入新密码"
-        value="${esc(S.pwdNew2)}" oninput="S.pwdNew2=this.value"/>
-    </div>
-    ${S.pwdErr?`<span class="err-text" style="padding:0 16px">${esc(S.pwdErr)}</span>`:''}
-    ${S.pwdOk?`<span style="color:#10B981;font-size:13px;padding:0 16px">密码设置成功 ✓</span>`:''}
-    <div class="btn-primary ${S.pwdLoading?'submit-disabled':''}" style="margin:16px" onclick="handleSetPassword()">
-      ${S.pwdLoading?'请稍候...':(hasPwd?'修改密码':'设置密码')}
+  const close = "setState({showSetPwdSheet:false});render()";
+  return `<div class="auth-sheet-mask" onclick="${close}">
+    <div class="auth-sheet" onclick="event.stopPropagation()">
+      <div class="auth-sheet-handle" onclick="${close}"></div>
+      <div class="auth-sheet-head">
+        <span class="auth-sheet-title">${hasPwd?'修改密码':'设置密码'}</span>
+        <span class="auth-sheet-close" onclick="${close}">✕</span>
+      </div>
+      <div class="auth-sheet-scroll" style="padding-bottom:32px">
+        ${hasPwd?`
+        <div class="field-group">
+          <span class="field-label">原密码</span>
+          <input class="lf-input" type="password" placeholder="请输入原密码"
+            value="${esc(S.pwdOld)}" oninput="S.pwdOld=this.value"/>
+        </div>`:''}
+        <div class="field-group">
+          <span class="field-label">新密码</span>
+          <input class="lf-input" type="password" placeholder="至少6位"
+            value="${esc(S.pwdNew)}" oninput="S.pwdNew=this.value"/>
+        </div>
+        <div class="field-group">
+          <span class="field-label">确认新密码</span>
+          <input class="lf-input" type="password" placeholder="再次输入新密码"
+            value="${esc(S.pwdNew2)}" oninput="S.pwdNew2=this.value" onkeydown="if(event.key==='Enter')handleSetPassword()"/>
+        </div>
+        ${S.pwdErr?`<span class="err-msg">${esc(S.pwdErr)}</span>`:''}
+        <div class="submit-btn ${S.pwdLoading?'submit-disabled':''}" style="margin-top:4px" onclick="handleSetPassword()">
+          ${S.pwdLoading?'请稍候...':(hasPwd?'修改密码':'设置密码')}
+        </div>
+      </div>
     </div>
   </div>`;
 }
@@ -1713,17 +1718,17 @@ function tVip() {
           ${pl.badge?`<div class="plan-badge">${pl.badge}</div>`:''}
           <span class="plan-name">${pl.name}</span>
           <span class="plan-duration">${pl.dur}</span>
-          <span class="plan-price">¥${pm[pl.key]}</span>
+          <span class="plan-price"><span class="plan-price-unit">¥</span><span class="plan-price-num">${pm[pl.key]}</span></span>
         </div>`).join('')}
     </div>
     <span class="section-label" style="margin-top:12px;display:block">支付方式</span>
     <div class="payment-row">
       <div class="payment-item ${S.selectedPayment==='wechat'?'payment-active':''}" onclick="selectPayment('wechat')">
-        <div class="payment-icon"><svg viewBox="0 0 48 48" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="10" fill="#07C160"/><path d="M20.3 13C13.5 13 8 17.6 8 23.3c0 3.2 1.7 6 4.4 7.9l-1.1 3.3 3.8-1.9c1.3.4 2.7.6 4.2.6.4 0 .8 0 1.2-.1-.3-.8-.4-1.6-.4-2.5 0-5.2 4.9-9.4 11-9.4.4 0 .8 0 1.2.1C31.5 17 26.4 13 20.3 13z" fill="#fff"/><circle cx="16.5" cy="23" r="1.8" fill="#07C160"/><circle cx="23.5" cy="23" r="1.8" fill="#07C160"/><path d="M28.5 20.5c-5.5 0-10 3.6-10 8.1 0 4.5 4.5 8.1 10 8.1 1.2 0 2.3-.2 3.4-.5l3.1 1.6-.9-2.8c2.3-1.6 3.8-4 3.8-6.5 0-4.4-4.5-8-9.4-8z" fill="#fff"/><circle cx="25.5" cy="28.5" r="1.5" fill="#07C160"/><circle cx="31.5" cy="28.5" r="1.5" fill="#07C160"/></svg></div>
+        <div class="payment-icon"><svg viewBox="0 0 40 40" width="40" height="40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="9" fill="#07C160"/><path d="M18 10c-5.5 0-10 3.8-10 8.5 0 2.8 1.5 5.2 3.9 6.8l-.9 2.9 3.4-1.7c1.1.3 2.3.5 3.6.5.3 0 .6 0 .9-.1-.2-.6-.3-1.3-.3-2 0-4.7 4.2-8.4 9.4-8.4.4 0 .7 0 1.1.1C28.1 13.4 23.4 10 18 10z" fill="#fff"/><circle cx="14.5" cy="18.5" r="1.5" fill="#07C160"/><circle cx="21.5" cy="18.5" r="1.5" fill="#07C160"/><path d="M27 22c-4.7 0-8.5 3.1-8.5 6.9 0 3.8 3.8 6.9 8.5 6.9 1 0 2-.2 2.9-.4l2.6 1.3-.7-2.3c2-1.3 3.2-3.3 3.2-5.5C35 25.1 31.2 22 27 22z" fill="#fff"/><circle cx="24" cy="29" r="1.3" fill="#07C160"/><circle cx="30" cy="29" r="1.3" fill="#07C160"/></svg></div>
         <span class="payment-name">微信支付</span>
       </div>
       <div class="payment-item ${S.selectedPayment==='alipay'?'payment-active':''}" onclick="selectPayment('alipay')">
-        <div class="payment-icon"><svg viewBox="0 0 48 48" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="48" height="48" rx="10" fill="#1677FF"/><path d="M37.9 31.3c-2.8-1-6.5-2.4-9.6-3.6 1.7-2.3 2.9-5.2 3.3-8.4H25v-2.1h8v-2H25V11h-4.5v4.2H12v2h8.5v2.1H13v2h13.8c-.4 2.2-1.3 4.2-2.6 5.8-2.8-1-5.6-1.9-7.7-2.3-4.6-.9-7.5 1-7.5 4.3 0 3.4 3.1 5.5 8.1 5.5 3.5 0 7-1.5 9.6-4.1 3.5 1.5 7.5 3.3 9.4 4.2l1.8-3.4z" fill="#fff"/><path d="M17.2 32.2c-3.2 0-4.9-1.1-4.9-2.8 0-1.6 1.4-2.4 3.7-2 1.8.3 3.9 1 6.1 1.9-1.6 1.8-3.3 2.9-4.9 2.9z" fill="#1677FF"/></svg></div>
+        <div class="payment-icon"><svg viewBox="0 0 40 40" width="40" height="40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="9" fill="#1677FF"/><path d="M30.8 26.2c-2.3-.8-5.3-2-7.8-3 1.4-1.9 2.4-4.3 2.7-6.9H21v-1.7h6.5v-1.6H21V9.5h-3.7v3.5H10v1.6h7v1.7H10.5v1.6H22c-.3 1.8-1 3.4-2.1 4.7-2.3-.8-4.6-1.5-6.3-1.9-3.7-.7-6.1.8-6.1 3.5 0 2.8 2.5 4.5 6.6 4.5 2.9 0 5.7-1.2 7.8-3.3 2.9 1.2 6.1 2.7 7.7 3.4l.7-2.1z" fill="#fff"/><path d="M14.1 26.4c-2.6 0-4-1-4-2.3 0-1.3 1.2-2 3-1.6 1.5.3 3.2.8 5 1.6-1.3 1.4-2.7 2.3-4 2.3z" fill="#1677FF"/></svg></div>
         <span class="payment-name">支付宝</span>
       </div>
     </div>
@@ -1802,8 +1807,10 @@ async function handleSetPassword() {
     if (S.userInfo?.has_password) body.old_password = pwdOld;
     const r = await api.post('/auth/set-password', body);
     if (r.code === 200) {
-      setState({ pwdLoading: false, pwdOk: true, pwdOld: '', pwdNew: '', pwdNew2: '' });
       if (S.userInfo) setState({ userInfo: { ...S.userInfo, has_password: true } });
+      setState({ pwdLoading: false, pwdOld: '', pwdNew: '', pwdNew2: '' });
+      showToast('密码设置成功');
+      setTimeout(() => setState({ showSetPwdSheet: false }), 800);
     } else { setState({ pwdLoading: false, pwdErr: r.msg || '操作失败' }); }
   } catch { setState({ pwdLoading: false, pwdErr: '网络错误，请重试' }); }
 }
