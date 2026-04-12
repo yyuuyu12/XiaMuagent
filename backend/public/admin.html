@@ -10,9 +10,7 @@
     .header { background: #fff; border-bottom: 1px solid #E8EDFF; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
     .header h1 { font-size: 18px; font-weight: 800; color: #1E1B4B; }
     .logout-btn { background: rgba(239,68,68,0.08); color: #EF4444; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
-    .main-tabs { display: flex; gap: 0; background: #fff; border-bottom: 2px solid #E8EDFF; padding: 0 32px; }
-    .main-tab { padding: 14px 24px; font-size: 14px; font-weight: 600; color: #6B7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; border: none; background: none; }
-    .main-tab.active { color: #6366F1; border-bottom-color: #6366F1; }
+    
     .container { max-width: 960px; margin: 28px auto; padding: 0 24px; }
     .section { background: #fff; border-radius: 16px; border: 1px solid #E8EDFF; padding: 24px; margin-bottom: 20px; }
     .section h2 { font-size: 15px; font-weight: 700; color: #1E1B4B; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #E8EDFF; }
@@ -34,12 +32,9 @@
     .msg { padding: 9px 14px; border-radius: 9px; font-size: 13px; margin-bottom: 14px; display: none; }
     .msg.success { background: rgba(34,197,94,0.1); color: #16A34A; display: block; }
     .msg.error { background: rgba(239,68,68,0.1); color: #DC2626; display: block; }
-    .tab-bar { display: flex; gap: 6px; margin-bottom: 18px; }
-    .tab { padding: 8px 16px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; color: #6B7280; background: #F3F4F6; border: none; }
-    .tab.active { background: #6366F1; color: #fff; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-    @media(max-width:600px) { .grid-2,.grid-3 { grid-template-columns: 1fr; } .main-tabs { padding: 0 16px; } .container { padding: 0 16px; } }
+    @media(max-width:600px) { .grid-2,.grid-3 { grid-template-columns: 1fr; } .container { padding: 0 16px; } }
     /* Prompt items */
     .prompt-item { border: 1px solid #E8EDFF; border-radius: 10px; overflow: hidden; margin-bottom: 6px; }
     .prompt-item-head { display: flex; align-items: center; padding: 10px 14px; cursor: pointer; gap: 10px; background: #fff; }
@@ -107,14 +102,7 @@
     </div>
   </div>
 
-  <!-- 主 Tab 栏 -->
-  <div class="main-tabs">
-    <button class="main-tab active" onclick="switchMainTab('config',this)">基础配置</button>
-    <button class="main-tab" onclick="switchMainTab('prompts',this)">提示词配置</button>
-  </div>
-
-  <!-- ========== Tab 1: 基础配置 ========== -->
-  <div id="tab-config" class="container">
+  <div class="container">
 
     <!-- 模型配置 -->
     <div class="section">
@@ -248,40 +236,25 @@
 
   </div>
 
-  <!-- ========== Tab 2: 提示词配置 ========== -->
-  <div id="tab-prompts" class="container" style="display:none">
-    <div class="section">
+  <div class="section">
       <h2>📝 提示词配置</h2>
       <div id="prompt-msg" class="msg"></div>
-      <div class="tab-bar">
-        <button class="tab active" onclick="switchPromptTab('all',this)">全部</button>
-        <button class="tab" onclick="switchPromptTab('rewrite',this)">改写</button>
-        <button class="tab" onclick="switchPromptTab('industry',this)">行业热点</button>
+      <div id="prompt-list"></div>
+
+      <div style="border-top:1px solid #E8EDFF;padding-top:16px;margin-top:14px">
+        <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:10px">行业标签</div>
+        <div id="ind-msg" class="msg"></div>
+        <div id="ind-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="new-ind-name" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:9px;font-size:13px;outline:none;width:160px" placeholder="新行业名称" />
+          <button class="btn-primary" style="padding:8px 18px" onclick="addIndustry()">添加</button>
+        </div>
       </div>
 
-      <!-- 全部 / 改写 的提示词列表 -->
-      <div id="prompt-content">
-        <div id="prompt-list"></div>
-      </div>
-
-      <!-- 行业热点内容（隐藏时 display:none） -->
-      <div id="industry-content" style="display:none">
-        <!-- 行业标签管理 -->
-        <div style="margin-bottom:20px">
-          <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:10px">行业标签</div>
-          <div id="ind-msg" class="msg"></div>
-          <div id="ind-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input id="new-ind-name" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:9px;font-size:13px;outline:none;width:160px" placeholder="新行业名称" />
-            <button class="btn-primary" style="padding:8px 18px" onclick="addIndustry()">添加</button>
-          </div>
-        </div>
-
-        <div style="border-top:1px solid #E8EDFF;padding-top:16px">
-          <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:4px">行业提示词</div>
-          <div style="font-size:12px;color:#9CA3AF;margin-bottom:12px">为每个行业设置专属风格提示词，留空则使用通用风格。支持换行和代码格式书写。</div>
-          <div id="ind-prompt-list"></div>
-        </div>
+      <div style="border-top:1px solid #E8EDFF;padding-top:16px;margin-top:16px">
+        <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:4px">行业提示词</div>
+        <div style="font-size:12px;color:#9CA3AF;margin-bottom:12px">为每个行业设置专属风格提示词，留空则使用通用风格。支持换行和代码格式书写。</div>
+        <div id="ind-prompt-list"></div>
       </div>
     </div>
   </div>
@@ -371,13 +344,6 @@ async function showAdmin() {
   await loadKeys(); await loadMemberPlans(); await loadCodes(); await loadPrompts();
 }
 
-// ---- 主 Tab ----
-function switchMainTab(tab, el) {
-  document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('tab-config').style.display = tab==='config' ? '' : 'none';
-  document.getElementById('tab-prompts').style.display = tab==='prompts' ? '' : 'none';
-}
 
 // ---- 模型配置 ----
 async function loadKeys() {
@@ -508,31 +474,14 @@ async function deleteCode(id) {
   else showMsg('code-msg', r.msg||'删除失败','error');
 }
 
-// ---- 提示词 Tab ----
-let currentPromptTab = 'all';
+// ---- 提示词配置 ----
 const _promptCache = {};
 const _indCache = {};
 
-function switchPromptTab(tab, el) {
-  currentPromptTab = tab;
-  document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  const isIndustry = tab === 'industry';
-  document.getElementById('prompt-content').style.display = isIndustry ? 'none' : '';
-  document.getElementById('industry-content').style.display = isIndustry ? '' : 'none';
-  if (isIndustry) { loadIndustries(); }
-  else { loadPrompts(tab === 'all' ? null : tab); }
-}
-
-async function loadPrompts(type) {
-  const url = type ? `/config/prompts?type=${type}` : '/config/prompts?type=rewrite';
-  const r = await req(url);
+async function loadPrompts() {
+  const r = await req('/config/prompts?type=rewrite');
   const list = document.getElementById('prompt-list');
-  const filtered = (r.data || []).filter(p => p.type !== 'inspire' || currentPromptTab === 'all');
-  // For 'all' tab, show rewrite prompts only (inspire handled under 行业热点)
-  const show = currentPromptTab === 'all'
-    ? (r.data || []).filter(p => p.type === 'rewrite')
-    : (r.data || []);
+  const show = (r.data || []).filter(p => p.type === 'rewrite');
   if (!show.length) { list.innerHTML = '<div style="color:#9CA3AF;font-size:13px;padding:12px 0">暂无提示词</div>'; return; }
   const typeLabel = {rewrite:'改写', inspire:'灵感', extract:'提取分析'};
   show.forEach(p => _promptCache[p.id] = p);
@@ -541,7 +490,6 @@ async function loadPrompts(type) {
       <div class="prompt-item-head" onclick="togglePrompt('pb-${p.id}')">
         <span style="font-size:13px;font-weight:600;color:#1E1B4B;flex:1">${escapeHtml(p.name)}</span>
         <span class="badge badge-purple">${typeLabel[p.type]||p.type}</span>
-        ${p.is_default?'<span class="badge badge-yellow">默认</span>':''}
         <span style="color:#9CA3AF;font-size:12px">▾</span>
       </div>
       <div class="prompt-item-body" id="pb-${p.id}">
@@ -563,6 +511,12 @@ async function loadPrompts(type) {
         </div>
       </div>
     </div>`).join('');
+
+  // 改写提示词默认展开（常见只有一条）
+  if (show[0]) {
+    const firstBody = document.getElementById(`pb-${show[0].id}`);
+    if (firstBody) firstBody.classList.add('open');
+  }
 }
 
 function togglePrompt(id) { document.getElementById(id).classList.toggle('open'); }
@@ -590,14 +544,14 @@ async function saveInlineEdit(id) {
   const r = await req('/config/prompts', {method:'POST', body:JSON.stringify({id,name,type:p.type,content})});
   if (r.code===200) {
     msgEl.style.display='block';msgEl.style.color='#10B981';msgEl.textContent='保存成功';
-    setTimeout(()=>{ cancelInlineEdit(id); loadPrompts(currentPromptTab==='all'?null:currentPromptTab); },800);
+    setTimeout(()=>{ cancelInlineEdit(id); loadPrompts(); },800);
   } else { msgEl.style.display='block';msgEl.style.color='#EF4444';msgEl.textContent=r.msg||'保存失败'; }
 }
 
 async function deletePrompt(id) {
   if (!confirm('确认删除？')) return;
   const r = await req(`/config/prompts/${id}`,{method:'DELETE'});
-  if (r.code===200) { showMsg('prompt-msg','删除成功'); loadPrompts(currentPromptTab==='all'?null:currentPromptTab); }
+  if (r.code===200) { showMsg('prompt-msg','删除成功'); loadPrompts(); }
   else showMsg('prompt-msg',r.msg,'error');
 }
 

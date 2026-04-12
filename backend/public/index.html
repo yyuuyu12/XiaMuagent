@@ -90,13 +90,12 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .result-label { font-size: 14px; font-weight: 600; color: #1A1814; }
 .result-label-sm { display: block; font-size: 11px; color: #A8A49C; margin-bottom: 6px; }
 .copy-btn { background: rgba(99,102,241,.1); color: #6366F1; border-radius: 50px; padding: 4px 12px; font-size: 12px; cursor: pointer; user-select: none; flex-shrink: 0; }
+.copy-btn-strong { background: #6366F1; color: #fff; }
 .thin-divider { height: 1px; background: #ECEAE2; margin-bottom: 10px; }
 .script-text { display: block; font-size: 14px; color: #1A1814; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
 .script-text-sm { display: block; font-size: 12px; color: #A8A49C; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
 .editable-script-textarea { width: 100%; min-height: 180px; max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 10px; padding: 12px; font-size: 14px; color: #1A1814; line-height: 1.8; resize: vertical; }
 .editable-script-textarea:focus { border-color: #F97316; outline: none; }
-.copy-btn-lg-wrap { display: flex; justify-content: center; margin: 10px 0 2px; }
-.copy-btn-lg { background: #6366F1; color: #fff; border-radius: 50px; padding: 0 28px; height: 42px; line-height: 42px; font-size: 15px; font-weight: 600; cursor: pointer; user-select: none; min-width: 170px; text-align: center; }
 
 /* === INSPIRE === */
 .section-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
@@ -847,15 +846,15 @@ ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
       </div>
       <div class="thin-divider"></div>
       <textarea class="editable-script-textarea" id="f-rewritten-script" oninput="S.rewrittenScript=this.value">${esc(S.rewrittenScript)}</textarea>
-      <div class="copy-btn-lg-wrap">
-        <div class="copy-btn-lg" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制改写文案'}</div>
+      <div class="result-action-bottom">
+        <div class="copy-btn copy-btn-strong" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制改写文案'}</div>
       </div>
     </div>
     <div class="action-row">
       <div class="btn-action-sec" onclick="resetExtract()">继续提取</div>
       ${S.extractLoading
         ? `<div class="btn-action-main" style="background:#B83060" onclick="stopExtractRewrite()">⏹ 停止改写</div>`
-        : `<div class="btn-action-main" onclick="rewriteAgain()">再次改写</div>`}
+        : `<div class="btn-action-main" onclick="rewriteAgain()">重新改写</div>`}
     </div>
   </div>`;
 }
@@ -1287,8 +1286,8 @@ function stopExtractRewrite() {
   setState({ extractLoading: false });
 }
 function rewriteAgain() {
-  // 保留当前已生成改写内容，仅重新触发一次改写请求
-  setState({ extractErr: '' });
+  // 重新基于原始文案（可编辑后的最新值）改写：先清空旧改写，再触发请求
+  setState({ rewrittenScript: '', extractErr: '' });
   handleRewrite();
 }
 function resetExtract() {
