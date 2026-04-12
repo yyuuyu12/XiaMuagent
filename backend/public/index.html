@@ -94,8 +94,22 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .thin-divider { height: 1px; background: #ECEAE2; margin-bottom: 10px; }
 .script-text { display: block; font-size: 14px; color: #1A1814; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
 .script-text-sm { display: block; font-size: 12px; color: #A8A49C; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
-.editable-script-textarea { width: 100%; min-height: 180px; max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 10px; padding: 12px; font-size: 14px; color: #1A1814; line-height: 1.8; resize: vertical; }
+.editable-script-textarea { width: 100%; min-height: 180px; max-height: 45vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #F7F6F2; border: 1px solid #E4E2DA; border-radius: 10px; padding: 12px; font-size: 14px; color: #1A1814; line-height: 1.8; resize: vertical; transition: background .2s ease, color .2s ease; }
 .editable-script-textarea:focus { border-color: #F97316; outline: none; }
+.editable-script-textarea.editable-disabled { background: #EEEEEA; color: #A8A49C; cursor: not-allowed; }
+.result-card.rewrite-generating { position: relative; overflow: hidden; }
+.result-card.rewrite-generating::before,
+.result-card.rewrite-generating::after {
+  content: ''; position: absolute; left: -40%; width: 40%; height: 3px;
+  background: linear-gradient(90deg, rgba(249,115,22,0), rgba(249,115,22,.65), rgba(249,115,22,0));
+  animation: rewriteWave 1.15s linear infinite;
+}
+.result-card.rewrite-generating::before { top: 0; }
+.result-card.rewrite-generating::after { bottom: 0; animation-delay: .35s; }
+@keyframes rewriteWave {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
 
 /* === INSPIRE === */
 .section-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
@@ -441,16 +455,18 @@ const S = {
   nicknamePrompt: false, nicknameInput: '', nicknamePromptDismissed: false,
   nicknameEditing: false, nicknameEditInput: '',
   historyPageExpanded: null,
-  historyTab: 'clone',
   cloneHistory: [], cloneHistoryLoaded: false,
   showTipExpanded: false, rewriteStyle: '', extractHistory: [], extractHistoryLoaded: false,
   profileView: 'main',
   appH5: { showProfilePhone: false, showAccountType: false },
   avatarCropOpen: false, avatarCropDataUrl: '',
   extractController: null,
+  extractTranscribeController: null,
+  rewriteGenerating: false,
 };
 let inspireController = null;
 let extractController = null;
+let extractTranscribeController = null;
 
 // ===== UTILS =====
 function esc(s) {
@@ -628,11 +644,11 @@ function tTopBar() {
       <div style="width:56px;flex-shrink:0"></div>
     </div>`;
   }
-  if (t === 'home' || t === 'profile' || t === 'history') {
+  if (t === 'home' || t === 'profile') {
     const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '';
     return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span>${loginHint}</div>`;
   }
-  const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员' };
+  const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员', history:'历史记录' };
   const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:56px;flex-shrink:0"></div>';
   return `<div class="top-bar top-bar-sub">
     <button type="button" class="back-btn" onclick="goBack()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
@@ -656,7 +672,6 @@ function tTabContent() {
 function tBottomTab() {
   const tabs = [
     { key: 'home',    icon: '🏠', label: '首页' },
-    { key: 'history', icon: '📄', label: '历史' },
     { key: 'profile', icon: '👤', label: '我的' },
   ];
   return `<div class="bottom-tab">
@@ -746,7 +761,7 @@ function tRecentSection() {
   return `<div style="margin-bottom:14px">
     <div class="home-section-header">
       <span class="home-section-title">最近创作</span>
-      <span class="home-section-more" onclick="switchTab('history')">查看全部 ›</span>
+      <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
     </div>
     ${items.length === 0
       ? `<div class="recent-empty-line">还没有创作记录，快去试试吧</div>`
@@ -759,7 +774,7 @@ function tRecentSection() {
               text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
             }
             const tag = it.type === 'rewrite' ? '克隆' : '灵感';
-            return `<div class="recent-item" onclick="switchTab('history')">
+            return `<div class="recent-item" onclick="openHistoryPage()">
               <div class="recent-item-head">
                 <div class="recent-item-text"><span style="font-size:10px;color:#F97316;background:#FFF1E8;border-radius:4px;padding:1px 5px;margin-right:5px;flex-shrink:0">${tag}</span>${esc(text)}</div>
                 <div class="recent-copy" onclick="cpHomeItem(event,${i})" title="复制">复制</div>
@@ -789,9 +804,9 @@ function tExtract() {
           <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
         </div>
         ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
-        <div class="btn-primary ${S.extractLoading||!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">
-          ${S.extractLoading?'⏳ 转录中，约1-2分钟...':'🚀 提取文案'}
-        </div>
+        ${S.extractLoading
+          ? `<div class="btn-primary" style="background:#B83060" onclick="stopExtractTranscribe()">⏹ 停止转录</div>`
+          : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">🚀 提取文案</div>`}
       </div>
       <div class="tip-card-v2">
         <span class="tip-line">1. 在抖音找到想参考的视频</span>
@@ -840,18 +855,18 @@ ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
         <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制原文'}</div>
       </div>
     </div>
-    <div class="result-card result-highlight">
+    <div class="result-card result-highlight ${S.rewriteGenerating?'rewrite-generating':''}">
       <div class="result-header-row">
         <span class="result-label">🚀 原创改写（可编辑）</span>
       </div>
       <div class="thin-divider"></div>
-      <textarea class="editable-script-textarea" id="f-rewritten-script" oninput="S.rewrittenScript=this.value">${esc(S.rewrittenScript)}</textarea>
+      <textarea class="editable-script-textarea ${S.rewriteGenerating?'editable-disabled':''}" id="f-rewritten-script" ${S.rewriteGenerating?'readonly':''} oninput="if(!S.rewriteGenerating){S.rewrittenScript=this.value}">${esc(S.rewrittenScript)}</textarea>
       <div class="result-action-bottom">
         <div class="copy-btn copy-btn-strong" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制改写文案'}</div>
       </div>
     </div>
     <div class="action-row">
-      <div class="btn-action-sec" onclick="resetExtract()">继续提取</div>
+      <div class="btn-action-sec" onclick="resetExtract()">重新上传链接</div>
       ${S.extractLoading
         ? `<div class="btn-action-main" style="background:#B83060" onclick="stopExtractRewrite()">⏹ 停止改写</div>`
         : `<div class="btn-action-main" onclick="rewriteAgain()">重新改写</div>`}
@@ -1208,11 +1223,22 @@ function switchTab(tab) {
   }
   if (tab === 'history') {
     if (!S.recentHistoryLoaded) loadRecentHistory(); else render();
-    if (S.historyTab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
+    if (!S.cloneHistoryLoaded) loadCloneHistory();
   }
   if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
 }
-function goBack() { setState({ currentTab: 'home' }); }
+function goBack() {
+  if (S.currentTab === 'history') {
+    setState({ currentTab: 'home', historyPageExpanded: null });
+    return;
+  }
+  setState({ currentTab: 'home' });
+}
+function openHistoryPage() {
+  setState({ currentTab: 'history', historyPageExpanded: null });
+  if (!S.recentHistoryLoaded) loadRecentHistory();
+  if (!S.cloneHistoryLoaded) loadCloneHistory();
+}
 
 // ===== USER =====
 async function fetchMe() {
@@ -1241,40 +1267,56 @@ async function loadIndustries() {
 async function handleExtract() {
   if (!ensureLoggedIn()) return;
   if (!S.videoUrl.trim() || S.extractLoading) return;
+  extractTranscribeController = new AbortController();
+  S.extractTranscribeController = extractTranscribeController;
   setState({ extractLoading: true, extractErr: '' });
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 300000);
+  const tid = setTimeout(() => {
+    if (extractTranscribeController) extractTranscribeController.abort();
+  }, 300000);
   try {
-    const r = await api.post('/video/douyin-to-text', { url: S.videoUrl.trim() }, ctrl.signal);
+    const r = await api.post('/video/douyin-to-text', { url: S.videoUrl.trim() }, extractTranscribeController.signal);
     clearTimeout(tid);
+    extractTranscribeController = null;
+    S.extractTranscribeController = null;
     if (apiUnauthorized(r)) setState({ extractLoading: false });
     else if (r.code === 200) setState({ extractedScript: r.data.script, extractStep: 1, extractLoading: false });
     else setState({ extractErr: r.msg || '提取失败，请检查链接是否正确', extractLoading: false });
   } catch(e) {
     clearTimeout(tid);
-    setState({ extractErr: e.name==='AbortError'?'语音识别超时，请尝试较短视频':'网络超时，请重试', extractLoading: false });
+    extractTranscribeController = null;
+    S.extractTranscribeController = null;
+    if (e && e.name === 'AbortError') setState({ extractErr: '', extractLoading: false });
+    else setState({ extractErr: '网络超时，请重试', extractLoading: false });
   }
+}
+function stopExtractTranscribe() {
+  if (extractTranscribeController) {
+    extractTranscribeController.abort();
+    extractTranscribeController = null;
+    S.extractTranscribeController = null;
+  }
+  setState({ extractLoading: false, extractErr: '' });
 }
 async function handleRewrite() {
   if (!ensureLoggedIn()) return;
   if (!S.extractedScript || S.extractLoading) return;
   extractController = new AbortController();
   S.extractController = extractController;
-  setState({ extractLoading: true, extractErr: '' });
+  setState({ extractLoading: true, extractErr: '', rewriteGenerating: true });
   try {
     const body = { text: S.extractedScript };
     if (S.rewriteStyle) body.style = S.rewriteStyle;
     const r = await api.post('/ai/rewrite', body, extractController.signal);
     extractController = null;
     S.extractController = null;
-    if (apiUnauthorized(r)) setState({ extractLoading: false });
-    else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false }); fetchMe(); refreshHistory(); }
-    else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false });
+    if (apiUnauthorized(r)) setState({ extractLoading: false, rewriteGenerating: false });
+    else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false, rewriteGenerating: false }); fetchMe(); refreshHistory(); }
+    else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false, rewriteGenerating: false });
   } catch (e) {
     extractController = null;
     S.extractController = null;
-    if (e && e.name === 'AbortError') setState({ extractErr: '', extractLoading: false });
-    else setState({ extractErr: '网络错误，请稍后重试', extractLoading: false });
+    if (e && e.name === 'AbortError') setState({ extractErr: '', extractLoading: false, rewriteGenerating: false });
+    else setState({ extractErr: '网络错误，请稍后重试', extractLoading: false, rewriteGenerating: false });
   }
 }
 function stopExtractRewrite() {
@@ -1283,11 +1325,11 @@ function stopExtractRewrite() {
     extractController = null;
     S.extractController = null;
   }
-  setState({ extractLoading: false });
+  setState({ extractLoading: false, rewriteGenerating: false });
 }
 function rewriteAgain() {
-  // 重新基于原始文案（可编辑后的最新值）改写：先清空旧改写，再触发请求
-  setState({ rewrittenScript: '', extractErr: '' });
+  // 重新基于原始文案（可编辑后的最新值）改写：保持当前文案可视，但进入灰态不可编辑与波纹生成态
+  setState({ extractErr: '', rewriteGenerating: true });
   handleRewrite();
 }
 function resetExtract() {
@@ -1296,7 +1338,12 @@ function resetExtract() {
     extractController = null;
     S.extractController = null;
   }
-  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '' });
+  if (extractTranscribeController) {
+    extractTranscribeController.abort();
+    extractTranscribeController = null;
+    S.extractTranscribeController = null;
+  }
+  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false });
 }
 function selectStyle(s) { setState({ rewriteStyle: S.rewriteStyle === s ? '' : s }); }
 async function pasteFromClipboard() {
@@ -1522,7 +1569,7 @@ function refreshHistory() {
   S.homeHistoryLoaded = false;
   loadRecentHistory();
   loadHomeHistory();
-  if (S.historyTab === 'clone') loadCloneHistory();
+  loadCloneHistory();
 }
 
 async function loadRecentHistory() {
@@ -1610,54 +1657,16 @@ function cpHomeItem(e, i) {
 
 // ===== HISTORY PAGE =====
 function tHistory() {
-  const tabs = `<div class="history-tabs">
-    <div class="history-tab-btn ${S.historyTab==='clone'?'history-tab-btn-active':''}" onclick="switchHistoryTab('clone')">📋 文案克隆</div>
-    <div class="history-tab-btn ${S.historyTab==='inspire'?'history-tab-btn-active':''}" onclick="switchHistoryTab('inspire')">✨ 灵感发现</div>
-  </div>`;
-
-  if (S.historyTab === 'inspire') {
-    const items = S.recentHistory;
-    if (items.length === 0) return `<div class="tab-page">${tabs}
-      <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
-        <div style="font-size:36px;margin-bottom:10px">✨</div>
-        <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有灵感记录</div>
-        <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('inspire')">去创作</div>
-      </div></div>`;
-    return `<div class="tab-page">${tabs}
-      ${items.map((it,i)=>`
-        <div class="history-page-card" onclick="toggleHistoryPage(${i})">
-          <span class="history-page-track">${esc(it.input||it.track||'历史记录')}</span>
-          ${it.result&&it.result[0]?`<div class="history-page-hook">${esc(it.result[0].hook||'')}</div>`:''}
-          <div class="history-page-meta">
-            <span class="history-page-time">${esc(formatDisplayTime(it.created_at))}</span>
-            ${Array.isArray(it.result)?`<span class="history-page-count">${it.result.length}条</span>`:''}
-          </div>
-          ${S.historyPageExpanded===i&&Array.isArray(it.result)?`
-            <div class="history-scripts">
-              ${it.result.map((s,si)=>`
-                <div class="history-script-item">
-                  <div class="history-script-col">
-                    ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
-                    ${s.content&&String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
-                    ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
-                  </div>
-                  <div class="copy-btn" onclick="cpHistoryPage(event,${i},${si})">复制</div>
-                </div>`).join('')}
-            </div>`:''}
-        </div>`).join('')}
-    </div>`;
-  }
-
-  // 文案克隆 tab
   const citems = S.cloneHistory;
-  if (citems.length === 0) return `<div class="tab-page">${tabs}
-    <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
-      <div style="font-size:36px;margin-bottom:10px">📋</div>
-      <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有克隆记录</div>
-      <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('extract')">去克隆</div>
-    </div></div>`;
-  return `<div class="tab-page">${tabs}
-    ${citems.map((it,i)=>{
+  const iitems = S.recentHistory;
+
+  return `<div class="tab-page">
+    <div style="margin-bottom:10px">
+      <span class="section-title-text">📋 文案克隆</span>
+    </div>
+    ${citems.length === 0 ? `
+      <div class="empty-tip" style="margin-bottom:14px">还没有克隆记录</div>
+    ` : citems.map((it,i)=>{
       const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
       const expanded = S.historyPageExpanded === ('c'+i);
       return `<div class="history-page-card" onclick="toggleClonePage(${i})">
@@ -1677,6 +1686,33 @@ function tHistory() {
           </div>`:''}
       </div>`;
     }).join('')}
+
+    <div style="margin:16px 0 10px">
+      <span class="section-title-text">✨ 灵感发现</span>
+    </div>
+    ${iitems.length === 0 ? `
+      <div class="empty-tip">还没有灵感记录</div>
+    ` : iitems.map((it,i)=>`
+      <div class="history-page-card" onclick="toggleHistoryPage(${i})">
+        <span class="history-page-track">${esc(it.input||it.track||'历史记录')}</span>
+        ${it.result&&it.result[0]?`<div class="history-page-hook">${esc(it.result[0].hook||'')}</div>`:''}
+        <div class="history-page-meta">
+          <span class="history-page-time">${esc(formatDisplayTime(it.created_at))}</span>
+          ${Array.isArray(it.result)?`<span class="history-page-count">${it.result.length}条</span>`:''}
+        </div>
+        ${S.historyPageExpanded===i&&Array.isArray(it.result)?`
+          <div class="history-scripts">
+            ${it.result.map((s,si)=>`
+              <div class="history-script-item">
+                <div class="history-script-col">
+                  ${s.hook?`<span class="history-script-hook">${esc(s.hook)}</span>`:''}
+                  ${s.content&&String(s.content).trim()!==String(s.hook||'').trim()?`<span class="history-script-content">${esc(s.content)}</span>`:''}
+                  ${!s.hook&&s.content?`<span class="history-script-hook">${esc(s.content)}</span>`:''}
+                </div>
+                <div class="copy-btn" onclick="cpHistoryPage(event,${i},${si})">复制</div>
+              </div>`).join('')}
+          </div>`:''}
+      </div>`).join('')}
   </div>`;
 }
 
@@ -1690,11 +1726,6 @@ function cpClonePage(e, i) {
   const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
   copyText(text);
   showToast('已复制');
-}
-
-function switchHistoryTab(tab) {
-  setState({ historyTab: tab, historyPageExpanded: null });
-  if (tab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
 }
 
 function scriptCopyText(s) {
