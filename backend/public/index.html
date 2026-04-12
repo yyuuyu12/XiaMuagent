@@ -512,7 +512,7 @@ const S = {
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
   extractLoading: false, extractErr: '', copiedId: '',
-  cloneTaskId: null, cloneTaskData: null,
+  cloneTaskId: null, cloneTaskData: null, extractFromHistory: false,
   industries: [], selectedIndustryId: null, selectedIndustryName: '', customTrack: '',
   inspireScripts: [], inspireLoading: false, inspireErr: '', expandedScript: null,
   matchedIndustry: '', showHistory: false, inspireHistory: [], historyLoaded: false, historyExpanded: null,
@@ -543,6 +543,7 @@ const S = {
   tasksList: [], tasksLoaded: false,
   tasksView: 'list',          // 'list'|'detail'
   viewingTask: null,
+  tasksDetailFromHome: false,
   tasksCopiedId: '',
   appH5: { showProfilePhone: false, showAccountType: false },
   avatarCropOpen: false, avatarCropDataUrl: '',
@@ -800,12 +801,17 @@ function tTopBar() {
   } else if (t === 'history') {
     if (S.tasksView === 'detail' && S.viewingTask) {
       title = S.viewingTask.title || '任务详情';
-      backAction = "setState({tasksView:'list',viewingTask:null});render()";
+      if (S.tasksDetailFromHome) {
+        backAction = "setState({tasksView:'list',viewingTask:null,tasksDetailFromHome:false,currentTab:'home'});render()";
+      } else {
+        backAction = "setState({tasksView:'list',viewingTask:null});render()";
+      }
     } else {
-      title = '任务进度';
+      title = '我的任务';
     }
   } else if (t === 'extract') {
     title = '爆款文案克隆';
+    if (S.extractFromHistory) backAction = "stopClonePoller();setState({currentTab:'history',extractFromHistory:false});render()";
   } else if (t === 'vip') {
     title = '开通会员';
   }
@@ -898,7 +904,7 @@ function tHomeTaskSection() {
   if (!bigCards.length && !smallItems.length) {
     return `<div style="margin-bottom:14px">
       <div class="home-section-header">
-        <span class="home-section-title">任务进度</span>
+        <span class="home-section-title">我的任务</span>
         <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
       </div>
       <div class="recent-empty-line">还没有创作记录，快去试试吧</div>
@@ -908,7 +914,7 @@ function tHomeTaskSection() {
   const hasLive = bigCards.some(t => t.status !== 'done');
   return `<div style="margin-bottom:14px">
     <div class="home-section-header">
-      <span class="home-section-title">${hasLive ? `<span class="task-live-dot"></span>` : ''}任务进度</span>
+      <span class="home-section-title">${hasLive ? `<span class="task-live-dot"></span>` : ''}我的任务</span>
       <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
     </div>
     ${bigCards.map(t => {
@@ -940,8 +946,9 @@ function tHomeTaskSection() {
         </div>`;
       }
       const cd = taskCountdown(t);
-      return `<div class="home-task-card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      const isCloneRunning = t.type === 'clone_video';
+      return `<div class="home-task-card${isCloneRunning?' home-task-card-done':''}" ${isCloneRunning?`onclick="openExtractWithTask('${t.id}')"`:''}  style="${isCloneRunning?'align-items:flex-start;flex-direction:column':''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;width:100%">
           <div style="min-width:0;flex:1">
             <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
             <div style="font-size:11px;color:#A8A49C;margin-top:2px">${typeLbl(t.type)}</div>
@@ -949,7 +956,7 @@ function tHomeTaskSection() {
           <span style="font-size:11px;color:${t.status==='running'?'#E8650A':'#A8A49C'};flex-shrink:0;margin-left:8px">${t.status==='running'?'进行中':'排队中'}</span>
         </div>
         ${t.status==='running' ? `
-          <div class="path-a-progress-bar" style="margin-bottom:6px"><div class="path-a-progress-fill" style="width:${t.progress||0}%"></div></div>
+          <div class="path-a-progress-bar" style="margin-bottom:6px;width:100%"><div class="path-a-progress-fill" style="width:${t.progress||0}%"></div></div>
           <div style="font-size:12px;color:#6B6860">${esc(t.thinking||'处理中...')}</div>
           <div style="font-size:11px;color:#A8A49C;margin-top:4px">${cd}</div>
         ` : `<div style="font-size:12px;color:#A8A49C">等待前序任务完成...</div>`}
@@ -958,9 +965,10 @@ function tHomeTaskSection() {
     ${smallItems.length > 0 ? `<div class="recent-list">
       ${smallItems.map(it => {
         if (it._type === 'task') {
-          return `<div class="recent-item" onclick="openHistoryPage('inspire')">
+          const clickFn = it.label === '克隆' ? `openHistoryPage('clone')` : `openHistoryPage('inspire')`;
+          return `<div class="recent-item" onclick="${clickFn}">
             <div class="recent-item-head">
-              <div class="recent-item-text"><span style="font-size:10px;color:#F97316;background:#FFF1E8;border-radius:4px;padding:1px 5px;margin-right:5px;flex-shrink:0">灵感</span>${esc(it.text)}</div>
+              <div class="recent-item-text"><span style="font-size:10px;color:#F97316;background:#FFF1E8;border-radius:4px;padding:1px 5px;margin-right:5px;flex-shrink:0">${esc(it.label)}</span>${esc(it.text)}</div>
             </div>
             <span class="recent-item-time">${esc(formatDisplayTime(it.created_at))}</span>
           </div>`;
@@ -979,7 +987,7 @@ function tHomeTaskSection() {
 
 async function openTaskFromHome(taskId) {
   dismissHomeDoneSeen();
-  setState({ currentTab: 'history', historyTab: 'inspire', tasksView: 'detail', viewingTask: null });
+  setState({ currentTab: 'history', historyTab: 'inspire', tasksView: 'detail', viewingTask: null, tasksDetailFromHome: true });
   loadTasks();
   try {
     const r = await api.get(`/tasks/${taskId}`);
@@ -1169,7 +1177,7 @@ function tInspireEntry() {
       <div class="inspire-entry-desc">没有对标也能用，选行业回答几个问题即可生成</div>
     </div>
     <div style="text-align:center;margin-top:20px">
-      <span style="font-size:13px;color:#A8A49C;cursor:pointer" onclick="openHistoryPage()">📋 查看任务进度</span>
+      <span style="font-size:13px;color:#A8A49C;cursor:pointer" onclick="openHistoryPage()">📋 查看我的任务</span>
     </div>
   </div>`;
 }
@@ -1377,7 +1385,7 @@ function tProfile() {
       <div class="profile-history-entry" onclick="openHistoryPage('clone')">
         <div>
           <div class="title">📋 任务中心</div>
-          <div class="sub">查看灵感任务进度与克隆记录</div>
+          <div class="sub">查看灵感我的任务与克隆记录</div>
         </div>
         <div style="color:#A8A49C;font-size:18px">›</div>
       </div>
@@ -1433,8 +1441,8 @@ function tProfile() {
     </div>`:''}
     <div class="profile-history-entry" onclick="openHistoryPage('clone')">
       <div>
-        <div class="title">📋 任务进度</div>
-        <div class="sub">查看灵感任务进度与克隆记录</div>
+        <div class="title">📋 我的任务</div>
+        <div class="sub">查看灵感我的任务与克隆记录</div>
       </div>
       <div style="color:#A8A49C;font-size:18px">›</div>
     </div>
@@ -1648,6 +1656,7 @@ function switchTab(tab) {
   if (tab === 'profile') fetchMe();
   if (tab === 'vip') loadMemberPlans();
   if (tab === 'home') {
+    dismissHomeDoneSeen();
     if (!S.cloneHistoryLoaded) loadCloneHistory(); else render();
     loadTasks();
   }
@@ -1663,6 +1672,7 @@ function goBack() {
   } else {
     setState({ currentTab: 'home' });
   }
+  dismissHomeDoneSeen();
   if (!S.cloneHistoryLoaded) loadCloneHistory();
   loadTasks();
 }
@@ -1756,8 +1766,8 @@ async function handleCloneRewrite() {
   } catch { setState({ extractStep: 'review', extractErr: '网络错误，请重试' }); }
 }
 
-async function openExtractWithTask(taskId) {
-  setState({ currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null, extractErr: '' });
+async function openExtractWithTask(taskId, fromHistory) {
+  setState({ currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null, extractErr: '', extractFromHistory: !!fromHistory });
   try {
     const r = await api.get(`/tasks/${taskId}`);
     if (r.code !== 200) { setState({ extractStep: 0 }); return; }
@@ -1839,7 +1849,7 @@ function resetExtract() {
     S.extractTranscribeController = null;
   }
   stopClonePoller();
-  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false, cloneTaskId: null, cloneTaskData: null });
+  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false, cloneTaskId: null, cloneTaskData: null, extractFromHistory: false });
 }
 function selectStyle(s) { setState({ rewriteStyle: S.rewriteStyle === s ? '' : s }); }
 async function pasteFromClipboard() {
@@ -2219,7 +2229,7 @@ function tHistory() {
   return `<div class="tab-page">${tabs}
     ${cloneTasks.map(t => {
       const canClick = t.status === 'done' || t.status === 'extracted';
-      return `<div class="history-page-card ${canClick?'task-card-clickable':''}" onclick="${canClick?`openExtractWithTask('${t.id}')`:''}" >
+      return `<div class="history-page-card ${canClick?'task-card-clickable':''}" onclick="${canClick?`openExtractWithTask('${t.id}',true)`:''}" >
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <span class="history-page-hook" style="-webkit-line-clamp:1;flex:1">${esc(t.title)}</span>
           <span style="font-size:11px;color:${t.status==='done'?'#10B981':t.status==='failed'?'#DC2626':'#E8650A'};flex-shrink:0;margin-left:8px">${statusLbl[t.status]||t.status}</span>
