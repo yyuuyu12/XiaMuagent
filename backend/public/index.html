@@ -288,6 +288,8 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .err-msg { display: block; color: #B83060; font-size: 12px; text-align: center; margin-bottom: 8px; padding: 6px; background: rgba(184,48,96,.06); border-radius: 6px; }
 .submit-btn { background: #FF6B35; color: #fff; border-radius: 50px; height: 48px; line-height: 48px; text-align: center; font-size: 16px; font-weight: 600; margin-top: 4px; cursor: pointer; user-select: none; }
 .submit-disabled { opacity: .5; pointer-events: none; }
+.sms-send-btn { flex-shrink: 0; padding: 0 14px; font-size: 13px; font-weight: 600; color: #E8650A; cursor: pointer; white-space: nowrap; border-left: 1px solid #E4E2DA; height: 100%; display: flex; align-items: center; }
+.sms-send-disabled { color: #C4C0B8; pointer-events: none; }
 .footer-tip { text-align: center; padding: 20px 16px 40px; }
 .footer-text { font-size: 11px; color: #C4C0B8; }
 
@@ -509,6 +511,9 @@ const S = {
   currentTab: 'home',
   showAuthSheet: false,
   isRegMode: false, phone: '', password: '', authErr: '', loading: false,
+  authMode: 'sms',       // 'sms' | 'pwd'
+  smsCode: '', smsSent: false, smsCountdown: 0,
+  pwdOld: '', pwdNew: '', pwdNew2: '', pwdErr: '', pwdOk: false, pwdLoading: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
   extractLoading: false, extractErr: '', copiedId: '',
@@ -685,27 +690,43 @@ function tLogin() {
     </div>
     <div class="form-card">
       <div class="mode-switch">
-        <div class="mode-btn ${!S.isRegMode?'mode-active':''}" onclick="setLoginMode()">登录</div>
-        <div class="mode-btn ${S.isRegMode?'mode-active':''}" onclick="setRegMode()">注册</div>
+        <div class="mode-btn ${S.authMode==='sms'?'mode-active':''}" onclick="setAuthMode('sms')">验证码登录</div>
+        <div class="mode-btn ${S.authMode==='pwd'?'mode-active':''}" onclick="setAuthMode('pwd')">密码登录</div>
       </div>
       <div class="field-group">
         <span class="field-label">手机号</span>
         <div class="input-wrap">
           <span class="input-prefix">+86</span>
           <input id="f-phone" class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
-            value="${esc(S.phone)}" oninput="S.phone=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+            value="${esc(S.phone)}" oninput="S.phone=this.value"/>
         </div>
       </div>
+      ${S.authMode==='sms'?`
+      <div class="field-group">
+        <span class="field-label">验证码</span>
+        <div class="input-wrap">
+          <input class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
+            value="${esc(S.smsCode)}" oninput="S.smsCode=this.value" onkeydown="if(event.key==='Enter')handleSmsLogin()" style="flex:1"/>
+          <div class="sms-send-btn ${S.smsCountdown>0||S.loading?'sms-send-disabled':''}" onclick="handleSendSms()">
+            ${S.smsCountdown>0?`${S.smsCountdown}s后重发`:S.smsSent?'重新发送':'获取验证码'}
+          </div>
+        </div>
+      </div>
+      ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
+      <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleSmsLogin()">
+        ${S.loading?'请稍候...':'登录 / 注册'}
+      </div>
+      `:`
       <div class="field-group">
         <span class="field-label">密码</span>
-        <input id="f-pwd" class="lf-input" type="password"
-          placeholder="${S.isRegMode?'设置密码（至少6位）':'请输入密码'}"
+        <input id="f-pwd" class="lf-input" type="password" placeholder="请输入密码"
           value="${esc(S.password)}" oninput="S.password=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
       </div>
       ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
       <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleAuth()">
-        ${S.loading?'请稍候...':(S.isRegMode?'注册':'登录')}
+        ${S.loading?'请稍候...':'登录'}
       </div>
+      `}
     </div>
     <div class="footer-tip"><span class="footer-text">登录即表示同意用户协议和隐私政策</span></div>
   </div>`;
@@ -724,27 +745,43 @@ function tAuthSheet() {
       <div class="auth-sheet-scroll">
         <div class="form-card form-card-sheet">
           <div class="mode-switch">
-            <div class="mode-btn ${!S.isRegMode?'mode-active':''}" onclick="setLoginMode()">登录</div>
-            <div class="mode-btn ${S.isRegMode?'mode-active':''}" onclick="setRegMode()">注册</div>
+            <div class="mode-btn ${S.authMode==='sms'?'mode-active':''}" onclick="setAuthMode('sms')">验证码登录</div>
+            <div class="mode-btn ${S.authMode==='pwd'?'mode-active':''}" onclick="setAuthMode('pwd')">密码登录</div>
           </div>
           <div class="field-group">
             <span class="field-label">手机号</span>
             <div class="input-wrap">
               <span class="input-prefix">+86</span>
-              <input id="f-phone" class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
-                value="${esc(S.phone)}" oninput="S.phone=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
+              <input class="lf-input" type="tel" maxlength="11" placeholder="请输入手机号"
+                value="${esc(S.phone)}" oninput="S.phone=this.value"/>
             </div>
           </div>
+          ${S.authMode==='sms'?`
+          <div class="field-group">
+            <span class="field-label">验证码</span>
+            <div class="input-wrap">
+              <input class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
+                value="${esc(S.smsCode)}" oninput="S.smsCode=this.value" onkeydown="if(event.key==='Enter')handleSmsLogin()" style="flex:1"/>
+              <div class="sms-send-btn ${S.smsCountdown>0||S.loading?'sms-send-disabled':''}" onclick="handleSendSms()">
+                ${S.smsCountdown>0?`${S.smsCountdown}s后重发`:S.smsSent?'重新发送':'获取验证码'}
+              </div>
+            </div>
+          </div>
+          ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
+          <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleSmsLogin()">
+            ${S.loading?'请稍候...':'登录 / 注册'}
+          </div>
+          `:`
           <div class="field-group">
             <span class="field-label">密码</span>
-            <input id="f-pwd" class="lf-input" type="password"
-              placeholder="${S.isRegMode?'设置密码（至少6位）':'请输入密码'}"
+            <input class="lf-input" type="password" placeholder="请输入密码"
               value="${esc(S.password)}" oninput="S.password=this.value" onkeydown="if(event.key==='Enter')handleAuth()"/>
           </div>
           ${S.authErr?`<span class="err-msg">${esc(S.authErr)}</span>`:''}
           <div class="submit-btn ${S.loading?'submit-disabled':''}" onclick="handleAuth()">
-            ${S.loading?'请稍候...':(S.isRegMode?'注册':'登录')}
+            ${S.loading?'请稍候...':'登录'}
           </div>
+          `}
         </div>
         <div class="footer-tip"><span class="footer-text">登录即表示同意用户协议和隐私政策</span></div>
       </div>
@@ -771,6 +808,13 @@ function tTopBar() {
     return `<div class="top-bar top-bar-sub">
       <button type="button" class="back-btn" onclick="goProfileEditBack()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
       <span class="sub-page-title">编辑资料</span>
+      <div style="width:56px;flex-shrink:0"></div>
+    </div>`;
+  }
+  if (t === 'profile' && S.profileView === 'setPassword') {
+    return `<div class="top-bar top-bar-sub">
+      <button type="button" class="back-btn" onclick="setState({profileView:'main'});render()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
+      <span class="sub-page-title">${S.userInfo?.has_password?'修改密码':'设置密码'}</span>
       <div style="width:56px;flex-shrink:0"></div>
     </div>`;
   }
@@ -1359,6 +1403,7 @@ function tInspireIndustry() {
 // ===== PROFILE =====
 function tProfile() {
   if (S.profileView === 'edit') return tProfileEdit();
+  if (S.profileView === 'setPassword') return tSetPassword();
   const u = S.userInfo;
   const loggedIn = !!getToken();
   const emojis = ['👨‍🚀','🦊','🐱','🐼'];
@@ -1468,6 +1513,13 @@ function tProfile() {
       </div>
       <span class="vip-upgrade-arrow">›</span>
     </div>
+    <div class="profile-history-entry" onclick="setState({profileView:'setPassword',pwdOld:'',pwdNew:'',pwdNew2:'',pwdErr:'',pwdOk:false});render()">
+      <div class="profile-history-label">
+        <span style="font-size:16px;margin-right:8px">🔒</span>
+        <span>${S.userInfo?.has_password?'修改密码':'设置密码'}</span>
+      </div>
+      <span class="profile-history-arrow">›</span>
+    </div>
     <div class="logout-btn" onclick="handleLogout()">退出登录</div>
     <div style="height:20px"></div>
   </div>`;
@@ -1514,6 +1566,32 @@ function tProfileEdit() {
       <p class="profile-field-hint">生成文案时自动预填，无需每次重复输入</p>
     </div>
     <div class="btn-primary" style="margin-top:4px" onclick="saveProfileEdit()">保存资料</div>
+  </div>`;
+}
+
+function tSetPassword() {
+  const hasPwd = S.userInfo?.has_password;
+  return `<div class="tab-page">
+    <div class="profile-section">
+      ${hasPwd?`
+      <span class="profile-field-label">原密码</span>
+      <input class="field-input" type="password" placeholder="请输入原密码"
+        value="${esc(S.pwdOld)}" oninput="S.pwdOld=this.value"/>
+      <div style="height:12px"></div>
+      `:''}
+      <span class="profile-field-label">新密码</span>
+      <input class="field-input" type="password" placeholder="至少6位"
+        value="${esc(S.pwdNew)}" oninput="S.pwdNew=this.value"/>
+      <div style="height:12px"></div>
+      <span class="profile-field-label">确认新密码</span>
+      <input class="field-input" type="password" placeholder="再次输入新密码"
+        value="${esc(S.pwdNew2)}" oninput="S.pwdNew2=this.value"/>
+    </div>
+    ${S.pwdErr?`<span class="err-text" style="padding:0 16px">${esc(S.pwdErr)}</span>`:''}
+    ${S.pwdOk?`<span style="color:#10B981;font-size:13px;padding:0 16px">密码设置成功 ✓</span>`:''}
+    <div class="btn-primary ${S.pwdLoading?'submit-disabled':''}" style="margin:16px" onclick="handleSetPassword()">
+      ${S.pwdLoading?'请稍候...':(hasPwd?'修改密码':'设置密码')}
+    </div>
   </div>`;
 }
 
@@ -1604,6 +1682,66 @@ function tPayModal() {
 // ===== LOGIN HANDLERS =====
 function setLoginMode() { setState({ isRegMode: false, authErr: '' }); }
 function setRegMode()   { setState({ isRegMode: true,  authErr: '' }); }
+function setAuthMode(mode) { setState({ authMode: mode, authErr: '', smsCode: '', smsSent: false }); }
+
+let smsCountdownTimer = null;
+function startSmsCountdown() {
+  setState({ smsCountdown: 60 });
+  if (smsCountdownTimer) clearInterval(smsCountdownTimer);
+  smsCountdownTimer = setInterval(() => {
+    const next = S.smsCountdown - 1;
+    if (next <= 0) { clearInterval(smsCountdownTimer); smsCountdownTimer = null; setState({ smsCountdown: 0 }); }
+    else setState({ smsCountdown: next });
+  }, 1000);
+}
+
+async function handleSendSms() {
+  if (S.smsCountdown > 0 || S.loading) return;
+  const phone = S.phone.trim();
+  if (!phone) { setState({ authErr: '请输入手机号' }); return; }
+  if (!/^1[3-9]\d{9}$/.test(phone)) { setState({ authErr: '手机号格式不正确' }); return; }
+  setState({ loading: true, authErr: '' });
+  try {
+    const r = await api.post('/auth/send-sms', { phone });
+    setState({ loading: false });
+    if (r.code === 200) { setState({ smsSent: true }); startSmsCountdown(); showToast('验证码已发送'); }
+    else setState({ authErr: r.msg || '发送失败，请重试' });
+  } catch { setState({ loading: false, authErr: '网络错误，请重试' }); }
+}
+
+async function handleSmsLogin() {
+  const phone = S.phone.trim(), code = S.smsCode.trim();
+  if (!phone) { setState({ authErr: '请输入手机号' }); return; }
+  if (!code)  { setState({ authErr: '请输入验证码' }); return; }
+  setState({ loading: true, authErr: '' });
+  try {
+    const r = await api.post('/auth/sms-login', { phone, code });
+    if (r.code === 200) {
+      localStorage.setItem('token', r.data.token);
+      setState({ loading: false, showAuthSheet: false, smsCode: '', smsSent: false, smsCountdown: 0, authErr: '', phone: '' });
+      if (smsCountdownTimer) { clearInterval(smsCountdownTimer); smsCountdownTimer = null; }
+      await fetchMe();
+      loadTasks();
+      showToast(r.data.isNew ? '注册成功，欢迎使用' : '登录成功');
+    } else { setState({ loading: false, authErr: r.msg || '验证失败，请重试' }); }
+  } catch { setState({ loading: false, authErr: '网络错误，请重试' }); }
+}
+
+async function handleSetPassword() {
+  const { pwdOld, pwdNew, pwdNew2 } = S;
+  if (!pwdNew || pwdNew.length < 6) { setState({ pwdErr: '新密码至少6位' }); return; }
+  if (pwdNew !== pwdNew2) { setState({ pwdErr: '两次输入的密码不一致' }); return; }
+  setState({ pwdLoading: true, pwdErr: '', pwdOk: false });
+  try {
+    const body = { new_password: pwdNew };
+    if (S.userInfo?.has_password) body.old_password = pwdOld;
+    const r = await api.post('/auth/set-password', body);
+    if (r.code === 200) {
+      setState({ pwdLoading: false, pwdOk: true, pwdOld: '', pwdNew: '', pwdNew2: '' });
+      if (S.userInfo) setState({ userInfo: { ...S.userInfo, has_password: true } });
+    } else { setState({ pwdLoading: false, pwdErr: r.msg || '操作失败' }); }
+  } catch { setState({ pwdLoading: false, pwdErr: '网络错误，请重试' }); }
+}
 
 async function handleAuth() {
   if (S.loading) return;
@@ -2089,7 +2227,7 @@ async function handleActivateCode() {
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
   clearAuth();
-  setState({ page:'login', currentTab:'home', showAuthSheet:false, userInfo:null, userName:'创作者', userPhone:'', userAvatar:0, phone:'', password:'', recentHistory:[], recentHistoryLoaded:false, homeHistory:[], homeHistoryLoaded:false, extractHistory:[], extractHistoryLoaded:false, inspireHistory:[], historyLoaded:false, cloneHistory:[], cloneHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
+  setState({ page:'login', currentTab:'home', showAuthSheet:false, userInfo:null, userName:'创作者', userPhone:'', userAvatar:0, phone:'', password:'', smsCode:'', smsSent:false, smsCountdown:0, authErr:'', authMode:'sms', recentHistory:[], recentHistoryLoaded:false, homeHistory:[], homeHistoryLoaded:false, extractHistory:[], extractHistoryLoaded:false, inspireHistory:[], historyLoaded:false, cloneHistory:[], cloneHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
 }
 
 // ===== VIP =====

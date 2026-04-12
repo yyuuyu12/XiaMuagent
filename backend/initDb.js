@@ -188,6 +188,27 @@ async function initDb() {
     if (!String(e.message || e).includes('Duplicate column name')) console.warn('[initDb] brand_name:', e.message || e);
   }
 
+  // users.password 改为可空（验证码注册的用户没有密码）
+  try {
+    await db.query("ALTER TABLE users MODIFY COLUMN password TEXT NULL DEFAULT NULL");
+  } catch (e) {
+    console.warn('[initDb] modify password nullable:', e.message || e);
+  }
+
+  // 短信验证码表
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS sms_codes (
+      id         INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      phone      VARCHAR(20) NOT NULL,
+      code       VARCHAR(10) NOT NULL,
+      type       VARCHAR(20) NOT NULL DEFAULT 'login',
+      expires_at TIMESTAMP NOT NULL,
+      used       TINYINT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW(),
+      INDEX idx_phone_created (phone, created_at)
+    ) CHARACTER SET utf8mb4
+  `);
+
   console.log('✅ 数据库初始化完成');
 }
 

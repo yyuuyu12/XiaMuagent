@@ -7,6 +7,140 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 const JWT_EXPIRES = '7d';
 
+// ==================== 阿里云短信发送 ====================
+async function sendAliyunSms(phone, code, templateCode) {
+  const Core = require('@alicloud/pop-core');
+  const client = new Core({
+    accessKeyId: process.env.ALIYUN_SMS_KEY_ID,
+    accessKeySecret: process.env.ALIYUN_SMS_KEY_SECRET,
+    endpoint: 'https://dysmsapi.aliyuncs.com',
+    apiVersion: '2017-05-25',
+  });
+  const result = await client.request('SendSms', {
+    PhoneNumbers: phone,
+    SignName: process.env.ALIYUN_SMS_SIGN || '烽鹏网络',
+    TemplateCode: templateCode,
+    TemplateParam: JSON.stringify({ code }),
+  }, { method: 'POST' });
+  if (result.Code !== 'OK') throw new Error(`短信发送失败：${result.Message || result.Code}`);
+}
+
+// ==================== 发送验证码 ====================
+router.post('/send-sms', async (req, res) => {
+  const { phone } = req.body;
+  if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
+    return res.status(400).json({ code: 400, msg: '手机号格式不正确' });
+  }
+
+  try {
+    // 60秒内只能发一次
+    const { rows: recent } = await db.query(
+      'SELECT id FROM sms_codes WHERE phone=? AND created_at > DATE_SUB(NOW(), INTERVAL 60 SECOND) LIMIT 1',
+      [phone]
+    );
+    if (recent.length > 0) {
+      return res.status(429).json({ code: 429, msg: '发送太频繁，请60秒后再试' });
+    }
+
+    // 判断是新用户还是老用户，选模板
+    const { rows: userRows } = await db.query('SELECT id FROM users WHERE phone=?', [phone]);
+    const isNew = userRows.length === 0;
+    const templateCode = isNew
+      ? (process.env.ALIYUN_SMS_TEMPLATE_REG || 'SMS_505140372')
+      : (process.env.ALIYUN_SMS_TEMPLATE_LOGIN || 'SMS_504845448');
+
+    // 生成6位验证码
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+
+    // 写入数据库（5分钟有效）
+    await db.query(
+      'INSERT INTO sms_codes (phone, code, type, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))',
+      [phone, code, isNew ? 'register' : 'login']
+    );
+
+    // 发送短信
+    await sendAliyunSms(phone, code, templateCode);
+
+    res.json({ code: 200, msg: '验证码已发送', data: { isNew } });
+  } catch (err) {
+    console.error('/send-sms error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message || '发送失败，请稍后重试' });
+  }
+});
+
+// ==================== 验证码登录 / 注册 ====================
+router.post('/sms-login', async (req, res) => {
+  const { phone, code } = req.body;
+  if (!phone || !code) return res.status(400).json({ code: 400, msg: '手机号和验证码不能为空' });
+  if (!/^1[3-9]\d{9}$/.test(phone)) return res.status(400).json({ code: 400, msg: '手机号格式不正确' });
+
+  try {
+    // 找最近一条未使用且未过期的验证码
+    const { rows: codeRows } = await db.query(
+      'SELECT * FROM sms_codes WHERE phone=? AND used=0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [phone]
+    );
+    const smsRecord = codeRows[0];
+    if (!smsRecord || smsRecord.code !== String(code).trim()) {
+      return res.status(401).json({ code: 401, msg: '验证码错误或已过期' });
+    }
+
+    // 标记已使用
+    await db.query('UPDATE sms_codes SET used=1 WHERE id=?', [smsRecord.id]);
+
+    // 查用户，不存在则自动注册
+    const { rows: userRows } = await db.query('SELECT * FROM users WHERE phone=?', [phone]);
+    let user = userRows[0];
+    if (!user) {
+      const nickname = `用户${phone.slice(-4)}`;
+      const { rows: ins } = await db.query(
+        'INSERT INTO users (phone, nickname) VALUES (?, ?)',
+        [phone, nickname]
+      );
+      const { rows: newRows } = await db.query(
+        'SELECT id, phone, nickname, avatar, role, daily_limit, auth_code_id, auth_expires_at FROM users WHERE id=?',
+        [ins[0]?.insertId || ins[0]?.id]
+      );
+      user = newRows[0];
+    }
+
+    const { password: _, avatar_image: _ai, ...safeUser } = user;
+    const token = jwt.sign({ id: safeUser.id, role: safeUser.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    const isNew = smsRecord.type === 'register';
+    res.json({ code: 200, msg: isNew ? '注册成功' : '登录成功', data: { token, user: safeUser, isNew } });
+  } catch (err) {
+    console.error('/sms-login error:', err.message);
+    res.status(500).json({ code: 500, msg: '登录失败，请稍后重试' });
+  }
+});
+
+// ==================== 设置/修改密码 ====================
+router.post('/set-password', requireAuth, async (req, res) => {
+  const { old_password, new_password } = req.body;
+  if (!new_password || new_password.length < 6) {
+    return res.status(400).json({ code: 400, msg: '新密码至少6位' });
+  }
+  try {
+    const { rows } = await db.query('SELECT password FROM users WHERE id=?', [req.userId]);
+    const user = rows[0];
+    if (!user) return res.status(404).json({ code: 404, msg: '用户不存在' });
+
+    // 已有密码时需验证旧密码
+    if (user.password) {
+      if (!old_password) return res.status(400).json({ code: 400, msg: '请输入原密码' });
+      const match = bcrypt.compareSync(old_password, user.password);
+      if (!match) return res.status(401).json({ code: 401, msg: '原密码错误' });
+    }
+
+    const hashed = bcrypt.hashSync(new_password, 10);
+    await db.query('UPDATE users SET password=? WHERE id=?', [hashed, req.userId]);
+    res.json({ code: 200, msg: '密码设置成功' });
+  } catch (err) {
+    console.error('/set-password error:', err.message);
+    res.status(500).json({ code: 500, msg: '操作失败，请稍后重试' });
+  }
+});
+
 // ==================== 注册 ====================
 router.post('/register', async (req, res) => {
   const { phone, password, nickname } = req.body;
@@ -15,18 +149,18 @@ router.post('/register', async (req, res) => {
   if (password.length < 6) return res.status(400).json({ code: 400, msg: '密码至少6位' });
 
   try {
-    const { rows: existing } = await db.query('SELECT id FROM users WHERE phone = $1', [phone]);
+    const { rows: existing } = await db.query('SELECT id FROM users WHERE phone = ?', [phone]);
     if (existing.length > 0) return res.status(409).json({ code: 409, msg: '该手机号已注册，请直接登录' });
 
     const hashed = bcrypt.hashSync(password, 10);
     const name = nickname || `用户${phone.slice(-4)}`;
     const { rows: ins } = await db.query(
-      'INSERT INTO users (phone, password, nickname) VALUES ($1, $2, $3)',
+      'INSERT INTO users (phone, password, nickname) VALUES (?, ?, ?)',
       [phone, hashed, name]
     );
     const { rows } = await db.query(
-      'SELECT id, phone, nickname, avatar, role FROM users WHERE id = $1',
-      [ins[0].id]
+      'SELECT id, phone, nickname, avatar, role FROM users WHERE id = ?',
+      [ins[0]?.insertId || ins[0]?.id]
     );
     const user = rows[0];
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
@@ -37,15 +171,16 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// ==================== 登录 ====================
+// ==================== 密码登录 ====================
 router.post('/login', async (req, res) => {
   const { phone, password } = req.body;
   if (!phone || !password) return res.status(400).json({ code: 400, msg: '手机号和密码不能为空' });
 
   try {
-    const { rows } = await db.query('SELECT * FROM users WHERE phone = $1', [phone]);
+    const { rows } = await db.query('SELECT * FROM users WHERE phone = ?', [phone]);
     const user = rows[0];
     if (!user) return res.status(401).json({ code: 401, msg: '手机号未注册' });
+    if (!user.password) return res.status(401).json({ code: 401, msg: '该账号未设置密码，请使用验证码登录' });
 
     const match = bcrypt.compareSync(password, user.password);
     if (!match) return res.status(401).json({ code: 401, msg: '密码错误' });
@@ -63,14 +198,18 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, phone, nickname, avatar, avatar_image, brand_name, role, daily_limit, auth_code_id, auth_expires_at, created_at FROM users WHERE id = $1',
+      'SELECT id, phone, nickname, avatar, avatar_image, brand_name, role, daily_limit, auth_code_id, auth_expires_at, created_at FROM users WHERE id = ?',
       [req.userId]
     );
     if (!rows[0]) return res.status(404).json({ code: 404, msg: '用户不存在' });
     const user = rows[0];
 
+    // 返回是否已设置密码（前端用于判断是否显示"设置密码"还是"修改密码"）
+    const hasPassword = !!user.password;
+    delete user.password;
+
     const { rows: usageRows } = await db.query(
-      'SELECT COUNT(*) AS cnt FROM usage_logs WHERE user_id = $1 AND DATE(created_at) = CURRENT_DATE',
+      'SELECT COUNT(*) AS cnt FROM usage_logs WHERE user_id = ? AND DATE(created_at) = CURRENT_DATE',
       [req.userId]
     );
     const usedToday = parseInt(usageRows[0].cnt);
@@ -80,7 +219,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
     res.json({
       code: 200,
-      data: { ...user, daily_limit: dailyLimitOut, used_today: usedToday, remaining }
+      data: { ...user, daily_limit: dailyLimitOut, used_today: usedToday, remaining, has_password: hasPassword }
     });
   } catch (err) {
     console.error('/me error:', err.message);
