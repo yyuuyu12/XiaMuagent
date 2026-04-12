@@ -563,6 +563,39 @@ let pathAPollerTimer = null;
 let tasksTickTimer = null;
 
 // ===== UTILS =====
+async function deleteTask(e, taskId) {
+  e.stopPropagation();
+  if (!confirm('确定删除这条任务记录吗？')) return;
+  try {
+    const r = await api.del(`/tasks/${taskId}`);
+    if (r.code === 200) {
+      setState({ tasksList: S.tasksList.filter(t => t.id !== taskId) });
+      showToast('已删除');
+    } else {
+      showToast(r.msg || '删除失败');
+    }
+  } catch { showToast('删除失败'); }
+}
+
+function friendlyError(msg) {
+  if (!msg) return '任务处理失败，请稍后重试';
+  if (msg.includes('524') || msg.includes('timeout occurred') || /timed?\s*out/i.test(msg))
+    return 'AI 服务响应超时，可能当前请求量较大，请稍后重试';
+  if (msg.includes('<!DOCTYPE') || msg.includes('<html') || msg.includes('Cloudflare') || msg.includes('cloudflare'))
+    return 'AI 服务暂时不可用，请稍后重试';
+  if (/asr|transcri|语音|whisper/i.test(msg))
+    return '语音识别服务出现问题，请稍后重试';
+  if (/tikhub|tik\s*hub|视频解析|视频下载|视频信息/i.test(msg))
+    return '视频解析失败，请检查链接是否有效后重试';
+  if (/ai\s*(接口|调用|错误|失败)|callai|openai|zhipu|api.*error/i.test(msg))
+    return 'AI 服务暂时出现问题，请稍后重试';
+  if (msg.includes('ASR 服务未配置') || msg.includes('TikHub API Key 未配置'))
+    return '服务配置不完整，请联系管理员';
+  if (msg.length > 80) return '服务暂时出现问题，请稍后重试';
+  return msg;
+}
+
+
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1141,7 +1174,7 @@ function tInspireAnalyze() {
       body = `<div style="text-align:center;padding:24px 0">
         <div style="font-size:36px;margin-bottom:12px">😞</div>
         <div style="font-size:14px;font-weight:600;color:#DC2626;margin-bottom:8px">处理失败</div>
-        <div style="font-size:12px;color:#6B6860;margin-bottom:16px">${esc(task.error_msg||'未知错误')}</div>
+        <div style="font-size:12px;color:#6B6860;margin-bottom:16px">${esc(friendlyError(task.error_msg))}</div>
         <div class="btn-primary" style="display:inline-block;padding:0 24px" onclick="setState({pathAState:'input',pathATaskData:null});render()">重新输入</div>
       </div>`;
     } else {
@@ -2164,6 +2197,7 @@ function tTasksList(tabsHtml) {
           <div class="task-card-header">
             <span class="task-type-badge ${typeClass(t.type)}">${typeLabel(t.type)}</span>
             <span class="task-card-title">${esc(t.title)}</span>
+            ${(t.status==='done'||t.status==='failed')?`<span style="font-size:18px;color:#C8C4BB;padding-left:8px;flex-shrink:0" onclick="deleteTask(event,'${t.id}')">🗑</span>`:''}
           </div>
           <div class="task-card-time">${formatDisplayTime(t.created_at)}</div>
           <div class="task-status-row">
@@ -2176,7 +2210,7 @@ function tTasksList(tabsHtml) {
             <div class="task-progress-wrap"><div class="task-progress-fill" style="width:${t.progress||0}%"></div></div>
           `:''}
           ${t.status==='pending'?`<div style="font-size:12px;color:#A8A49C;margin-top:6px">等待前序任务完成后开始处理</div>`:''}
-          ${t.status==='failed'?`<div style="font-size:12px;color:#DC2626;margin-top:6px">${esc(t.error_msg||'任务失败')}</div>`:''}
+          ${t.status==='failed'?`<div style="font-size:12px;color:#E8650A;margin-top:6px">${esc(friendlyError(t.error_msg))}</div>`:''}
         </div>`).join('')
     }
   </div>`;

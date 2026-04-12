@@ -41,4 +41,22 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/tasks/:id - 删除任务（仅限 done / failed）
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, status FROM tasks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
+    if (rows[0].status === 'pending' || rows[0].status === 'running') {
+      return res.status(400).json({ code: 400, msg: '进行中的任务无法删除' });
+    }
+    await db.query('DELETE FROM tasks WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
+    res.json({ code: 200, msg: '已删除' });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
 module.exports = router;
