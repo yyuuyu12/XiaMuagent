@@ -527,7 +527,8 @@ const S = {
   isRegMode: false, phone: '', password: '', authErr: '', loading: false,
   authMode: 'sms',       // 'sms' | 'pwd'
   smsCode: '', smsSent: false, smsCountdown: 0,
-  pwdOld: '', pwdNew: '', pwdNew2: '', pwdErr: '', pwdOk: false, pwdLoading: false,
+  pwdSmsCode: '', pwdSmsSent: false, pwdSmsCountdown: 0,
+  pwdNew: '', pwdNew2: '', pwdErr: '', pwdLoading: false,
   showAuthCodeInput: false, showAuthCodeSheet: false, showSetPwdSheet: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
@@ -1623,7 +1624,9 @@ function tProfileEdit() {
 
 function tSetPasswordSheet() {
   const hasPwd = S.userInfo?.has_password;
-  const close = "setState({showSetPwdSheet:false});render()";
+  const phone = S.userInfo?.phone || '';
+  const maskedPhone = phone && !phone.startsWith('wx_') ? maskPhone(phone) : '';
+  const close = "setState({showSetPwdSheet:false,pwdSmsCode:'',pwdSmsSent:false,pwdSmsCountdown:0,pwdErr:'',pwdNew:'',pwdNew2:''});render()";
   return `<div class="auth-sheet-mask" onclick="${close}">
     <div class="auth-sheet" onclick="event.stopPropagation()">
       <div class="auth-sheet-handle" onclick="${close}"></div>
@@ -1633,10 +1636,16 @@ function tSetPasswordSheet() {
       </div>
       <div class="auth-sheet-scroll" style="padding-bottom:32px">
         ${hasPwd?`
+        <div style="font-size:13px;color:#6B6860;margin-bottom:14px">将向 <span style="color:#1A1814;font-weight:600">+86 ${esc(maskedPhone)}</span> 发送验证码以确认身份</div>
         <div class="field-group">
-          <span class="field-label">原密码</span>
-          <input class="lf-input" type="password" placeholder="请输入原密码"
-            value="${esc(S.pwdOld)}" oninput="S.pwdOld=this.value"/>
+          <span class="field-label">验证码</span>
+          <div class="input-wrap">
+            <input class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
+              value="${esc(S.pwdSmsCode)}" oninput="S.pwdSmsCode=this.value" style="flex:1;padding-left:14px"/>
+            <div class="sms-send-btn ${S.pwdSmsCountdown>0||S.pwdLoading?'sms-send-disabled':''}" onclick="handleSendPwdSms()">
+              ${S.pwdSmsCountdown>0?`${S.pwdSmsCountdown}s后重发`:S.pwdSmsSent?'重新发送':'获取验证码'}
+            </div>
+          </div>
         </div>`:''}
         <div class="field-group">
           <span class="field-label">新密码</span>
@@ -1650,7 +1659,7 @@ function tSetPasswordSheet() {
         </div>
         ${S.pwdErr?`<span class="err-msg">${esc(S.pwdErr)}</span>`:''}
         <div class="submit-btn ${S.pwdLoading?'submit-disabled':''}" style="margin-top:4px" onclick="handleSetPassword()">
-          ${S.pwdLoading?'请稍候...':(hasPwd?'修改密码':'设置密码')}
+          ${S.pwdLoading?'请稍候...':(hasPwd?'确认修改':'设置密码')}
         </div>
       </div>
     </div>
@@ -1755,6 +1764,28 @@ function setRegMode()   { setState({ isRegMode: true,  authErr: '' }); }
 function setAuthMode(mode) { setState({ authMode: mode, authErr: '', smsCode: '', smsSent: false }); }
 
 let smsCountdownTimer = null;
+let pwdSmsCountdownTimer = null;
+function startPwdSmsCountdown() {
+  setState({ pwdSmsCountdown: 60 });
+  if (pwdSmsCountdownTimer) clearInterval(pwdSmsCountdownTimer);
+  pwdSmsCountdownTimer = setInterval(() => {
+    const next = S.pwdSmsCountdown - 1;
+    if (next <= 0) { clearInterval(pwdSmsCountdownTimer); pwdSmsCountdownTimer = null; setState({ pwdSmsCountdown: 0 }); }
+    else setState({ pwdSmsCountdown: next });
+  }, 1000);
+}
+async function handleSendPwdSms() {
+  if (S.pwdSmsCountdown > 0 || S.pwdLoading) return;
+  const phone = S.userInfo?.phone;
+  if (!phone) return;
+  setState({ pwdLoading: true, pwdErr: '' });
+  try {
+    const r = await api.post('/auth/send-sms', { phone });
+    setState({ pwdLoading: false });
+    if (r.code === 200) { setState({ pwdSmsSent: true }); startPwdSmsCountdown(); showToast('验证码已发送'); }
+    else setState({ pwdErr: r.msg || '发送失败，请重试' });
+  } catch { setState({ pwdLoading: false, pwdErr: '网络错误，请重试' }); }
+}
 function startSmsCountdown() {
   setState({ smsCountdown: 60 });
   if (smsCountdownTimer) clearInterval(smsCountdownTimer);
@@ -1798,17 +1829,18 @@ async function handleSmsLogin() {
 }
 
 async function handleSetPassword() {
-  const { pwdOld, pwdNew, pwdNew2 } = S;
+  const { pwdSmsCode, pwdNew, pwdNew2 } = S;
   if (!pwdNew || pwdNew.length < 6) { setState({ pwdErr: '新密码至少6位' }); return; }
   if (pwdNew !== pwdNew2) { setState({ pwdErr: '两次输入的密码不一致' }); return; }
-  setState({ pwdLoading: true, pwdErr: '', pwdOk: false });
+  if (S.userInfo?.has_password && !pwdSmsCode.trim()) { setState({ pwdErr: '请先获取并输入验证码' }); return; }
+  setState({ pwdLoading: true, pwdErr: '' });
   try {
     const body = { new_password: pwdNew };
-    if (S.userInfo?.has_password) body.old_password = pwdOld;
+    if (S.userInfo?.has_password) body.sms_code = pwdSmsCode.trim();
     const r = await api.post('/auth/set-password', body);
     if (r.code === 200) {
       if (S.userInfo) setState({ userInfo: { ...S.userInfo, has_password: true } });
-      setState({ pwdLoading: false, pwdOld: '', pwdNew: '', pwdNew2: '' });
+      setState({ pwdLoading: false, pwdNew: '', pwdNew2: '', pwdSmsCode: '', pwdSmsSent: false, pwdSmsCountdown: 0 });
       showToast('密码设置成功');
       setTimeout(() => setState({ showSetPwdSheet: false }), 800);
     } else { setState({ pwdLoading: false, pwdErr: r.msg || '操作失败' }); }

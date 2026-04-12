@@ -116,25 +116,32 @@ router.post('/sms-login', async (req, res) => {
 
 // ==================== 设置/修改密码 ====================
 router.post('/set-password', requireAuth, async (req, res) => {
-  const { old_password, new_password } = req.body;
+  const { sms_code, new_password } = req.body;
   if (!new_password || new_password.length < 6) {
     return res.status(400).json({ code: 400, msg: '新密码至少6位' });
   }
   try {
-    const { rows } = await db.query('SELECT password FROM users WHERE id=?', [req.userId]);
+    const { rows } = await db.query('SELECT password, phone FROM users WHERE id=?', [req.userId]);
     const user = rows[0];
     if (!user) return res.status(404).json({ code: 404, msg: '用户不存在' });
 
-    // 已有密码时需验证旧密码
+    // 已有密码时，必须通过短信验证码验证身份
     if (user.password) {
-      if (!old_password) return res.status(400).json({ code: 400, msg: '请输入原密码' });
-      const match = bcrypt.compareSync(old_password, user.password);
-      if (!match) return res.status(401).json({ code: 401, msg: '原密码错误' });
+      if (!sms_code) return res.status(400).json({ code: 400, msg: '请输入验证码' });
+      const { rows: codeRows } = await db.query(
+        'SELECT * FROM sms_codes WHERE phone=? AND used=0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+        [user.phone]
+      );
+      const rec = codeRows[0];
+      if (!rec || rec.code !== String(sms_code).trim()) {
+        return res.status(401).json({ code: 401, msg: '验证码错误或已过期' });
+      }
+      await db.query('UPDATE sms_codes SET used=1 WHERE id=?', [rec.id]);
     }
 
     const hashed = bcrypt.hashSync(new_password, 10);
     await db.query('UPDATE users SET password=? WHERE id=?', [hashed, req.userId]);
-    res.json({ code: 200, msg: '密码设置成功' });
+    res.json({ code: 200, msg: '密码修改成功' });
   } catch (err) {
     console.error('/set-password error:', err.message);
     res.status(500).json({ code: 500, msg: '操作失败，请稍后重试' });
