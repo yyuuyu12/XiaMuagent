@@ -876,16 +876,17 @@ function dismissHomeDoneSeen() {
 function tHomeTaskSection() {
   if (!S.tasksLoaded && !S.cloneHistoryLoaded) return '';
   const dismissed = S.dismissedFromHomeIds || [];
-  const typeLbl = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成' }[t]||t);
+  const typeLbl = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成', clone_video:'克隆' }[t]||t);
+  const typeTagLabel = t => t.type === 'clone_video' ? '克隆' : '灵感';
 
   const bigCards = (S.tasksList || []).filter(t =>
-    t.status === 'pending' || t.status === 'running' ||
+    t.status === 'pending' || t.status === 'running' || t.status === 'extracted' ||
     (t.status === 'done' && !dismissed.includes(t.id))
   );
 
   const dismissedTasks = (S.tasksList || [])
     .filter(t => dismissed.includes(t.id))
-    .map(t => ({ _type: 'task', label: '灵感', text: t.title, created_at: t.created_at }));
+    .map(t => ({ _type: 'task', label: typeTagLabel(t), text: t.title, created_at: t.created_at }));
   const cloneItems = (S.cloneHistory || [])
     .map((it, idx) => ({ _type: 'clone', idx, label: '克隆', text: it.input || '', created_at: it.created_at }));
   const smallItems = [...dismissedTasks, ...cloneItems]
@@ -917,6 +918,22 @@ function tHomeTaskSection() {
             <div style="font-size:11px;color:#A8A49C;margin-top:2px">${typeLbl(t.type)} · 已完成</div>
           </div>
           <span style="font-size:13px;color:#E8650A;flex-shrink:0">查看结果 ›</span>
+        </div>`;
+      }
+      if (t.status === 'extracted') {
+        return `<div class="home-task-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
+              <div style="font-size:11px;color:#A8A49C;margin-top:2px">克隆</div>
+            </div>
+            <span style="font-size:11px;color:#10B981;flex-shrink:0;margin-left:8px">提取完成 ✓</span>
+          </div>
+          <div class="path-a-progress-bar" style="margin-bottom:8px"><div class="path-a-progress-fill" style="width:50%"></div></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:#6B6860;flex:1">文案已提取，点击开始AI改写</span>
+            <div style="background:#E8650A;color:#fff;font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;cursor:pointer;white-space:nowrap" onclick="startCloneRewrite('${t.id}')">✨ 去改写</div>
+          </div>
         </div>`;
       }
       const cd = taskCountdown(t);
@@ -1028,88 +1045,28 @@ function tHome() {
 
 // ===== EXTRACT =====
 function tExtract() {
-  if (S.extractStep === 0) {
-    const recentItems = S.extractHistory.slice(0, 3);
-    return `<div class="tab-page">
-      <div class="platform-tabs">
-        <div class="platform-tab platform-tab-active">抖音</div>
-        <div class="platform-tab platform-tab-disabled">快手<span class="coming-soon-badge">即将上线</span></div>
-        <div class="platform-tab platform-tab-disabled">小红书<span class="coming-soon-badge">即将上线</span></div>
-      </div>
-      <div class="input-card">
-        <span class="input-label">粘贴抖音视频链接或分享文字</span>
-        <div class="url-input-wrap">
-          <textarea class="url-textarea-v2" id="f-url" placeholder="例如：https://v.douyin.com/xxx 或直接粘贴分享文字..."
-            oninput="S.videoUrl=this.value;render()">${esc(S.videoUrl)}</textarea>
-          <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
-        </div>
-        ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
-        ${S.extractLoading
-          ? `<div class="btn-primary" style="background:#B83060" onclick="stopExtractTranscribe()">⏹ 停止转录</div>`
-          : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">🚀 提取文案</div>`}
-      </div>
-      <div class="tip-card-v2">
-        <span class="tip-line">1. 在抖音找到想参考的视频</span>
-        <span class="tip-line">2. 点击"分享"并复制链接</span>
-        <span class="tip-line">3. 粘贴到上方并点击提取</span>
-        <span class="tip-line">4. AI语音识别转录，约需1-2分钟</span>
-        <span class="tip-line">5. 提取成功后可一键AI改写</span>
-      </div>
-      ${recentItems.length>0?`
-        <div class="home-section-header" style="margin-top:4px">
-          <span class="home-section-title">最近提取</span>
-        </div>
-        ${recentItems.map((it,i)=>`
-          <div class="extract-hist-item" onclick="reuseExtractUrl(${i})">
-            <span class="extract-hist-url">${esc(it.url||it.input||'')}</span>
-            <span class="extract-hist-time">${esc(it.created_at||'')}</span>
-          </div>`).join('')}`:''}
-    </div>`;
-  }
-
-  if (S.extractStep === 1) return `<div class="tab-page">
-    <div class="result-card">
-      <div class="result-header-row">
-        <span class="result-label">📝 提取的文案（可编辑）</span>
-      </div>
-      <div class="thin-divider"></div>
-      <textarea class="editable-script-textarea" id="f-extracted-script" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
-      <div class="result-action-bottom">
-        <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制'}</div>
-      </div>
-    </div>
-${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
-    <div class="action-row">
-      <div class="btn-action-sec" onclick="resetExtract()">重新输入</div>
-      ${S.extractLoading
-        ? `<div class="btn-action-main" style="background:#B83060" onclick="stopExtractRewrite()">⏹ 停止改写</div>`
-        : `<div class="btn-action-main ${!S.extractedScript.trim()?'btn-disabled':''}" onclick="handleRewrite()">✨ 一键原创改写</div>`}
-    </div>
-  </div>`;
-
   return `<div class="tab-page">
-    <div class="result-card result-muted">
-      <span class="result-label-sm">原始文案（可编辑）</span>
-      <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
-      <div class="result-action-bottom">
-        <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制原文'}</div>
-      </div>
+    <div class="platform-tabs">
+      <div class="platform-tab platform-tab-active">抖音</div>
+      <div class="platform-tab platform-tab-disabled">快手<span class="coming-soon-badge">即将上线</span></div>
+      <div class="platform-tab platform-tab-disabled">小红书<span class="coming-soon-badge">即将上线</span></div>
     </div>
-    <div class="result-card result-highlight ${S.rewriteGenerating?'rewrite-generating':''}">
-      <div class="result-header-row">
-        <span class="result-label">🚀 原创改写（可编辑）</span>
+    <div class="input-card">
+      <span class="input-label">粘贴抖音视频链接或分享文字</span>
+      <div class="url-input-wrap">
+        <textarea class="url-textarea-v2" id="f-url" placeholder="例如：https://v.douyin.com/xxx 或直接粘贴分享文字..."
+          oninput="S.videoUrl=this.value;render()">${esc(S.videoUrl)}</textarea>
+        <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
       </div>
-      <div class="thin-divider"></div>
-      <textarea class="editable-script-textarea ${S.rewriteGenerating?'editable-disabled':''}" id="f-rewritten-script" ${S.rewriteGenerating?'readonly':''} oninput="if(!S.rewriteGenerating){S.rewrittenScript=this.value}">${esc(S.rewrittenScript)}</textarea>
-      <div class="result-action-bottom">
-        <div class="copy-btn copy-btn-strong" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制改写文案'}</div>
-      </div>
-    </div>
-    <div class="action-row">
-      <div class="btn-action-sec" onclick="resetExtract()">重新上传链接</div>
+      ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
       ${S.extractLoading
-        ? `<div class="btn-action-main" style="background:#B83060" onclick="stopExtractRewrite()">⏹ 停止改写</div>`
-        : `<div class="btn-action-main" onclick="rewriteAgain()">重新改写</div>`}
+        ? `<div class="btn-primary btn-disabled">⏳ 提交中...</div>`
+        : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">🚀 开始克隆</div>`}
+    </div>
+    <div class="tip-card-v2">
+      <span class="tip-line">1. 在抖音找到想参考的视频，点击分享复制链接</span>
+      <span class="tip-line">2. 粘贴到上方，点击开始克隆</span>
+      <span class="tip-line">3. 后台自动提取语音，完成后回首页点击改写</span>
     </div>
   </div>`;
 }
@@ -1664,28 +1621,29 @@ async function loadIndustries() {
 async function handleExtract() {
   if (!ensureLoggedIn()) return;
   if (!S.videoUrl.trim() || S.extractLoading) return;
-  extractTranscribeController = new AbortController();
-  S.extractTranscribeController = extractTranscribeController;
   setState({ extractLoading: true, extractErr: '' });
-  const tid = setTimeout(() => {
-    if (extractTranscribeController) extractTranscribeController.abort();
-  }, 300000);
   try {
-    const r = await api.post('/video/douyin-to-text', { url: S.videoUrl.trim() }, extractTranscribeController.signal);
-    clearTimeout(tid);
-    extractTranscribeController = null;
-    S.extractTranscribeController = null;
-    if (apiUnauthorized(r)) setState({ extractLoading: false });
-    else if (r.code === 200) setState({ extractedScript: r.data.script, extractStep: 1, extractLoading: false });
-    else setState({ extractErr: r.msg || '提取失败，请检查链接是否正确', extractLoading: false });
-  } catch(e) {
-    clearTimeout(tid);
-    extractTranscribeController = null;
-    S.extractTranscribeController = null;
-    if (e && e.name === 'AbortError') setState({ extractErr: '', extractLoading: false });
-    else setState({ extractErr: '网络超时，请重试', extractLoading: false });
+    const r = await api.post('/video/clone-start', { url: S.videoUrl.trim() });
+    if (apiUnauthorized(r)) { setState({ extractLoading: false }); return; }
+    if (r.code === 200) {
+      setState({ extractLoading: false, videoUrl: '', currentTab: 'home' });
+      loadTasks();
+      showToast('克隆任务已提交，正在首页处理中');
+    } else {
+      setState({ extractErr: r.msg || '提交失败，请重试', extractLoading: false });
+    }
+  } catch {
+    setState({ extractErr: '网络错误，请重试', extractLoading: false });
   }
 }
+async function startCloneRewrite(taskId) {
+  try {
+    const r = await api.post(`/tasks/${taskId}/start-rewrite`, {});
+    if (r.code === 200) { loadTasks(); startTasksPolling(); startTasksTickTimer(); }
+    else showToast(r.msg || '触发改写失败');
+  } catch { showToast('网络错误，请重试'); }
+}
+
 function stopExtractTranscribe() {
   if (extractTranscribeController) {
     extractTranscribeController.abort();
@@ -2163,7 +2121,7 @@ function switchHistoryTab(tab) {
 // ===== 任务页视图 =====
 function taskCountdown(t) {
   if (t.status !== 'pending' && t.status !== 'running') return '';
-  const expectedSecs = { profile_analyze: 180, single_video_analyze: 90, industry_gen: 20 };
+  const expectedSecs = { profile_analyze: 180, single_video_analyze: 90, industry_gen: 20, clone_video: 90 };
   const expected = expectedSecs[t.type] || 120;
   const elapsed = Math.floor((Date.now() - new Date(t.created_at).getTime()) / 1000);
   const remaining = Math.max(0, expected - elapsed);
@@ -2181,10 +2139,10 @@ function tTasksList(tabsHtml) {
     <div style="text-align:center;padding-top:40px;font-size:14px;color:#A8A49C">加载中...</div>
   </div>`;
   const tasks = S.tasksList;
-  const typeLabel = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成' }[t] || t);
-  const typeClass = t => ({ profile_analyze:'task-type-a', single_video_analyze:'task-type-v', industry_gen:'task-type-b' }[t] || 'task-type-b');
-  const statusLabel = { pending:'排队中', running:'进行中', done:'已完成', failed:'失败' };
-  const statusClass = { pending:'task-status-pending', running:'task-status-running', done:'task-status-done', failed:'task-status-failed' };
+  const typeLabel = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成', clone_video:'克隆' }[t] || t);
+  const typeClass = t => ({ profile_analyze:'task-type-a', single_video_analyze:'task-type-v', industry_gen:'task-type-b', clone_video:'task-type-v' }[t] || 'task-type-b');
+  const statusLabel = { pending:'排队中', running:'进行中', extracted:'待改写', done:'已完成', failed:'失败' };
+  const statusClass = { pending:'task-status-pending', running:'task-status-running', extracted:'task-status-running', done:'task-status-done', failed:'task-status-failed' };
   return `<div class="tab-page">${tabsHtml||''}
     ${tasks.length === 0 ? `
       <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
@@ -2208,6 +2166,13 @@ function tTasksList(tabsHtml) {
           ${t.status==='running'?`
             <div class="task-thinking">${esc(t.thinking||'处理中...')}</div>
             <div class="task-progress-wrap"><div class="task-progress-fill" style="width:${t.progress||0}%"></div></div>
+          `:''}
+          ${t.status==='extracted'?`
+            <div class="task-progress-wrap" style="margin-top:8px"><div class="task-progress-fill" style="width:50%"></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+              <span style="font-size:12px;color:#6B6860">文案已提取，可开始AI改写</span>
+              <span style="font-size:12px;color:#E8650A;font-weight:600;cursor:pointer" onclick="startCloneRewrite('${t.id}')">✨ 去改写 ›</span>
+            </div>
           `:''}
           ${t.status==='pending'?`<div style="font-size:12px;color:#A8A49C;margin-top:6px">等待前序任务完成后开始处理</div>`:''}
           ${t.status==='failed'?`<div style="font-size:12px;color:#E8650A;margin-top:6px">${esc(friendlyError(t.error_msg))}</div>`:''}

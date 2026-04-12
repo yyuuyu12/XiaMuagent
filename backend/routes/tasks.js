@@ -41,6 +41,27 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/tasks/:id/start-rewrite - 触发克隆任务的改写阶段
+router.post('/:id/start-rewrite', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, status, type FROM tasks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
+    if (rows[0].type !== 'clone_video') return res.status(400).json({ code: 400, msg: '任务类型不支持' });
+    if (rows[0].status !== 'extracted') return res.status(400).json({ code: 400, msg: '文案尚未提取完成' });
+    await db.query(
+      "UPDATE tasks SET status='pending', thinking='', updated_at=NOW() WHERE id=$1",
+      [req.params.id]
+    );
+    require('../taskRunner').enqueue({ taskId: req.params.id, type: 'clone_video' });
+    res.json({ code: 200, msg: '改写任务已提交' });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
 // DELETE /api/tasks/:id - 删除任务（仅限 done / failed）
 router.delete('/:id', requireAuth, async (req, res) => {
   try {

@@ -121,4 +121,26 @@ router.post('/douyin-to-text', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/video/clone-start - 创建克隆任务（异步两阶段）
+router.post('/clone-start', requireAuth, async (req, res) => {
+  const { url } = req.body;
+  if (!url?.trim()) return res.status(400).json({ code: 400, msg: '请输入视频链接' });
+
+  const usage = await checkAndRecordUsage(req.userId, 'extract');
+  if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
+
+  try {
+    const crypto = require('crypto');
+    const taskId = crypto.randomUUID();
+    await db.query(
+      'INSERT INTO tasks (id, user_id, type, title, status, progress, thinking, input_data) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [taskId, req.userId, 'clone_video', '克隆中...', 'pending', 0, '', JSON.stringify({ url: url.trim() })]
+    );
+    require('../taskRunner').enqueue({ taskId, type: 'clone_video' });
+    res.json({ code: 200, data: { taskId } });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
 module.exports = router;

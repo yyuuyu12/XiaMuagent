@@ -205,6 +205,99 @@ async function processSingleVideoAnalyze(taskId) {
   );
 }
 
+// ===== 克隆任务两阶段处理 =====
+async function processCloneVideo(taskId) {
+  const { rows } = await db.query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+  const task = rows[0];
+  if (!task) throw new Error(`任务 ${taskId} 不存在`);
+
+  // 阶段2：已提取，继续改写
+  if (task.stage === 'extracted') {
+    const existing = typeof task.result === 'string' ? JSON.parse(task.result) : (task.result || {});
+    await processCloneRewritePhase(taskId, existing);
+    return;
+  }
+
+  // 阶段1：提取文案
+  await processCloneExtractPhase(taskId, task);
+}
+
+async function processCloneExtractPhase(taskId, task) {
+  const input = JSON.parse(task.input_data || '{}');
+  const { url = '' } = input;
+
+  const { rows: cfgRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'tikhub_api_key'");
+  const tikhubKey = cfgRows[0]?.value;
+  const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'asr_url'");
+  const asrUrl = asrRows[0]?.value;
+  if (!tikhubKey) throw new Error('TikHub API Key 未配置');
+  if (!asrUrl) throw new Error('ASR 服务未配置');
+
+  await updateTask(taskId, { status: 'running', stage: 'download', thinking: '正在解析视频链接...', progress: 10 });
+
+  const urlMatch = url.match(/https?:\/\/[^\s\u4e00-\u9fff，。！？、]+/);
+  const cleanUrl = urlMatch ? urlMatch[0].replace(/\/+$/, '') + '/' : url.trim();
+  let awemeId = '';
+  try {
+    const resp = await fetch(cleanUrl, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
+    const m = resp.url.match(/\/video\/(\d+)/);
+    awemeId = m?.[1] || '';
+  } catch {}
+
+  await updateTask(taskId, { thinking: '正在获取视频信息...', progress: 20 });
+
+  const tikhubUrl = awemeId
+    ? `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?aweme_id=${awemeId}`
+    : `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?aweme_id=0&url=${encodeURIComponent(cleanUrl)}`;
+  const vResp = await fetch(tikhubUrl, { headers: { Authorization: `Bearer ${tikhubKey}` }, signal: AbortSignal.timeout(15000) });
+  if (!vResp.ok) throw new Error(`视频解析失败: ${vResp.status}`);
+  const vData = await vResp.json();
+  const item = vData?.data?.aweme_details?.[0] || vData?.data?.aweme_detail;
+  if (!item) throw new Error('无法获取视频信息，请检查链接是否正确');
+  const mp4Url = item.video?.play_addr?.url_list?.[0] || item.video?.download_addr?.url_list?.[0];
+  if (!mp4Url) throw new Error('无法获取视频下载地址');
+
+  const videoTitle = item.desc?.slice(0, 30) || '视频';
+  const author = item.author?.nickname || '';
+  await db.query('UPDATE tasks SET title = $1 WHERE id = $2', [`${videoTitle} 的克隆`, taskId]);
+
+  await updateTask(taskId, { stage: 'asr', thinking: '正在识别视频语音...', progress: 35 });
+
+  let transcript = asrCache.get(`asr:${awemeId || cleanUrl}`) || null;
+  if (!transcript) {
+    const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, mp4Url }),
+      signal: AbortSignal.timeout(300000),
+    });
+    if (!asrRes.ok) throw new Error(`语音识别失败: ${await asrRes.text()}`);
+    const asrData = await asrRes.json();
+    transcript = asrData.text?.trim() || '';
+    if (transcript && awemeId) asrCache.set(`asr:${awemeId}`, transcript);
+  }
+
+  // 阶段1完成，等待用户触发改写
+  await db.query(
+    'UPDATE tasks SET status=$1, stage=$2, progress=$3, thinking=$4, result=$5, updated_at=NOW() WHERE id=$6',
+    ['extracted', 'extracted', 50, '', JSON.stringify({ transcript, title: videoTitle, author }), taskId]
+  );
+}
+
+async function processCloneRewritePhase(taskId, existing) {
+  const { transcript = '', title = '', author = '' } = existing;
+  await updateTask(taskId, { status: 'running', stage: 'rewrite', thinking: '正在AI改写文案...', progress: 70 });
+
+  const { rows: tplRows } = await db.query("SELECT content FROM prompt_templates WHERE type = 'rewrite' AND is_default = 1");
+  const tpl = tplRows[0]?.content || '请将以下文案改写为抖音爆款风格：\n{input}';
+  const rewritten = await callAI(tpl.replace('{input}', transcript || '(无口播内容)'));
+
+  await db.query(
+    'UPDATE tasks SET status=$1, progress=$2, thinking=$3, result=$4, stage=$5, updated_at=NOW() WHERE id=$6',
+    ['done', 100, '', JSON.stringify({ transcript, rewritten, title, author, scripts: [{ id: 1, hook_type: '克隆改写', content: rewritten }] }), 'done', taskId]
+  );
+}
+
 const TASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 分钟上限
 
 // ===== 注册任务处理器 =====
@@ -219,6 +312,7 @@ taskRunner.setHandler(async (job) => {
   const processPromise = (async () => {
     if (type === 'profile_analyze') await processProfileAnalyze(taskId);
     else if (type === 'single_video_analyze') await processSingleVideoAnalyze(taskId);
+    else if (type === 'clone_video') await processCloneVideo(taskId);
     else throw new Error(`未知任务类型: ${type}`);
   })();
 
