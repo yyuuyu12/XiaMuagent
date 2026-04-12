@@ -960,53 +960,27 @@ function tBottomTab() {
 }
 
 // ===== HOME TASK SECTION =====
-function updateHomeDoneSeen() {
-  if (S.currentTab !== 'home') return;
-  const dismissed = S.dismissedFromHomeIds || [];
-  const doneBigCards = (S.tasksList || []).filter(t => t.status === 'done' && !dismissed.includes(t.id));
-  if (!doneBigCards.length) return;
-  const newSeen = [...(S.homeDoneSeenIds || [])];
-  let changed = false;
-  for (const t of doneBigCards) {
-    if (!newSeen.includes(t.id)) { newSeen.push(t.id); changed = true; }
-  }
-  if (changed) {
-    setState({ homeDoneSeenIds: newSeen });
-    try { localStorage.setItem(userHomeKey('home_done_seen'), JSON.stringify(newSeen)); } catch {}
-  }
-}
-
-function dismissHomeDoneSeen() {
-  const dismissed = S.dismissedFromHomeIds || [];
-  const toAdd = (S.tasksList || [])
-    .filter(t => t.status === 'done' && !dismissed.includes(t.id))
-    .map(t => t.id);
-  if (!toAdd.length) return;
-  const newDismissed = [...dismissed, ...toAdd];
-  setState({ dismissedFromHomeIds: newDismissed, homeDoneSeenIds: [] });
-  try {
-    localStorage.setItem(userHomeKey('dismissed_from_home'), JSON.stringify(newDismissed));
-    localStorage.setItem(userHomeKey('home_done_seen'), JSON.stringify([]));
-  } catch {}
-}
+// 大卡片现改为时间维度（2小时内完成 = 大卡），不再依赖 localStorage，换设备保持一致
+function updateHomeDoneSeen() {}
+function dismissHomeDoneSeen() {}
 
 function tHomeTaskSection() {
   if (!S.tasksLoaded && !S.cloneHistoryLoaded) return '';
-  const dismissed = S.dismissedFromHomeIds || [];
+  const DONE_BIG_WINDOW = 2 * 60 * 60 * 1000; // done任务2小时内显示大卡，之后降为小条目
   const typeLbl = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成', clone_video:'克隆' }[t]||t);
   const typeTagLabel = t => t.type === 'clone_video' ? '克隆' : '灵感';
+  const isRecentDone = t => t.status === 'done' && (Date.now() - new Date(t.updated_at || t.created_at).getTime()) < DONE_BIG_WINDOW;
 
   const bigCards = (S.tasksList || []).filter(t =>
-    t.status === 'pending' || t.status === 'running' || t.status === 'extracted' ||
-    (t.status === 'done' && !dismissed.includes(t.id))
+    t.status === 'pending' || t.status === 'running' || t.status === 'extracted' || isRecentDone(t)
   );
 
-  const dismissedTasks = (S.tasksList || [])
-    .filter(t => dismissed.includes(t.id))
+  const oldDoneTasks = (S.tasksList || [])
+    .filter(t => t.status === 'done' && !isRecentDone(t))
     .map(t => ({ _type: 'task', label: typeTagLabel(t), text: t.title, created_at: t.created_at }));
   const cloneItems = (S.cloneHistory || [])
     .map((it, idx) => ({ _type: 'clone', idx, label: '克隆', text: it.input || '', created_at: it.created_at }));
-  const smallItems = [...dismissedTasks, ...cloneItems]
+  const smallItems = [...oldDoneTasks, ...cloneItems]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 5);
 
