@@ -172,10 +172,10 @@ async function initDb() {
       status     VARCHAR(20) DEFAULT 'pending',
       stage      VARCHAR(50) DEFAULT '',
       progress   INTEGER DEFAULT 0,
-      thinking   TEXT DEFAULT '',
+      thinking   TEXT,
       input_data MEDIUMTEXT,
       result     MEDIUMTEXT,
-      error_msg  TEXT DEFAULT '',
+      error_msg  TEXT,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW() ON UPDATE NOW()
     ) CHARACTER SET utf8mb4
