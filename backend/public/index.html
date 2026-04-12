@@ -410,6 +410,10 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .analysis-card { background: #EEF2FF; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 .typewriter-text::after { content: '|'; animation: tw-blink 1s step-end infinite; color: #E8650A; }
 @keyframes tw-blink { 50% { opacity: 0; } }
+.home-task-card { background:#fff; border-radius:12px; padding:14px; margin-bottom:8px; }
+.home-task-card-done { cursor:pointer; display:flex; align-items:center; gap:10px; }
+.task-live-dot { display:inline-block; width:7px; height:7px; background:#E8650A; border-radius:50%; margin-right:5px; animation:live-pulse 1.4s ease-in-out infinite; }
+@keyframes live-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
 .path-a-progress-bar { background:#F5F4F0; border-radius:8px; height:8px; overflow:hidden; margin-bottom:16px; }
 .path-a-progress-fill { background:#E8650A; height:100%; border-radius:8px; transition:width 0.8s ease; }
 .analysis-title { font-size: 12px; font-weight: 600; color: #4F46E5; margin-bottom: 6px; }
@@ -548,6 +552,7 @@ const S = {
   extractController: null,
   extractTranscribeController: null,
   rewriteGenerating: false,
+  seenTaskIds: (()=>{try{return JSON.parse(localStorage.getItem('seen_task_ids')||'[]');}catch{return [];}})(),
 };
 let inspireController = null;
 let extractController = null;
@@ -803,6 +808,72 @@ function tBottomTab() {
   </div>`;
 }
 
+// ===== HOME ACTIVE TASKS =====
+function tHomeActiveTasks() {
+  if (!S.tasksLoaded || !S.tasksList.length) return '';
+  const seen = S.seenTaskIds || [];
+  const active = S.tasksList.filter(t =>
+    t.status === 'pending' || t.status === 'running' ||
+    (t.status === 'done' && !seen.includes(t.id))
+  );
+  if (!active.length) return '';
+  const typeLbl = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成' }[t]||t);
+  const hasLive = active.some(t => t.status !== 'done');
+  return `<div style="margin-bottom:14px">
+    <div class="home-section-header">
+      <span class="home-section-title">${hasLive?`<span class="task-live-dot"></span>`:''}任务进度</span>
+      <span class="home-section-more" onclick="openHistoryPage()">全部 ›</span>
+    </div>
+    ${active.map(t => {
+      if (t.status === 'done') {
+        return `<div class="home-task-card home-task-card-done" onclick="openTaskFromHome('${t.id}')">
+          <span style="font-size:20px">✅</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
+            <div style="font-size:11px;color:#A8A49C;margin-top:2px">${typeLbl(t.type)} · 已完成</div>
+          </div>
+          <span style="font-size:13px;color:#E8650A;flex-shrink:0">查看结果 ›</span>
+        </div>`;
+      }
+      const cd = taskCountdown(t);
+      return `<div class="home-task-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="min-width:0;flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
+            <div style="font-size:11px;color:#A8A49C;margin-top:2px">${typeLbl(t.type)}</div>
+          </div>
+          <span style="font-size:11px;color:${t.status==='running'?'#E8650A':'#A8A49C'};flex-shrink:0;margin-left:8px">${t.status==='running'?'进行中':'排队中'}</span>
+        </div>
+        ${t.status==='running'?`
+          <div class="path-a-progress-bar" style="margin-bottom:6px"><div class="path-a-progress-fill" style="width:${t.progress||0}%"></div></div>
+          <div style="font-size:12px;color:#6B6860">${esc(t.thinking||'处理中...')}</div>
+          <div style="font-size:11px;color:#A8A49C;margin-top:4px">${cd}</div>
+        `:`<div style="font-size:12px;color:#A8A49C">等待前序任务完成...</div>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function openTaskFromHome(taskId) {
+  markTaskSeen(taskId);
+  setState({ currentTab: 'history', historyTab: 'inspire', tasksView: 'detail', viewingTask: null });
+  loadTasks();
+  try {
+    const r = await api.get(`/tasks/${taskId}`);
+    if (r.code === 200) setState({ viewingTask: r.data });
+    else setState({ tasksView: 'list' });
+  } catch { setState({ tasksView: 'list' }); }
+}
+
+function markTaskSeen(taskId) {
+  const seen = [...(S.seenTaskIds || [])];
+  if (!seen.includes(taskId)) {
+    seen.push(taskId);
+    setState({ seenTaskIds: seen });
+    try { localStorage.setItem('seen_task_ids', JSON.stringify(seen)); } catch {}
+  }
+}
+
 // ===== HOME =====
 function tHome() {
   const u = S.userInfo;
@@ -857,6 +928,7 @@ function tHome() {
         <span class="feature-arrow-orange">›</span>
       </div>
     </div>
+    ${tHomeActiveTasks()}
     ${tRecentSection()}
   </div>`;
 }
@@ -1478,6 +1550,7 @@ function switchTab(tab) {
   if (tab === 'vip') loadMemberPlans();
   if (tab === 'home') {
     if (!S.homeHistoryLoaded) loadHomeHistory(); else render();
+    loadTasks();
   }
   if (tab === 'history') {
     if (!S.recentHistoryLoaded) loadRecentHistory(); else render();
@@ -1493,10 +1566,11 @@ function goBack() {
   }
   setState({ currentTab: 'home' });
 }
-function openHistoryPage() {
-  setState({ currentTab: 'history', historyPageExpanded: null });
-  if (!S.recentHistoryLoaded) loadRecentHistory();
-  if (!S.cloneHistoryLoaded) loadCloneHistory();
+function openHistoryPage(tab) {
+  if (tab === 'tasks') tab = 'inspire';
+  setState({ currentTab: 'history', historyTab: tab || 'inspire', historyPageExpanded: null, tasksView: 'list' });
+  if (!S.cloneHistoryLoaded && (!tab || tab === 'clone')) loadCloneHistory();
+  loadTasks();
 }
 
 // ===== USER =====
@@ -2129,7 +2203,7 @@ async function loadTasks() {
 function startTasksPolling() {
   if (tasksPollerTimer) return;
   tasksPollerTimer = setInterval(async () => {
-    if (S.currentTab !== 'history') return;
+    if (S.currentTab !== 'history' && S.currentTab !== 'home') return;
     try {
       const r = await api.get('/tasks');
       if (r.code === 200) {
@@ -2144,7 +2218,7 @@ function startTasksPolling() {
 function startTasksTickTimer() {
   if (tasksTickTimer) return;
   tasksTickTimer = setInterval(() => {
-    if (S.currentTab === 'history' && S.historyTab === 'inspire') render();
+    if (S.currentTab === 'home' || (S.currentTab === 'history' && S.historyTab === 'inspire')) render();
   }, 1000);
 }
 
@@ -2157,6 +2231,7 @@ function stopTasksPolling() {
 }
 
 async function openTask(taskId) {
+  markTaskSeen(taskId);
   setState({ tasksView: 'detail', viewingTask: null });
   try {
     const r = await api.get(`/tasks/${taskId}`);
