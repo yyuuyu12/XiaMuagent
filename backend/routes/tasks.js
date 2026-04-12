@@ -26,7 +26,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
 
     const task = { ...rows[0] };
-    if (task.status === 'done' && task.result) {
+    if ((task.status === 'done' || task.status === 'extracted') && task.result) {
       try { task.result = JSON.parse(task.result); } catch { task.result = null; }
     } else {
       task.result = null;
