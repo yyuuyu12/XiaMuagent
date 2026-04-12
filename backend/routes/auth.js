@@ -63,7 +63,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, phone, nickname, avatar, avatar_image, role, daily_limit, auth_code_id, auth_expires_at, created_at FROM users WHERE id = $1',
+      'SELECT id, phone, nickname, avatar, avatar_image, brand_name, role, daily_limit, auth_code_id, auth_expires_at, created_at FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows[0]) return res.status(404).json({ code: 404, msg: '用户不存在' });
@@ -192,7 +192,7 @@ router.post('/update-avatar', requireAuth, async (req, res) => {
 // ==================== 修改昵称 / 头像 / 自定义头像图 ====================
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    const { nickname, avatar, avatar_image } = req.body || {};
+    const { nickname, avatar, avatar_image, brand_name } = req.body || {};
     const parts = [];
     const vals = [];
 
@@ -215,6 +215,11 @@ router.put('/profile', requireAuth, async (req, res) => {
         parts.push('avatar_image = ?');
         vals.push(avatar_image);
       }
+    }
+
+    if (brand_name !== undefined) {
+      parts.push('brand_name = ?');
+      vals.push(String(brand_name || '').trim().slice(0, 100) || null);
     }
 
     if (!parts.length) return res.status(400).json({ code: 400, msg: '无更新项' });

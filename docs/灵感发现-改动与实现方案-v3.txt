@@ -1,0 +1,1320 @@
+============================================================
+灵感发现 - 产品改动与实现方案
+版本:v3.0(完整可落地版)
+适用对象:个体户老板 / 小微商家
+文档类型:产品设计 + 技术实现 + 代码样例
+============================================================
+
+
+【硬约束 · 必读】
+------------------------------------------------------------
+本次改动不得影响现有的"单视频链接 → mp4 → ASR → 文案"
+处理路径。该路径作为底层能力被复用,所有新功能在它之上
+叠加,不修改其内部逻辑。
+
+具体含义:
+- 现有单视频处理接口保持原样,入参出参不变
+- 新功能通过"在前面加一层"的方式调用它,而不是改造它
+- 任何 ASR / 下载 / 文件处理代码不动
+============================================================
+
+
+目录
+------------------------------------------------------------
+一、整体改动范围
+二、灵感发现页(二级页)的改动
+三、路径 A:对标拆解 - 产品流程
+四、路径 A:链接解析与识别(技术实现)
+五、路径 A:tikhub 接口对接(代码级)
+六、路径 A:视频下载与 ASR 衔接(代码级)
+七、路径 A:AI 拆解与仿写(提示词)
+八、路径 B:行业生成的完整流程
+九、任务页(原历史记录升级)
+十、打字机效果与轮询实现
+十一、结果页与改写能力
+十二、"我的"页设置
+十三、改动优先级
+十四、工程注意事项
+十五、环境变量与密钥管理
+
+
+一、整体改动范围
+------------------------------------------------------------
+
+【不动的部分】
+- App 首页(一级页)
+- 现有单视频链接处理管线
+- 现有 ASR 模型与本地推理逻辑
+
+【要改的部分】
+- 灵感发现页(二级页,即用户截图那个页面)
+- 历史记录页(升级为"任务"页)
+- "我的"页(增加店铺名称设置入口)
+
+【新增的部分】
+- 灵感发现页内的双路径切换
+- 路径 A 的链接解析与视频列表选择
+- 路径 B 的意图澄清问答
+- 任务队列状态管理与思考过程展示
+- 基于 tikhub 接口的主页解析能力
+
+
+二、灵感发现页(二级页)的改动
+------------------------------------------------------------
+
+2.1 当前布局
+
+- 顶部:返回 + 标题"灵感发现"
+- 中部:预设赛道选择 + 自定义赛道输入
+- 底部:获取热门灵感按钮 + 历史记录入口
+- 底部 Tab:首页 / 历史 / 我的
+
+2.2 改动后布局
+
+页面顶部新增"模式切换"标签栏:
+
+  ┌────────────────────────────────┐
+  │  [对标拆解 · 推荐]   行业生成   │
+  └────────────────────────────────┘
+
+两个 Tab 切换显示不同内容,默认停留在"对标拆解"。
+
+2.3 对标拆解 Tab 的内容
+
+- 一个粘贴框:"粘贴对标主页或视频链接"
+- 一行说明:"支持抖音主页、单条视频链接"
+- 按钮:"解析"
+- 粘贴框下方可以显示最近用过的链接(P2,后期做)
+
+2.4 行业生成 Tab 的内容
+
+- 预设赛道标签(保留原有的 10 个)
+- 自定义赛道输入框
+  - placeholder 改为"如:二手车、烘焙店..."
+  - 不再预填"家居生活"
+- 店铺名称输入框(选填,只有这一个字段)
+- 按钮:"下一步"
+  - 不再叫"获取热门灵感",因为点击后进入意图澄清
+  - 不直接出文案
+
+
+三、路径 A:对标拆解 - 产品流程
+------------------------------------------------------------
+
+3.1 整体流程
+
+  Step 1  用户在灵感发现页粘贴分享文本 → 点击"解析"
+  Step 2  系统识别链接类型:
+            (a) 单视频 → 直接走现有单视频管线
+            (b) 主页 → 调 tikhub 拉视频列表
+  Step 3  (仅主页)展示视频列表供用户勾选 3 条
+  Step 4  创建后台任务,跳转到"任务"页
+  Step 5  用户在任务页实时查看进度(打字机效果滚动思考过程)
+  Step 6  任务完成后,点击进入查看仿写结果
+  Step 7  结果页支持改写、复制、导出
+
+3.2 用户实际粘贴的内容形态
+
+用户从抖音 App 分享出来的内容,大部分是下面这种格式:
+
+  1- 长按复制此条消息,打开抖音搜索,查看TA的更多作品。 
+  https://v.douyin.com/bVJylBfnlAk/ 0@5.com :7pm
+
+或者这种口令格式(较少见,新版本抖音已不常见):
+
+  8:/ h@O.kP 05/21 【xxx】长按复制打开抖音...
+
+系统必须能识别以上两种格式,但主要处理第一种。
+
+
+四、路径 A:链接解析与识别(技术实现)
+------------------------------------------------------------
+
+4.1 核心发现(基于实测)
+
+抖音短链 https://v.douyin.com/xxx/ 的真实行为:
+
+- HTTP GET 请求后返回 302 重定向
+- Location 头里直接给出真实长链
+- 长链格式:https://www.iesdouyin.com/share/user/{sec_user_id}?...
+  或           https://www.iesdouyin.com/share/video/{aweme_id}?...
+- Query 参数里还有 sec_uid=xxx(双保险)
+- 展开过程不花钱、不需要 tikhub,自己用 axios 就能搞定
+
+重要:tikhub 的 fetch_share_info_by_share_code 接口经实测
+对格式非常挑,不接受纯短链和带短链的分享文本,只认带 @
+和 : 符号的旧口令格式。因此本方案完全放弃该接口,改用
+"自研短链展开 + 正则识别"方案。
+
+4.2 链接解析完整代码(Node.js)
+
+```javascript
+const axios = require('axios');
+
+const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) ' +
+                  'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 ' +
+                  'Mobile/15E148 Safari/604.1';
+
+/**
+ * 从用户粘贴的分享文本中抠出 URL
+ * 支持短链和各种长链格式
+ */
+function extractUrl(text) {
+  // 匹配优先级:长链 > 短链
+  const patterns = [
+    /https?:\/\/www\.iesdouyin\.com\/share\/(video|user)\/[A-Za-z0-9_\-]+/,
+    /https?:\/\/www\.douyin\.com\/(video|user)\/[A-Za-z0-9_\-]+/,
+    /https?:\/\/v\.douyin\.com\/[A-Za-z0-9]+/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[0];
+  }
+  return null;
+}
+
+/**
+ * 展开短链,获取真实长链
+ */
+async function expandShortUrl(url) {
+  if (!url.includes('v.douyin.com')) {
+    return url;  // 已经是长链,直接返回
+  }
+  
+  try {
+    const res = await axios.get(url, {
+      maxRedirects: 0,  // 不自动跟随,我们只要第一次 302 的 Location
+      validateStatus: s => s === 301 || s === 302,
+      headers: { 'User-Agent': MOBILE_UA },
+      timeout: 10000
+    });
+    return res.headers.location;
+  } catch (err) {
+    throw new Error(`短链展开失败: ${err.message}`);
+  }
+}
+
+/**
+ * 从长链中提取 sec_user_id 或 aweme_id
+ */
+function classifyUrl(url) {
+  // 先尝试从 path 提取
+  const userInPath = url.match(
+    /\/(?:share\/)?user\/([A-Za-z0-9_\-]+)/
+  );
+  if (userInPath) {
+    return { type: 'user', sec_user_id: userInPath[1] };
+  }
+  
+  const videoInPath = url.match(
+    /\/(?:share\/)?video\/(\d+)/
+  );
+  if (videoInPath) {
+    return { type: 'video', aweme_id: videoInPath[1] };
+  }
+  
+  // 兜底:从 query 参数里找 sec_uid
+  const secUidInQuery = url.match(/[?&]sec_uid=([A-Za-z0-9_\-]+)/);
+  if (secUidInQuery) {
+    return { type: 'user', sec_user_id: secUidInQuery[1] };
+  }
+  
+  return { type: 'unknown' };
+}
+
+/**
+ * 主入口:解析用户粘贴的任意内容
+ */
+async function resolveDouyinLink(userInput) {
+  const url = extractUrl(userInput);
+  if (!url) {
+    throw new Error('未识别到有效的抖音链接,请复制分享链接后重试');
+  }
+  
+  const expandedUrl = await expandShortUrl(url);
+  const result = classifyUrl(expandedUrl);
+  
+  if (result.type === 'unknown') {
+    throw new Error('链接格式不支持,请确保是抖音主页或视频');
+  }
+  
+  return result;
+}
+```
+
+4.3 能处理的输入全清单
+
+resolveDouyinLink 函数能识别以下所有输入:
+
+- 纯短链:https://v.douyin.com/xxx/
+- 带分享文案的短链:1- 长按复制... https://v.douyin.com/xxx/ ...
+- 视频长链:https://www.douyin.com/video/7xxx
+- 主页长链:https://www.douyin.com/user/MS4w...
+- 分享落地页:https://www.iesdouyin.com/share/user/MS4w...
+- 分享视频页:https://www.iesdouyin.com/share/video/7xxx...
+
+输出统一结构:
+- 主页:{ type: 'user', sec_user_id: 'MS4w...' }
+- 视频:{ type: 'video', aweme_id: '7xxxxx' }
+
+4.4 路由到不同处理管线
+
+```javascript
+async function handleUserInput(text) {
+  const result = await resolveDouyinLink(text);
+  
+  if (result.type === 'video') {
+    // 单视频 → 直接走现有管线(零改动)
+    // 不调用 tikhub,不做列表展示
+    const videoUrl = `https://www.douyin.com/video/${result.aweme_id}`;
+    return createSingleVideoTask(videoUrl);
+  }
+  
+  if (result.type === 'user') {
+    // 主页 → 走新的"主页 → 列表 → 选 3 条"流程
+    // 下一步调 tikhub 拉视频列表
+    return fetchProfileAndShowList(result.sec_user_id);
+  }
+}
+```
+
+
+五、路径 A:tikhub 接口对接(代码级)
+------------------------------------------------------------
+
+5.1 接口信息
+
+Endpoint:
+  GET https://api.tikhub.io/api/v1/douyin/app/v3/fetch_user_post_videos
+
+鉴权:
+  Header: Authorization: Bearer ${TIKHUB_TOKEN}
+  Token 从环境变量读取,不要硬编码在代码里
+
+参数:
+  - sec_user_id  必填,从 resolveDouyinLink 返回值中取
+  - max_cursor   整数,第一次传 0,翻页时传上次返回的 max_cursor
+  - count        整数,建议 20(够用即可)
+  - sort_type    整数,0=默认排序(按时间倒序)
+
+注意:
+  所有参数都必须传具体值,不能留空字符串。实测空字符串会
+  返回 int_parsing 错误。
+
+5.2 返回数据的关键字段结构
+
+```
+data
+├── aweme_list[]              视频数组
+│   ├── aweme_id              视频 ID(缓存 key 用)
+│   ├── desc                  完整描述(含 hashtag)
+│   ├── item_title            精简标题(去掉 hashtag)
+│   ├── duration              视频时长(毫秒)
+│   ├── create_time           发布时间戳
+│   ├── cover
+│   │   └── url_list[]        封面图
+│   ├── statistics
+│   │   ├── digg_count        点赞数
+│   │   ├── comment_count     评论数
+│   │   ├── share_count       分享数
+│   │   └── collect_count     收藏数
+│   ├── video
+│   │   ├── play_addr
+│   │   │   ├── uri           视频唯一 URI
+│   │   │   └── url_list[]    ★★ 无水印 mp4 地址列表(降级链)
+│   │   ├── download_addr
+│   │   │   └── url_list[]    带水印的下载地址(不用)
+│   │   ├── duration          视频时长(毫秒)
+│   │   └── cdn_url_expired   ★★ CDN 地址过期时间戳(秒)
+│   └── author
+│       ├── nickname          账号昵称
+│       ├── signature         账号签名(定位分析用)
+│       └── sec_uid
+├── has_more                  是否有更多
+├── max_cursor                下一页游标
+└── sec_uid
+
+```
+
+5.3 重要发现(实测确认)
+
+关键发现 1:无水印 mp4 地址直接在返回里
+- video.play_addr.url_list 里有 4 条 URL
+- 前两条是直连 CDN(douyinvod.com、zjcdn.com)
+- 后两条是官方接口(amemv.com)作为兜底
+- 这就是可以直接喂给本地 ASR 的 mp4 地址
+- 因此路径 A 只需要 tikhub 调用 1 次,拿到列表后直接从
+  每个视频的 play_addr.url_list 取 mp4 地址即可
+
+关键发现 2:CDN 地址有时效性
+- cdn_url_expired 字段,表示 CDN 地址过期时间(秒级时间戳)
+- 实测过期时间约为请求后 1 小时
+- 影响:列表不能缓存太久,用户勾选后必须立刻下载
+- 对策:列表缓存最多 30 分钟(留出余量),超时就重拉
+
+关键发现 3:URL 带签名,必须原样使用
+- URL 里有 x-expires、x-signature、sign=xxx 等参数
+- 这是签名过的临时地址
+- 不能自己拼、不能删参数、不能改,原样传给下载器
+
+关键发现 4:下载必须带移动端 UA
+- 抖音 CDN 对 User-Agent 有检查
+- 不带或用默认 UA 会返回 403
+- 必须带:Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 ...)
+
+关键发现 5:视频时长差异巨大
+- 实测返回里第一条 33 秒,第二条 111 秒,第四条 95 秒
+- 本地 ASR 时间和视频长度成正比
+- 对策:在前端按时长过滤或在后端设上限(见 5.5)
+
+5.4 字段映射与主流程代码
+
+```javascript
+/**
+ * 把 tikhub 返回的单个视频对象,转成内部标准结构
+ */
+function parseAwemeItem(aweme) {
+  return {
+    aweme_id: aweme.aweme_id,
+    title: aweme.item_title || aweme.desc || '(无标题)',
+    full_desc: aweme.desc,
+    duration_ms: aweme.video?.duration || 0,
+    duration_sec: Math.round((aweme.video?.duration || 0) / 1000),
+    create_time: aweme.create_time,
+    
+    author: {
+      nickname: aweme.author?.nickname || '',
+      sec_uid: aweme.author?.sec_uid || '',
+      signature: aweme.author?.signature || ''
+    },
+    
+    cover_url: aweme.video?.cover?.url_list?.[0] || 
+               aweme.video?.origin_cover?.url_list?.[0] || '',
+    
+    stats: {
+      digg: aweme.statistics?.digg_count || 0,
+      comment: aweme.statistics?.comment_count || 0,
+      share: aweme.statistics?.share_count || 0,
+      collect: aweme.statistics?.collect_count || 0
+    },
+    
+    // ★ 下载用的 mp4 地址列表(降级顺序)
+    play_urls: aweme.video?.play_addr?.url_list || [],
+    
+    // ★ 过期时间(毫秒戳)
+    expire_at: (aweme.video?.cdn_url_expired || 0) * 1000
+  };
+}
+
+/**
+ * 拉取用户主页视频列表
+ */
+async function fetchProfileVideos(secUserId) {
+  const res = await axios.get(
+    'https://api.tikhub.io/api/v1/douyin/app/v3/fetch_user_post_videos',
+    {
+      params: {
+        sec_user_id: secUserId,
+        max_cursor: 0,
+        count: 20,
+        sort_type: 0
+      },
+      headers: {
+        'Authorization': `Bearer ${process.env.TIKHUB_TOKEN}`
+      },
+      timeout: 15000
+    }
+  );
+  
+  if (res.data.code !== 200) {
+    throw new Error(`tikhub 返回错误: ${res.data.message}`);
+  }
+  
+  const awemeList = res.data.data?.aweme_list || [];
+  const author = awemeList[0]?.author || {};
+  
+  return {
+    author: {
+      nickname: author.nickname || '',
+      signature: author.signature || '',
+      sec_uid: secUserId
+    },
+    videos: awemeList.map(parseAwemeItem)
+  };
+}
+```
+
+5.5 业务层过滤与排序
+
+tikhub APP v3 接口的 sort_type 是否支持按热度排序不确定
+(文档未明确说明)。建议做法:
+
+- 先用 sort_type=0 拉 20 条
+- 在后端按 digg_count 降序自排一遍
+- 过滤掉时长超过 120 秒的视频(避免拖死 ASR)
+- 取前 10 条返回给前端展示
+- 前端默认勾选前 3 条(时长 < 90 秒的优先)
+
+```javascript
+function filterAndSort(videos) {
+  return videos
+    .filter(v => v.duration_sec > 0 && v.duration_sec <= 120)
+    .sort((a, b) => b.stats.digg - a.stats.digg)
+    .slice(0, 10);
+}
+```
+
+5.6 缓存策略
+
+- 主页列表:按 sec_user_id 缓存 30 分钟(比 CDN 过期时间短)
+- ASR 结果:按 aweme_id 永久缓存,这是省本地 GPU 时间的关键
+
+```javascript
+// 主页列表缓存
+const PROFILE_CACHE_TTL = 30 * 60;  // 30 分钟
+
+async function getProfileCached(secUserId) {
+  const cacheKey = `profile:${secUserId}`;
+  const cached = await redis.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+  
+  const data = await fetchProfileVideos(secUserId);
+  await redis.setex(cacheKey, PROFILE_CACHE_TTL, JSON.stringify(data));
+  return data;
+}
+```
+
+
+六、路径 A:视频下载与 ASR 衔接(代码级)
+------------------------------------------------------------
+
+6.1 下载单个视频(含 URL 降级)
+
+url_list 里有 4 个地址,不是冗余,是降级链。依次尝试,
+遇到错误(403、超时)就换下一个。
+
+```javascript
+const fs = require('fs');
+const path = require('path');
+
+const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) ' +
+                  'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 ' +
+                  'Mobile/15E148 Safari/604.1';
+
+const DOWNLOAD_DIR = '/tmp/douyin_videos';
+
+async function downloadVideo(playUrls, awemeId) {
+  if (!playUrls || playUrls.length === 0) {
+    throw new Error(`视频 ${awemeId} 没有可用的播放地址`);
+  }
+  
+  fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+  const outputPath = path.join(DOWNLOAD_DIR, `${awemeId}.mp4`);
+  
+  for (const url of playUrls) {
+    try {
+      const response = await axios.get(url, {
+        responseType: 'stream',
+        headers: { 'User-Agent': MOBILE_UA },
+        timeout: 30000,
+        maxRedirects: 5
+      });
+      
+      const writer = fs.createWriteStream(outputPath);
+      response.data.pipe(writer);
+      
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+      
+      return outputPath;
+    } catch (err) {
+      console.warn(`下载失败,尝试下一个地址: ${err.message}`);
+      continue;
+    }
+  }
+  
+  throw new Error(`所有播放地址都下载失败: ${awemeId}`);
+}
+```
+
+6.2 串行处理 3 个视频(本地 ASR 扛不住并发)
+
+```javascript
+/**
+ * 处理用户勾选的 3 个视频
+ * @param {Array} videos - 用户勾选的视频对象数组
+ * @param {Function} onProgress - 进度回调,更新 task.thinking
+ */
+async function processSelectedVideos(videos, onProgress) {
+  const results = [];
+  
+  for (let i = 0; i < videos.length; i++) {
+    const video = videos[i];
+    const idx = i + 1;
+    const total = videos.length;
+    
+    // === 阶段 1:下载 ===
+    onProgress({
+      stage: 'download',
+      text: `正在下载第 ${idx} 条视频...`,
+      progress: 10 + (idx - 1) * 20 / total
+    });
+    
+    const mp4Path = await downloadVideo(video.play_urls, video.aweme_id);
+    
+    // === 阶段 2:ASR 转写 ===
+    onProgress({
+      stage: 'asr',
+      text: `正在听第 ${idx} 条视频说了什么...`,
+      progress: 30 + (idx - 1) * 40 / total
+    });
+    
+    // 先查缓存
+    let transcript = await getCachedASR(video.aweme_id);
+    if (!transcript) {
+      // 调用你本地现有的 ASR 管线
+      // 根据你管线的入参类型不同,这里传的东西也不同:
+      // - 如果管线入参是 mp4 路径,传 mp4Path
+      // - 如果管线入参是抖音 URL,用 https://www.douyin.com/video/${aweme_id}
+      // - 如果管线入参是 mp4 直链,直接传 video.play_urls[0]
+      transcript = await yourLocalASRPipeline(mp4Path);
+      
+      await saveCachedASR(video.aweme_id, transcript);
+    }
+    
+    results.push({
+      ...video,
+      transcript
+    });
+    
+    // 清理 mp4 文件,不留垃圾
+    fs.unlink(mp4Path, () => {});
+  }
+  
+  return results;
+}
+
+// 缓存函数示例(用你实际用的缓存实现替换)
+async function getCachedASR(awemeId) {
+  return await redis.get(`asr:${awemeId}`);
+}
+
+async function saveCachedASR(awemeId, transcript) {
+  // 永久缓存,不设过期
+  await redis.set(`asr:${awemeId}`, transcript);
+}
+```
+
+6.3 关于现有单视频管线的入参
+
+你现有管线入参是 mp4 本地路径还是抖音 URL 还是 mp4 直链,
+直接影响上面代码中的 yourLocalASRPipeline 调用参数。
+
+三种情况的对接方式:
+
+情况 A:管线入参是抖音视频 URL,内部自己下载去水印
+  → 不需要调用 downloadVideo
+  → 直接传 `https://www.douyin.com/video/${aweme_id}`
+  → 管线内部自己处理下载和去水印
+
+情况 B:管线入参是 mp4 直链
+  → 不需要调用 downloadVideo
+  → 直接传 video.play_urls[0]
+  → 注意管线内部下载时要带移动端 UA,否则 403
+
+情况 C:管线入参是本地 mp4 文件路径
+  → 必须调用 downloadVideo 先把文件下载到本地
+  → 然后把 mp4Path 传给管线
+  → 这是上面代码示例的写法
+
+请在开发时确认你管线的情况,调整上面代码中
+yourLocalASRPipeline 的调用参数。
+
+
+七、路径 A:AI 拆解与仿写(提示词)
+------------------------------------------------------------
+
+7.1 处理阶段
+
+在 3 条视频都 ASR 完成后,得到 3 段文案。接下来做两次
+GPT-4.5 调用:
+
+  Stage 4:账号拆解(输入 3 段文案 + 账号信息 → 账号画像)
+  Stage 5:仿写生成(输入画像 + 用户店铺名 → 5 条仿写文案)
+
+7.2 Stage 4 提示词:账号拆解
+
+System Prompt:
+
+  你是一个短视频内容分析师。下面是某个抖音账号最近的爆款视频,
+  包含口播文案、标题、点赞数。请分析该账号的内容策略。
+  
+  输出 JSON,只输出 JSON,不要任何解释:
+  {
+    "account_positioning": "账号定位一句话总结(30字以内)",
+    "target_audience": "目标受众(20字以内)",
+    "content_patterns": ["选题规律1", "选题规律2", "选题规律3"],
+    "hook_types": ["该账号常用的开头钩子类型"],
+    "cta_types": ["该账号常用的结尾引导方式"],
+    "tone": "整体语言风格(如:接地气/专业/幽默)"
+  }
+
+User Message:
+
+  账号昵称:{author.nickname}
+  账号签名:{author.signature}
+  
+  视频1:
+  - 标题:{video1.title}
+  - 点赞:{video1.stats.digg}
+  - 口播文案:{video1.transcript}
+  
+  视频2:
+  - 标题:{video2.title}
+  - 点赞:{video2.stats.digg}
+  - 口播文案:{video2.transcript}
+  
+  视频3:
+  - 标题:{video3.title}
+  - 点赞:{video3.stats.digg}
+  - 口播文案:{video3.transcript}
+
+调用参数:
+  model: gpt-4.5 最新版
+  response_format: { type: "json_object" }
+  temperature: 0.3  (求稳定)
+
+7.3 Stage 5 提示词:仿写生成
+
+System Prompt:
+
+  你是一名资深短视频文案撰稿人,服务对象是个体户老板,
+  他们需要的是真人口播视频文案。
+  
+  【任务】
+  基于对标账号的内容分析,为用户生成 5 条原创仿写文案,
+  不抄袭原文,只学习套路。
+  
+  【生成规则】
+  1. 数量:严格生成 5 条,差异化明显
+  2. 每条结构:开头钩子(1-2句) + 主体(3-5句) + 结尾CTA(1句)
+  3. 时长控制:每条 30 秒左右,1 秒约 3-4 个汉字
+  4. 语言风格:口语化、有情绪、像真人说话,禁止书面语
+  5. 开头钩子类型必须 5 条全部不同,从以下中选:
+     痛点提问 / 反常识 / 数字冲击 / 故事开场 / 福利诱惑
+  
+  【品牌名使用规则】(重要)
+  - 5 条中仅 1-2 条自然提及品牌名,且优先放在结尾 CTA
+  - 禁止每条都自报家门
+  - 若品牌名为空,完全不提及,不要说"我们店""我家"
+  - 禁止"家人们""老铁们"等过度网感词
+  
+  【输出格式】
+  只输出 JSON:
+  {
+    "scripts": [
+      {
+        "id": 1,
+        "hook_type": "痛点提问",
+        "reference_video": 2,
+        "rewrite_idea": "借鉴了视频2的痛点开场套路,改写为...",
+        "content": "完整文案",
+        "estimated_seconds": 28
+      }
+    ]
+  }
+
+User Message:
+
+  【对标账号分析】
+  {Stage 4 返回的 JSON}
+  
+  【用户信息】
+  行业:{可选,如果用户填了}
+  店铺名称:{brand_name 或 "无"}
+
+调用参数:
+  temperature: 0.8  (让 5 条之间差异更大)
+
+
+八、路径 B:行业生成的完整流程
+------------------------------------------------------------
+
+8.1 整体流程
+
+  Step 1  用户在"行业生成"Tab 选赛道 + 填店铺名 → 下一步
+  Step 2  调 GPT-4.5(第 1 次)生成 2-3 个澄清问题
+  Step 3  前端渲染问题为按钮选择题,用户点选答案
+  Step 4  调 GPT-4.5(第 2 次)生成 5 条文案
+  Step 5  跳转到结果页
+
+路径 B 不需要任务队列,因为只有两次 GPT 调用,速度快
+(一般 5-15 秒),前端 loading 即可。但建议也写入任务
+记录,方便用户回看。
+
+8.2 第一次 GPT 调用:生成澄清问题
+
+System Prompt:
+
+  你是一个短视频文案策划顾问。用户会告诉你他的行业,
+  你需要生成 2-3 个澄清问题,帮助你理解他的具体业务,
+  然后才能为他生成精准的文案。
+  
+  要求:
+  1. 问题数量:2-3 个,不超过 3 个
+  2. 每个问题必须是选择题,提供 3-5 个选项
+  3. 问题必须覆盖以下三个维度(可合并):
+     - 业务细分方向(他具体做什么)
+     - 目标客群(卖给谁)
+     - 视频目的(引流/卖货/打品牌/加微信)
+  4. 选项要具体、互斥、贴合该行业的真实情况
+  5. 最后一个选项可以是"其他"以兜底
+  
+  只输出 JSON,不要任何解释:
+  {
+    "questions": [
+      {
+        "id": "q1",
+        "question": "问题文本",
+        "type": "single" 或 "multi",
+        "options": ["选项1", "选项2", ...]
+      }
+    ]
+  }
+
+User Message:
+  行业:{用户输入的赛道}
+
+调用代码:
+
+```javascript
+async function generateClarifyQuestions(industry) {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4.5-...',
+    messages: [
+      { role: 'system', content: CLARIFY_SYSTEM_PROMPT },
+      { role: 'user', content: `行业:${industry}` }
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3
+  });
+  
+  return JSON.parse(response.choices[0].message.content).questions;
+}
+```
+
+8.3 第二次 GPT 调用:生成文案
+
+System Prompt 与 7.3 的"仿写生成"完全一致(路径 B 没有
+对标分析,直接生成),差别在 User Message:
+
+User Message:
+  行业:{industry}
+  店铺名称:{brand_name 或 "无"}
+  具体业务:{q1 答案}
+  目标客群:{q2 答案}
+  视频目的:{q3 答案}
+  时长:30 秒
+
+
+九、任务页(原历史记录升级)
+------------------------------------------------------------
+
+9.1 设计思路
+
+把"历史记录"重命名为"任务",底部 Tab 同步改名。
+原因:
+- 路径 A 处理慢(1-3 分钟),用户提交后需要离开页面
+- 必须有地方让用户回来查看进度和结果
+- 把"正在进行"和"已完成"放在一起,符合用户心智
+
+任务页 = 进行中 + 已完成 + 失败,全部按时间倒序混排在
+同一个列表里,页面内无 Tab 分栏。
+
+9.2 任务列表项的展示
+
+每个任务卡片显示:
+
+  ┌───────────────────────────────────┐
+  │ [类型标签]  任务标题              │
+  │ 创建时间                          │
+  │ ─────────────────────────────     │
+  │ [状态徽章]  状态描述               │
+  │ (进行中)思考过程文字(打字机效果)│
+  │ (进行中)进度条                    │
+  └───────────────────────────────────┘
+
+类型标签:
+- "对标拆解"(路径 A,蓝色)
+- "行业生成"(路径 B,绿色)
+
+任务标题:
+- 路径 A:取对标账号昵称,如"@老王说二手车 的拆解"
+- 路径 B:取行业 + 店铺名,如"二手车 · 老王二手车"
+
+状态徽章:
+- 排队中(灰)
+- 进行中(橙,带动画)
+- 已完成(绿)
+- 失败(红,可点击重试)
+
+9.3 思考过程文案库
+
+进行中的任务,卡片下方实时滚动展示当前阶段的"思考过程"
+文字。不是技术日志,是用拟人化的话术告诉用户"我在做什么"。
+
+路径 A 的思考过程文案库:
+
+Stage 1 - 解析主页(进度 0% → 10%):
+  - "正在打开对标账号主页..."
+  - "正在获取近期作品列表..."
+  - "找到 N 条作品,按热度排序中..."
+
+Stage 2 - 下载视频(进度 10% → 30%):
+  - "正在下载第 1 条视频..."
+  - "正在下载第 2 条视频..."
+  - "正在下载第 3 条视频..."
+
+Stage 3 - ASR 转写(进度 30% → 70%):
+  - "正在听第 1 条视频说了什么..."
+  - "正在听第 2 条视频说了什么..."
+  - "正在听第 3 条视频说了什么..."
+
+Stage 4 - AI 拆解(进度 70% → 85%):
+  - "正在分析这个账号的内容定位..."
+  - "正在提取爆款视频的开头套路..."
+  - "正在总结结尾引导话术..."
+
+Stage 5 - AI 仿写(进度 85% → 100%):
+  - "正在为你量身定制原创文案..."
+  - "正在优化文案的口语化表达..."
+  - "马上就好,正在做最后润色..."
+
+文案要求:
+- 用第一人称"我"或省略主语,不要用"系统"
+- 进行中用"正在...",不要用"已完成"
+- 避免技术词汇:不说"ASR"说"听内容",不说"调用 GPT"说"分析"
+
+9.4 数据结构(task 表设计参考)
+
+```
+task {
+  id              UUID
+  user_id         用户 ID
+  type            'profile_analyze' | 'single_video' | 'industry_gen'
+  title           任务标题(展示用)
+  status          'pending' | 'running' | 'done' | 'failed'
+  stage           当前阶段名(parse/download/asr/analyze/rewrite)
+  progress        0-100
+  thinking        当前思考过程文字
+  input           入参 JSON(原始链接、勾选的视频等)
+  result          结果 JSON(拆解分析 + 5 条仿写文案)
+  error_message   失败原因
+  created_at
+  updated_at
+}
+```
+
+
+十、打字机效果与轮询实现
+------------------------------------------------------------
+
+10.1 整体设计
+
+- 前端轮询间隔:固定 2 秒
+- 任务 done 或 failed 后:立即停止轮询
+- 新文字到达后:旧文字淡出 300ms → 新文字逐字显示 50ms/字
+- 不用 WebSocket/SSE,保持首期实现简单
+
+10.2 前端实现(React 伪代码)
+
+```javascript
+function TaskCard({ taskId }) {
+  const [task, setTask] = useState(null);
+  const [displayedText, setDisplayedText] = useState('');
+  const currentTextRef = useRef('');
+  const typewriterRef = useRef(null);
+  
+  useEffect(() => {
+    let isMounted = true;
+    
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/task/${taskId}`);
+        const data = await res.json();
+        if (!isMounted) return;
+        
+        setTask(data);
+        
+        // 检测思考过程文字变化
+        if (data.thinking && data.thinking !== currentTextRef.current) {
+          currentTextRef.current = data.thinking;
+          runTypewriter(data.thinking);
+        }
+        
+        // 任务结束,停止轮询
+        if (data.status === 'done' || data.status === 'failed') {
+          return;
+        }
+        
+        // 继续轮询
+        setTimeout(poll, 2000);
+      } catch (err) {
+        console.error('轮询失败', err);
+        if (isMounted) setTimeout(poll, 5000);
+      }
+    };
+    
+    poll();
+    
+    return () => {
+      isMounted = false;
+      if (typewriterRef.current) clearInterval(typewriterRef.current);
+    };
+  }, [taskId]);
+  
+  const runTypewriter = (targetText) => {
+    // 清除旧的打字机
+    if (typewriterRef.current) clearInterval(typewriterRef.current);
+    
+    // 淡出旧文字(CSS 处理)
+    setDisplayedText('');
+    
+    // 延迟 300ms 后开始打新字(等淡出动画)
+    setTimeout(() => {
+      let i = 0;
+      typewriterRef.current = setInterval(() => {
+        if (i >= targetText.length) {
+          clearInterval(typewriterRef.current);
+          return;
+        }
+        i++;
+        setDisplayedText(targetText.slice(0, i));
+      }, 50);
+    }, 300);
+  };
+  
+  return (
+    <div className="task-card">
+      <div className="task-header">{task?.title}</div>
+      <div className="task-status">{task?.status}</div>
+      {task?.status === 'running' && (
+        <>
+          <div className="thinking-text">{displayedText}</div>
+          <div className="progress-bar">
+            <div 
+              className="progress-fill" 
+              style={{ width: `${task.progress}%` }}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+10.3 后端推送进度的接口
+
+后端提供一个简单的 GET 接口,返回任务当前状态:
+
+```javascript
+app.get('/api/task/:id', async (req, res) => {
+  const task = await db.task.findById(req.params.id);
+  if (!task) return res.status(404).json({ error: 'not found' });
+  
+  res.json({
+    id: task.id,
+    status: task.status,
+    stage: task.stage,
+    progress: task.progress,
+    thinking: task.thinking,
+    title: task.title,
+    result: task.status === 'done' ? task.result : null,
+    error_message: task.error_message
+  });
+});
+```
+
+10.4 后端执行任务时的进度更新
+
+```javascript
+async function runProfileAnalyzeTask(taskId, input) {
+  const updateProgress = async (stage, text, progress) => {
+    await db.task.update(taskId, {
+      stage,
+      thinking: text,
+      progress,
+      status: 'running',
+      updated_at: new Date()
+    });
+  };
+  
+  try {
+    // Stage 1: 解析主页
+    await updateProgress('parse', '正在打开对标账号主页...', 5);
+    const profile = await getProfileCached(input.sec_user_id);
+    
+    await updateProgress('parse', '正在获取近期作品列表...', 8);
+    const topVideos = filterAndSort(profile.videos).slice(0, 3);
+    
+    // Stage 2-3: 下载 + ASR(由 processSelectedVideos 内部更新)
+    const transcripts = await processSelectedVideos(
+      topVideos,
+      (p) => updateProgress(p.stage, p.text, p.progress)
+    );
+    
+    // Stage 4: AI 拆解
+    await updateProgress(
+      'analyze', 
+      '正在分析这个账号的内容定位...', 
+      75
+    );
+    const analysis = await analyzeAccount(profile.author, transcripts);
+    
+    // Stage 5: AI 仿写
+    await updateProgress(
+      'rewrite', 
+      '正在为你量身定制原创文案...', 
+      90
+    );
+    const scripts = await generateScripts(analysis, input.brand_name);
+    
+    // 完成
+    await db.task.update(taskId, {
+      status: 'done',
+      progress: 100,
+      thinking: '',
+      result: JSON.stringify({ analysis, scripts }),
+      updated_at: new Date()
+    });
+  } catch (err) {
+    await db.task.update(taskId, {
+      status: 'failed',
+      error_message: err.message,
+      updated_at: new Date()
+    });
+  }
+}
+```
+
+
+十一、结果页与改写能力
+------------------------------------------------------------
+
+11.1 页面结构
+
+顶部(仅路径 A 显示):
+  对标账号分析卡片
+  - 账号定位一句话
+  - 内容套路 3-5 条
+  - 常用钩子类型
+
+中部:5 条文案卡片,纵向排列
+  每条卡片包含:
+  - 钩子类型标签(痛点提问/反常识/数字冲击/故事/福利)
+  - 完整文案
+  - 估算时长(如"约 28 秒")
+  - 路径 A 多一行:"仿写自视频 X"
+  - 操作按钮区
+
+操作按钮(每条文案下方):
+  P0 必做:
+  - 复制
+  - 导出
+
+  P1 待做:
+  - 一键改写(弹出菜单:换开头/更口语化/再短点/重新生成)
+  - 收藏
+  - 分镜建议
+  - 标题推荐
+  - 提词器模式(全屏滚动)
+
+11.2 一键改写的实现
+
+每个改写选项对应一段 prompt,都是基于原文案做局部调整:
+
+换开头:
+  保持以下文案的主体和结尾不变,只重写开头 1-2 句,
+  用 {新钩子类型} 的方式开场。
+
+更口语化:
+  把以下文案改得更口语化,像朋友聊天一样,
+  去掉所有书面语和长句。
+
+再短一点:
+  把以下文案压缩到 {当前字数 × 0.7} 字以内,
+  保留核心信息,删除修饰。
+
+重新生成:
+  用原始入参重新走一次第二次 GPT 调用,只要 1 条。
+
+改写不进任务队列,直接在结果页等 GPT 返回(几秒钟),
+给一个简单的 loading 动画即可。
+
+
+十二、"我的"页设置
+------------------------------------------------------------
+
+只增加一项设置:
+- 默认店铺名称(选填)
+- 设置后,行业生成路径自动预填,免得每次都填
+
+不做更复杂的品牌档案。
+
+理由:字段越多,提示词污染越严重,文案越生硬。
+只保留店铺名一个字段,在 GPT 提示词里通过"仅 1-2 条自然
+提及"的规则约束,效果最好。
+
+
+十三、改动优先级
+------------------------------------------------------------
+
+P0(必须做,首期上线):
+- 灵感发现页双 Tab 切换
+- 路径 A 的链接识别(短链展开)
+- 路径 A 单视频走现有管线
+- 路径 A 主页解析 + 视频列表 + 勾选 3 条
+- 路径 A tikhub 接口对接 + 字段映射
+- 路径 A 下载视频 + 串行 ASR
+- 路径 A 两次 GPT 调用(拆解 + 仿写)
+- 任务页(状态、进度、思考过程 + 打字机效果)
+- 路径 B 的两次 GPT 调用 + 意图澄清
+- 结果页基础展示 + 复制 + 导出
+- 店铺名称设置入口
+
+P1(二期):
+- 一键改写(换开头、更口语化、再短点)
+- 收藏与素材库
+- 任务失败重试
+- 结果页分镜建议
+
+P2(三期):
+- 标题与话题标签推荐
+- 提词器模式
+- 多链接历史快捷选择
+- 小红书主页支持
+
+
+十四、工程注意事项
+------------------------------------------------------------
+
+1. 单视频管线零侵入
+   新代码只能"调用"现有管线,不能"修改"它的入参出参。
+   建议把现有管线封装成一个独立 service,新功能通过
+   service.processSingleVideo(xxx) 这种方式调用。
+
+2. ASR 是串行的,这是性能瓶颈
+   不要试图并发,本地模型扛不住。
+   3 条视频串行处理是总耗时的大头,必须靠缓存来摊薄成本。
+
+3. 任务状态的实时性
+   前端轮询间隔固定 2 秒,任务 done/failed 后立即停止。
+   不用 WebSocket/SSE,首期保持简单。
+
+4. 链接解析失败的兜底
+   短链展开失败 → 提示用户"链接可能已失效,请重新复制"
+   正则匹配不到 → 提示"未识别到有效的抖音链接"
+   不要静默失败。
+
+5. tikhub 接口失败的兜底
+   - 401 认证失败 → 检查 TIKHUB_TOKEN 环境变量
+   - 403/429 限流 → 等待重试,最多 3 次
+   - 500 服务错误 → 标记任务失败,允许用户重试
+   - 不要让整个路径 A 因此挂掉,保持单视频管线可用
+
+6. CDN 地址过期的处理
+   - 列表缓存时间(30 分钟)设置必须短于 CDN 过期时间(约 60 分钟)
+   - 用户点击"开始拆解"时,检查 expire_at 是否已过期
+   - 过期则重新拉 tikhub 接口(再走一次 fetchProfileVideos)
+   - 用户全程操作应在缓存有效期内完成
+
+7. 视频下载的 URL 降级
+   play_urls 里有 4 个地址,必须依次尝试,不能只用第一个。
+   403 错误通常是 UA 检查,确认 User-Agent 带了移动端 UA。
+
+8. ASR 失败的兜底
+   3 条视频里只要有 2 条转写成功,就允许进入后续 AI 分析。
+   不要因为 1 条失败导致整个任务失败。
+   给失败的视频一个占位 transcript:"(这条视频转写失败)"
+
+9. GPT 返回 JSON 解析失败
+   重试 1 次(temperature 调低一点),再失败就报错并允许
+   用户重试任务。不要静默失败。
+   建议用 try-catch 包裹 JSON.parse。
+
+10. 思考过程文字不能写死在后端
+    后端推送的应该是"阶段名 + 当前进度数字",前端根据阶段名
+    从文案库里取对应的话术。这样以后改文案不用动后端代码。
+    或者后端直接推送文案,但把文案常量集中在一个配置文件里。
+
+11. 视频时长过滤
+    duration > 120 秒的视频,ASR 时间会非常久。建议在
+    filterAndSort 阶段就过滤掉,或在用户勾选时给出警告。
+
+12. mp4 临时文件清理
+    downloadVideo 下载的 mp4 文件在 ASR 完成后必须立即删除,
+    否则 /tmp 会塞满。建议用 try-finally 确保清理。
+
+
+十五、环境变量与密钥管理
+------------------------------------------------------------
+
+所有敏感信息必须通过环境变量读取,不要硬编码。
+
+.env 文件示例(加入 .gitignore,不要提交):
+
+  # tikhub API
+  TIKHUB_TOKEN=你的_tikhub_api_key
+  
+  # OpenAI / GPT-4.5
+  OPENAI_API_KEY=你的_openai_key
+  OPENAI_MODEL=gpt-4.5-...
+  
+  # Redis(缓存)
+  REDIS_URL=redis://localhost:6379
+  
+  # 本地 ASR 服务地址(如果是 HTTP 接口)
+  ASR_SERVICE_URL=http://localhost:8080/asr
+  
+  # 临时文件目录
+  DOWNLOAD_TMP_DIR=/tmp/douyin_videos
+
+代码中读取:
+
+```javascript
+require('dotenv').config();
+
+const TIKHUB_TOKEN = process.env.TIKHUB_TOKEN;
+if (!TIKHUB_TOKEN) {
+  throw new Error('TIKHUB_TOKEN 环境变量未设置');
+}
+```
+
+安全准则:
+- 永远不要把 key 写在代码里
+- 永远不要把 key 提交到 git
+- 永远不要把 key 发到聊天窗口、邮件、截图
+- 测试和生产用不同的 key
+- 如果 key 泄露过,立刻去 tikhub 后台重置
+
+
+============================================================
+文档结束
+
+现在你可以直接照着开发了。三个关键问题:
+
+1. 你现有单视频 ASR 管线的入参是 mp4 路径 / 抖音 URL / mp4 直链?
+   - 对应调整第六章 6.3 节的 yourLocalASRPipeline 调用方式
+
+2. 缓存用 Redis 还是其他方案?
+   - 代码示例用的是 Redis,换成你实际用的即可
+
+3. 任务表的数据库是 MySQL / PostgreSQL / MongoDB?
+   - 对应调整第十章 db.task 的 ORM 调用方式
+
+这三个点不影响方案本身,只影响具体代码实现细节。
+============================================================

@@ -17,6 +17,8 @@ const extractRouter = require('./routes/extract');
 const historyRouter = require('./routes/history');
 const codesRouter   = require('./routes/codes');
 const douyinRouter  = require('./routes/douyinToText');
+const inspireRouter = require('./routes/inspire');
+const tasksRouter   = require('./routes/tasks');
 
 app.use('/api/auth',    authRouter);
 app.use('/api/config',  configRouter);
@@ -25,6 +27,8 @@ app.use('/api/extract', extractRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/codes',   codesRouter);
 app.use('/api/video',   douyinRouter);
+app.use('/api/inspire', inspireRouter);
+app.use('/api/tasks',   tasksRouter);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/health', (req, res) => res.json({ code: 200, msg: 'ok', time: new Date().toISOString() }));
@@ -40,6 +44,18 @@ app.use((err, req, res, next) => {
 
 initDb()
   .then(() => {
+    // 启动 BullMQ Worker（仅当 REDIS_URL 已配置时）
+    if (process.env.REDIS_URL) {
+      try {
+        require('./worker');
+        console.log('✅ BullMQ Worker 已启动');
+      } catch (e) {
+        console.warn('⚠️  Worker 启动失败:', e.message);
+      }
+    } else {
+      console.warn('⚠️  REDIS_URL 未配置，后台任务（对标拆解）不可用');
+    }
+
     app.listen(PORT, () => {
       console.log(`\n🚀 爆款文案工坊后端启动成功`);
       console.log(`   监听端口: ${PORT}`);

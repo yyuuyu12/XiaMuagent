@@ -162,6 +162,32 @@ async function initDb() {
      WHERE config_key = 'asr_url' AND value NOT LIKE 'http%'`
   );
 
+  // tasks 表
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id         VARCHAR(36) PRIMARY KEY,
+      user_id    INTEGER NOT NULL,
+      type       VARCHAR(50) NOT NULL,
+      title      VARCHAR(255) DEFAULT '',
+      status     VARCHAR(20) DEFAULT 'pending',
+      stage      VARCHAR(50) DEFAULT '',
+      progress   INTEGER DEFAULT 0,
+      thinking   TEXT DEFAULT '',
+      input_data MEDIUMTEXT,
+      result     MEDIUMTEXT,
+      error_msg  TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW() ON UPDATE NOW()
+    ) CHARACTER SET utf8mb4
+  `);
+
+  // users 表新增 brand_name 字段
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN brand_name VARCHAR(200) DEFAULT NULL');
+  } catch (e) {
+    if (!String(e.message || e).includes('Duplicate column name')) console.warn('[initDb] brand_name:', e.message || e);
+  }
+
   console.log('✅ 数据库初始化完成');
 }
 
