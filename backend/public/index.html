@@ -552,7 +552,8 @@ const S = {
   extractController: null,
   extractTranscribeController: null,
   rewriteGenerating: false,
-  seenTaskIds: (()=>{try{return JSON.parse(localStorage.getItem('seen_task_ids')||'[]');}catch{return [];}})(),
+  homeDoneSeenIds: (()=>{try{return JSON.parse(localStorage.getItem('home_done_seen')||'[]');}catch{return [];}})(),
+  dismissedFromHomeIds: (()=>{try{return JSON.parse(localStorage.getItem('dismissed_from_home')||'[]');}catch{return [];}})(),
 };
 let inspireController = null;
 let extractController = null;
@@ -808,23 +809,70 @@ function tBottomTab() {
   </div>`;
 }
 
-// ===== HOME ACTIVE TASKS =====
-function tHomeActiveTasks() {
-  if (!S.tasksLoaded || !S.tasksList.length) return '';
-  const seen = S.seenTaskIds || [];
-  const active = S.tasksList.filter(t =>
-    t.status === 'pending' || t.status === 'running' ||
-    (t.status === 'done' && !seen.includes(t.id))
-  );
-  if (!active.length) return '';
+// ===== HOME TASK SECTION =====
+function updateHomeDoneSeen() {
+  if (S.currentTab !== 'home') return;
+  const dismissed = S.dismissedFromHomeIds || [];
+  const doneBigCards = (S.tasksList || []).filter(t => t.status === 'done' && !dismissed.includes(t.id));
+  if (!doneBigCards.length) return;
+  const newSeen = [...(S.homeDoneSeenIds || [])];
+  let changed = false;
+  for (const t of doneBigCards) {
+    if (!newSeen.includes(t.id)) { newSeen.push(t.id); changed = true; }
+  }
+  if (changed) {
+    setState({ homeDoneSeenIds: newSeen });
+    try { localStorage.setItem('home_done_seen', JSON.stringify(newSeen)); } catch {}
+  }
+}
+
+function dismissHomeDoneSeen() {
+  const toMove = (S.homeDoneSeenIds || []).filter(id => !(S.dismissedFromHomeIds || []).includes(id));
+  if (!toMove.length) return;
+  const newDismissed = [...(S.dismissedFromHomeIds || []), ...toMove];
+  setState({ dismissedFromHomeIds: newDismissed, homeDoneSeenIds: [] });
+  try {
+    localStorage.setItem('dismissed_from_home', JSON.stringify(newDismissed));
+    localStorage.setItem('home_done_seen', JSON.stringify([]));
+  } catch {}
+}
+
+function tHomeTaskSection() {
+  if (!S.tasksLoaded && !S.cloneHistoryLoaded) return '';
+  const dismissed = S.dismissedFromHomeIds || [];
   const typeLbl = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成' }[t]||t);
-  const hasLive = active.some(t => t.status !== 'done');
+
+  const bigCards = (S.tasksList || []).filter(t =>
+    t.status === 'pending' || t.status === 'running' ||
+    (t.status === 'done' && !dismissed.includes(t.id))
+  );
+
+  const dismissedTasks = (S.tasksList || [])
+    .filter(t => dismissed.includes(t.id))
+    .map(t => ({ _type: 'task', label: '灵感', text: t.title, created_at: t.created_at }));
+  const cloneItems = (S.cloneHistory || [])
+    .map((it, idx) => ({ _type: 'clone', idx, label: '克隆', text: it.input || '', created_at: it.created_at }));
+  const smallItems = [...dismissedTasks, ...cloneItems]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 5);
+
+  if (!bigCards.length && !smallItems.length) {
+    return `<div style="margin-bottom:14px">
+      <div class="home-section-header">
+        <span class="home-section-title">任务进度</span>
+        <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
+      </div>
+      <div class="recent-empty-line">还没有创作记录，快去试试吧</div>
+    </div>`;
+  }
+
+  const hasLive = bigCards.some(t => t.status !== 'done');
   return `<div style="margin-bottom:14px">
     <div class="home-section-header">
-      <span class="home-section-title">${hasLive?`<span class="task-live-dot"></span>`:''}任务进度</span>
-      <span class="home-section-more" onclick="openHistoryPage()">全部 ›</span>
+      <span class="home-section-title">${hasLive ? `<span class="task-live-dot"></span>` : ''}任务进度</span>
+      <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
     </div>
-    ${active.map(t => {
+    ${bigCards.map(t => {
       if (t.status === 'done') {
         return `<div class="home-task-card home-task-card-done" onclick="openTaskFromHome('${t.id}')">
           <span style="font-size:20px">✅</span>
@@ -844,18 +892,37 @@ function tHomeActiveTasks() {
           </div>
           <span style="font-size:11px;color:${t.status==='running'?'#E8650A':'#A8A49C'};flex-shrink:0;margin-left:8px">${t.status==='running'?'进行中':'排队中'}</span>
         </div>
-        ${t.status==='running'?`
+        ${t.status==='running' ? `
           <div class="path-a-progress-bar" style="margin-bottom:6px"><div class="path-a-progress-fill" style="width:${t.progress||0}%"></div></div>
           <div style="font-size:12px;color:#6B6860">${esc(t.thinking||'处理中...')}</div>
           <div style="font-size:11px;color:#A8A49C;margin-top:4px">${cd}</div>
-        `:`<div style="font-size:12px;color:#A8A49C">等待前序任务完成...</div>`}
+        ` : `<div style="font-size:12px;color:#A8A49C">等待前序任务完成...</div>`}
       </div>`;
     }).join('')}
+    ${smallItems.length > 0 ? `<div class="recent-list">
+      ${smallItems.map(it => {
+        if (it._type === 'task') {
+          return `<div class="recent-item" onclick="openHistoryPage('inspire')">
+            <div class="recent-item-head">
+              <div class="recent-item-text"><span style="font-size:10px;color:#F97316;background:#FFF1E8;border-radius:4px;padding:1px 5px;margin-right:5px;flex-shrink:0">灵感</span>${esc(it.text)}</div>
+            </div>
+            <span class="recent-item-time">${esc(formatDisplayTime(it.created_at))}</span>
+          </div>`;
+        }
+        return `<div class="recent-item" onclick="openHistoryPage('clone')">
+          <div class="recent-item-head">
+            <div class="recent-item-text"><span style="font-size:10px;color:#F97316;background:#FFF1E8;border-radius:4px;padding:1px 5px;margin-right:5px;flex-shrink:0">克隆</span>${esc(it.text)}</div>
+            <div class="recent-copy" onclick="cpHomeCloneItem(event,${it.idx})" title="复制">复制</div>
+          </div>
+          <span class="recent-item-time">${esc(formatDisplayTime(it.created_at))}</span>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
   </div>`;
 }
 
 async function openTaskFromHome(taskId) {
-  markTaskSeen(taskId);
+  dismissHomeDoneSeen();
   setState({ currentTab: 'history', historyTab: 'inspire', tasksView: 'detail', viewingTask: null });
   loadTasks();
   try {
@@ -863,15 +930,6 @@ async function openTaskFromHome(taskId) {
     if (r.code === 200) setState({ viewingTask: r.data });
     else setState({ tasksView: 'list' });
   } catch { setState({ tasksView: 'list' }); }
-}
-
-function markTaskSeen(taskId) {
-  const seen = [...(S.seenTaskIds || [])];
-  if (!seen.includes(taskId)) {
-    seen.push(taskId);
-    setState({ seenTaskIds: seen });
-    try { localStorage.setItem('seen_task_ids', JSON.stringify(seen)); } catch {}
-  }
 }
 
 // ===== HOME =====
@@ -928,38 +986,7 @@ function tHome() {
         <span class="feature-arrow-orange">›</span>
       </div>
     </div>
-    ${tHomeActiveTasks()}
-    ${tRecentSection()}
-  </div>`;
-}
-
-function tRecentSection() {
-  const items = S.homeHistory;
-  return `<div style="margin-bottom:14px">
-    <div class="home-section-header">
-      <span class="home-section-title">任务进度</span>
-      <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
-    </div>
-    ${items.length === 0
-      ? `<div class="recent-empty-line">还没有创作记录，快去试试吧</div>`
-      : `<div class="recent-list">
-          ${items.slice(0,5).map((it,i)=>{
-            let text = '';
-            if (it.type === 'rewrite') {
-              text = it.input || '';
-            } else {
-              text = it.result&&it.result[0] ? (it.result[0].hook||'') : (it.input||it.track||'');
-            }
-            const tag = it.type === 'rewrite' ? '克隆' : '灵感';
-            return `<div class="recent-item" onclick="openHistoryPage('${it.type==='rewrite'?'clone':'inspire'}')">
-              <div class="recent-item-head">
-                <div class="recent-item-text"><span style="font-size:10px;color:#F97316;background:#FFF1E8;border-radius:4px;padding:1px 5px;margin-right:5px;flex-shrink:0">${tag}</span>${esc(text)}</div>
-                <div class="recent-copy" onclick="cpHomeItem(event,${i})" title="复制">复制</div>
-              </div>
-              <span class="recent-item-time">${esc(formatDisplayTime(it.created_at))}</span>
-            </div>`;
-          }).join('')}
-        </div>`}
+    ${tHomeTaskSection()}
   </div>`;
 }
 
@@ -1549,11 +1576,10 @@ function switchTab(tab) {
   if (tab === 'profile') fetchMe();
   if (tab === 'vip') loadMemberPlans();
   if (tab === 'home') {
-    if (!S.homeHistoryLoaded) loadHomeHistory(); else render();
+    if (!S.cloneHistoryLoaded) loadCloneHistory(); else render();
     loadTasks();
   }
   if (tab === 'history') {
-    if (!S.recentHistoryLoaded) loadRecentHistory(); else render();
     if (!S.cloneHistoryLoaded) loadCloneHistory();
     loadTasks();
   }
@@ -2011,26 +2037,23 @@ function cpRecentItem(e, i) {
   showToast('已复制');
 }
 
-function cpHomeItem(e, i) {
+function cpHomeCloneItem(e, i) {
   e.stopPropagation();
-  const it = S.homeHistory[i];
+  const it = S.cloneHistory[i];
   if (!it) return;
-  if (it.type === 'rewrite') {
-    const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
-    copyText(text);
-  } else {
-    if (!it.result||!it.result[0]) return;
-    copyText(it.result[0].content || it.result[0].hook || '');
-  }
+  const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
+  copyText(text || it.input || '');
   showToast('已复制');
 }
 
 function openHistoryPage(tab = 'inspire') {
-  // 兼容旧调用：'tasks' → 'inspire'
   if (tab === 'tasks') tab = 'inspire';
   setState({ currentTab: 'history', historyTab: tab, historyPageExpanded: null, tasksView: 'list' });
   if (tab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
-  if (tab === 'inspire') loadTasks();
+  if (tab === 'inspire') {
+    dismissHomeDoneSeen();
+    loadTasks();
+  }
 }
 
 // ===== HISTORY PAGE =====
@@ -2093,7 +2116,10 @@ function cpClonePage(e, i) {
 function switchHistoryTab(tab) {
   setState({ historyTab: tab, historyPageExpanded: null, tasksView: 'list' });
   if (tab === 'clone' && !S.cloneHistoryLoaded) loadCloneHistory();
-  if (tab === 'inspire') loadTasks();
+  if (tab === 'inspire') {
+    dismissHomeDoneSeen();
+    loadTasks();
+  }
 }
 
 // ===== 任务页视图 =====
@@ -2193,6 +2219,7 @@ async function loadTasks() {
     const r = await api.get('/tasks');
     if (r.code === 200) {
       setState({ tasksList: r.data, tasksLoaded: true });
+      updateHomeDoneSeen();
       const hasRunning = r.data.some(t => t.status === 'pending' || t.status === 'running');
       if (hasRunning) { startTasksPolling(); startTasksTickTimer(); }
       else { stopTasksPolling(); stopTasksTickTimer(); }
@@ -2208,6 +2235,7 @@ function startTasksPolling() {
       const r = await api.get('/tasks');
       if (r.code === 200) {
         setState({ tasksList: r.data });
+        updateHomeDoneSeen();
         const hasRunning = r.data.some(t => t.status === 'pending' || t.status === 'running');
         if (!hasRunning) { stopTasksPolling(); stopTasksTickTimer(); }
       }
@@ -2231,7 +2259,6 @@ function stopTasksPolling() {
 }
 
 async function openTask(taskId) {
-  markTaskSeen(taskId);
   setState({ tasksView: 'detail', viewingTask: null });
   try {
     const r = await api.get(`/tasks/${taskId}`);
