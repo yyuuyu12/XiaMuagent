@@ -744,7 +744,7 @@ function tTopBar() {
   }
   // 动态计算子页面标题和返回动作
   let title = '';
-  let backAction = "setState({currentTab:'home'});render()";
+  let backAction = "setState({currentTab:'home'});loadTasks();render()";
 
   if (t === 'inspire') {
     if (S.inspireMode === 'analyze') {
@@ -1591,9 +1591,11 @@ function switchTab(tab) {
 function goBack() {
   if (S.currentTab === 'history') {
     setState({ currentTab: 'home', historyPageExpanded: null });
-    return;
+  } else {
+    setState({ currentTab: 'home' });
   }
-  setState({ currentTab: 'home' });
+  if (!S.cloneHistoryLoaded) loadCloneHistory();
+  loadTasks();
 }
 function openHistoryPage(tab) {
   if (tab === 'tasks') tab = 'inspire';
