@@ -736,12 +736,45 @@ function tTopBar() {
     const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '';
     return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span>${loginHint}</div>`;
   }
-  const titles = { extract:'爆款文案克隆', inspire:'灵感发现', vip:'开通会员', history:'任务' };
+  // 动态计算子页面标题和返回动作
+  let title = '';
+  let backAction = "setState({currentTab:'home'});render()";
+
+  if (t === 'inspire') {
+    if (S.inspireMode === 'analyze') {
+      title = '对标拆解';
+      if (S.pathAState === 'videos') {
+        backAction = "setState({pathAState:'input',pathAErr:''});render()";
+      } else if (S.pathAState === 'started') {
+        backAction = "stopPathAPolling();setState({inspireMode:null,pathAState:'input',pathATaskData:null});render()";
+      } else {
+        backAction = "setState({inspireMode:null});render()";
+      }
+    } else if (S.inspireMode === 'industry') {
+      title = '行业生成';
+      backAction = "setState({inspireMode:null});render()";
+    } else {
+      title = '灵感发现';
+    }
+  } else if (t === 'history') {
+    if (S.tasksView === 'detail' && S.viewingTask) {
+      title = S.viewingTask.title || '任务详情';
+      backAction = "setState({tasksView:'list',viewingTask:null});render()";
+    } else {
+      title = '任务进度';
+    }
+  } else if (t === 'extract') {
+    title = '爆款文案克隆';
+  } else if (t === 'vip') {
+    title = '开通会员';
+  }
+
+  const isDeepSub = !!(S.inspireMode || (t === 'history' && S.tasksView === 'detail'));
   const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:56px;flex-shrink:0"></div>';
   return `<div class="top-bar top-bar-sub">
-    <button type="button" class="back-btn" onclick="goBack()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
-    <span class="sub-page-title">${titles[t]||''}</span>
-    ${loginHint}
+    <button type="button" class="back-btn" onclick="${backAction}"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <span class="sub-page-title">${esc(title)}</span>
+    ${isDeepSub ? '<div style="width:56px;flex-shrink:0"></div>' : loginHint}
   </div>`;
 }
 
@@ -760,7 +793,6 @@ function tTabContent() {
 function tBottomTab() {
   const tabs = [
     { key: 'home',    icon: '🏠', label: '首页' },
-    { key: 'history', icon: '📋', label: '任务' },
     { key: 'profile', icon: '👤', label: '我的' },
   ];
   return `<div class="bottom-tab">
@@ -826,22 +858,6 @@ function tHome() {
       </div>
     </div>
     ${tRecentSection()}
-    <div class="stats-wrap">
-      <div class="stats-row">
-        <div class="stat-pill"><span class="stat-pill-num">128w+</span><span class="stat-pill-label">文案生成</span></div>
-        <div class="stat-pill"><span class="stat-pill-num">56w+</span><span class="stat-pill-label">用户数</span></div>
-        <div class="stat-pill"><span class="stat-pill-num">98%</span><span class="stat-pill-label">好评率</span></div>
-      </div>
-      <div class="stats-source">数据来源：平台累计统计</div>
-    </div>
-    <div class="hot-tags-section">
-      <div class="home-section-header">
-        <span class="home-section-title">热门行业</span>
-      </div>
-      <div class="hot-tags-scroll">
-        ${hotTags.map(t=>`<div class="hot-tag-chip" onclick="goInspireWithTag('${esc(t.name)}')">${esc(t.name)}</div>`).join('')}
-      </div>
-    </div>
   </div>`;
 }
 
@@ -849,7 +865,7 @@ function tRecentSection() {
   const items = S.homeHistory;
   return `<div style="margin-bottom:14px">
     <div class="home-section-header">
-      <span class="home-section-title">最近创作</span>
+      <span class="home-section-title">任务进度</span>
       <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
     </div>
     ${items.length === 0
@@ -982,25 +998,12 @@ function tInspireEntry() {
       <div class="inspire-entry-desc">没有对标也能用，选行业回答几个问题即可生成</div>
     </div>
     <div style="text-align:center;margin-top:20px">
-      <span style="font-size:13px;color:#A8A49C;cursor:pointer" onclick="openHistoryPage()">📋 查看历史记录</span>
+      <span style="font-size:13px;color:#A8A49C;cursor:pointer" onclick="openHistoryPage()">📋 查看任务进度</span>
     </div>
   </div>`;
 }
 
 function tInspireAnalyze() {
-  const isVideosState = S.pathAState === 'videos';
-  const isStartedState = S.pathAState === 'started';
-  const backOnclick = isVideosState
-    ? "setState({pathAState:'input',pathAErr:''});render()"
-    : isStartedState
-      ? "stopPathAPolling();setState({inspireMode:null,pathAState:'input',pathATaskData:null});render()"
-      : "setState({inspireMode:null});render()";
-  const backLabel = '对标拆解';
-  const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="${backOnclick}">
-    <span style="font-size:16px;color:#A8A49C;margin-right:6px">‹</span>
-    <span style="font-size:15px;font-weight:600;color:#1A1814">${backLabel}</span>
-  </div>`;
-
   if (S.pathAState === 'started') {
     const task = S.pathATaskData;
     const isDone = task?.status === 'done';
@@ -1052,13 +1055,13 @@ function tInspireAnalyze() {
       </div>`;
     }
 
-    return `<div class="tab-page">${backBtn}${body}</div>`;
+    return `<div class="tab-page">${body}</div>`;
   }
 
   if (S.pathAState === 'videos' && S.pathAProfile) {
     const profile = S.pathAProfile;
     const selected = S.pathASelectedIds;
-    return `<div class="tab-page">${backBtn}
+    return `<div class="tab-page">
       <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:4px">@${esc(profile.author.nickname)} 的近期视频</div>
       <div style="font-size:11px;color:#A8A49C;margin-bottom:12px">选择 1-3 条，AI 将拆解其内容套路</div>
       ${profile.videos.map(v=>{
@@ -1087,7 +1090,7 @@ function tInspireAnalyze() {
   }
 
   // 默认：链接输入
-  return `<div class="tab-page">${backBtn}
+  return `<div class="tab-page">
     <div class="section-card">
       <span class="section-label">粘贴对标主页或视频链接</span>
       <textarea class="field-input" id="f-path-a-text" rows="3"
@@ -1104,13 +1107,8 @@ function tInspireAnalyze() {
 }
 
 function tInspireIndustry() {
-  const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="setState({inspireMode:null});render()">
-    <span style="font-size:16px;color:#A8A49C;margin-right:6px">‹</span>
-    <span style="font-size:15px;font-weight:600;color:#1A1814">行业生成</span>
-  </div>`;
-
   if (S.pathBState === 'done' && S.pathBScripts.length > 0) {
-    return `<div class="tab-page">${backBtn}
+    return `<div class="tab-page">
       <div style="font-size:14px;font-weight:700;color:#1A1814;margin-bottom:12px">生成结果（${S.pathBScripts.length}条）</div>
       ${S.pathBScripts.map((s,i)=>`
         <div class="script-result-card">
@@ -1127,14 +1125,14 @@ function tInspireIndustry() {
 
   if (S.pathBState === 'clarifying' || S.pathBState === 'generating') {
     const msg = S.pathBState === 'clarifying' ? '正在生成问题...' : '正在生成文案...';
-    return `<div class="tab-page">${backBtn}
+    return `<div class="tab-page">
       <div style="text-align:center;padding:40px 0;font-size:14px;color:#6B6860">⏳ ${msg}</div>
     </div>`;
   }
 
   if (S.pathBState === 'clarify' && S.pathBQuestions.length > 0) {
     const allAnswered = S.pathBQuestions.every(q => S.pathBAnswers[q.id]);
-    return `<div class="tab-page">${backBtn}
+    return `<div class="tab-page">
       <div style="font-size:13px;color:#6B6860;margin-bottom:14px">回答几个问题，帮助生成更精准的文案</div>
       ${S.pathBQuestions.map(q=>`
         <div class="clarify-question">
@@ -1154,7 +1152,7 @@ function tInspireIndustry() {
   }
 
   // 默认：表单
-  return `<div class="tab-page">${backBtn}
+  return `<div class="tab-page">
     <div class="section-card">
       <span class="section-label">选择赛道</span>
       <div class="industry-grid">
@@ -1265,7 +1263,7 @@ function tProfile() {
     <div class="profile-history-entry" onclick="openHistoryPage('clone')">
       <div>
         <div class="title">📖 历史记录</div>
-        <div class="sub">查看文案克隆与灵感发现记录</div>
+        <div class="sub">查看灵感任务进度与克隆记录</div>
       </div>
       <div style="color:#A8A49C;font-size:18px">›</div>
     </div>
@@ -2082,17 +2080,13 @@ function tTasksList(tabsHtml) {
 function tTaskDetail() {
   const t = S.viewingTask;
   if (!t) return `<div class="tab-page"><div class="empty-tip">加载中...</div></div>`;
-  const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="setState({tasksView:'list',viewingTask:null});render()">
-    <span style="font-size:16px;color:#A8A49C;margin-right:6px">‹</span>
-    <span style="font-size:15px;font-weight:600;color:#1A1814">任务</span>
-  </div>`;
 
   const result = t.result || {};
   const scripts = result.scripts || [];
   const analysis = result.analysis || null;
   const transcript = result.transcript || null;
 
-  return `<div class="tab-page">${backBtn}
+  return `<div class="tab-page">
     ${analysis ? `
       <div class="analysis-card">
         <div class="analysis-title">对标账号分析</div>
