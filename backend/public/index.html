@@ -995,7 +995,7 @@ function tInspireAnalyze() {
     : isStartedState
       ? "stopPathAPolling();setState({inspireMode:null,pathAState:'input',pathATaskData:null});render()"
       : "setState({inspireMode:null});render()";
-  const backLabel = isVideosState ? '返回' : isStartedState ? '对标拆解' : '对标拆解';
+  const backLabel = '对标拆解';
   const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="${backOnclick}">
     <span style="font-size:16px;color:#A8A49C;margin-right:6px">‹</span>
     <span style="font-size:15px;font-weight:600;color:#1A1814">${backLabel}</span>
@@ -1011,7 +1011,9 @@ function tInspireAnalyze() {
     let body = '';
     if (isDone) {
       let result = {};
-      try { result = JSON.parse(task.result || '{}'); } catch {}
+      try {
+        result = typeof task.result === 'string' ? JSON.parse(task.result) : (task.result || {});
+      } catch {}
       const { analysis = {}, scripts = [], author = {} } = result;
       body = `
         <div style="font-size:15px;font-weight:700;color:#1A1814;margin-bottom:12px">✅ 拆解完成</div>
@@ -2082,7 +2084,7 @@ function tTaskDetail() {
   if (!t) return `<div class="tab-page"><div class="empty-tip">加载中...</div></div>`;
   const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="setState({tasksView:'list',viewingTask:null});render()">
     <span style="font-size:16px;color:#A8A49C;margin-right:6px">‹</span>
-    <span style="font-size:15px;font-weight:600;color:#1A1814">返回任务列表</span>
+    <span style="font-size:15px;font-weight:600;color:#1A1814">任务</span>
   </div>`;
 
   const result = t.result || {};
