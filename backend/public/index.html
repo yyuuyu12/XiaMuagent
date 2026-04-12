@@ -408,6 +408,10 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .script-content { font-size: 13.5px; color: #1A1814; line-height: 1.8; white-space: pre-wrap; word-break: break-all; }
 .script-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
 .analysis-card { background: #EEF2FF; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.typewriter-text::after { content: '|'; animation: tw-blink 1s step-end infinite; color: #E8650A; }
+@keyframes tw-blink { 50% { opacity: 0; } }
+.path-a-progress-bar { background:#F5F4F0; border-radius:8px; height:8px; overflow:hidden; margin-bottom:16px; }
+.path-a-progress-fill { background:#E8650A; height:100%; border-radius:8px; transition:width 0.8s ease; }
 .analysis-title { font-size: 12px; font-weight: 600; color: #4F46E5; margin-bottom: 6px; }
 .analysis-row { font-size: 12px; color: #374151; line-height: 1.7; }
 .history-page-time { font-size: 11px; color: #A8A49C; }
@@ -525,7 +529,7 @@ const S = {
   pathAState: 'input',        // 'input'|'videos'|'started'
   pathAResolveData: null, pathAProfile: null,
   pathASelectedIds: [], pathABrandName: '',
-  pathALastTaskId: null,
+  pathALastTaskId: null, pathATaskData: null,
   // 路径B
   pathBState: 'form',         // 'form'|'clarifying'|'clarify'|'generating'|'done'
   pathBIndustryId: null, pathBIndustryName: '', pathBCustom: '', pathBBrandName: '',
@@ -549,6 +553,7 @@ let inspireController = null;
 let extractController = null;
 let extractTranscribeController = null;
 let tasksPollerTimer = null;
+let pathAPollerTimer = null;
 
 // ===== UTILS =====
 function esc(s) {
@@ -983,23 +988,68 @@ function tInspireEntry() {
 
 function tInspireAnalyze() {
   const isVideosState = S.pathAState === 'videos';
+  const isStartedState = S.pathAState === 'started';
   const backOnclick = isVideosState
     ? "setState({pathAState:'input',pathAErr:''});render()"
-    : "setState({inspireMode:null});render()";
+    : isStartedState
+      ? "stopPathAPolling();setState({inspireMode:null,pathAState:'input',pathATaskData:null});render()"
+      : "setState({inspireMode:null});render()";
+  const backLabel = isVideosState ? '返回' : isStartedState ? '对标拆解' : '对标拆解';
   const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="${backOnclick}">
     <span style="font-size:16px;color:#A8A49C;margin-right:6px">‹</span>
-    <span style="font-size:15px;font-weight:600;color:#1A1814">${isVideosState ? '返回' : '对标拆解'}</span>
+    <span style="font-size:15px;font-weight:600;color:#1A1814">${backLabel}</span>
   </div>`;
 
   if (S.pathAState === 'started') {
-    return `<div class="tab-page">${backBtn}
-      <div style="text-align:center;padding:30px 0">
-        <div style="font-size:40px;margin-bottom:12px">🚀</div>
-        <div style="font-size:16px;font-weight:700;color:#1A1814;margin-bottom:8px">任务已创建！</div>
-        <div style="font-size:13px;color:#6B6860;margin-bottom:24px;line-height:1.6">AI 正在后台拆解中，通常需要 1-3 分钟<br>可以去做别的事，完成后在任务页查看</div>
-        <div class="btn-primary" style="display:inline-block;padding:0 28px" onclick="openHistoryPage()">去任务页查看进度</div>
-      </div>
-    </div>`;
+    const task = S.pathATaskData;
+    const isDone = task?.status === 'done';
+    const isFailed = task?.status === 'failed';
+    const progress = task?.progress || 0;
+    const thinking = task?.thinking || (task ? 'AI 正在准备中...' : '任务已提交，等待处理...');
+
+    let body = '';
+    if (isDone) {
+      let result = {};
+      try { result = JSON.parse(task.result || '{}'); } catch {}
+      const { analysis = {}, scripts = [], author = {} } = result;
+      body = `
+        <div style="font-size:15px;font-weight:700;color:#1A1814;margin-bottom:12px">✅ 拆解完成</div>
+        ${analysis.account_positioning ? `<div class="analysis-card">
+          <div class="analysis-title">对标账号分析</div>
+          ${analysis.account_positioning?`<div class="analysis-row">定位：${esc(analysis.account_positioning)}</div>`:''}
+          ${analysis.target_audience?`<div class="analysis-row">受众：${esc(analysis.target_audience)}</div>`:''}
+          ${analysis.tone?`<div class="analysis-row">风格：${esc(analysis.tone)}</div>`:''}
+          ${Array.isArray(analysis.content_patterns)&&analysis.content_patterns.length?`<div class="analysis-row">规律：${analysis.content_patterns.map(s=>esc(s)).join('、')}</div>`:''}
+        </div>` : ''}
+        <div style="font-size:14px;font-weight:700;color:#1A1814;margin-bottom:10px">生成文案（${scripts.length}条）</div>
+        ${scripts.map((s,i)=>`<div class="script-result-card">
+          <div class="script-hook-badge">${esc(s.hook_type||'文案')}</div>
+          <div class="script-content">${esc(s.content)}</div>
+          <div class="script-actions">
+            <button class="btn-copy-small" onclick="cpPathAInlineScript(${i})">复制</button>
+          </div>
+        </div>`).join('')}`;
+    } else if (isFailed) {
+      body = `<div style="text-align:center;padding:24px 0">
+        <div style="font-size:36px;margin-bottom:12px">😞</div>
+        <div style="font-size:14px;font-weight:600;color:#DC2626;margin-bottom:8px">处理失败</div>
+        <div style="font-size:12px;color:#6B6860;margin-bottom:16px">${esc(task.error_msg||'未知错误')}</div>
+        <div class="btn-primary" style="display:inline-block;padding:0 24px" onclick="setState({pathAState:'input',pathATaskData:null});render()">重新输入</div>
+      </div>`;
+    } else {
+      body = `<div style="padding:8px 0">
+        <div style="font-size:14px;font-weight:600;color:#1A1814;margin-bottom:14px">${esc(task?.title||'AI 拆解任务')}</div>
+        <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:${progress}%"></div></div>
+        <div style="font-size:13px;color:#6B6860;line-height:1.7;min-height:44px">
+          <span class="typewriter-text">${esc(thinking)}</span>
+        </div>
+        <div style="font-size:11px;color:#A8A49C;margin-top:20px;text-align:center">
+          通常需要 1-3 分钟，可以先去做别的事 · <span style="text-decoration:underline;cursor:pointer;color:#E8650A" onclick="openHistoryPage()">去任务中心</span>
+        </div>
+      </div>`;
+    }
+
+    return `<div class="tab-page">${backBtn}${body}</div>`;
   }
 
   if (S.pathAState === 'videos' && S.pathAProfile) {
@@ -2143,6 +2193,36 @@ function cpPathBScript(e, idx) {
   setTimeout(() => { setState({ tasksCopiedId: '' }); }, 2000);
 }
 
+// ===== 路径A 进度轮询 =====
+function startPathAPolling(taskId) {
+  if (pathAPollerTimer) clearInterval(pathAPollerTimer);
+  pathAPollerTimer = setInterval(async () => {
+    try {
+      const r = await api.get(`/tasks/${taskId}`);
+      if (r.code === 200) {
+        setState({ pathATaskData: r.data });
+        if (r.data.status === 'done' || r.data.status === 'failed') {
+          clearInterval(pathAPollerTimer);
+          pathAPollerTimer = null;
+        }
+      }
+    } catch {}
+  }, 2500);
+}
+
+function stopPathAPolling() {
+  if (pathAPollerTimer) { clearInterval(pathAPollerTimer); pathAPollerTimer = null; }
+}
+
+function cpPathAInlineScript(i) {
+  const task = S.pathATaskData;
+  if (!task) return;
+  let result = {};
+  try { result = JSON.parse(task.result || '{}'); } catch {}
+  const s = (result.scripts || [])[i];
+  if (s) { copyText(s.content); showToast('已复制'); }
+}
+
 // ===== 路径A 函数 =====
 async function pathAResolve() {
   if (!ensureLoggedIn()) return;
@@ -2158,8 +2238,8 @@ async function pathAResolve() {
       // 单视频 → 直接建任务
       const r2 = await api.post('/inspire/start-single-video', { aweme_id: data.aweme_id, brand_name: S.pathABrandName });
       if (r2.code !== 200) { setState({ pathAErr: r2.msg, pathALoading: false }); return; }
-      setState({ pathALoading: false, pathAState: 'started', pathALastTaskId: r2.data.taskId });
-      startTasksPolling();
+      setState({ pathALoading: false, pathAState: 'started', pathALastTaskId: r2.data.taskId, pathATaskData: null });
+      startPathAPolling(r2.data.taskId);
     } else {
       // 主页 → 拉视频列表
       const r3 = await api.post('/inspire/profile-videos', { sec_user_id: data.sec_user_id });
@@ -2191,8 +2271,8 @@ async function pathAStartAnalyze() {
       brand_name: S.pathABrandName,
     });
     if (r.code !== 200) { setState({ pathAErr: r.msg, pathALoading: false }); return; }
-    setState({ pathALoading: false, pathAState: 'started', pathALastTaskId: r.data.taskId });
-    startTasksPolling();
+    setState({ pathALoading: false, pathAState: 'started', pathALastTaskId: r.data.taskId, pathATaskData: null });
+    startPathAPolling(r.data.taskId);
   } catch (e) {
     setState({ pathAErr: '网络错误，请重试', pathALoading: false });
   }
