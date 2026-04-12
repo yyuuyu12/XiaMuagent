@@ -982,9 +982,13 @@ function tInspireEntry() {
 }
 
 function tInspireAnalyze() {
-  const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="setState({inspireMode:null});render()">
+  const isVideosState = S.pathAState === 'videos';
+  const backOnclick = isVideosState
+    ? "setState({pathAState:'input',pathAErr:''});render()"
+    : "setState({inspireMode:null});render()";
+  const backBtn = `<div style="display:flex;align-items:center;margin-bottom:16px;cursor:pointer" onclick="${backOnclick}">
     <span style="font-size:16px;color:#A8A49C;margin-right:6px">‹</span>
-    <span style="font-size:15px;font-weight:600;color:#1A1814">对标拆解</span>
+    <span style="font-size:15px;font-weight:600;color:#1A1814">${isVideosState ? '返回' : '对标拆解'}</span>
   </div>`;
 
   if (S.pathAState === 'started') {
@@ -1036,11 +1040,11 @@ function tInspireAnalyze() {
       <textarea class="field-input" id="f-path-a-text" rows="3"
         style="height:auto;padding:10px 14px;resize:none;line-height:1.6"
         placeholder="粘贴抖音分享文本或链接，支持主页、单视频"
-        oninput="S.pathAText=this.value">${esc(S.pathAText)}</textarea>
+        oninput="S.pathAText=this.value;render()">${esc(S.pathAText)}</textarea>
       <div style="font-size:11px;color:#A8A49C;margin-top:6px">支持：抖音主页链接 / 单条视频链接 / 分享文本</div>
     </div>
     ${S.pathAErr?`<div class="err-text">${esc(S.pathAErr)}</div>`:''}
-    <div class="btn-primary ${S.pathALoading||!S.pathAText.trim()?'btn-disabled':''}" onclick="pathAResolve()">
+    <div class="btn-primary ${S.pathALoading?'btn-disabled':''}" onclick="pathAResolve()">
       ${S.pathALoading?'⏳ 解析中...':'解析并开始'}
     </div>
   </div>`;

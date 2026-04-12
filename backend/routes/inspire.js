@@ -25,9 +25,9 @@ const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleW
 
 function extractUrl(text) {
   const patterns = [
-    /https?:\/\/www\.iesdouyin\.com\/share\/(video|user)\/[A-Za-z0-9_-]+/,
-    /https?:\/\/www\.douyin\.com\/(video|user)\/[A-Za-z0-9_-]+/,
-    /https?:\/\/v\.douyin\.com\/[A-Za-z0-9]+/,
+    /https?:\/\/www\.iesdouyin\.com\/share\/(video|user)\/[A-Za-z0-9_-]+\/?/,
+    /https?:\/\/www\.douyin\.com\/(video|user)\/[A-Za-z0-9_-]+\/?/,
+    /https?:\/\/v\.douyin\.com\/[A-Za-z0-9]+\/?/,
   ];
   for (const p of patterns) {
     const m = text.match(p);
