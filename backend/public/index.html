@@ -64,7 +64,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .feature-icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; }
 .feature-icon-blue { background: rgba(99,102,241,.12); }
 .feature-icon-orange { background: rgba(255,107,53,.12); }
-.feature-icon { font-size: 18px; }
+.feature-icon { display: flex; align-items: center; justify-content: center; }
 .feature-info { flex: 1; }
 .feature-title { display: block; font-size: 15px; font-weight: 600; color: #1A1814; margin-bottom: 3px; }
 .feature-desc { display: block; font-size: 12px; color: #A8A49C; line-height: 1.5; }
@@ -185,7 +185,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .avatar-opt-1 { background: #F97316; }
 .avatar-opt-2 { background: #3B82F6; }
 .avatar-opt-3 { background: #10B981; }
-.avatar-opt-emoji { font-size: 22px; }
+.avatar-opt-circle { display: flex; align-items: center; justify-content: center; }
 .profile-section { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
 .profile-section-title { display: block; font-size: 12px; color: #A8A49C; font-weight: 500; margin-bottom: 10px; }
 .profile-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F0EEE8; }
@@ -234,7 +234,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 /* === BOTTOM TAB === */
 .bottom-tab { display: flex; flex-direction: row; background: #fff; border-top: 1px solid #ECEAE2; padding-bottom: env(safe-area-inset-bottom, 0px); flex-shrink: 0; }
 .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 0 8px; cursor: pointer; user-select: none; }
-.tab-icon { font-size: 22px; margin-bottom: 4px; opacity: .35; }
+.tab-icon { display: flex; align-items: center; justify-content: center; margin-bottom: 4px; opacity: .35; }
 .tab-label { font-size: 11px; color: #A8A49C; }
 .tab-active .tab-icon { opacity: 1; }
 .tab-active .tab-label { color: #F97316; font-weight: 600; }
@@ -492,6 +492,7 @@ function getToken() { return localStorage.getItem('wf_token') || ''; }
 function setToken(t) { localStorage.setItem('wf_token', t); }
 function clearAuth() { localStorage.removeItem('wf_token'); localStorage.removeItem('wf_user'); }
 function getUser() { try { return JSON.parse(localStorage.getItem('wf_user') || 'null'); } catch { return null; } }
+function userHomeKey(base) { const uid = (S.userInfo && S.userInfo.id) || (getUser() && getUser().id); return uid ? base + '_' + uid : base; }
 function setUser(u) { localStorage.setItem('wf_user', JSON.stringify(u)); }
 
 // ===== API =====
@@ -575,8 +576,8 @@ const S = {
   extractController: null,
   extractTranscribeController: null,
   rewriteGenerating: false,
-  homeDoneSeenIds: (()=>{try{return JSON.parse(localStorage.getItem('home_done_seen')||'[]');}catch{return [];}})(),
-  dismissedFromHomeIds: (()=>{try{return JSON.parse(localStorage.getItem('dismissed_from_home')||'[]');}catch{return [];}})(),
+  homeDoneSeenIds: [],
+  dismissedFromHomeIds: [],
 };
 let inspireController = null;
 let extractController = null;
@@ -587,6 +588,18 @@ let tasksTickTimer = null;
 let clonePollerTimer = null;
 
 // ===== UTILS =====
+async function deleteCloneHistoryItem(e, histId) {
+  e.stopPropagation();
+  if (!confirm('确定删除这条记录吗？')) return;
+  try {
+    const r = await api.del('/history/' + histId);
+    if (r.code === 200) {
+      S.cloneHistory = S.cloneHistory.filter(it => it.id !== histId);
+      render();
+      showToast('已删除');
+    } else { showToast(r.msg || '删除失败'); }
+  } catch { showToast('删除失败'); }
+}
 async function deleteTask(e, taskId) {
   e.stopPropagation();
   if (!confirm('确定删除这条任务记录吗？')) return;
@@ -689,7 +702,7 @@ function apiUnauthorized(r) {
   if (r && r.code === 401) {
     const had = !!getToken();
     clearAuth();
-    setState({ userInfo: null, userName: '创作者', userPhone: '', userAvatar: 0, recentHistory: [], recentHistoryLoaded: false, inspireHistory: [], historyLoaded: false });
+    setState({ userInfo: null, userName: '创作者', userPhone: '', userAvatar: 0, recentHistory: [], recentHistoryLoaded: false, inspireHistory: [], historyLoaded: false, homeDoneSeenIds: [], dismissedFromHomeIds: [] });
     if (had) { openAuthSheet(); showToast('登录已过期，请重新登录'); }
     return true;
   }
@@ -700,7 +713,7 @@ function apiUnauthorized(r) {
 function tLogin() {
   return `<div class="login-page">
     <div class="logo-area">
-      <div class="logo-icon">🔥</div>
+      <div class="logo-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="#FF6B35"><path d="M12 2C10 5.5 8 7.5 8 10.5c0 1 .25 2 .75 2.8C7.5 12.1 7 10.5 7 9c-2 2.5-3 4.5-3 6.5A8 8 0 0 0 20 15c0-2-.75-3.7-2-5 0 0-.4 1.2-1.5 1.7C17 10.2 16.5 7 12 2z"/></svg></div>
       <span class="logo-title">爆款文案工坊</span>
       <span class="logo-sub">AI驱动 · 一键生成爆款内容</span>
     </div>
@@ -870,7 +883,7 @@ function tTopBar() {
   }
   if (t === 'home' || t === 'profile') {
     const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '';
-    return `<div class="top-bar"><span class="app-name">🔥 爆款文案工坊</span>${loginHint}</div>`;
+    return `<div class="top-bar"><span class="app-name">爆款文案工坊</span>${loginHint}</div>`;
   }
   // 动态计算子页面标题和返回动作
   let title = '';
@@ -934,14 +947,14 @@ function tTabContent() {
 }
 
 function tBottomTab() {
-  const tabs = [
-    { key: 'home',    icon: '🏠', label: '首页' },
-    { key: 'profile', icon: '👤', label: '我的' },
+  const tabDef = [
+    { key: 'home',    label: '首页', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+    { key: 'profile', label: '我的', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>` },
   ];
   return `<div class="bottom-tab">
-    ${tabs.map(t=>`
+    ${tabDef.map(t=>`
     <div class="tab-item ${S.currentTab===t.key?'tab-active':''}" onclick="switchTab('${t.key}')">
-      <span class="tab-icon">${t.icon}</span><span class="tab-label">${t.label}</span>
+      <span class="tab-icon">${t.svg}</span><span class="tab-label">${t.label}</span>
     </div>`).join('')}
   </div>`;
 }
@@ -959,7 +972,7 @@ function updateHomeDoneSeen() {
   }
   if (changed) {
     setState({ homeDoneSeenIds: newSeen });
-    try { localStorage.setItem('home_done_seen', JSON.stringify(newSeen)); } catch {}
+    try { localStorage.setItem(userHomeKey('home_done_seen'), JSON.stringify(newSeen)); } catch {}
   }
 }
 
@@ -972,8 +985,8 @@ function dismissHomeDoneSeen() {
   const newDismissed = [...dismissed, ...toAdd];
   setState({ dismissedFromHomeIds: newDismissed, homeDoneSeenIds: [] });
   try {
-    localStorage.setItem('dismissed_from_home', JSON.stringify(newDismissed));
-    localStorage.setItem('home_done_seen', JSON.stringify([]));
+    localStorage.setItem(userHomeKey('dismissed_from_home'), JSON.stringify(newDismissed));
+    localStorage.setItem(userHomeKey('home_done_seen'), JSON.stringify([]));
   } catch {}
 }
 
@@ -1017,7 +1030,7 @@ function tHomeTaskSection() {
       if (t.status === 'done') {
         const clickFn = t.type === 'clone_video' ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
         return `<div class="home-task-card home-task-card-done" onclick="${clickFn}">
-          <span style="font-size:20px">✅</span>
+          <span style="display:flex;align-items:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="20 6 9 17 4 12"/></svg></span>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
             <div style="font-size:11px;color:#A8A49C;margin-top:2px">${typeLbl(t.type)} · 已完成</div>
@@ -1097,7 +1110,7 @@ function tHome() {
   const u = S.userInfo;
   // 欢迎语：有昵称显示昵称，无昵称显示「你好，老板」
   const hasNickname = !!(u?.nickname && u.nickname.trim());
-  const greetText = hasNickname ? `你好，${esc(u.nickname)} 👋` : '你好，老板';
+  const greetText = hasNickname ? `你好，${esc(u.nickname)}` : '你好，老板';
 
   // 用次进度条：已登录但数据未加载时显示空进度条
   let usageSection;
@@ -1130,7 +1143,7 @@ function tHome() {
     </div>
     <div class="feature-cards">
       <div class="feature-card-main" onclick="switchTab('extract')">
-        <div class="feature-icon-wrap feature-icon-blue"><span class="feature-icon">📋</span></div>
+        <div class="feature-icon-wrap feature-icon-blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div>
         <div class="feature-info">
           <span class="feature-title">爆款文案克隆</span>
           <span class="feature-desc">粘贴视频链接，提取文案并AI改写</span>
@@ -1138,7 +1151,7 @@ function tHome() {
         <span class="feature-arrow-orange">›</span>
       </div>
       <div class="feature-card-main" onclick="switchTab('inspire')">
-        <div class="feature-icon-wrap feature-icon-orange"><span class="feature-icon">✨</span></div>
+        <div class="feature-icon-wrap feature-icon-orange"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
         <div class="feature-info">
           <span class="feature-title">灵感发现</span>
           <span class="feature-desc">选择行业赛道，生成爆款文案创意</span>
@@ -1159,7 +1172,7 @@ function tExtract() {
     const thinking = task?.thinking || '正在初始化...';
     return `<div class="tab-page">
       <div class="input-card" style="text-align:center;padding:32px 20px">
-        <div style="font-size:40px;margin-bottom:14px">🎙️</div>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:14px"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M8 22h8"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在提取文案</div>
         <div style="font-size:12px;color:#A8A49C;margin-bottom:16px">预计需要 1~2 分钟，请稍候</div>
         <div class="path-a-progress-bar" style="margin-bottom:10px"><div class="path-a-progress-fill" style="width:${progress}%"></div></div>
@@ -1172,7 +1185,7 @@ function tExtract() {
   // 提取完成，用户查看并决定是否改写
   if (S.extractStep === 'review') {
     return `<div class="tab-page">
-      <div style="font-size:12px;color:#A8A49C;margin-bottom:8px">📝 识别出的原始文案（可编辑）</div>
+      <div style="font-size:12px;color:#A8A49C;margin-bottom:8px">识别出的原始文案（可编辑）</div>
       <div class="result-card">
         <textarea class="editable-script-textarea" id="f-extracted-script" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
         <div class="result-action-bottom">
@@ -1182,7 +1195,7 @@ function tExtract() {
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
       <div class="action-row">
         <div class="btn-action-sec" onclick="resetExtract()">重新输入</div>
-        <div class="btn-action-main ${!S.extractedScript.trim()?'btn-disabled':''}" onclick="handleCloneRewrite()">✨ 开始AI改写</div>
+        <div class="btn-action-main ${!S.extractedScript.trim()?'btn-disabled':''}" onclick="handleCloneRewrite()">开始AI改写</div>
       </div>
     </div>`;
   }
@@ -1194,7 +1207,7 @@ function tExtract() {
     const thinking = task?.thinking || '正在AI改写文案...';
     return `<div class="tab-page">
       <div class="input-card" style="text-align:center;padding:32px 20px">
-        <div style="font-size:40px;margin-bottom:14px">✨</div>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:14px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">AI 改写中</div>
         <div style="font-size:12px;color:#A8A49C;margin-bottom:16px">通常只需 20~30 秒</div>
         <div class="path-a-progress-bar" style="margin-bottom:10px"><div class="path-a-progress-fill" style="width:${progress}%"></div></div>
@@ -1214,7 +1227,7 @@ function tExtract() {
         </div>
       </div>
       <div class="result-card result-highlight">
-        <div class="result-header-row"><span class="result-label">🚀 AI改写结果（可编辑）</span></div>
+        <div class="result-header-row"><span class="result-label">AI改写结果（可编辑）</span></div>
         <div class="thin-divider"></div>
         <textarea class="editable-script-textarea" id="f-rewritten-script" oninput="S.rewrittenScript=this.value">${esc(S.rewrittenScript)}</textarea>
         <div class="result-action-bottom">
@@ -1244,7 +1257,7 @@ function tExtract() {
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
       ${S.extractLoading
         ? `<div class="btn-primary btn-disabled">⏳ 提交中...</div>`
-        : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">🚀 开始克隆</div>`}
+        : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">开始克隆</div>`}
     </div>
     <div class="tip-card-v2">
       <span class="tip-line">1. 在抖音找到想参考的视频，点击分享复制链接</span>
@@ -1273,7 +1286,7 @@ function tInspireEntry() {
       <div class="inspire-entry-desc">没有对标也能用，选行业回答几个问题即可生成</div>
     </div>
     <div style="text-align:center;margin-top:20px">
-      <span style="font-size:13px;color:#A8A49C;cursor:pointer" onclick="openHistoryPage()">📋 查看我的任务</span>
+      <span style="font-size:13px;color:#A8A49C;cursor:pointer" onclick="openHistoryPage()">查看我的任务</span>
     </div>
   </div>`;
 }
@@ -1294,7 +1307,7 @@ function tInspireAnalyze() {
       } catch {}
       const { analysis = {}, scripts = [], author = {} } = result;
       body = `
-        <div style="font-size:15px;font-weight:700;color:#1A1814;margin-bottom:12px">✅ 拆解完成</div>
+        <div style="font-size:15px;font-weight:700;color:#1A1814;margin-bottom:12px;display:flex;align-items:center;gap:6px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="20 6 9 17 4 12"/></svg> 拆解完成</div>
         ${analysis.account_positioning ? `<div class="analysis-card">
           <div class="analysis-title">对标账号分析</div>
           ${analysis.account_positioning?`<div class="analysis-row">定位：${esc(analysis.account_positioning)}</div>`:''}
@@ -1457,8 +1470,7 @@ function tProfile() {
   if (S.profileView === 'edit') return tProfileEdit();
   const u = S.userInfo;
   const loggedIn = !!getToken();
-  const emojis = ['👨‍🚀','🦊','🐱','🐼'];
-  const emoji = emojis[S.userAvatar] || (S.userName ? S.userName[0] : '?');
+  const emoji = '<svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg>';
   const hasImg = u && u.avatar_image;
   const showPhone = S.appH5 && S.appH5.showProfilePhone;
   const showAcc = S.appH5 && S.appH5.showAccountType;
@@ -1469,7 +1481,7 @@ function tProfile() {
       <div class="profile-hero">
         <div class="profile-hero-top">
           <div class="avatar-lg avatar-type-0" onclick="openAuthSheet()">
-            <span class="avatar-lg-text">👤</span>
+            <span class="avatar-lg-text"><svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg></span>
           </div>
           <div class="profile-hero-mid">
             <span class="profile-name" style="cursor:default">未登录</span>
@@ -1480,7 +1492,7 @@ function tProfile() {
       </div>
       <div class="profile-history-entry" onclick="openHistoryPage('clone')">
         <div>
-          <div class="title">📋 任务中心</div>
+          <div class="title">任务中心</div>
           <div class="sub">查看灵感我的任务与克隆记录</div>
         </div>
         <div style="color:#A8A49C;font-size:18px">›</div>
@@ -1580,8 +1592,7 @@ function tProfile() {
 
 function tProfileEdit() {
   const u = S.userInfo;
-  const emojis = ['👨‍🚀','🦊','🐱','🐼'];
-  const emoji = emojis[S.userAvatar] || '?';
+  const emoji = '<svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg>';
   const hasImg = u && u.avatar_image;
   return `<div class="tab-page profile-edit-page">
     <div class="profile-section">
@@ -1597,7 +1608,7 @@ function tProfileEdit() {
       <div class="avatar-options" style="justify-content:flex-start;flex-wrap:wrap;gap:10px">
         ${[0,1,2,3].map(i=>`
           <div class="avatar-option ${S.userAvatar===i && !hasImg ? 'avatar-option-active' : ''}" onclick="selectAvatar(${i})">
-            <div class="avatar-opt-circle avatar-opt-${i}"><span class="avatar-opt-emoji">${emojis[i]}</span></div>
+            <div class="avatar-opt-circle avatar-opt-${i}"><svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg></div>
           </div>`).join('')}
       </div>
     </div>
@@ -1932,10 +1943,15 @@ async function fetchMe() {
     const r = await api.get('/auth/me');
     if (r.code === 200) {
       const hasNickname = !!(r.data.nickname && r.data.nickname.trim());
+      const _uid = r.data.id;
+      const _seen = (()=>{try{return JSON.parse(localStorage.getItem('home_done_seen_'+_uid)||'[]');}catch{return [];}})();
+      const _dismissed = (()=>{try{return JSON.parse(localStorage.getItem('dismissed_from_home_'+_uid)||'[]');}catch{return [];}})();
       setState({
         userInfo: r.data,
         userName: r.data.nickname || '创作者',
         nicknamePrompt: !hasNickname && !S.nicknamePromptDismissed && S.currentTab === 'home',
+        homeDoneSeenIds: _seen,
+        dismissedFromHomeIds: _dismissed,
       });
     } else if (r.code === 401) { apiUnauthorized(r); }
   } catch {}
@@ -2459,8 +2475,8 @@ function tHistory() {
   if (S.tasksView === 'detail' && S.viewingTask) return tTaskDetail();
 
   const tabs = `<div class="history-tabs">
-    <div class="history-tab-btn ${S.historyTab==='inspire'?'history-tab-btn-active':''}" onclick="switchHistoryTab('inspire')">✨ 灵感</div>
-    <div class="history-tab-btn ${S.historyTab==='clone'?'history-tab-btn-active':''}" onclick="switchHistoryTab('clone')">📋 克隆</div>
+    <div class="history-tab-btn ${S.historyTab==='inspire'?'history-tab-btn-active':''}" onclick="switchHistoryTab('inspire')">灵感发现</div>
+    <div class="history-tab-btn ${S.historyTab==='clone'?'history-tab-btn-active':''}" onclick="switchHistoryTab('clone')">文案克隆</div>
   </div>`;
 
   if (S.historyTab === 'inspire') return tTasksList(tabs);
@@ -2472,7 +2488,7 @@ function tHistory() {
     <div style="text-align:center;padding-top:40px;font-size:14px;color:#A8A49C">加载中...</div></div>`;
   if (cloneTasks.length === 0 && citems.length === 0) return `<div class="tab-page">${tabs}
     <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
-      <div style="font-size:36px;margin-bottom:10px">📋</div>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D0CECA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
       <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有克隆记录</div>
       <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('extract')">去克隆</div>
     </div></div>`;
@@ -2483,7 +2499,10 @@ function tHistory() {
       return `<div class="history-page-card ${canClick?'task-card-clickable':''}" onclick="${canClick?`openExtractWithTask('${t.id}',true)`:''}" >
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <span class="history-page-hook" style="-webkit-line-clamp:1;flex:1">${esc(t.title)}</span>
-          <span style="font-size:11px;color:${t.status==='done'?'#10B981':t.status==='failed'?'#DC2626':'#E8650A'};flex-shrink:0;margin-left:8px">${statusLbl[t.status]||t.status}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
+            <span style="font-size:11px;color:${t.status==='done'?'#10B981':t.status==='failed'?'#DC2626':'#E8650A'}">${statusLbl[t.status]||t.status}</span>
+            ${(t.status==='done'||t.status==='failed')?`<span style="display:flex;align-items:center;cursor:pointer" onclick="deleteTask(event,'${t.id}')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C8C4BB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span>`:''}
+          </div>
         </div>
         <div class="history-page-meta">
           <span class="history-page-time">${esc(formatDisplayTime(t.created_at))}</span>
@@ -2497,8 +2516,9 @@ function tHistory() {
       const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
       const expanded = S.historyPageExpanded === ('c'+i);
       return `<div class="history-page-card" onclick="toggleClonePage(${i})">
-        <span class="history-page-track" style="font-size:13px;font-weight:400;color:#A8A49C">原文</span>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="flex:1;min-width:0"><span class="history-page-track" style="font-size:13px;font-weight:400;color:#A8A49C">原文</span>
         <div class="history-page-hook" style="-webkit-line-clamp:1">${esc(it.input||'')}</div>
+        </div><span style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;margin-left:8px;padding-top:2px" onclick="deleteCloneHistoryItem(event,${it.id})"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C8C4BB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span></div>
         <div class="history-page-meta">
           <span class="history-page-time">${esc(formatDisplayTime(it.created_at))}</span>
           <span class="history-page-count">改写</span>
@@ -2565,7 +2585,7 @@ function tTasksList(tabsHtml) {
   return `<div class="tab-page">${tabsHtml||''}
     ${tasks.length === 0 ? `
       <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
-        <div style="font-size:36px;margin-bottom:10px">✨</div>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D0CECA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有任务，去生成吧</div>
         <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('inspire')">去灵感发现</div>
       </div>` :
@@ -2574,7 +2594,7 @@ function tTasksList(tabsHtml) {
           <div class="task-card-header">
             <span class="task-type-badge ${typeClass(t.type)}">${typeLabel(t.type)}</span>
             <span class="task-card-title">${esc(t.title)}</span>
-            ${(t.status==='done'||t.status==='failed')?`<span style="font-size:18px;color:#C8C4BB;padding-left:8px;flex-shrink:0" onclick="deleteTask(event,'${t.id}')">🗑</span>`:''}
+            ${(t.status==='done'||t.status==='failed')?`<span style="display:flex;align-items:center;padding-left:8px;flex-shrink:0;cursor:pointer" onclick="deleteTask(event,'${t.id}')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C8C4BB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span>`:''}
           </div>
           <div class="task-card-time">${formatDisplayTime(t.created_at)}</div>
           <div class="task-status-row">
@@ -2590,7 +2610,7 @@ function tTasksList(tabsHtml) {
             <div class="task-progress-wrap" style="margin-top:8px"><div class="task-progress-fill" style="width:50%"></div></div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
               <span style="font-size:12px;color:#6B6860">文案已提取，可开始AI改写</span>
-              <span style="font-size:12px;color:#E8650A;font-weight:600;cursor:pointer" onclick="startCloneRewrite('${t.id}')">✨ 去改写 ›</span>
+              <span style="font-size:12px;color:#E8650A;font-weight:600;cursor:pointer" onclick="startCloneRewrite('${t.id}')">去改写 ›</span>
             </div>
           `:''}
           ${t.status==='pending'?`<div style="font-size:12px;color:#A8A49C;margin-top:6px">等待前序任务完成后开始处理</div>`:''}
