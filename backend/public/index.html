@@ -966,7 +966,7 @@ function dismissHomeDoneSeen() {}
 
 function tHomeTaskSection() {
   if (!S.tasksLoaded && !S.cloneHistoryLoaded) return '';
-  const DONE_BIG_WINDOW = 2 * 60 * 60 * 1000; // done任务2小时内显示大卡，之后降为小条目
+  const DONE_BIG_WINDOW = 1 * 60 * 60 * 1000; // done任务1小时内显示大卡，之后降为小条目
   const typeLbl = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成', clone_video:'克隆' }[t]||t);
   const typeTagLabel = t => t.type === 'clone_video' ? '克隆' : '灵感';
   const isRecentDone = t => t.status === 'done' && (Date.now() - new Date(t.updated_at || t.created_at).getTime()) < DONE_BIG_WINDOW;
