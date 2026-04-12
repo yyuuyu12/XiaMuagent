@@ -337,6 +337,18 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .profile-history-entry { margin-bottom: 10px; background: #fff; border: 1px solid #EAE7DF; border-radius: 10px; padding: 12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
 .profile-history-entry .title { font-size: 13px; color:#1A1814; font-weight:600; }
 .profile-history-entry .sub { font-size: 11px; color:#A8A49C; margin-top:2px; }
+.profile-menu-list { background:#fff; border-radius:12px; border:1px solid #EAE7DF; overflow:hidden; margin-bottom:12px; }
+.profile-menu-item { display:flex; align-items:center; padding:14px 16px; cursor:pointer; gap:12px; position:relative; }
+.profile-menu-item:not(:last-child)::after { content:''; position:absolute; bottom:0; left:52px; right:0; height:1px; background:#F0EDE6; }
+.profile-menu-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pmi-orange { background:#FFF1E8; }
+.pmi-blue { background:#EEF4FF; }
+.pmi-green { background:#EDFAF4; }
+.pmi-gray { background:#F5F4F0; }
+.profile-menu-body { flex:1; min-width:0; }
+.profile-menu-title { display:block; font-size:14px; font-weight:600; color:#1A1814; }
+.profile-menu-sub { display:block; font-size:11px; color:#A8A49C; margin-top:1px; }
+.profile-menu-arrow { flex-shrink:0; color:#C8C4BB; }
 .recent-empty { background: #fff; border-radius: 10px; padding: 24px; display: flex; flex-direction: column; align-items: center; }
 .recent-empty-icon { font-size: 32px; margin-bottom: 8px; }
 .recent-empty-text { font-size: 13px; color: #A8A49C; margin-bottom: 12px; text-align: center; line-height: 1.6; }
@@ -1484,42 +1496,55 @@ function tProfile() {
         ${u.auth_expires_at?`<div class="profile-row"><span class="profile-key">授权到期</span><span class="profile-val">${esc(u.auth_expires_at)}</span></div>`:''}
       `:''}
     </div>`:''}
-    <div class="profile-history-entry" onclick="openHistoryPage('clone')">
-      <div>
-        <div class="title">📋 我的任务</div>
-        <div class="sub">查看灵感我的任务与克隆记录</div>
-      </div>
-      <div style="color:#A8A49C;font-size:18px">›</div>
-    </div>
-    <div class="profile-section">
-      <span class="profile-section-title">🎫 填写授权码</span>
-      ${u&&u.auth_expires_at?`
-        <div class="code-activated">
-          <span class="code-activated-text">✓ 已激活，有效期至 ${esc(u.auth_expires_at)}，每日可用 ${u.daily_limit} 次</span>
-        </div>`:`
-        <div class="code-row">
-          <input class="code-input" id="f-code" placeholder="请输入授权码"
-            value="${esc(S.authCodeInput)}" oninput="S.authCodeInput=this.value"/>
-          <div class="code-submit ${S.authCodeLoading?'btn-disabled':''}" onclick="handleActivateCode()">
-            ${S.authCodeLoading?'...':'立即激活'}
-          </div>
-        </div>
-        ${S.authCodeMsg?`<span class="code-msg ${S.authCodeOk?'code-ok':'code-err'}">${esc(S.authCodeMsg)}</span>`:''}`}
-    </div>
     <div class="vip-upgrade-card" onclick="switchTab('vip')">
       <div class="vip-upgrade-left">
-        <span class="vip-upgrade-title">👑 升级专业版</span>
-        <span class="vip-upgrade-sub">无限次数 · 更多功能 · 优先生成</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="margin-right:10px;flex-shrink:0"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.6)" stroke-width="1"/></svg>
+        <div><span class="vip-upgrade-title">升级专业版</span><span class="vip-upgrade-sub">无限次数 · 更多功能 · 优先生成</span></div>
       </div>
       <span class="vip-upgrade-arrow">›</span>
     </div>
-    <div class="profile-history-entry" onclick="setState({profileView:'setPassword',pwdOld:'',pwdNew:'',pwdNew2:'',pwdErr:'',pwdOk:false});render()">
-      <div class="profile-history-label">
-        <span style="font-size:16px;margin-right:8px">🔒</span>
-        <span>${S.userInfo?.has_password?'修改密码':'设置密码'}</span>
+    <div class="profile-menu-list">
+      <div class="profile-menu-item" onclick="openHistoryPage('inspire')">
+        <div class="profile-menu-icon pmi-blue">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </div>
+        <div class="profile-menu-body">
+          <span class="profile-menu-title">我的任务</span>
+          <span class="profile-menu-sub">灵感生成 · 文案克隆记录</span>
+        </div>
+        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <span class="profile-history-arrow">›</span>
+      <div class="profile-menu-item" onclick="focusAuthCode()">
+        <div class="profile-menu-icon pmi-green">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 00-8 0v2"/><line x1="12" y1="12" x2="12" y2="16"/><circle cx="12" cy="12" r="1" fill="#10B981"/></svg>
+        </div>
+        <div class="profile-menu-body">
+          <span class="profile-menu-title">填写授权码</span>
+          <span class="profile-menu-sub">${u&&u.auth_expires_at?`已激活，到期 ${esc(u.auth_expires_at)}`:'激活后获得更多每日次数'}</span>
+        </div>
+        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="profile-menu-item" onclick="setState({profileView:'setPassword',pwdOld:'',pwdNew:'',pwdNew2:'',pwdErr:'',pwdOk:false});render()">
+        <div class="profile-menu-icon pmi-gray">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <div class="profile-menu-body">
+          <span class="profile-menu-title">${u?.has_password?'修改密码':'设置密码'}</span>
+          <span class="profile-menu-sub">${u?.has_password?'定期更换密码更安全':'设置后可用密码登录'}</span>
+        </div>
+        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
     </div>
+    ${u&&!u.auth_expires_at?`<div class="profile-section" id="auth-code-section">
+      <div class="code-row">
+        <input class="code-input" id="f-code" placeholder="请输入授权码"
+          value="${esc(S.authCodeInput)}" oninput="S.authCodeInput=this.value"/>
+        <div class="code-submit ${S.authCodeLoading?'btn-disabled':''}" onclick="handleActivateCode()">
+          ${S.authCodeLoading?'...':'立即激活'}
+        </div>
+      </div>
+      ${S.authCodeMsg?`<span class="code-msg ${S.authCodeOk?'code-ok':'code-err'}">${esc(S.authCodeMsg)}</span>`:''}
+    </div>`:''}
     <div class="logout-btn" onclick="handleLogout()">退出登录</div>
     <div style="height:20px"></div>
   </div>`;
@@ -2212,6 +2237,11 @@ async function loadAppH5Settings() {
       render();
     }
   } catch {}
+}
+function focusAuthCode() {
+  const el = document.getElementById('f-code');
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => el.focus(), 300); }
+  else { const sec = document.getElementById('auth-code-section'); if (sec) sec.scrollIntoView({ behavior: 'smooth' }); }
 }
 async function handleActivateCode() {
   if (!ensureLoggedIn()) return;
