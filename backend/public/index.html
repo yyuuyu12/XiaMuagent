@@ -827,9 +827,12 @@ function updateHomeDoneSeen() {
 }
 
 function dismissHomeDoneSeen() {
-  const toMove = (S.homeDoneSeenIds || []).filter(id => !(S.dismissedFromHomeIds || []).includes(id));
-  if (!toMove.length) return;
-  const newDismissed = [...(S.dismissedFromHomeIds || []), ...toMove];
+  const dismissed = S.dismissedFromHomeIds || [];
+  const toAdd = (S.tasksList || [])
+    .filter(t => t.status === 'done' && !dismissed.includes(t.id))
+    .map(t => t.id);
+  if (!toAdd.length) return;
+  const newDismissed = [...dismissed, ...toAdd];
   setState({ dismissedFromHomeIds: newDismissed, homeDoneSeenIds: [] });
   try {
     localStorage.setItem('dismissed_from_home', JSON.stringify(newDismissed));
