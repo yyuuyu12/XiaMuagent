@@ -1,7 +1,9 @@
-const { Worker } = require('bullmq');
 const db = require('./db');
 const { callAI } = require('./lib/callAI');
-const redis = require('./redis');
+const taskRunner = require('./taskRunner');
+
+// 内存 ASR 缓存（进程重启后清空，无需 Redis）
+const asrCache = new Map();
 
 // ===== 进度更新工具 =====
 async function updateTask(taskId, fields) {
@@ -32,12 +34,8 @@ async function processProfileAnalyze(taskId) {
 
     await updateTask(taskId, { status: 'running', stage: 'asr', thinking: `正在听第 ${i + 1} 条视频说了什么...`, progress: stageProgress });
 
-    // 查 ASR 缓存
-    let transcript = null;
-    try {
-      const cached = await redis.get(`asr:${video.aweme_id}`);
-      if (cached) transcript = cached;
-    } catch {}
+    // 查内存 ASR 缓存
+    let transcript = asrCache.get(`asr:${video.aweme_id}`) || null;
 
     if (!transcript) {
       const mp4Url = video.play_urls?.[0];
@@ -66,7 +64,7 @@ async function processProfileAnalyze(taskId) {
 
       // 缓存 ASR 结果
       if (transcript && !transcript.startsWith('(')) {
-        try { await redis.set(`asr:${video.aweme_id}`, transcript); } catch {}
+        asrCache.set(`asr:${video.aweme_id}`, transcript);
       }
     }
 
@@ -175,9 +173,8 @@ async function processSingleVideoAnalyze(taskId) {
 
   await updateTask(taskId, { stage: 'asr', thinking: '正在听视频说了什么...', progress: 30 });
 
-  // 查 ASR 缓存
-  let transcript = null;
-  try { transcript = await redis.get(`asr:${aweme_id}`); } catch {}
+  // 查内存 ASR 缓存
+  let transcript = asrCache.get(`asr:${aweme_id}`) || null;
 
   if (!transcript) {
     const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
@@ -190,7 +187,7 @@ async function processSingleVideoAnalyze(taskId) {
     const asrData = await asrRes.json();
     transcript = asrData.text?.trim() || '';
     if (transcript) {
-      try { await redis.set(`asr:${aweme_id}`, transcript); } catch {}
+      asrCache.set(`asr:${aweme_id}`, transcript);
     }
   }
 
@@ -208,38 +205,27 @@ async function processSingleVideoAnalyze(taskId) {
   );
 }
 
-// ===== BullMQ Worker =====
-const worker = new Worker(
-  'tasks',
-  async (job) => {
-    const { taskId, type } = job.data;
-    console.log(`[Worker] 开始处理任务 ${taskId} (${type})`);
-    try {
-      if (type === 'profile_analyze') {
-        await processProfileAnalyze(taskId);
-      } else if (type === 'single_video_analyze') {
-        await processSingleVideoAnalyze(taskId);
-      } else {
-        throw new Error(`未知任务类型: ${type}`);
-      }
-      console.log(`[Worker] 任务完成: ${taskId}`);
-    } catch (err) {
-      console.error(`[Worker] 任务失败: ${taskId}`, err.message);
-      await db.query(
-        'UPDATE tasks SET status = $1, error_msg = $2, updated_at = NOW() WHERE id = $3',
-        ['failed', err.message, taskId]
-      ).catch(() => {});
-      throw err;
+// ===== 注册任务处理器 =====
+taskRunner.setHandler(async (job) => {
+  const { taskId, type } = job;
+  console.log(`[Worker] 开始处理任务 ${taskId} (${type})`);
+  try {
+    if (type === 'profile_analyze') {
+      await processProfileAnalyze(taskId);
+    } else if (type === 'single_video_analyze') {
+      await processSingleVideoAnalyze(taskId);
+    } else {
+      throw new Error(`未知任务类型: ${type}`);
     }
-  },
-  {
-    connection: redis,
-    concurrency: 1,           // 串行处理，避免 ASR 并发压力
-    lockDuration: 20 * 60 * 1000,  // 20 分钟锁定（ASR 最慢场景）
+    console.log(`[Worker] 任务完成: ${taskId}`);
+  } catch (err) {
+    console.error(`[Worker] 任务失败: ${taskId}`, err.message);
+    await db.query(
+      'UPDATE tasks SET status = $1, error_msg = $2, updated_at = NOW() WHERE id = $3',
+      ['failed', err.message, taskId]
+    ).catch(() => {});
+    throw err;
   }
-);
+});
 
-worker.on('completed', (job) => console.log(`[Worker] Job ${job.id} completed`));
-worker.on('failed', (job, err) => console.error(`[Worker] Job ${job?.id} failed:`, err.message));
-
-module.exports = worker;
+console.log('✅ TaskRunner Worker 已就绪');

@@ -44,16 +44,11 @@ app.use((err, req, res, next) => {
 
 initDb()
   .then(() => {
-    // 启动 BullMQ Worker（仅当 REDIS_URL 已配置时）
-    if (process.env.REDIS_URL) {
-      try {
-        require('./worker');
-        console.log('✅ BullMQ Worker 已启动');
-      } catch (e) {
-        console.warn('⚠️  Worker 启动失败:', e.message);
-      }
-    } else {
-      console.warn('⚠️  REDIS_URL 未配置，后台任务（对标拆解）不可用');
+    // 启动任务处理器
+    try {
+      require('./worker');
+    } catch (e) {
+      console.warn('⚠️  Worker 启动失败:', e.message);
     }
 
     app.listen(PORT, () => {

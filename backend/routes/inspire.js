@@ -6,6 +6,19 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
+// 内存主页缓存（30 分钟 TTL，无需 Redis）
+const profileCache = new Map(); // key -> { data, expireAt }
+
+function profileCacheGet(key) {
+  const entry = profileCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expireAt) { profileCache.delete(key); return null; }
+  return entry.data;
+}
+function profileCacheSet(key, data, ttlMs) {
+  profileCache.set(key, { data, expireAt: Date.now() + ttlMs });
+}
+
 // ===== 工具函数 =====
 
 const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1';
@@ -88,22 +101,15 @@ router.post('/resolve', requireAuth, async (req, res) => {
 });
 
 // ===== POST /api/inspire/profile-videos =====
-// 拉取主页视频列表（带 Redis 缓存）
+// 拉取主页视频列表（带内存缓存）
 router.post('/profile-videos', requireAuth, async (req, res) => {
   const { sec_user_id } = req.body;
   if (!sec_user_id) return res.status(400).json({ code: 400, msg: 'sec_user_id 缺失' });
 
-  let redis = null;
-  try { redis = require('../redis'); } catch {}
-
   try {
     // 查缓存
-    if (redis) {
-      try {
-        const cached = await redis.get(`profile:${sec_user_id}`);
-        if (cached) return res.json({ code: 200, data: JSON.parse(cached) });
-      } catch {}
-    }
+    const cached = profileCacheGet(`profile:${sec_user_id}`);
+    if (cached) return res.json({ code: 200, data: cached });
 
     const { rows } = await db.query("SELECT value FROM system_config WHERE config_key = 'tikhub_api_key'");
     const tikhubKey = rows[0]?.value;
@@ -143,9 +149,7 @@ router.post('/profile-videos', requireAuth, async (req, res) => {
       videos,
     };
 
-    if (redis) {
-      try { await redis.setex(`profile:${sec_user_id}`, 30 * 60, JSON.stringify(profileData)); } catch {}
-    }
+    profileCacheSet(`profile:${sec_user_id}`, profileData, 30 * 60 * 1000);
 
     res.json({ code: 200, data: profileData });
   } catch (err) {
@@ -164,17 +168,8 @@ router.post('/start-analyze', requireAuth, async (req, res) => {
   const usage = await checkAndRecordUsage(req.userId, 'inspire');
   if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
 
-  let redis = null;
-  try { redis = require('../redis'); } catch {}
-
   try {
-    let profileData = null;
-    if (redis) {
-      try {
-        const cached = await redis.get(`profile:${sec_user_id}`);
-        if (cached) profileData = JSON.parse(cached);
-      } catch {}
-    }
+    const profileData = profileCacheGet(`profile:${sec_user_id}`);
     if (!profileData) return res.status(400).json({ code: 400, msg: '主页数据已过期，请重新解析链接' });
 
     const selectedVideos = profileData.videos.filter(v => selected_video_ids.includes(v.aweme_id));
@@ -190,8 +185,7 @@ router.post('/start-analyze', requireAuth, async (req, res) => {
       })]
     );
 
-    const taskQueue = require('../queue');
-    await taskQueue.add('analyze', { taskId, type: 'profile_analyze' });
+    require('../taskRunner').enqueue({ taskId, type: 'profile_analyze' });
 
     res.json({ code: 200, data: { taskId, title } });
   } catch (err) {
@@ -217,8 +211,7 @@ router.post('/start-single-video', requireAuth, async (req, res) => {
       [taskId, req.userId, 'single_video_analyze', title, 'pending', 0, '', JSON.stringify({ aweme_id, brand_name: brand_name || '' })]
     );
 
-    const taskQueue = require('../queue');
-    await taskQueue.add('analyze', { taskId, type: 'single_video_analyze' });
+    require('../taskRunner').enqueue({ taskId, type: 'single_video_analyze' });
 
     res.json({ code: 200, data: { taskId, title } });
   } catch (err) {
