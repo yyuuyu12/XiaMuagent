@@ -2469,7 +2469,7 @@ function dismissNicknamePrompt() {
   if (token) {
     const user = getUser();
     if (user) { S.userName = user.nickname||'创作者'; S.userPhone = user.phone||''; S.userAvatar = user.avatar||0; }
-    render(); fetchMe(); loadIndustries(); loadAppH5Settings();
+    render(); fetchMe(); loadIndustries(); loadAppH5Settings(); loadTasks(); loadCloneHistory();
   } else { render(); loadIndustries(); }
 })();
 </script>
