@@ -2209,7 +2209,7 @@ function cpPathAInlineScript(i) {
   const task = S.pathATaskData;
   if (!task) return;
   let result = {};
-  try { result = JSON.parse(task.result || '{}'); } catch {}
+  try { result = typeof task.result === 'string' ? JSON.parse(task.result) : (task.result || {}); } catch {}
   const s = (result.scripts || [])[i];
   if (s) { copyText(s.content); showToast('已复制'); }
 }
