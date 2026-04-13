@@ -734,7 +734,7 @@ function tLogin() {
       <div class="field-group">
         <span class="field-label">验证码</span>
         <div class="input-wrap">
-          <input id="smsCodeInput" class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
+          <input id="smsCodeInput" class="lf-input" type="tel" maxlength="6" placeholder="6位验证码" inputmode="numeric" pattern="[0-9]*"
             value="${esc(S.smsCode)}" oninput="S.smsCode=this.value" onkeydown="if(event.key==='Enter')handleSmsLogin()" style="flex:1"/>
           <div class="sms-send-btn ${S.smsCountdown>0||S.loading?'sms-send-disabled':''}" onclick="handleSendSms()">
             ${S.smsCountdown>0?`${S.smsCountdown}s后重发`:S.smsSent?'重新发送':'获取验证码'}
@@ -828,7 +828,7 @@ function tAuthSheet() {
           <div class="field-group">
             <span class="field-label">验证码</span>
             <div class="input-wrap">
-              <input id="smsCodeInput" class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
+              <input id="smsCodeInput" class="lf-input" type="tel" maxlength="6" placeholder="6位验证码" inputmode="numeric" pattern="[0-9]*"
                 value="${esc(S.smsCode)}" oninput="S.smsCode=this.value" onkeydown="if(event.key==='Enter')handleSmsLogin()" style="flex:1;padding-left:14px"/>
               <div class="sms-send-btn ${S.smsCountdown>0||S.loading?'sms-send-disabled':''}" onclick="handleSendSms()">
                 ${S.smsCountdown>0?`${S.smsCountdown}s后重发`:S.smsSent?'重新发送':'获取验证码'}
@@ -1803,7 +1803,7 @@ async function handleSmsLogin() {
   try {
     const r = await api.post('/auth/sms-login', { phone, code });
     if (r.code === 200) {
-      localStorage.setItem('token', r.data.token);
+      setToken(r.data.token);
       setState({ loading: false, showAuthSheet: false, smsCode: '', smsSent: false, smsCountdown: 0, authErr: '', phone: '' });
       if (smsCountdownTimer) { clearInterval(smsCountdownTimer); smsCountdownTimer = null; }
       await fetchMe();
