@@ -680,7 +680,7 @@ function setState(updates) {
   render();
   if (focusId) {
     const el = document.getElementById(focusId);
-    if (el) { el.focus(); try { el.setSelectionRange(focusSel[0], focusSel[1]); } catch {} }
+    if (el) { el.focus(); try { el.setSelectionRange(focusSel[0], focusSel[1]); } catch { try { el.setSelectionRange(el.value.length, el.value.length); } catch {} } }
   }
 }
 function render() {
@@ -734,7 +734,7 @@ function tLogin() {
       <div class="field-group">
         <span class="field-label">验证码</span>
         <div class="input-wrap">
-          <input class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
+          <input id="smsCodeInput" class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
             value="${esc(S.smsCode)}" oninput="S.smsCode=this.value" onkeydown="if(event.key==='Enter')handleSmsLogin()" style="flex:1"/>
           <div class="sms-send-btn ${S.smsCountdown>0||S.loading?'sms-send-disabled':''}" onclick="handleSendSms()">
             ${S.smsCountdown>0?`${S.smsCountdown}s后重发`:S.smsSent?'重新发送':'获取验证码'}
@@ -828,7 +828,7 @@ function tAuthSheet() {
           <div class="field-group">
             <span class="field-label">验证码</span>
             <div class="input-wrap">
-              <input class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
+              <input id="smsCodeInput" class="lf-input" type="number" maxlength="6" placeholder="6位验证码"
                 value="${esc(S.smsCode)}" oninput="S.smsCode=this.value" onkeydown="if(event.key==='Enter')handleSmsLogin()" style="flex:1;padding-left:14px"/>
               <div class="sms-send-btn ${S.smsCountdown>0||S.loading?'sms-send-disabled':''}" onclick="handleSendSms()">
                 ${S.smsCountdown>0?`${S.smsCountdown}s后重发`:S.smsSent?'重新发送':'获取验证码'}
@@ -1796,7 +1796,7 @@ async function handleSendSms() {
 }
 
 async function handleSmsLogin() {
-  const phone = S.phone.trim(), code = S.smsCode.trim();
+  const phone = S.phone.trim(), code = (document.getElementById('smsCodeInput')?.value || S.smsCode).trim();
   if (!phone) { setState({ authErr: '请输入手机号' }); return; }
   if (!code)  { setState({ authErr: '请输入验证码' }); return; }
   setState({ loading: true, authErr: '' });
