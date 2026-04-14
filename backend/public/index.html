@@ -481,16 +481,16 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .btn-action-main { background: #F97316; color: #fff; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 15px; font-weight: 600; flex: 2; cursor: pointer; user-select: none; }
 
 /* === 克隆流程步骤条 === */
-.clone-step-bar { position:sticky; top:0; z-index:10; background:#fff; margin:-12px -16px 14px; padding:10px 16px 7px; border-bottom:1px solid #F0EEE8; }
-.clone-step-bar-inner { display:flex; align-items:flex-start; overflow-x:auto; padding-bottom:2px; }
-.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:3px; flex-shrink:0; }
-.clone-step-c { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; flex-shrink:0; }
+.clone-step-bar { background:#fff; padding:10px 20px 8px; border-bottom:1px solid #F0EEE8; width:100%; flex-shrink:0; }
+.clone-step-bar-inner { display:flex; align-items:flex-start; width:100%; }
+.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; }
+.clone-step-c { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; flex-shrink:0; }
 .clone-step-c-done { background:#FF6B35; color:#fff; }
 .clone-step-c-active { background:#FF6B35; color:#fff; }
 .clone-step-c-idle { background:#fff; border:1.5px solid #D4D0C8; color:#B4B2A9; }
 .clone-step-lbl { font-size:10px; color:#B4B2A9; white-space:nowrap; }
 .clone-step-lbl-active { color:#FF6B35; font-weight:600; }
-.clone-step-line { flex:1; height:2px; margin:11px 2px 0; min-width:8px; max-width:22px; }
+.clone-step-line { flex:1; height:2px; margin:12px 3px 0; }
 .clone-step-line-done { background:#FF6B35; }
 .clone-step-line-idle { background:#E4E2DA; }
 /* 开关 */
@@ -671,8 +671,10 @@ function friendlyError(msg) {
     return 'AI 服务响应超时，可能当前请求量较大，请稍后重试';
   if (msg.includes('<!DOCTYPE') || msg.includes('<html') || msg.includes('Cloudflare') || msg.includes('cloudflare'))
     return 'AI 服务暂时不可用，请稍后重试';
+  if (/未配置|未启动|not configured/i.test(msg) && /asr|语音/i.test(msg))
+    return '语音识别服务未配置，请联系管理员在后台填写 ASR 服务地址';
   if (/asr|transcri|语音|whisper/i.test(msg))
-    return '语音识别服务出现问题，请稍后重试';
+    return '语音识别服务连接失败，请检查 ASR 服务是否正常运行';
   if (/tikhub|tik\s*hub|视频解析|视频下载|视频信息/i.test(msg))
     return '视频解析失败，请检查链接是否有效后重试';
   if (/ai\s*(接口|调用|错误|失败)|callai|openai|zhipu|api.*error/i.test(msg))
@@ -1232,7 +1234,7 @@ function tExtract() {
     const task = S.cloneTaskData;
     const progress = task?.progress || 0;
     const thinking = task?.thinking || '正在初始化...';
-    return `<div class="tab-page">${sb}
+    return `${sb}<div class="tab-page">
       <div class="input-card" style="text-align:center;padding:32px 20px">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:14px"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M8 22h8"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在提取文案</div>
@@ -1246,7 +1248,7 @@ function tExtract() {
 
   // 提取完成，用户查看并决定是否改写
   if (S.extractStep === 'review') {
-    return `<div class="tab-page">${sb}
+    return `${sb}<div class="tab-page">
       <div style="font-size:12px;color:#A8A49C;margin-bottom:8px">识别出的原始文案（可编辑）</div>
       <div class="result-card">
         <textarea class="editable-script-textarea" id="f-extracted-script" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
@@ -1267,7 +1269,7 @@ function tExtract() {
     const task = S.cloneTaskData;
     const progress = task?.progress || 60;
     const thinking = task?.thinking || '正在AI改写文案...';
-    return `<div class="tab-page">${sb}
+    return `${sb}<div class="tab-page">
       <div class="input-card" style="text-align:center;padding:32px 20px">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:14px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">AI 改写中</div>
@@ -1280,7 +1282,7 @@ function tExtract() {
 
   // 改写完成，展示结果 — 步骤2
   if (S.extractStep === 2) {
-    return `<div class="tab-page">${sb}
+    return `${sb}<div class="tab-page">
       <div class="result-card result-muted">
         <span class="result-label-sm">原始文案</span>
         <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
@@ -1318,6 +1320,7 @@ function tExtract() {
         <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
       </div>
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
+      ${S.extractErr&&/语音|asr/i.test(S.extractErr)?`<div style="text-align:center;margin-top:6px"><span style="font-size:13px;color:#FF6B35;text-decoration:underline;cursor:pointer" onclick="setState({extractStep:'review',extractedScript:'',extractErr:''})">手动输入文案跳过提取 →</span></div>`:''}
       ${S.extractLoading
         ? `<div class="btn-primary btn-disabled">⏳ 提交中...</div>`
         : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">开始克隆</div>`}
@@ -1334,7 +1337,7 @@ function tExtract() {
 function tCloneStep3(sb) {
   // 合成中状态
   if (S.extractStep === 'tts_gen') {
-    return `<div class="tab-page">${sb}
+    return `${sb}<div class="tab-page">
       <div class="input-card" style="text-align:center;padding:32px 20px;margin-top:4px">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="1.5" style="margin-bottom:12px"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在合成语音</div>
@@ -1372,7 +1375,7 @@ function tCloneStep3(sb) {
       <span style="font-size:11px;color:#059669;background:#ECFDF5;padding:4px 10px;border-radius:50px">✓ 合成完成</span>
     </div>` : '';
 
-  return `<div class="tab-page">${sb}
+  return `${sb}<div class="tab-page">
     <div class="section-card">
       <div class="section-label">选择音色</div>
       <div style="display:flex;gap:8px">${voiceHtml}</div>
@@ -1423,7 +1426,7 @@ function tCloneStep4(sb) {
     </div>`;
   }).join('');
 
-  return `<div class="tab-page">${sb}
+  return `${sb}<div class="tab-page">
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div class="section-label" style="margin-bottom:0">选择数字人形象</div>
@@ -1484,7 +1487,7 @@ function tCloneStep5(sb) {
 
   const previewTitle = esc((S.rewrittenScript||S.extractedScript||'').slice(0,20));
 
-  return `<div class="tab-page">${sb}
+  return `${sb}<div class="tab-page">
     <div style="background:#F0EDE8;border-radius:14px;aspect-ratio:9/10;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:12px;position:relative;overflow:hidden">
       <div style="width:50px;height:50px;background:#FF6B35;border-radius:50%;display:flex;align-items:center;justify-content:center">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -1550,7 +1553,7 @@ function tCloneStep6(sb) {
     S.ttsAudioUrl && '语音',
   ].filter(Boolean).map(b=>`<span style="font-size:11px;color:#9A3412;background:#FFF1E8;padding:4px 8px;border-radius:6px">${b}</span>`).join('');
 
-  return `<div class="tab-page">${sb}
+  return `${sb}<div class="tab-page">
     <div style="display:flex;gap:12px;margin-bottom:14px">
       <div style="width:72px;aspect-ratio:9/16;background:#F0EDE8;border-radius:10px;position:relative;overflow:hidden;flex-shrink:0">
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
