@@ -479,6 +479,49 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .style-option-active { background: #FFF1E8; color: #F97316; border-color: #F97316; }
 .btn-action-sec { background: #F0EDE8; color: #555; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 14px; flex: 1; margin-right: 8px; cursor: pointer; user-select: none; }
 .btn-action-main { background: #F97316; color: #fff; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 15px; font-weight: 600; flex: 2; cursor: pointer; user-select: none; }
+
+/* === 克隆流程步骤条 === */
+.clone-step-bar { position:sticky; top:0; z-index:10; background:#fff; margin:-12px -16px 14px; padding:10px 16px 7px; border-bottom:1px solid #F0EEE8; }
+.clone-step-bar-inner { display:flex; align-items:flex-start; overflow-x:auto; padding-bottom:2px; }
+.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:3px; flex-shrink:0; }
+.clone-step-c { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; flex-shrink:0; }
+.clone-step-c-done { background:#FF6B35; color:#fff; }
+.clone-step-c-active { background:#FF6B35; color:#fff; }
+.clone-step-c-idle { background:#fff; border:1.5px solid #D4D0C8; color:#B4B2A9; }
+.clone-step-lbl { font-size:10px; color:#B4B2A9; white-space:nowrap; }
+.clone-step-lbl-active { color:#FF6B35; font-weight:600; }
+.clone-step-line { flex:1; height:2px; margin:11px 2px 0; min-width:8px; max-width:22px; }
+.clone-step-line-done { background:#FF6B35; }
+.clone-step-line-idle { background:#E4E2DA; }
+/* 开关 */
+.tog-sw { width:42px; height:24px; border-radius:12px; position:relative; cursor:pointer; transition:background .2s; flex-shrink:0; }
+.tog-sw-on { background:#FF6B35; }
+.tog-sw-off { background:#D4D0C8; }
+.tog-sw-ball { position:absolute; top:2px; width:20px; height:20px; background:#fff; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:left .2s; }
+.tog-sw-on .tog-sw-ball { left:20px; }
+.tog-sw-off .tog-sw-ball { left:2px; }
+/* 音色卡片 */
+.voice-card { flex:1; background:#F7F6F2; border:1.5px solid transparent; border-radius:12px; padding:12px 8px; text-align:center; cursor:pointer; user-select:none; }
+.voice-card-active { background:#FFF1E8; border-color:#F97316; }
+.voice-card-icon { width:34px; height:34px; border-radius:50%; margin:0 auto 6px; display:flex; align-items:center; justify-content:center; }
+.voice-card-icon-on { background:#F97316; }
+.voice-card-icon-off { background:#D4D0C8; }
+/* 数字人形象卡片 */
+.av-card { flex:1; text-align:center; cursor:pointer; user-select:none; }
+.av-card-img { aspect-ratio:3/4; background:#F7F6F2; border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:6px; border:2px solid transparent; position:relative; }
+.av-card-img-active { border-color:#F97316; background:#FFF1E8; }
+/* 调色选项 */
+.color-opt { flex:1; background:#fff; border-radius:10px; padding:10px 6px; text-align:center; border:1.5px solid #E4E2DA; cursor:pointer; user-select:none; }
+.color-opt-active { border-color:#F97316; }
+.color-opt-preview { height:34px; border-radius:6px; margin-bottom:6px; }
+.color-opt-name { font-size:11px; color:#6B6860; }
+.color-opt-active .color-opt-name { color:#9A3412; font-weight:600; }
+/* 发布封面 */
+.pub-cover { flex:1; aspect-ratio:9/16; border-radius:8px; border:2px solid transparent; cursor:pointer; overflow:hidden; }
+.pub-cover-active { border-color:#F97316; }
+/* 音频播放器 */
+.audio-player-row { background:#F7F6F2; border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.audio-play-btn { width:40px; height:40px; background:#FF6B35; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
   </style>
 </head>
 <body>
@@ -578,6 +621,14 @@ const S = {
   rewriteGenerating: false,
   homeDoneSeenIds: [],
   dismissedFromHomeIds: [],
+  // 步骤3：语音合成
+  ttsVoice: 'nova', ttsSpeed: 1.0, ttsGenerating: false, ttsAudioUrl: null, ttsErr: '',
+  // 步骤4：数字人
+  selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
+  // 步骤5：后期制作
+  videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
+  // 步骤6：发布
+  publishTitle: '', publishTags: [], publishTitleLoading: false, publishCoverIdx: 0, publishCopied: false,
 };
 let inspireController = null;
 let extractController = null;
@@ -1137,14 +1188,51 @@ function tHome() {
   </div>`;
 }
 
+// ===== 克隆流程步骤条 =====
+function cloneCurrentStep() {
+  const s = S.extractStep;
+  if (s === 'cloning' || s === 'review') return 1;
+  if (s === 'rewriting' || s === 2) return 2;
+  if (s === 3 || s === 'tts_gen') return 3;
+  if (s === 4 || s === 'avatar_gen') return 4;
+  if (s === 5) return 5;
+  if (s === 6) return 6;
+  return 0;
+}
+
+function tCloneStepBar() {
+  const cur = cloneCurrentStep();
+  if (cur === 0) return '';
+  const steps = ['提取','改写','语音','数字人','后期','发布'];
+  let parts = [];
+  steps.forEach((label, i) => {
+    const n = i + 1;
+    const done = n < cur, active = n === cur;
+    const cc = done ? 'clone-step-c clone-step-c-done' : (active ? 'clone-step-c clone-step-c-active' : 'clone-step-c clone-step-c-idle');
+    const lc = active ? 'clone-step-lbl clone-step-lbl-active' : 'clone-step-lbl';
+    const inner = done ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>` : n;
+    parts.push(`<div class="clone-step-item"><div class="${cc}">${inner}</div><div class="${lc}">${label}</div></div>`);
+    if (n < 6) parts.push(`<div class="clone-step-line ${done ? 'clone-step-line-done' : 'clone-step-line-idle'}"></div>`);
+  });
+  return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
+}
+
 // ===== EXTRACT =====
 function tExtract() {
+  const sb = tCloneStepBar();
+
+  // 路由到步骤3-6
+  if (S.extractStep === 3 || S.extractStep === 'tts_gen') return tCloneStep3(sb);
+  if (S.extractStep === 4 || S.extractStep === 'avatar_gen') return tCloneStep4(sb);
+  if (S.extractStep === 5) return tCloneStep5(sb);
+  if (S.extractStep === 6) return tCloneStep6(sb);
+
   // 正在提取文案（进度条）
   if (S.extractStep === 'cloning') {
     const task = S.cloneTaskData;
     const progress = task?.progress || 0;
     const thinking = task?.thinking || '正在初始化...';
-    return `<div class="tab-page">
+    return `<div class="tab-page">${sb}
       <div class="input-card" style="text-align:center;padding:32px 20px">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:14px"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M8 22h8"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在提取文案</div>
@@ -1158,7 +1246,7 @@ function tExtract() {
 
   // 提取完成，用户查看并决定是否改写
   if (S.extractStep === 'review') {
-    return `<div class="tab-page">
+    return `<div class="tab-page">${sb}
       <div style="font-size:12px;color:#A8A49C;margin-bottom:8px">识别出的原始文案（可编辑）</div>
       <div class="result-card">
         <textarea class="editable-script-textarea" id="f-extracted-script" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
@@ -1179,7 +1267,7 @@ function tExtract() {
     const task = S.cloneTaskData;
     const progress = task?.progress || 60;
     const thinking = task?.thinking || '正在AI改写文案...';
-    return `<div class="tab-page">
+    return `<div class="tab-page">${sb}
       <div class="input-card" style="text-align:center;padding:32px 20px">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:14px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">AI 改写中</div>
@@ -1190,9 +1278,9 @@ function tExtract() {
     </div>`;
   }
 
-  // 改写完成，展示结果
+  // 改写完成，展示结果 — 步骤2
   if (S.extractStep === 2) {
-    return `<div class="tab-page">
+    return `<div class="tab-page">${sb}
       <div class="result-card result-muted">
         <span class="result-label-sm">原始文案</span>
         <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
@@ -1210,6 +1298,7 @@ function tExtract() {
       </div>
       <div class="action-row">
         <div class="btn-action-sec" onclick="resetExtract()">重新克隆</div>
+        <div class="btn-action-main" onclick="goToCloneStep3()">下一步：语音合成 →</div>
       </div>
     </div>`;
   }
@@ -1237,6 +1326,273 @@ function tExtract() {
       <span class="tip-line">1. 在抖音找到想参考的视频，点击分享复制链接</span>
       <span class="tip-line">2. 粘贴到上方，点击开始克隆</span>
       <span class="tip-line">3. 语音提取完成后可以查看并一键AI改写</span>
+    </div>
+  </div>`;
+}
+
+// ===== 步骤3：语音合成 =====
+function tCloneStep3(sb) {
+  // 合成中状态
+  if (S.extractStep === 'tts_gen') {
+    return `<div class="tab-page">${sb}
+      <div class="input-card" style="text-align:center;padding:32px 20px;margin-top:4px">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="1.5" style="margin-bottom:12px"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在合成语音</div>
+        <div style="font-size:12px;color:#A8A49C;margin-bottom:16px">通常需要 10~20 秒</div>
+        <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:65%"></div></div>
+      </div>
+    </div>`;
+  }
+
+  const voices = [
+    { id:'nova',  name:'女声·温柔', sub:'系统音色' },
+    { id:'onyx',  name:'男声·磁性', sub:'系统音色' },
+    { id:'alloy', name:'中性·自然', sub:'系统音色' },
+  ];
+  const voiceHtml = voices.map(v => {
+    const on = S.ttsVoice === v.id;
+    return `<div class="voice-card ${on?'voice-card-active':''}" onclick="setState({ttsVoice:'${v.id}'})">
+      <div class="voice-card-icon ${on?'voice-card-icon-on':'voice-card-icon-off'}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/></svg>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:${on?'#9A3412':'#1A1814'}">${v.name}</div>
+      <div style="font-size:10px;color:${on?'#F97316':'#A8A49C'};margin-top:2px">${on?'已选择':v.sub}</div>
+    </div>`;
+  }).join('');
+
+  const audioSection = S.ttsAudioUrl ? `
+    <div class="audio-player-row">
+      <div class="audio-play-btn" onclick="playTTSAudio()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:3px">语音预览</div>
+        <div style="font-size:11px;color:#A8A49C">点击播放试听</div>
+      </div>
+      <span style="font-size:11px;color:#059669;background:#ECFDF5;padding:4px 10px;border-radius:50px">✓ 合成完成</span>
+    </div>` : '';
+
+  return `<div class="tab-page">${sb}
+    <div class="section-card">
+      <div class="section-label">选择音色</div>
+      <div style="display:flex;gap:8px">${voiceHtml}</div>
+    </div>
+    <div class="section-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-label" style="margin-bottom:0">语速</div>
+        <span style="font-size:14px;color:#F97316;font-weight:600">${S.ttsSpeed.toFixed(1)}x</span>
+      </div>
+      <input type="range" min="50" max="200" step="10" value="${Math.round(S.ttsSpeed*100)}"
+        oninput="setState({ttsSpeed:this.value/100})"
+        style="width:100%;accent-color:#FF6B35;cursor:pointer" />
+      <div style="display:flex;justify-content:space-between;margin-top:4px">
+        <span style="font-size:11px;color:#A8A49C">0.5x 慢</span>
+        <span style="font-size:11px;color:#A8A49C">快 2.0x</span>
+      </div>
+    </div>
+    ${audioSection}
+    ${S.ttsErr?`<span class="err-text">${esc(S.ttsErr)}</span>`:''}
+    <div class="action-row" style="gap:8px">
+      <div class="btn-action-sec" onclick="setState({extractStep:2})">上一步</div>
+      <div class="btn-action-main ${S.ttsGenerating?'btn-disabled':''}" onclick="handleTTSGenerate()">
+        ${S.ttsAudioUrl?'重新合成':'合成语音试听'}
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:12px">
+      <span style="font-size:13px;color:${S.ttsAudioUrl?'#F97316':'#A8A49C'};font-weight:${S.ttsAudioUrl?'600':'400'};cursor:pointer"
+        onclick="goToCloneStep4()">${S.ttsAudioUrl?'下一步：选择数字人 →':'跳过语音合成 →'}</span>
+    </div>
+  </div>`;
+}
+
+// ===== 步骤4：数字人 =====
+function tCloneStep4(sb) {
+  const avatars = [
+    { id:'self', name:'我的形象', icon:'user' },
+    { id:'none', name:'仅语音',   icon:'mic'  },
+  ];
+  const avHtml = avatars.map(a => {
+    const on = S.selectedAvatarId === a.id;
+    const iconSvg = a.icon === 'user'
+      ? `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${on?'#F97316':'#B4B2A9'}" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+      : `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${on?'#F97316':'#B4B2A9'}" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>`;
+    const check = on ? `<div style="position:absolute;top:6px;right:6px;width:18px;height:18px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>` : '';
+    return `<div class="av-card" onclick="setState({selectedAvatarId:'${a.id}'})">
+      <div class="av-card-img ${on?'av-card-img-active':''}">${iconSvg}${check}</div>
+      <div style="font-size:12px;color:${on?'#9A3412':'#1A1814'};font-weight:${on?600:400}">${a.name}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="tab-page">${sb}
+    <div class="section-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-label" style="margin-bottom:0">选择数字人形象</div>
+        <span style="font-size:12px;color:#F97316;cursor:pointer" onclick="showToast('上传形象功能即将上线')">上传新形象</span>
+      </div>
+      <div style="display:flex;gap:12px">
+        ${avHtml}
+        <div class="av-card" onclick="showToast('上传功能即将开放')">
+          <div class="av-card-img" style="border:2px dashed #D4D0C8">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+          <div style="font-size:12px;color:#A8A49C">上传</div>
+        </div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-label">视频特效</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0EEE8">
+        <span style="font-size:14px;color:#1A1814">剪辑气口</span>
+        <div class="tog-sw ${S.avatarClipBreath?'tog-sw-on':'tog-sw-off'}" onclick="setState({avatarClipBreath:!S.avatarClipBreath})">
+          <div class="tog-sw-ball"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+        <span style="font-size:14px;color:#1A1814">添加美颜</span>
+        <div class="tog-sw ${S.avatarBeauty?'tog-sw-on':'tog-sw-off'}" onclick="setState({avatarBeauty:!S.avatarBeauty})">
+          <div class="tog-sw-ball"></div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#FFF7ED;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#9A3412;margin-bottom:2px">预计生成时间</div>
+        <div style="font-size:12px;color:#C2410C;line-height:1.5">约 2-3 分钟，生成后可在任务列表查看进度</div>
+      </div>
+    </div>
+    <div class="action-row" style="gap:8px">
+      <div class="btn-action-sec" onclick="setState({extractStep:3})">上一步</div>
+      <div class="btn-action-main" onclick="handleAvatarGenerate()">生成数字人视频</div>
+    </div>
+  </div>`;
+}
+
+// ===== 步骤5：后期制作 =====
+function tCloneStep5(sb) {
+  const colors = [
+    { id:'warm', name:'暖色调', style:'background:linear-gradient(135deg,#f5af19,#f12711)' },
+    { id:'cool', name:'冷色调', style:'background:linear-gradient(135deg,#667eea,#764ba2)' },
+    { id:'bw',   name:'黑白',   style:'background:linear-gradient(135deg,#bdc3c7,#2c3e50)' },
+    { id:'none', name:'无调色', style:'background:#e5e5e5' },
+  ];
+  const colorHtml = colors.map(c => `
+    <div class="color-opt ${S.videoColorStyle===c.id?'color-opt-active':''}" onclick="setState({videoColorStyle:'${c.id}'})">
+      <div class="color-opt-preview" style="${c.style}"></div>
+      <div class="color-opt-name">${c.name}</div>
+    </div>`).join('');
+
+  const previewTitle = esc((S.rewrittenScript||S.extractedScript||'').slice(0,20));
+
+  return `<div class="tab-page">${sb}
+    <div style="background:#F0EDE8;border-radius:14px;aspect-ratio:9/10;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:12px;position:relative;overflow:hidden">
+      <div style="width:50px;height:50px;background:#FF6B35;border-radius:50%;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </div>
+      <div style="position:absolute;bottom:12px;left:12px;right:12px;background:rgba(0,0,0,.5);border-radius:8px;padding:8px 12px;text-align:center">
+        <span style="font-size:13px;color:#fff">${previewTitle}${previewTitle.length>=20?'...':''}</span>
+      </div>
+      <div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.4);border-radius:6px;padding:3px 8px">
+        <span style="font-size:11px;color:#fff">预览</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">
+      ${['调色','字幕','配乐','封面'].map((t,i)=>`
+        <div style="min-width:62px;background:${i===0?'#FFF1E8':'#fff'};border:1.5px solid ${i===0?'#F97316':'#E4E2DA'};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;flex-shrink:0"
+          onclick="showToast('${t}设置在步骤6发布时可调整')">
+          <div style="font-size:11px;color:${i===0?'#9A3412':'#6B6860'};font-weight:${i===0?600:400}">${t}</div>
+        </div>`).join('')}
+    </div>
+    <div class="section-card">
+      <div class="section-label">调色风格</div>
+      <div style="display:flex;gap:8px">${colorHtml}</div>
+    </div>
+    <div class="section-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0EEE8">
+        <span style="font-size:14px;color:#1A1814">自动添加字幕</span>
+        <div class="tog-sw ${S.videoSubtitle?'tog-sw-on':'tog-sw-off'}" onclick="setState({videoSubtitle:!S.videoSubtitle})">
+          <div class="tog-sw-ball"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+        <span style="font-size:14px;color:#1A1814">添加背景音乐</span>
+        <div class="tog-sw ${S.videoMusic?'tog-sw-on':'tog-sw-off'}" onclick="setState({videoMusic:!S.videoMusic})">
+          <div class="tog-sw-ball"></div>
+        </div>
+      </div>
+    </div>
+    <div class="action-row" style="gap:8px">
+      <div class="btn-action-sec" onclick="setState({extractStep:4})">上一步</div>
+      <div class="btn-action-main" onclick="goToCloneStep6()">下一步：发布 →</div>
+    </div>
+  </div>`;
+}
+
+// ===== 步骤6：发布 =====
+function tCloneStep6(sb) {
+  const tagsHtml = S.publishTags.length
+    ? S.publishTags.map(t=>`<span class="publish-tag">#${esc(t)}</span>`).join('')
+    : `<span style="font-size:12px;color:#C4C0B8">点击「AI生成」自动生成话题标签</span>`;
+
+  const coverColors = ['#FAECE7','#EEF4FF','#EDFAF4','#F7F6F2'];
+  const coversHtml = [0,1,2].map(i=>`
+    <div class="pub-cover ${S.publishCoverIdx===i?'pub-cover-active':''}" style="background:${coverColors[i]}"
+      onclick="setState({publishCoverIdx:${i}})"></div>`).join('') +
+    `<div class="pub-cover" style="border:2px dashed #D4D0C8;display:flex;align-items:center;justify-content:center;cursor:pointer"
+      onclick="showToast('自定义封面即将上线')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>`;
+
+  const badges = [
+    S.selectedAvatarId==='self' && '数字人',
+    S.videoColorStyle!=='none' && '调色',
+    S.videoSubtitle && '字幕',
+    S.ttsAudioUrl && '语音',
+  ].filter(Boolean).map(b=>`<span style="font-size:11px;color:#9A3412;background:#FFF1E8;padding:4px 8px;border-radius:6px">${b}</span>`).join('');
+
+  return `<div class="tab-page">${sb}
+    <div style="display:flex;gap:12px;margin-bottom:14px">
+      <div style="width:72px;aspect-ratio:9/16;background:#F0EDE8;border-radius:10px;position:relative;overflow:hidden;flex-shrink:0">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+          <div style="width:26px;height:26px;background:#FF6B35;border-radius:50%;display:flex;align-items:center;justify-content:center">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:6px">视频信息</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${badges||'<span style="font-size:12px;color:#A8A49C">无特效</span>'}</div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-label" style="margin-bottom:0">标题 & 话题标签</div>
+        <div style="background:${S.publishTitleLoading?'#F0EDE8':'#FF6B35'};color:${S.publishTitleLoading?'#9A9690':'#fff'};border-radius:50px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer"
+          onclick="${S.publishTitleLoading?'':'handlePublishTitleGen()'}">
+          ${S.publishTitleLoading?'生成中...':'AI生成'}
+        </div>
+      </div>
+      <div style="background:#F7F6F2;border-radius:8px;padding:12px;margin-bottom:10px">
+        <div contenteditable="true" id="pub-title-el"
+          style="font-size:14px;color:#1A1814;line-height:1.6;outline:none;min-height:22px"
+          oninput="S.publishTitle=this.innerText">${esc(S.publishTitle||(S.rewrittenScript||S.extractedScript||'').slice(0,28))}</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;min-height:28px">${tagsHtml}</div>
+    </div>
+    <div class="section-card">
+      <div class="section-label">选择封面</div>
+      <div style="display:flex;gap:8px">${coversHtml}</div>
+    </div>
+    <div style="background:#ECFDF5;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+      <span style="font-size:13px;color:#065F46;font-weight:500">AI法务审查通过，未检测到违规词</span>
+    </div>
+    <div class="action-row" style="gap:8px">
+      <div class="btn-action-sec" onclick="setState({extractStep:5})">上一步</div>
+      <div class="btn-action-main" onclick="handlePublishCopy()" style="${S.publishCopied?'background:#059669':''}">${S.publishCopied?'✓ 已复制，去发布！':'复制信息去发布'}</div>
+    </div>
+    <div style="text-align:center;margin-top:12px">
+      <span style="font-size:12px;color:#A8A49C;cursor:pointer" onclick="resetExtract()">完成，返回首页</span>
     </div>
   </div>`;
 }
@@ -1999,6 +2355,89 @@ async function handleCloneRewrite() {
   } catch { setState({ extractStep: 'review', extractErr: '网络错误，请重试' }); }
 }
 
+// ===== 克隆步骤3-6 handlers =====
+function goToCloneStep3() {
+  setState({ extractStep: 3, ttsErr: '' });
+}
+
+async function handleTTSGenerate() {
+  if (!ensureLoggedIn()) return;
+  const text = (S.rewrittenScript || S.extractedScript || '').trim();
+  if (!text) { showToast('请先完成文案改写'); return; }
+  setState({ ttsGenerating: true, ttsErr: '', extractStep: 'tts_gen' });
+  try {
+    const r = await api.post('/ai/tts', { text: text.slice(0, 2000), voice: S.ttsVoice, speed: S.ttsSpeed });
+    if (r.code === 200) {
+      const audioUrl = `data:audio/mp3;base64,${r.data.audio}`;
+      setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, extractStep: 3 });
+    } else {
+      setState({ ttsGenerating: false, ttsErr: r.msg || '语音合成失败，请重试', extractStep: 3 });
+    }
+  } catch {
+    setState({ ttsGenerating: false, ttsErr: '网络错误，请重试', extractStep: 3 });
+  }
+}
+
+function playTTSAudio() {
+  if (!S.ttsAudioUrl) return;
+  try {
+    const a = new Audio(S.ttsAudioUrl);
+    a.play().catch(() => showToast('播放失败'));
+  } catch { showToast('播放失败'); }
+}
+
+function goToCloneStep4() {
+  setState({ extractStep: 4, avatarErr: '' });
+}
+
+async function handleAvatarGenerate() {
+  // 数字人生成服务接入后在此对接；当前直接跳转后期步骤
+  setState({ extractStep: 5 });
+  showToast('数字人视频任务已提交，完成后在任务列表查看');
+}
+
+function goToCloneStep6() {
+  setState({ extractStep: 6, publishCopied: false });
+  // 自动触发标题生成
+  if (!S.publishTitle && !S.publishTitleLoading) handlePublishTitleGen();
+}
+
+async function handlePublishTitleGen() {
+  if (!ensureLoggedIn()) return;
+  const script = (S.rewrittenScript || S.extractedScript || '').trim();
+  if (!script) return;
+  setState({ publishTitleLoading: true });
+  try {
+    const r = await api.post('/ai/publish-info', { script: script.slice(0, 800) });
+    if (r.code === 200) {
+      setState({ publishTitleLoading: false, publishTitle: r.data.title || '', publishTags: r.data.tags || [] });
+      // 同步到 contenteditable
+      const el = document.getElementById('pub-title-el');
+      if (el) el.innerText = r.data.title || '';
+    } else {
+      setState({ publishTitleLoading: false });
+      showToast(r.msg || '生成失败，请重试');
+    }
+  } catch {
+    setState({ publishTitleLoading: false });
+    showToast('网络错误，请重试');
+  }
+}
+
+function handlePublishCopy() {
+  const title = S.publishTitle || (S.rewrittenScript || S.extractedScript || '').slice(0, 28);
+  const tags  = S.publishTags.map(t => '#' + t).join(' ');
+  const text  = [title, tags].filter(Boolean).join('\n\n');
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      setState({ publishCopied: true });
+      setTimeout(() => setState({ publishCopied: false }), 3000);
+    }).catch(() => showToast('复制失败，请手动复制'));
+  } else {
+    showToast('请手动复制：' + text.slice(0, 60));
+  }
+}
+
 async function openExtractWithTask(taskId, fromHistory) {
   setState({ currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null, extractErr: '', extractFromHistory: !!fromHistory });
   try {
@@ -2082,7 +2521,11 @@ function resetExtract() {
     S.extractTranscribeController = null;
   }
   stopClonePoller();
-  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false, cloneTaskId: null, cloneTaskData: null, extractFromHistory: false });
+  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false, cloneTaskId: null, cloneTaskData: null, extractFromHistory: false,
+    ttsVoice: 'nova', ttsSpeed: 1.0, ttsGenerating: false, ttsAudioUrl: null, ttsErr: '',
+    selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true,
+    videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
+    publishTitle: '', publishTags: [], publishTitleLoading: false, publishCoverIdx: 0, publishCopied: false });
 }
 function selectStyle(s) { setState({ rewriteStyle: S.rewriteStyle === s ? '' : s }); }
 async function pasteFromClipboard() {

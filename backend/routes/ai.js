@@ -228,4 +228,67 @@ router.post('/inspire-expand', requireAuth, async (req, res) => {
   }
 });
 
+// ==================== 语音合成 TTS ====================
+router.post('/tts', requireAuth, async (req, res) => {
+  const { text, voice, speed } = req.body;
+  if (!text?.trim()) return res.json({ code: 400, msg: '文案内容不能为空' });
+
+  const cfg = await getAIConfig();
+  const provider = cfg.ai_provider || 'openai';
+  if (provider !== 'openai') return res.json({ code: 400, msg: '语音合成暂仅支持 OpenAI 服务商，请在管理后台切换' });
+  if (!cfg.openai_api_key) return res.json({ code: 400, msg: 'OpenAI Key 未配置' });
+
+  const baseUrl = cfg.openai_base_url || 'https://api.openai.com/v1';
+  const validVoices = ['alloy','echo','fable','onyx','nova','shimmer'];
+  const ttsVoice = validVoices.includes(voice) ? voice : 'nova';
+  const ttsSpeed = Math.min(Math.max(parseFloat(speed) || 1.0, 0.25), 4.0);
+
+  try {
+    const response = await fetch(`${baseUrl}/audio/speech`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.openai_api_key}` },
+      body: JSON.stringify({ model: 'tts-1', input: text.trim().slice(0, 4096), voice: ttsVoice, speed: ttsSpeed, response_format: 'mp3' })
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.json({ code: 500, msg: `语音合成失败: ${errText.slice(0, 200)}` });
+    }
+    const buf = await response.arrayBuffer();
+    const b64 = Buffer.from(buf).toString('base64');
+    return res.json({ code: 200, data: { audio: b64, format: 'mp3' } });
+  } catch (e) {
+    return res.json({ code: 500, msg: `语音合成出错: ${e.message}` });
+  }
+});
+
+// ==================== 发布信息生成（标题+话题标签）====================
+router.post('/publish-info', requireAuth, async (req, res) => {
+  const { script } = req.body;
+  if (!script?.trim()) return res.json({ code: 400, msg: '文案内容不能为空' });
+
+  try {
+    const prompt = `根据以下短视频文案，生成：
+1. 一个吸引人的发布标题（15-28字，不加引号）
+2. 4-6个相关话题标签（不带#号，每个2-6字）
+
+文案内容：
+${script.slice(0, 800)}
+
+严格按JSON格式返回，不要其他内容：
+{"title": "...", "tags": ["标签1", "标签2", "标签3", "标签4"]}`;
+
+    const raw = await callAI(prompt);
+    let result = {};
+    try {
+      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      result = JSON.parse(cleaned);
+    } catch {
+      result = { title: script.slice(0, 25) + '...', tags: [] };
+    }
+    return res.json({ code: 200, data: { title: result.title || '', tags: result.tags || [] } });
+  } catch (e) {
+    return res.json({ code: 500, msg: e.message });
+  }
+});
+
 module.exports = router;
