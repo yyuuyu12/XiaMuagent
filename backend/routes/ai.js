@@ -228,36 +228,117 @@ router.post('/inspire-expand', requireAuth, async (req, res) => {
   }
 });
 
-// ==================== 语音合成 TTS ====================
+// ==================== 语音合成 TTS（多通道）====================
+// 优先级：Fish Audio 克隆音色 → 本地 edge-tts → OpenAI tts-1 兜底
 router.post('/tts', requireAuth, async (req, res) => {
-  const { text, voice, speed } = req.body;
+  const { text, voice, speed, cloneVoiceId } = req.body;
   if (!text?.trim()) return res.json({ code: 400, msg: '文案内容不能为空' });
+  const trimText = text.trim().slice(0, 4096);
 
+  // ===== 通道1：Fish Audio 克隆音色 =====
+  if (cloneVoiceId) {
+    try {
+      const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='fish_audio_api_key'");
+      const fishKey = (rows[0]?.value || '').trim();
+      if (!fishKey) return res.json({ code: 400, msg: '未配置 Fish Audio API Key，请管理员在后台填写 fish_audio_api_key' });
+
+      const fishRes = await fetch('https://api.fish.audio/v1/tts', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${fishKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimText, reference_id: cloneVoiceId, format: 'mp3', streaming: false }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!fishRes.ok) {
+        const errText = await fishRes.text();
+        return res.json({ code: 500, msg: `Fish Audio 合成失败: ${errText.slice(0, 200)}` });
+      }
+      const buf = await fishRes.arrayBuffer();
+      return res.json({ code: 200, data: { audio: Buffer.from(buf).toString('base64'), format: 'mp3' } });
+    } catch (e) {
+      return res.json({ code: 500, msg: `Fish Audio 出错: ${e.message}` });
+    }
+  }
+
+  // ===== 通道2：本地 edge-tts（经由 ASR 服务器）=====
+  try {
+    const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+    const asrUrl = (asrRows[0]?.value || '').trim();
+    if (asrUrl) {
+      const edgeRate = Math.max(-50, Math.min(100, Math.round(((parseFloat(speed) || 1.0) - 1.0) * 100)));
+      const resp = await fetch(`${asrUrl}/tts/synthesize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimText, voice: voice || 'xiaoxiao', rate: edgeRate }),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.audio) return res.json({ code: 200, data: { audio: data.audio, format: 'mp3' } });
+      }
+    }
+  } catch (_) { /* 降级到下一通道 */ }
+
+  // ===== 通道3：OpenAI tts-1 兜底 =====
   const cfg = await getAIConfig();
-  const provider = cfg.ai_provider || 'openai';
-  if (provider !== 'openai') return res.json({ code: 400, msg: '语音合成暂仅支持 OpenAI 服务商，请在管理后台切换' });
-  if (!cfg.openai_api_key) return res.json({ code: 400, msg: 'OpenAI Key 未配置' });
-
+  if (!cfg.openai_api_key) {
+    return res.json({ code: 500, msg: '语音合成失败：本地 ASR 服务未启动，且未配置 OpenAI Key。请启动本地 ASR 服务或在后台配置 OpenAI Key。' });
+  }
   const baseUrl = cfg.openai_base_url || 'https://api.openai.com/v1';
-  const validVoices = ['alloy','echo','fable','onyx','nova','shimmer'];
-  const ttsVoice = validVoices.includes(voice) ? voice : 'nova';
+  const voiceMap = { xiaoxiao: 'nova', yunjian: 'onyx', xiaoyi: 'nova', yunxi: 'alloy', yunyang: 'echo' };
+  const ttsVoice = voiceMap[voice] || 'nova';
   const ttsSpeed = Math.min(Math.max(parseFloat(speed) || 1.0, 0.25), 4.0);
-
   try {
     const response = await fetch(`${baseUrl}/audio/speech`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.openai_api_key}` },
-      body: JSON.stringify({ model: 'tts-1', input: text.trim().slice(0, 4096), voice: ttsVoice, speed: ttsSpeed, response_format: 'mp3' })
+      body: JSON.stringify({ model: 'tts-1', input: trimText, voice: ttsVoice, speed: ttsSpeed, response_format: 'mp3' }),
+      signal: AbortSignal.timeout(60000),
     });
     if (!response.ok) {
       const errText = await response.text();
       return res.json({ code: 500, msg: `语音合成失败: ${errText.slice(0, 200)}` });
     }
     const buf = await response.arrayBuffer();
-    const b64 = Buffer.from(buf).toString('base64');
-    return res.json({ code: 200, data: { audio: b64, format: 'mp3' } });
+    return res.json({ code: 200, data: { audio: Buffer.from(buf).toString('base64'), format: 'mp3' } });
   } catch (e) {
     return res.json({ code: 500, msg: `语音合成出错: ${e.message}` });
+  }
+});
+
+// ==================== 音色克隆（Fish Audio）====================
+router.post('/tts/clone', requireAuth, async (req, res) => {
+  const { audio, audioName } = req.body;
+  if (!audio) return res.json({ code: 400, msg: '请提供音频数据' });
+
+  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='fish_audio_api_key'");
+  const fishKey = (rows[0]?.value || '').trim();
+  if (!fishKey) return res.json({ code: 400, msg: '管理员尚未配置 Fish Audio API Key，无法使用音色克隆功能' });
+
+  try {
+    const audioBuffer = Buffer.from(audio, 'base64');
+    const formData = new FormData();
+    const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+    formData.append('title', audioName || '我的克隆音色');
+    formData.append('train_mode', 'fast');
+    formData.append('enhance_audio_quality', 'true');
+    formData.append('voices', blob, 'sample.mp3');
+
+    const resp = await fetch('https://api.fish.audio/model', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${fishKey}` },
+      body: formData,
+      signal: AbortSignal.timeout(120000),
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      return res.json({ code: 500, msg: `Fish Audio 克隆失败: ${errText.slice(0, 200)}` });
+    }
+    const data = await resp.json();
+    const voiceId = data._id || data.id;
+    if (!voiceId) return res.json({ code: 500, msg: `Fish Audio 返回异常: ${JSON.stringify(data).slice(0, 200)}` });
+    return res.json({ code: 200, data: { voice_id: voiceId } });
+  } catch (e) {
+    return res.json({ code: 500, msg: `音色克隆出错: ${e.message}` });
   }
 });
 

@@ -1,5 +1,8 @@
 fastapi
 uvicorn
 openai-whisper
-ffmpeg-python
+ffmpeg-python==0.2.0
 httpx
+edge-tts
+# ⚠️ 不要安装 python-ffmpeg！它与 ffmpeg-python 命名空间相同会冲突
+# pip uninstall python-ffmpeg  （如果已装则卸载）
