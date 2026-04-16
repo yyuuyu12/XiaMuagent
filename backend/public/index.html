@@ -481,18 +481,52 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .btn-action-main { background: #F97316; color: #fff; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 15px; font-weight: 600; flex: 2; cursor: pointer; user-select: none; }
 
 /* === 克隆流程步骤条 === */
-.clone-step-bar { background:#fff; padding:16px 16px 14px; border-bottom:1px solid #F0EEE8; width:100%; flex-shrink:0; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-.clone-step-bar-inner { display:flex; align-items:flex-start; min-width:max-content; }
-.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:56px; cursor:pointer; }
-.clone-step-c { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; flex-shrink:0; }
-.clone-step-c-done { background:#FF6B35; color:#fff; }
-.clone-step-c-active { background:#FF6B35; color:#fff; }
-.clone-step-c-idle { background:#fff; border:2px solid #D4D0C8; color:#B4B2A9; }
-.clone-step-lbl { font-size:12px; color:#B4B2A9; white-space:nowrap; }
-.clone-step-lbl-active { color:#FF6B35; font-weight:600; }
-.clone-step-line { width:24px; flex-shrink:0; height:2px; margin:17px 4px 0; }
-.clone-step-line-done { background:#FF6B35; }
-.clone-step-line-idle { background:#E4E2DA; }
+.clone-step-bar {
+  background:#fff; border-bottom:1px solid #F0EEE8;
+  width:100%; flex-shrink:0;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.clone-step-bar::-webkit-scrollbar { display:none; }
+.clone-step-bar-inner {
+  display:flex; align-items:flex-start;
+  padding:20px 20px 16px; min-width:max-content; gap:0;
+}
+.csb-step {
+  display:flex; flex-direction:column; align-items:center;
+  gap:8px; min-width:64px; flex-shrink:0; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.csb-node {
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:700; transition:transform .2s,box-shadow .2s;
+  position:relative;
+}
+.csb-node-done {
+  background:#FF6B35; color:#fff;
+  box-shadow:0 3px 10px rgba(255,107,53,.30);
+}
+.csb-node-active {
+  background:#FF6B35; color:#fff;
+  box-shadow:0 4px 16px rgba(255,107,53,.45);
+  transform:scale(1.12);
+}
+.csb-node-idle {
+  background:#F5F4F0; color:#C4C0B8;
+  border:2px solid #E4E2DA;
+}
+.csb-lbl { font-size:12px; white-space:nowrap; line-height:1; }
+.csb-lbl-done { color:#FF6B35; }
+.csb-lbl-active { color:#FF6B35; font-weight:700; }
+.csb-lbl-idle { color:#C4C0B8; }
+.csb-line {
+  width:28px; height:2px; flex-shrink:0; border-radius:1px;
+  margin-top:22px; /* (44-2)/2 = 21, +1 for label gap visual center */
+  align-self:flex-start;
+}
+.csb-line-done { background:#FF6B35; }
+.csb-line-idle { background:#E4E2DA; }
 /* 开关 */
 .tog-sw { width:42px; height:24px; border-radius:12px; position:relative; cursor:pointer; transition:background .2s; flex-shrink:0; }
 .tog-sw-on { background:#FF6B35; }
@@ -1208,16 +1242,17 @@ function tCloneStepBar() {
   if (cur === 0) return '';
   const steps = ['提取','改写','语音','数字人','后期','发布'];
   const targets = ['review', 2, 3, 4, 5, 6];
+  const CHECK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
   let parts = [];
   steps.forEach((label, i) => {
     const n = i + 1;
     const done = n < cur, active = n === cur;
-    const cc = done ? 'clone-step-c clone-step-c-done' : (active ? 'clone-step-c clone-step-c-active' : 'clone-step-c clone-step-c-idle');
-    const lc = active ? 'clone-step-lbl clone-step-lbl-active' : 'clone-step-lbl';
-    const inner = done ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>` : n;
+    const nc = done ? 'csb-node csb-node-done' : (active ? 'csb-node csb-node-active' : 'csb-node csb-node-idle');
+    const lc = done ? 'csb-lbl csb-lbl-done' : (active ? 'csb-lbl csb-lbl-active' : 'csb-lbl csb-lbl-idle');
+    const inner = done ? CHECK : n;
     const target = JSON.stringify(targets[i]);
-    parts.push(`<div class="clone-step-item" onclick="setState({extractStep:${target}})" style="cursor:pointer"><div class="${cc}">${inner}</div><div class="${lc}">${label}</div></div>`);
-    if (n < 6) parts.push(`<div class="clone-step-line ${done ? 'clone-step-line-done' : 'clone-step-line-idle'}"></div>`);
+    parts.push(`<div class="csb-step" onclick="setState({extractStep:${target}})"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
+    if (n < 6) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
   });
   return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
 }
