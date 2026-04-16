@@ -82,7 +82,10 @@ async function doTranscribe(taskId, mp4Urls, cacheKey, asrUrl, openaiKey, openai
         body: JSON.stringify({ taskId, mp4Url: firstUrl }),
         signal: AbortSignal.timeout(300000),
       });
-      if (!asrRes.ok) throw new Error(`本地ASR返回错误: ${asrRes.status}`);
+      if (!asrRes.ok) {
+        const body = await asrRes.text().catch(() => '');
+        throw new Error(`本地ASR返回错误: ${asrRes.status}${body ? ' - ' + body.slice(0, 300) : ''}`);
+      }
       const asrData = await asrRes.json();
       transcript = asrData.text?.trim() || '';
     } catch (asrErr) {

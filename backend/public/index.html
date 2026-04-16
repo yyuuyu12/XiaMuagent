@@ -708,6 +708,11 @@ function friendlyError(msg) {
     return 'AI 服务暂时不可用，请稍后重试';
   if (/未配置|未启动|not configured/i.test(msg) && /asr|语音/i.test(msg))
     return '语音识别服务未配置，请联系管理员在后台填写 ASR 服务地址';
+  // 中转站不支持 whisper-1
+  if (/model_not_found|No available channel.*whisper/i.test(msg))
+    return '语音转写失败：当前 AI 中转站不支持 whisper-1 模型，请在后台配置本地 ASR 服务地址';
+  // 本地ASR返回错误，附上状态码
+  if (/本地ASR返回错误/i.test(msg)) return msg;
   if (/asr|transcri|语音|whisper/i.test(msg))
     return '语音识别服务连接失败，请检查 ASR 服务是否正常运行';
   if (/tikhub|tik\s*hub|视频解析|视频下载|视频信息/i.test(msg))
