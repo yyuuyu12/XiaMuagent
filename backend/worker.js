@@ -6,10 +6,29 @@ const taskRunner = require('./taskRunner');
 const asrCache = new Map();
 
 // ===== OpenAI Whisper API 转写（本地 ASR 未配置时的云端备选）=====
-async function transcribeWithWhisper(mp4Url, apiKey, baseUrl) {
-  const videoResp = await fetch(mp4Url, { signal: AbortSignal.timeout(120000) });
-  if (!videoResp.ok) throw new Error(`下载视频失败: ${videoResp.status}`);
-  const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+const DOUYIN_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+
+async function transcribeWithWhisper(mp4Urls, apiKey, baseUrl) {
+  const urls = Array.isArray(mp4Urls) ? mp4Urls : [mp4Urls];
+
+  // 依次尝试每个 URL，带移动端 UA + Referer 绕过 CDN 鉴权
+  let videoBuffer = null;
+  let lastErr = '无可用地址';
+  for (const url of urls.slice(0, 5)) {
+    if (!url) continue;
+    try {
+      const videoResp = await fetch(url, {
+        headers: { 'User-Agent': DOUYIN_UA, 'Referer': 'https://www.douyin.com/' },
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!videoResp.ok) { lastErr = `HTTP ${videoResp.status}`; continue; }
+      const buf = Buffer.from(await videoResp.arrayBuffer());
+      if (buf.byteLength < 1000) { lastErr = '文件过小'; continue; }
+      videoBuffer = buf;
+      break;
+    } catch (e) { lastErr = e.message; continue; }
+  }
+  if (!videoBuffer) throw new Error(`视频下载失败 (${lastErr})，无法通过 Whisper 转写`);
 
   if (videoBuffer.byteLength > 24 * 1024 * 1024) {
     throw new Error('视频文件超过 24MB，无法通过 Whisper 转写，请换较短的视频');
@@ -47,16 +66,20 @@ async function getAsrConfig() {
   };
 }
 
-async function doTranscribe(taskId, mp4Url, cacheKey, asrUrl, openaiKey, openaiBaseUrl) {
+// mp4Urls 可以是单个 URL 字符串，也可以是 URL 数组（会逐一尝试）
+async function doTranscribe(taskId, mp4Urls, cacheKey, asrUrl, openaiKey, openaiBaseUrl) {
   let transcript = asrCache.get(`asr:${cacheKey}`) || null;
   if (transcript) return transcript;
+
+  // local ASR 用第一个 URL 即可（本地机器自己下载）
+  const firstUrl = Array.isArray(mp4Urls) ? mp4Urls[0] : mp4Urls;
 
   if (asrUrl) {
     try {
       const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, mp4Url }),
+        body: JSON.stringify({ taskId, mp4Url: firstUrl }),
         signal: AbortSignal.timeout(300000),
       });
       if (!asrRes.ok) throw new Error(`本地ASR返回错误: ${asrRes.status}`);
@@ -65,10 +88,10 @@ async function doTranscribe(taskId, mp4Url, cacheKey, asrUrl, openaiKey, openaiB
     } catch (asrErr) {
       if (!openaiKey) throw new Error(`本地语音识别服务不可用 (${asrErr.message})，且未配置 OpenAI API Key 作为备用`);
       console.warn(`[Worker] 本地ASR失败，降级到Whisper: ${asrErr.message}`);
-      transcript = await transcribeWithWhisper(mp4Url, openaiKey, openaiBaseUrl);
+      transcript = await transcribeWithWhisper(mp4Urls, openaiKey, openaiBaseUrl);
     }
   } else if (openaiKey) {
-    transcript = await transcribeWithWhisper(mp4Url, openaiKey, openaiBaseUrl);
+    transcript = await transcribeWithWhisper(mp4Urls, openaiKey, openaiBaseUrl);
   } else {
     throw new Error('语音识别未配置：请在管理后台填写本地 ASR 地址，或配置 OpenAI API Key（自动调用 Whisper 转写）');
   }
@@ -290,8 +313,12 @@ async function processCloneExtractPhase(taskId, task) {
   const vData = await vResp.json();
   const item = vData?.data?.aweme_details?.[0] || vData?.data?.aweme_detail;
   if (!item) throw new Error('无法获取视频信息，请检查链接是否正确');
-  const mp4Url = item.video?.play_addr?.url_list?.[0] || item.video?.download_addr?.url_list?.[0];
-  if (!mp4Url) throw new Error('无法获取视频下载地址');
+  // 收集所有可用 URL：download_addr 优先（无水印），play_addr 备用
+  const mp4Urls = [
+    ...(item.video?.download_addr?.url_list || []),
+    ...(item.video?.play_addr?.url_list || []),
+  ].filter(u => u && u.startsWith('http')).slice(0, 6);
+  if (!mp4Urls.length) throw new Error('无法获取视频下载地址');
 
   const videoTitle = item.desc?.slice(0, 30) || '视频';
   const author = item.author?.nickname || '';
@@ -299,7 +326,7 @@ async function processCloneExtractPhase(taskId, task) {
 
   await updateTask(taskId, { stage: 'asr', thinking: '正在识别视频语音...', progress: 35 });
 
-  const transcript = await doTranscribe(taskId, mp4Url, awemeId || cleanUrl, asrUrl, openaiKey, openaiBaseUrl);
+  const transcript = await doTranscribe(taskId, mp4Urls, awemeId || cleanUrl, asrUrl, openaiKey, openaiBaseUrl);
 
   // 阶段1完成，等待用户触发改写
   await db.query(
