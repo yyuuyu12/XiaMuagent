@@ -1207,6 +1207,7 @@ function tCloneStepBar() {
   const cur = cloneCurrentStep();
   if (cur === 0) return '';
   const steps = ['提取','改写','语音','数字人','后期','发布'];
+  const targets = ['review', 2, 3, 4, 5, 6];
   let parts = [];
   steps.forEach((label, i) => {
     const n = i + 1;
@@ -1214,7 +1215,8 @@ function tCloneStepBar() {
     const cc = done ? 'clone-step-c clone-step-c-done' : (active ? 'clone-step-c clone-step-c-active' : 'clone-step-c clone-step-c-idle');
     const lc = active ? 'clone-step-lbl clone-step-lbl-active' : 'clone-step-lbl';
     const inner = done ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>` : n;
-    parts.push(`<div class="clone-step-item"><div class="${cc}">${inner}</div><div class="${lc}">${label}</div></div>`);
+    const target = JSON.stringify(targets[i]);
+    parts.push(`<div class="clone-step-item" onclick="setState({extractStep:${target}})" style="cursor:pointer"><div class="${cc}">${inner}</div><div class="${lc}">${label}</div></div>`);
     if (n < 6) parts.push(`<div class="clone-step-line ${done ? 'clone-step-line-done' : 'clone-step-line-idle'}"></div>`);
   });
   return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
