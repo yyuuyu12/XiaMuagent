@@ -259,7 +259,33 @@ router.post('/tts', requireAuth, async (req, res) => {
     }
   }
 
-  // ===== 通道2：本地 edge-tts（经由 ASR 服务器）=====
+  // ===== 通道2：IndexTTS 本地克隆音色 =====
+  if (voice === 'indextts') {
+    const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+    const asrUrl = (asrRows[0]?.value || '').trim();
+    if (!asrUrl) return res.json({ code: 500, msg: 'IndexTTS 需要本地 ASR 服务，请在后台配置 asr_url' });
+    const { indexRefAudio, indexEmotion } = req.body;
+    if (!indexRefAudio) return res.json({ code: 400, msg: '请先上传参考音频（你的声音样本）才能使用克隆音色' });
+    try {
+      const resp = await fetch(`${asrUrl}/tts/indextts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', speed: parseFloat(speed) || 1.0 }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        return res.json({ code: 500, msg: `IndexTTS 合成失败: ${errText.slice(0, 300)}` });
+      }
+      const data = await resp.json();
+      if (data.audio) return res.json({ code: 200, data: { audio: data.audio, format: data.format || 'wav' } });
+      return res.json({ code: 500, msg: 'IndexTTS 返回数据异常' });
+    } catch (e) {
+      return res.json({ code: 500, msg: `IndexTTS 出错: ${e.message}` });
+    }
+  }
+
+  // ===== 通道3：本地 edge-tts（经由 ASR 服务器）=====
   try {
     const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
     const asrUrl = (asrRows[0]?.value || '').trim();

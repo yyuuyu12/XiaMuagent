@@ -128,6 +128,24 @@ async def tts_synthesize(payload: dict):
             os.unlink(tmp_path)
 
 
+# ===================== IndexTTS 代理接口 =====================
+INDEXTTS_URL = "http://localhost:8766"
+
+@app.post("/tts/indextts")
+async def tts_indextts_proxy(payload: dict):
+    """代理到 IndexTTS 服务（端口 8766），需要先启动 start_indextts.bat"""
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(f"{INDEXTTS_URL}/tts/generate", json=payload)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text[:400])
+        return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="IndexTTS 服务未启动，请运行 start_indextts.bat 后重试")
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="IndexTTS 推理超时（文本过长或 GPU 繁忙）")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
