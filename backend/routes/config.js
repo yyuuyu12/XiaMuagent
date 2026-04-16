@@ -126,6 +126,54 @@ router.delete('/industries/:id', requireAuth, requireAdmin, async (req, res) => 
   res.json({ code: 200, msg: '删除成功' });
 });
 
+// ==================== ASR 诊断 ====================
+router.get('/asr-test', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      "SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','openai_api_key','openai_base_url')"
+    );
+    const cfg = {};
+    rows.forEach(r => { cfg[r.config_key] = r.value; });
+
+    const asrUrl = (cfg.asr_url || '').trim();
+    const openaiKey = (cfg.openai_api_key || '').trim();
+    const openaiBase = (cfg.openai_base_url || 'https://api.openai.com/v1').trim();
+
+    const result = {
+      asr_url: asrUrl || '(未配置)',
+      openai_key: openaiKey ? `已配置 (${openaiKey.slice(0,4)}****)` : '(未配置)',
+      openai_base_url: openaiBase,
+      asr_ping: '(跳过)',
+      whisper_reachable: '(跳过)',
+    };
+
+    if (asrUrl) {
+      try {
+        const r = await fetch(`${asrUrl}/health`, { signal: AbortSignal.timeout(5000) });
+        result.asr_ping = r.ok ? `✅ 正常 (${r.status})` : `❌ 返回 ${r.status}`;
+      } catch (e) {
+        result.asr_ping = `❌ 连接失败: ${e.message}`;
+      }
+    }
+
+    if (openaiKey) {
+      try {
+        const r = await fetch(`${openaiBase}/models`, {
+          headers: { Authorization: `Bearer ${openaiKey}` },
+          signal: AbortSignal.timeout(8000),
+        });
+        result.whisper_reachable = r.ok ? `✅ 可达 (${r.status})` : `❌ ${r.status}: ${await r.text().then(t => t.slice(0,120))}`;
+      } catch (e) {
+        result.whisper_reachable = `❌ 连接失败: ${e.message}`;
+      }
+    }
+
+    res.json({ code: 200, data: result });
+  } catch (e) {
+    res.status(500).json({ code: 500, msg: e.message });
+  }
+});
+
 // ==================== H5「我的」页展示开关（默认关闭，后台可打开）====================
 router.get('/app-h5-settings', async (req, res) => {
   const out = { showProfilePhone: false, showAccountType: false };

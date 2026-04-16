@@ -611,7 +611,7 @@ const S = {
   showAuthCodeInput: false, showAuthCodeSheet: false, showSetPwdSheet: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
   videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
-  extractLoading: false, extractErr: '', copiedId: '',
+  extractLoading: false, extractErr: '', extractRawErr: '', copiedId: '',
   cloneTaskId: null, cloneTaskData: null, extractFromHistory: false,
   industries: [], selectedIndustryId: null, selectedIndustryName: '', customTrack: '',
   inspireScripts: [], inspireLoading: false, inspireErr: '', expandedScript: null,
@@ -1358,6 +1358,7 @@ function tExtract() {
         <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
       </div>
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
+      ${S.extractRawErr?`<div style="font-size:10px;color:#B4B2A9;margin-top:4px;word-break:break-all">原始错误：${esc(S.extractRawErr)}</div>`:''}
       ${S.extractLoading
         ? `<div class="btn-primary btn-disabled">⏳ 提交中...</div>`
         : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">开始克隆</div>`}
@@ -1697,7 +1698,8 @@ function tInspireAnalyze() {
       body = `<div style="text-align:center;padding:24px 0">
         <div style="font-size:36px;margin-bottom:12px">😞</div>
         <div style="font-size:14px;font-weight:600;color:#DC2626;margin-bottom:8px">处理失败</div>
-        <div style="font-size:12px;color:#6B6860;margin-bottom:16px">${esc(friendlyError(task.error_msg))}</div>
+        <div style="font-size:12px;color:#6B6860;margin-bottom:6px">${esc(friendlyError(task.error_msg))}</div>
+        ${task.error_msg?`<div style="font-size:10px;color:#B4B2A9;margin-bottom:16px;word-break:break-all">原始错误：${esc(task.error_msg)}</div>`:''}
         <div class="btn-primary" style="display:inline-block;padding:0 24px" onclick="setState({pathAState:'input',pathATaskData:null});render()">重新输入</div>
       </div>`;
     } else {
@@ -2373,7 +2375,7 @@ function startClonePoller(taskId) {
         loadTasks();
       } else if (task.status === 'failed') {
         stopClonePoller();
-        setState({ extractStep: 0, extractErr: friendlyError(task.error_msg), cloneTaskId: null, cloneTaskData: null });
+        setState({ extractStep: 0, extractErr: friendlyError(task.error_msg), extractRawErr: task.error_msg || '', cloneTaskId: null, cloneTaskData: null });
         loadTasks();
       }
     } catch {}
