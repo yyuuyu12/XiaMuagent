@@ -2438,7 +2438,8 @@ async function handleTTSGenerate() {
     if (S.ttsVoice === 'cloned' && S.ttsCloneVoiceId) payload.cloneVoiceId = S.ttsCloneVoiceId;
     const r = await api.post('/ai/tts', payload);
     if (r.code === 200) {
-      const audioUrl = `data:audio/mp3;base64,${r.data.audio}`;
+      // 转成 Blob URL，移动端大 base64 直接用 new Audio() 会静默失败
+      const audioUrl = _b64ToBlobUrl(r.data.audio, 'audio/mp3');
       setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, extractStep: 3 });
     } else {
       setState({ ttsGenerating: false, ttsErr: r.msg || '语音合成失败，请重试', extractStep: 3 });
@@ -2448,12 +2449,22 @@ async function handleTTSGenerate() {
   }
 }
 
+function _b64ToBlobUrl(b64, mime) {
+  try {
+    const raw = atob(b64);
+    const buf = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+    return URL.createObjectURL(new Blob([buf], { type: mime }));
+  } catch { return `data:${mime};base64,${b64}`; }
+}
+
 function playTTSAudio() {
   if (!S.ttsAudioUrl) return;
   try {
     const a = new Audio(S.ttsAudioUrl);
-    a.play().catch(() => showToast('播放失败'));
-  } catch { showToast('播放失败'); }
+    a.addEventListener('error', () => showToast('播放失败'));
+    a.play().catch(e => showToast('播放失败：' + (e.message || e)));
+  } catch (e) { showToast('播放失败：' + e.message); }
 }
 
 async function handleCloneAudioSelect(event) {

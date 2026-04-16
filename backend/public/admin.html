@@ -153,6 +153,11 @@
         <input id="asr_url" placeholder="例如：http://your-server:9000" />
         <div class="hint">本地 Whisper 服务地址，用于抖音视频转文字。留空则禁用该功能。</div>
       </div>
+      <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
+        <label>🐟 Fish Audio API Key（音色克隆）</label>
+        <input id="fish_audio_api_key" type="password" placeholder="在 fish.audio 注册后获取" />
+        <div class="hint">用于用户音色克隆功能。留空则克隆功能不可用，普通 edge-tts 语音合成不受影响。</div>
+      </div>
       <button class="btn-primary" onclick="saveKeys()">保存配置</button>
     </div>
 
@@ -360,6 +365,7 @@ async function loadKeys() {
   document.getElementById('zhipu_model').value = d.zhipu_model || '';
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
   document.getElementById('asr_url').value = d.asr_url || '';
+  document.getElementById('fish_audio_api_key').value = d.fish_audio_api_key || '';
 }
 
 async function saveKeys() {
@@ -372,6 +378,7 @@ async function saveKeys() {
     zhipu_model: document.getElementById('zhipu_model').value,
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
     asr_url: document.getElementById('asr_url').value,
+    fish_audio_api_key: document.getElementById('fish_audio_api_key').value,
   };
   const r = await req('/config/ai-keys', { method:'POST', body: JSON.stringify(body) });
   if (r.code===200) showMsg('key-msg','配置已保存'); else showMsg('key-msg',r.msg||'保存失败','error');
