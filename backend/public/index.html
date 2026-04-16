@@ -481,16 +481,16 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .btn-action-main { background: #F97316; color: #fff; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 15px; font-weight: 600; flex: 2; cursor: pointer; user-select: none; }
 
 /* === 克隆流程步骤条 === */
-.clone-step-bar { background:#fff; padding:14px 16px 12px; border-bottom:1px solid #F0EEE8; width:100%; flex-shrink:0; }
-.clone-step-bar-inner { display:flex; align-items:flex-start; width:100%; }
-.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:5px; flex-shrink:0; }
-.clone-step-c { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0; }
+.clone-step-bar { background:#fff; padding:16px 16px 14px; border-bottom:1px solid #F0EEE8; width:100%; flex-shrink:0; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.clone-step-bar-inner { display:flex; align-items:flex-start; min-width:max-content; }
+.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:56px; cursor:pointer; }
+.clone-step-c { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; flex-shrink:0; }
 .clone-step-c-done { background:#FF6B35; color:#fff; }
 .clone-step-c-active { background:#FF6B35; color:#fff; }
-.clone-step-c-idle { background:#fff; border:1.5px solid #D4D0C8; color:#B4B2A9; }
-.clone-step-lbl { font-size:11px; color:#B4B2A9; white-space:nowrap; }
+.clone-step-c-idle { background:#fff; border:2px solid #D4D0C8; color:#B4B2A9; }
+.clone-step-lbl { font-size:12px; color:#B4B2A9; white-space:nowrap; }
 .clone-step-lbl-active { color:#FF6B35; font-weight:600; }
-.clone-step-line { flex:1; height:2px; margin:14px 4px 0; }
+.clone-step-line { width:24px; flex-shrink:0; height:2px; margin:17px 4px 0; }
 .clone-step-line-done { background:#FF6B35; }
 .clone-step-line-idle { background:#E4E2DA; }
 /* 开关 */

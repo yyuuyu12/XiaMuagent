@@ -52,15 +52,21 @@ async function doTranscribe(taskId, mp4Url, cacheKey, asrUrl, openaiKey, openaiB
   if (transcript) return transcript;
 
   if (asrUrl) {
-    const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, mp4Url }),
-      signal: AbortSignal.timeout(300000),
-    });
-    if (!asrRes.ok) throw new Error(`语音识别失败: ${await asrRes.text()}`);
-    const asrData = await asrRes.json();
-    transcript = asrData.text?.trim() || '';
+    try {
+      const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, mp4Url }),
+        signal: AbortSignal.timeout(300000),
+      });
+      if (!asrRes.ok) throw new Error(`本地ASR返回错误: ${asrRes.status}`);
+      const asrData = await asrRes.json();
+      transcript = asrData.text?.trim() || '';
+    } catch (asrErr) {
+      if (!openaiKey) throw new Error(`本地语音识别服务不可用 (${asrErr.message})，且未配置 OpenAI API Key 作为备用`);
+      console.warn(`[Worker] 本地ASR失败，降级到Whisper: ${asrErr.message}`);
+      transcript = await transcribeWithWhisper(mp4Url, openaiKey, openaiBaseUrl);
+    }
   } else if (openaiKey) {
     transcript = await transcribeWithWhisper(mp4Url, openaiKey, openaiBaseUrl);
   } else {
