@@ -481,16 +481,16 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .btn-action-main { background: #F97316; color: #fff; border-radius: 50px; height: 46px; line-height: 46px; text-align: center; font-size: 15px; font-weight: 600; flex: 2; cursor: pointer; user-select: none; }
 
 /* === 克隆流程步骤条 === */
-.clone-step-bar { background:#fff; padding:10px 20px 8px; border-bottom:1px solid #F0EEE8; width:100%; flex-shrink:0; }
+.clone-step-bar { background:#fff; padding:14px 16px 12px; border-bottom:1px solid #F0EEE8; width:100%; flex-shrink:0; }
 .clone-step-bar-inner { display:flex; align-items:flex-start; width:100%; }
-.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; }
-.clone-step-c { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; flex-shrink:0; }
+.clone-step-item { display:flex; flex-direction:column; align-items:center; gap:5px; flex-shrink:0; }
+.clone-step-c { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0; }
 .clone-step-c-done { background:#FF6B35; color:#fff; }
 .clone-step-c-active { background:#FF6B35; color:#fff; }
 .clone-step-c-idle { background:#fff; border:1.5px solid #D4D0C8; color:#B4B2A9; }
-.clone-step-lbl { font-size:10px; color:#B4B2A9; white-space:nowrap; }
+.clone-step-lbl { font-size:11px; color:#B4B2A9; white-space:nowrap; }
 .clone-step-lbl-active { color:#FF6B35; font-weight:600; }
-.clone-step-line { flex:1; height:2px; margin:12px 3px 0; }
+.clone-step-line { flex:1; height:2px; margin:14px 4px 0; }
 .clone-step-line-done { background:#FF6B35; }
 .clone-step-line-idle { background:#E4E2DA; }
 /* 开关 */
@@ -519,6 +519,7 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 /* 发布封面 */
 .pub-cover { flex:1; aspect-ratio:9/16; border-radius:8px; border:2px solid transparent; cursor:pointer; overflow:hidden; }
 .pub-cover-active { border-color:#F97316; }
+.publish-tag { font-size:12px; color:#9A3412; background:#FFF1E8; padding:4px 10px; border-radius:50px; display:inline-block; }
 /* 音频播放器 */
 .audio-player-row { background:#F7F6F2; border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; margin-bottom:12px; }
 .audio-play-btn { width:40px; height:40px; background:#FF6B35; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
@@ -1320,7 +1321,6 @@ function tExtract() {
         <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
       </div>
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
-      ${S.extractErr&&/语音|asr/i.test(S.extractErr)?`<div style="text-align:center;margin-top:6px"><span style="font-size:13px;color:#FF6B35;text-decoration:underline;cursor:pointer" onclick="setState({extractStep:'review',extractedScript:'',extractErr:''})">手动输入文案跳过提取 →</span></div>`:''}
       ${S.extractLoading
         ? `<div class="btn-primary btn-disabled">⏳ 提交中...</div>`
         : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">开始克隆</div>`}

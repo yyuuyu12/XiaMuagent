@@ -5,6 +5,72 @@ const taskRunner = require('./taskRunner');
 // 内存 ASR 缓存（进程重启后清空，无需 Redis）
 const asrCache = new Map();
 
+// ===== OpenAI Whisper API 转写（本地 ASR 未配置时的云端备选）=====
+async function transcribeWithWhisper(mp4Url, apiKey, baseUrl) {
+  const videoResp = await fetch(mp4Url, { signal: AbortSignal.timeout(120000) });
+  if (!videoResp.ok) throw new Error(`下载视频失败: ${videoResp.status}`);
+  const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+
+  if (videoBuffer.byteLength > 24 * 1024 * 1024) {
+    throw new Error('视频文件超过 24MB，无法通过 Whisper 转写，请换较短的视频');
+  }
+
+  const formData = new FormData();
+  const blob = new Blob([videoBuffer], { type: 'video/mp4' });
+  formData.append('file', blob, 'audio.mp4');
+  formData.append('model', 'whisper-1');
+  formData.append('language', 'zh');
+
+  const whisperUrl = (baseUrl || 'https://api.openai.com/v1') + '/audio/transcriptions';
+  const resp = await fetch(whisperUrl, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: formData,
+    signal: AbortSignal.timeout(180000),
+  });
+  if (!resp.ok) throw new Error(`Whisper 转写失败: ${await resp.text()}`);
+  const data = await resp.json();
+  return data.text?.trim() || '';
+}
+
+// 读取 ASR 相关配置（本地 asr_url 优先，否则用 OpenAI Whisper）
+async function getAsrConfig() {
+  const { rows } = await db.query(
+    "SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','openai_api_key','openai_base_url')"
+  );
+  const cfg = {};
+  rows.forEach(r => { cfg[r.config_key] = r.value; });
+  return {
+    asrUrl: cfg.asr_url || '',
+    openaiKey: cfg.openai_api_key || '',
+    openaiBaseUrl: cfg.openai_base_url || 'https://api.openai.com/v1',
+  };
+}
+
+async function doTranscribe(taskId, mp4Url, cacheKey, asrUrl, openaiKey, openaiBaseUrl) {
+  let transcript = asrCache.get(`asr:${cacheKey}`) || null;
+  if (transcript) return transcript;
+
+  if (asrUrl) {
+    const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, mp4Url }),
+      signal: AbortSignal.timeout(300000),
+    });
+    if (!asrRes.ok) throw new Error(`语音识别失败: ${await asrRes.text()}`);
+    const asrData = await asrRes.json();
+    transcript = asrData.text?.trim() || '';
+  } else if (openaiKey) {
+    transcript = await transcribeWithWhisper(mp4Url, openaiKey, openaiBaseUrl);
+  } else {
+    throw new Error('语音识别未配置：请在管理后台填写本地 ASR 地址，或配置 OpenAI API Key（自动调用 Whisper 转写）');
+  }
+
+  if (transcript && cacheKey) asrCache.set(`asr:${cacheKey}`, transcript);
+  return transcript;
+}
+
 // ===== 进度更新工具 =====
 async function updateTask(taskId, fields) {
   const sets = Object.entries(fields).map(([k], i) => `${k} = $${i + 1}`).join(', ');
@@ -22,9 +88,8 @@ async function processProfileAnalyze(taskId) {
   const { author = {}, selected_videos = [], brand_name = '' } = input;
 
   // 读 ASR 地址
-  const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'asr_url'");
-  const asrUrl = asrRows[0]?.value;
-  if (!asrUrl) throw new Error('ASR 服务未配置，请在后台设置 asr_url');
+  const { asrUrl, openaiKey, openaiBaseUrl } = await getAsrConfig();
+  if (!asrUrl && !openaiKey) throw new Error('语音识别未配置：请在管理后台填写本地 ASR 地址，或配置 OpenAI API Key');
 
   // ===== Stage 1-3: ASR 串行处理每个视频 =====
   const transcripts = [];
@@ -44,27 +109,10 @@ async function processProfileAnalyze(taskId) {
         continue;
       }
 
-      let asrOk = false;
-      for (const url of (video.play_urls || []).slice(0, 3)) {
-        try {
-          const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId: `${taskId}_${i}`, mp4Url: url }),
-            signal: AbortSignal.timeout(300000),
-          });
-          if (!asrRes.ok) continue;
-          const asrData = await asrRes.json();
-          transcript = asrData.text?.trim() || '';
-          asrOk = true;
-          break;
-        } catch { continue; }
-      }
-      if (!asrOk) transcript = '(此视频转写失败)';
-
-      // 缓存 ASR 结果
-      if (transcript && !transcript.startsWith('(')) {
-        asrCache.set(`asr:${video.aweme_id}`, transcript);
+      try {
+        transcript = await doTranscribe(`${taskId}_${i}`, mp4Url, video.aweme_id, asrUrl, openaiKey, openaiBaseUrl);
+      } catch {
+        transcript = '(此视频转写失败)';
       }
     }
 
@@ -145,13 +193,12 @@ async function processSingleVideoAnalyze(taskId) {
   const input = JSON.parse(task.input_data || '{}');
   const { aweme_id, brand_name = '' } = input;
 
-  const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'asr_url'");
-  const asrUrl = asrRows[0]?.value;
   const { rows: tikhubRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'tikhub_api_key'");
   const tikhubKey = tikhubRows[0]?.value;
+  const { asrUrl, openaiKey, openaiBaseUrl } = await getAsrConfig();
 
-  if (!asrUrl) throw new Error('ASR 服务未配置');
   if (!tikhubKey) throw new Error('TikHub API Key 未配置');
+  if (!asrUrl && !openaiKey) throw new Error('语音识别未配置：请在管理后台填写本地 ASR 地址，或配置 OpenAI API Key');
 
   await updateTask(taskId, { status: 'running', stage: 'download', thinking: '正在解析视频信息...', progress: 10 });
 
@@ -173,23 +220,7 @@ async function processSingleVideoAnalyze(taskId) {
 
   await updateTask(taskId, { stage: 'asr', thinking: '正在听视频说了什么...', progress: 30 });
 
-  // 查内存 ASR 缓存
-  let transcript = asrCache.get(`asr:${aweme_id}`) || null;
-
-  if (!transcript) {
-    const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, mp4Url }),
-      signal: AbortSignal.timeout(300000),
-    });
-    if (!asrRes.ok) throw new Error(`ASR 失败: ${await asrRes.text()}`);
-    const asrData = await asrRes.json();
-    transcript = asrData.text?.trim() || '';
-    if (transcript) {
-      asrCache.set(`asr:${aweme_id}`, transcript);
-    }
-  }
+  const transcript = await doTranscribe(taskId, mp4Url, aweme_id, asrUrl, openaiKey, openaiBaseUrl);
 
   await updateTask(taskId, { stage: 'rewrite', thinking: '正在仿写文案...', progress: 70 });
 
@@ -228,10 +259,9 @@ async function processCloneExtractPhase(taskId, task) {
 
   const { rows: cfgRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'tikhub_api_key'");
   const tikhubKey = cfgRows[0]?.value;
-  const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key = 'asr_url'");
-  const asrUrl = asrRows[0]?.value;
   if (!tikhubKey) throw new Error('TikHub API Key 未配置');
-  if (!asrUrl) throw new Error('ASR 服务未配置');
+  const { asrUrl, openaiKey, openaiBaseUrl } = await getAsrConfig();
+  if (!asrUrl && !openaiKey) throw new Error('语音识别未配置：请在管理后台填写本地 ASR 地址，或配置 OpenAI API Key');
 
   await updateTask(taskId, { status: 'running', stage: 'download', thinking: '正在解析视频链接...', progress: 10 });
 
@@ -263,19 +293,7 @@ async function processCloneExtractPhase(taskId, task) {
 
   await updateTask(taskId, { stage: 'asr', thinking: '正在识别视频语音...', progress: 35 });
 
-  let transcript = asrCache.get(`asr:${awemeId || cleanUrl}`) || null;
-  if (!transcript) {
-    const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, mp4Url }),
-      signal: AbortSignal.timeout(300000),
-    });
-    if (!asrRes.ok) throw new Error(`语音识别失败: ${await asrRes.text()}`);
-    const asrData = await asrRes.json();
-    transcript = asrData.text?.trim() || '';
-    if (transcript && awemeId) asrCache.set(`asr:${awemeId}`, transcript);
-  }
+  const transcript = await doTranscribe(taskId, mp4Url, awemeId || cleanUrl, asrUrl, openaiKey, openaiBaseUrl);
 
   // 阶段1完成，等待用户触发改写
   await db.query(
