@@ -51,10 +51,24 @@ router.post('/:id/start-rewrite', requireAuth, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
     if (rows[0].type !== 'clone_video') return res.status(400).json({ code: 400, msg: '任务类型不支持' });
     if (rows[0].status !== 'extracted') return res.status(400).json({ code: 400, msg: '文案尚未提取完成' });
-    await db.query(
-      "UPDATE tasks SET status='pending', thinking='', updated_at=NOW() WHERE id=$1",
-      [req.params.id]
-    );
+
+    // 如果前端传来了用户修改后的文案，写回 DB result.transcript
+    const { editedTranscript } = req.body;
+    if (editedTranscript && editedTranscript.trim()) {
+      const { rows: resultRows } = await db.query('SELECT result FROM tasks WHERE id=$1', [req.params.id]);
+      let existing = {};
+      try { existing = typeof resultRows[0].result === 'string' ? JSON.parse(resultRows[0].result) : (resultRows[0].result || {}); } catch {}
+      existing.transcript = editedTranscript.trim();
+      await db.query(
+        "UPDATE tasks SET status='pending', thinking='', result=$2, updated_at=NOW() WHERE id=$1",
+        [req.params.id, JSON.stringify(existing)]
+      );
+    } else {
+      await db.query(
+        "UPDATE tasks SET status='pending', thinking='', updated_at=NOW() WHERE id=$1",
+        [req.params.id]
+      );
+    }
     require('../taskRunner').enqueue({ taskId: req.params.id, type: 'clone_video' });
     res.json({ code: 200, msg: '改写任务已提交' });
   } catch (err) {

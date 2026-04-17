@@ -2576,9 +2576,12 @@ function stopClonePoller() {
 async function handleCloneRewrite() {
   const taskId = S.cloneTaskId;
   if (!taskId || !S.extractedScript.trim()) return;
+  // 同步 textarea 最新内容（防止 oninput 未触发）
+  const ta = document.getElementById('f-extracted-script');
+  if (ta) S.extractedScript = ta.value;
   setState({ extractStep: 'rewriting', extractErr: '' });
   try {
-    const r = await api.post(`/tasks/${taskId}/start-rewrite`, {});
+    const r = await api.post(`/tasks/${taskId}/start-rewrite`, { editedTranscript: S.extractedScript });
     if (r.code === 200) startClonePoller(taskId);
     else setState({ extractStep: 'review', extractErr: r.msg || '触发改写失败，请重试' });
   } catch { setState({ extractStep: 'review', extractErr: '网络错误，请重试' }); }
