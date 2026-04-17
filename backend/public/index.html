@@ -1269,9 +1269,8 @@ function tCloneStepBar() {
     const nc = done ? 'csb-node csb-node-done' : (active ? 'csb-node csb-node-active' : 'csb-node csb-node-idle');
     const lc = done ? 'csb-lbl csb-lbl-done' : (active ? 'csb-lbl csb-lbl-active' : 'csb-lbl csb-lbl-idle');
     const inner = done ? CHECK : n;
-    // 只允许点击已完成的步骤回看
-    const clickable = done && cur > 1;
-    const onclick = clickable ? `onclick="setState({extractStep:${JSON.stringify(targets[i])}})"` : '';
+    // 所有阶段均可点击跳转（支持调试）
+    const onclick = `onclick="setState({extractStep:${JSON.stringify(targets[i])}})"` ;
     parts.push(`<div class="csb-step" ${onclick} data-step="${n}"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
     if (n < 6) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
   });
@@ -1481,7 +1480,7 @@ function tCloneStep3(sb) {
         ${isCloneSelected?`<span style="font-size:11px;color:#059669;background:#ECFDF5;padding:3px 10px;border-radius:50px">✓ 已选择</span>`:''}
       </div>
       ${S.myVoices.length > 0 ? voiceListHtml : `<div style="text-align:center;padding:12px 0;color:#A8A49C;font-size:13px">还没有克隆声音，先上传一个吧</div>`}
-      <input type="file" id="myVoiceInput" accept="audio/*" style="display:none" onchange="handleMyVoiceUpload(event)" />
+      <input type="file" id="myVoiceInput" accept="audio/*,.m4a,.caf,.aac,.mp3,.wav,.ogg,.opus,.flac" style="display:none" onchange="handleMyVoiceUpload(event)" />
       <div onclick="document.getElementById('myVoiceInput').click()"
         style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;background:${isCloneSelected?'#FFE8D6':'#F5F4F0'};border-radius:10px;padding:10px;cursor:pointer;border:1.5px dashed ${isCloneSelected?'#F97316':'#D4D0C8'}">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${isCloneSelected?'#F97316':'#8B8880'}" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1500,7 +1499,7 @@ function tCloneStep3(sb) {
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div class="section-label" style="margin-bottom:0">语速</div>
-        <span style="font-size:15px;color:#F97316;font-weight:700">${S.ttsSpeed.toFixed(1)}x</span>
+        <span id="speedDisplay" style="font-size:15px;color:#F97316;font-weight:700">${S.ttsSpeed.toFixed(1)}x</span>
       </div>
       <input id="speedSlider" type="range" class="speed-slider" min="50" max="200" step="5" value="${Math.round(S.ttsSpeed*100)}"
         oninput="onSpeedInput(this)" />
@@ -2522,7 +2521,9 @@ async function handleTTSGenerate() {
     const r = await api.post('/ai/tts', payload);
     if (r.code === 200) {
       // 转成 Blob URL，移动端大 base64 直接用 new Audio() 会静默失败
-      const audioUrl = _b64ToBlobUrl(r.data.audio, 'audio/mp3');
+      const fmt = r.data.format || 'mp3';
+      const mime = fmt === 'wav' ? 'audio/wav' : fmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
+      const audioUrl = _b64ToBlobUrl(r.data.audio, mime);
       setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, extractStep: 3 });
     } else {
       setState({ ttsGenerating: false, ttsErr: r.msg || '语音合成失败，请重试', extractStep: 3 });
@@ -2556,9 +2557,17 @@ function playTTSAudio() {
     return;
   }
   // 新建
-  _ttsAudio = new Audio(S.ttsAudioUrl);
+  _ttsAudio = new Audio();
+  _ttsAudio.preload = 'auto';
   _ttsAudio.addEventListener('ended', () => setState({ ttsPlaying: false }));
-  _ttsAudio.addEventListener('error', () => { showToast('播放失败'); setState({ ttsPlaying: false }); });
+  _ttsAudio.addEventListener('error', (ev) => {
+    const code = _ttsAudio?.error?.code;
+    const msg = ['','ABORTED','NETWORK','DECODE','SRC_NOT_SUPPORTED'][code] || code;
+    showToast('播放失败(' + msg + ')，请重试');
+    setState({ ttsPlaying: false });
+  });
+  _ttsAudio.src = S.ttsAudioUrl;
+  _ttsAudio.load();
   _ttsAudio.play().then(() => setState({ ttsPlaying: true })).catch(e => { showToast('播放失败：' + e.message); setState({ ttsPlaying: false }); });
 }
 
@@ -2570,7 +2579,10 @@ function stopTTSAudio() {
 function onSpeedInput(el) {
   const pct = ((el.value - el.min) / (el.max - el.min)) * 100;
   el.style.background = `linear-gradient(to right,#FF6B35 0%,#FF6B35 ${pct}%,#E8E4DC ${pct}%,#E8E4DC 100%)`;
-  setState({ ttsSpeed: el.value / 100 });
+  // 直接操作 DOM，不触发全量 render，避免步骤条抖动
+  const disp = document.getElementById('speedDisplay');
+  if (disp) disp.textContent = (el.value / 100).toFixed(1) + 'x';
+  S.ttsSpeed = el.value / 100; // 静默更新 state，不调 setState
 }
 
 function selectSysVoice(id) {
