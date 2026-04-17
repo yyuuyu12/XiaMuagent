@@ -485,22 +485,22 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
   background:#fff; border-bottom:1px solid #F0EEE8;
   width:100%; flex-shrink:0;
   overflow-x:auto; -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
+  scrollbar-width:none; scroll-behavior:smooth;
 }
 .clone-step-bar::-webkit-scrollbar { display:none; }
 .clone-step-bar-inner {
   display:flex; align-items:flex-start;
-  padding:20px 20px 16px; min-width:max-content; gap:0;
+  padding:18px 16px 14px; min-width:max-content; gap:0;
 }
 .csb-step {
   display:flex; flex-direction:column; align-items:center;
-  gap:8px; min-width:64px; flex-shrink:0; cursor:pointer;
+  gap:8px; min-width:80px; flex-shrink:0; cursor:pointer;
   -webkit-tap-highlight-color:transparent;
 }
 .csb-node {
-  width:44px; height:44px; border-radius:50%;
+  width:54px; height:54px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  font-size:16px; font-weight:700; transition:transform .2s,box-shadow .2s;
+  font-size:18px; font-weight:700; transition:transform .2s,box-shadow .2s;
   position:relative;
 }
 .csb-node-done {
@@ -509,8 +509,8 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 }
 .csb-node-active {
   background:#FF6B35; color:#fff;
-  box-shadow:0 4px 16px rgba(255,107,53,.45);
-  transform:scale(1.12);
+  box-shadow:0 5px 18px rgba(255,107,53,.50);
+  transform:scale(1.10);
 }
 .csb-node-idle {
   background:#F5F4F0; color:#C4C0B8;
@@ -521,8 +521,8 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .csb-lbl-active { color:#FF6B35; font-weight:700; }
 .csb-lbl-idle { color:#C4C0B8; }
 .csb-line {
-  width:28px; height:2px; flex-shrink:0; border-radius:1px;
-  margin-top:22px; /* (44-2)/2 = 21, +1 for label gap visual center */
+  width:32px; height:2px; flex-shrink:0; border-radius:1px;
+  margin-top:27px; /* (54-2)/2 = 26, +1 visual center */
   align-self:flex-start;
 }
 .csb-line-done { background:#FF6B35; }
@@ -1235,21 +1235,20 @@ function tHome() {
 // ===== 克隆流程步骤条 =====
 function cloneCurrentStep() {
   const s = S.extractStep;
-  if (s === 'cloning' || s === 'review') return 1;
+  if (s === 0 || s === 'cloning' || s === 'review') return 1;
   if (s === 'rewriting' || s === 2) return 2;
   if (s === 3 || s === 'tts_gen') return 3;
   if (s === 4 || s === 'avatar_gen') return 4;
   if (s === 5) return 5;
   if (s === 6) return 6;
-  return 0;
+  return 1;
 }
 
 function tCloneStepBar() {
   const cur = cloneCurrentStep();
-  if (cur === 0) return '';
   const steps = ['提取','改写','语音','数字人','后期','发布'];
   const targets = ['review', 2, 3, 4, 5, 6];
-  const CHECK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
+  const CHECK = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
   let parts = [];
   steps.forEach((label, i) => {
     const n = i + 1;
@@ -1257,10 +1256,23 @@ function tCloneStepBar() {
     const nc = done ? 'csb-node csb-node-done' : (active ? 'csb-node csb-node-active' : 'csb-node csb-node-idle');
     const lc = done ? 'csb-lbl csb-lbl-done' : (active ? 'csb-lbl csb-lbl-active' : 'csb-lbl csb-lbl-idle');
     const inner = done ? CHECK : n;
-    const target = JSON.stringify(targets[i]);
-    parts.push(`<div class="csb-step" onclick="setState({extractStep:${target}})"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
+    // 只允许点击已完成的步骤回看
+    const clickable = done && cur > 1;
+    const onclick = clickable ? `onclick="setState({extractStep:${JSON.stringify(targets[i])}})"` : '';
+    parts.push(`<div class="csb-step" ${onclick} data-step="${n}"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
     if (n < 6) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
   });
+  // 渲染后自动滚动到当前步骤可见
+  setTimeout(() => {
+    const bar = document.querySelector('.clone-step-bar');
+    const activeEl = bar && bar.querySelector(`[data-step="${cur}"]`);
+    if (bar && activeEl) {
+      const barW = bar.offsetWidth;
+      const elLeft = activeEl.offsetLeft;
+      const elW = activeEl.offsetWidth;
+      bar.scrollLeft = elLeft - (barW - elW) / 2;
+    }
+  }, 30);
   return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
 }
 
@@ -1351,7 +1363,7 @@ function tExtract() {
   }
 
   // 默认：输入链接
-  return `<div class="tab-page">
+  return `${sb}<div class="tab-page">
     <div class="platform-tabs">
       <div class="platform-tab platform-tab-active">抖音</div>
       <div class="platform-tab platform-tab-disabled">快手<span class="coming-soon-badge">即将上线</span></div>
