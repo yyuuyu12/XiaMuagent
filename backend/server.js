@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE'], allowedHeaders: ['Content-Type','Authorization'] }));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '20mb' })); // 克隆音色需要传 base64 音频（~1-3MB）
 
 const { router: authRouter } = require('./routes/auth');
 const configRouter  = require('./routes/config');

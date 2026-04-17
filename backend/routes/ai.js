@@ -234,6 +234,11 @@ router.post('/tts', requireAuth, async (req, res) => {
   const { text, voice, speed, cloneVoiceId } = req.body;
   if (!text?.trim()) return res.json({ code: 400, msg: '文案内容不能为空' });
   const trimText = text.trim().slice(0, 4096);
+  // 拦截超大 base64 音频（>8MB），避免超时或OOM
+  const refAudio = req.body.indexRefAudio || '';
+  if (refAudio.length > 8 * 1024 * 1024) {
+    return res.json({ code: 400, msg: '参考音频文件太大（>6MB），请上传 30 秒以内的录音' });
+  }
 
   // ===== 通道1：Fish Audio 克隆音色 =====
   if (cloneVoiceId) {
