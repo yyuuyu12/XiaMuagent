@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import whisper
 import ffmpeg
 import tempfile
@@ -25,6 +26,7 @@ for _pat in _FFMPEG_PATTERNS:
         break
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 print("正在加载 Whisper medium 模型（首次约需1-2分钟下载）...")
 model = whisper.load_model("medium")
