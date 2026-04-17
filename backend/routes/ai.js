@@ -264,13 +264,13 @@ router.post('/tts', requireAuth, async (req, res) => {
     const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
     const asrUrl = (asrRows[0]?.value || '').trim();
     if (!asrUrl) return res.json({ code: 500, msg: 'IndexTTS 需要本地 ASR 服务，请在后台配置 asr_url' });
-    const { indexRefAudio, indexEmotion } = req.body;
+    const { indexRefAudio, indexEmotion, indexEmoAlpha } = req.body;
     if (!indexRefAudio) return res.json({ code: 400, msg: '请先上传参考音频（你的声音样本）才能使用克隆音色' });
     try {
       const resp = await fetch(`${asrUrl}/tts/indextts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', speed: parseFloat(speed) || 1.0 }),
+        body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }),
         signal: AbortSignal.timeout(240000), // 4分钟，GPU首次推理较慢
       });
       if (!resp.ok) {

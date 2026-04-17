@@ -97,8 +97,9 @@ app = FastAPI(title="IndexTTS2 Server")
 async def generate(payload: dict):
     text             = (payload.get("text") or "").strip()
     prompt_audio_b64 = payload.get("prompt_audio", "")   # 说话人参考音频（音色）
-    emotion          = payload.get("emotion", "neutral")
-    speed            = float(payload.get("speed", 1.0))
+    emotion           = payload.get("emotion", "neutral")
+    emo_alpha_override = payload.get("emo_alpha_override")  # 前端 0-10 → 0.0-1.0，None 表示用默认
+    speed             = float(payload.get("speed", 1.0))
 
     if not text:
         raise HTTPException(400, "text 不能为空")
@@ -120,7 +121,11 @@ async def generate(payload: dict):
 
     # 情感参考音频（可选：用 examples/ 里的模板）
     emo_path  = EMOTION_TEMPLATES.get(emotion)
-    emo_alpha = EMOTION_ALPHA.get(emotion, 0.0)
+    # 优先用前端传来的强度覆盖，否则用默认表
+    if emo_alpha_override is not None:
+        emo_alpha = float(emo_alpha_override)
+    else:
+        emo_alpha = EMOTION_ALPHA.get(emotion, 0.0)
     if emo_path and not os.path.exists(emo_path):
         emo_path  = None
         emo_alpha = 0.0

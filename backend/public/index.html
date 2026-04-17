@@ -680,7 +680,7 @@ const S = {
   // 步骤3：语音合成
   ttsVoice: 'xiaoxiao', ttsSpeed: 1.0, ttsGenerating: false, ttsAudioUrl: null, ttsErr: '',
   ttsCloneVoiceId: localStorage.getItem('ttsCloneVoiceId') || null, ttsCloning: false, ttsCloneErr: '',
-  ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral',
+  ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral', ttsEmoIntensity: 5,
   // 声音库
   myVoices: JSON.parse(localStorage.getItem('myVoices') || '[]'),
   selectedMyVoiceId: localStorage.getItem('selectedMyVoiceId') || '',
@@ -1457,18 +1457,35 @@ function tCloneStep3(sb) {
     </div>`;
   }).join('');
 
-  // 当选择我的声音时显示情绪选择
+  // 当选择我的声音时显示情绪选择 + 强度滑块
   const selectedMyVoice = myVoices.find(v => S.ttsVoice === 'my_' + v.id);
+  const curEmo = S.ttsIndexEmotion || 'neutral';
+  const curIntensity = S.ttsEmoIntensity != null ? S.ttsEmoIntensity : 5;
+  const intensityPct = curIntensity / 10 * 100;
+  const intensityBg = `linear-gradient(to right,#F97316 ${intensityPct}%,#E8E4DC ${intensityPct}%)`;
   const emotionSection = selectedMyVoice ? `
     <div class="section-card" style="background:#FFF8F3;border:1.5px solid #FFD5B8">
       <div class="section-label" style="margin-bottom:8px;color:#9A3412">情绪风格</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${curEmo!=='neutral'?'14px':'0'}">
         ${[['neutral','自然'],['happy','开心'],['excited','激动'],['sad','忧郁'],['calm','平静']].map(([id,name])=>{
-          const on = (S.ttsIndexEmotion || 'neutral') === id;
+          const on = curEmo === id;
           return `<div onclick="setState({ttsIndexEmotion:'${id}'})"
             style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid ${on?'#F97316':'#E8E4DC'};background:${on?'#FFF1E8':'#F7F6F2'};color:${on?'#9A3412':'#6B7280'}">${name}</div>`;
         }).join('')}
       </div>
+      ${curEmo !== 'neutral' ? `
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;color:#9A3412;font-weight:600">情绪强度</span>
+          <span style="font-size:13px;font-weight:700;color:#F97316">${curIntensity} <span style="font-size:11px;color:#A8A49C;font-weight:400">/ 10</span></span>
+        </div>
+        <input type="range" min="0" max="10" step="1" value="${curIntensity}"
+          style="width:100%;appearance:none;-webkit-appearance:none;height:4px;border-radius:2px;outline:none;cursor:pointer;background:${intensityBg}"
+          oninput="onEmoIntensityInput(this)"/>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#C4C0B8;margin-top:4px">
+          <span>弱</span><span>强</span>
+        </div>
+      </div>` : ''}
     </div>` : '';
 
   const speedPct = Math.round((S.ttsSpeed - 0.5) / 1.5 * 100);
@@ -2631,6 +2648,10 @@ async function handleTTSGenerate() {
       if (!refAudio) { setState({ ttsGenerating: false, ttsErr: '请先上传参考音频', extractStep: 3 }); return; }
       payload.indexRefAudio = refAudio;
       payload.indexEmotion = indexEmotion;
+      // neutral 不传强度（不叠模板），其他情绪传用户设置的强度 0-10 → 0.0-1.0
+      if (indexEmotion !== 'neutral') {
+        payload.indexEmoAlpha = (S.ttsEmoIntensity != null ? S.ttsEmoIntensity : 5) / 10;
+      }
     }
     const r = await api.post('/ai/tts', payload);
     if (r.code === 200) {
@@ -2902,6 +2923,16 @@ function stopMicRecording() {
 }
 
 // ===== 语速滑块（不触发setState防止抖动）=====
+function onEmoIntensityInput(el) {
+  const v = parseInt(el.value);
+  S.ttsEmoIntensity = v;
+  // 更新滑块颜色和标签，不触发 setState 重绘避免抖动
+  const pct = v / 10 * 100;
+  el.style.background = `linear-gradient(to right,#F97316 ${pct}%,#E8E4DC ${pct}%)`;
+  const lbl = el.closest('.section-card').querySelector('span[style*="font-weight:700"]');
+  if (lbl) lbl.firstChild.textContent = v + ' ';
+}
+
 function onSpeedInput(val) {
   S.ttsSpeed = val / 100;
   const lbl = document.getElementById('speedLabel');
@@ -3137,7 +3168,7 @@ function resetExtract() {
   setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false, cloneTaskId: null, cloneTaskData: null, extractFromHistory: false,
     ttsVoice: 'xiaoxiao', ttsSpeed: 1.0, ttsGenerating: false, ttsAudioUrl: null, ttsErr: '',
     ttsCloning: false, ttsCloneErr: '',
-    ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral',
+    ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral', ttsEmoIntensity: 5,
     selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true,
     videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
     publishTitle: '', publishTags: [], publishTitleLoading: false, publishCoverIdx: 0, publishCopied: false });
