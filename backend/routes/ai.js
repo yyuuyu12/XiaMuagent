@@ -401,4 +401,52 @@ ${script.slice(0, 800)}
   }
 });
 
+// ==================== 数字人视频生成 ====================
+router.post('/video/generate', requireAuth, async (req, res) => {
+  const { audio_b64, image_b64, audio_fmt, image_fmt, enhancer } = req.body;
+  if (!audio_b64) return res.json({ code: 400, msg: '请先完成语音合成' });
+  if (!image_b64) return res.json({ code: 400, msg: '请上传人脸图片' });
+  if (audio_b64.length > 6 * 1024 * 1024) return res.json({ code: 400, msg: '音频过大（>4.5MB），请缩短语音' });
+  if (image_b64.length > 4 * 1024 * 1024) return res.json({ code: 400, msg: '图片过大（>3MB），请压缩图片' });
+
+  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+  const asrUrl = (rows[0]?.value || '').trim();
+  if (!asrUrl) return res.json({ code: 500, msg: '请在后台配置 asr_url（本地服务地址）' });
+
+  try {
+    const resp = await fetch(`${asrUrl}/video/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio_b64, image_b64, audio_fmt: audio_fmt || 'wav', image_fmt: image_fmt || 'jpg', enhancer: !!enhancer }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      return res.json({ code: 500, msg: `视频服务出错: ${t.slice(0, 200)}` });
+    }
+    const data = await resp.json();
+    return res.json({ code: 200, data });
+  } catch (e) {
+    const msg = e.message || '';
+    if (msg.includes('503') || msg.includes('ECONNREFUSED')) return res.json({ code: 503, msg: 'SadTalker 服务未启动，请在本机运行 start_sadtalker.bat' });
+    return res.json({ code: 500, msg: `视频生成出错: ${msg}` });
+  }
+});
+
+router.get('/video/task/:taskId', requireAuth, async (req, res) => {
+  const { taskId } = req.params;
+  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+  const asrUrl = (rows[0]?.value || '').trim();
+  if (!asrUrl) return res.json({ code: 500, msg: '未配置 asr_url' });
+
+  try {
+    const resp = await fetch(`${asrUrl}/video/task/${taskId}`, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) return res.json({ code: 500, msg: '查询失败' });
+    const data = await resp.json();
+    return res.json({ code: 200, data });
+  } catch (e) {
+    return res.json({ code: 500, msg: `轮询失败: ${e.message}` });
+  }
+});
+
 module.exports = router;

@@ -688,6 +688,8 @@ const S = {
   recordingSeconds: 0,
   // 步骤4：数字人
   selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
+  avatarImageB64: null, avatarImageName: '', avatarImageFmt: 'jpg',
+  avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false,
   // 步骤5：后期制作
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
   // 步骤6：发布
@@ -1522,64 +1524,81 @@ function tCloneStep3(sb) {
 
 // ===== 步骤4：数字人 =====
 function tCloneStep4(sb) {
-  const avatars = [
-    { id:'self', name:'我的形象', icon:'user' },
-    { id:'none', name:'仅语音',   icon:'mic'  },
-  ];
-  const avHtml = avatars.map(a => {
-    const on = S.selectedAvatarId === a.id;
-    const iconSvg = a.icon === 'user'
-      ? `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${on?'#F97316':'#B4B2A9'}" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
-      : `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${on?'#F97316':'#B4B2A9'}" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>`;
-    const check = on ? `<div style="position:absolute;top:6px;right:6px;width:18px;height:18px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>` : '';
-    return `<div class="av-card" onclick="setState({selectedAvatarId:'${a.id}'})">
-      <div class="av-card-img ${on?'av-card-img-active':''}">${iconSvg}${check}</div>
-      <div style="font-size:12px;color:${on?'#9A3412':'#1A1814'};font-weight:${on?600:400}">${a.name}</div>
+  // 生成中
+  if (S.extractStep === 'avatar_gen') {
+    return `${sb}<div class="tab-page">
+      <div class="input-card" style="text-align:center;padding:32px 20px;margin-top:4px">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="1.5" style="margin-bottom:12px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在生成数字人视频</div>
+        <div style="font-size:12px;color:#A8A49C;margin-bottom:16px">GPU 渲染中，通常 1~3 分钟</div>
+        <div class="path-a-progress-bar"><div class="path-a-progress-fill" id="avatarProgressFill" style="width:20%"></div></div>
+        <div id="avatarProgressMsg" style="font-size:12px;color:#6B6860;margin-top:8px">初始化中...</div>
+      </div>
     </div>`;
-  }).join('');
+  }
+
+  // 生成完成 — 显示视频
+  if (S.avatarVideoUrl) {
+    return `${sb}<div class="tab-page">
+      <div class="section-card" style="text-align:center">
+        <video src="${S.avatarVideoUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:50vh"></video>
+        <div style="font-size:13px;color:#059669;margin-top:10px;font-weight:600">✓ 数字人视频生成完成</div>
+      </div>
+      ${S.avatarErr?`<div class="err-text">${esc(S.avatarErr)}</div>`:''}
+      <div class="action-row" style="gap:8px">
+        <div class="btn-action-sec" onclick="setState({avatarVideoUrl:null,avatarTaskId:null,extractStep:4})">重新生成</div>
+        <div class="btn-action-main" onclick="goToCloneStep4()">下一步：后期制作 →</div>
+      </div>
+    </div>`;
+  }
+
+  // 上传图片 + 触发生成
+  const imgPreview = S.avatarImageB64
+    ? `<img src="data:image/${S.avatarImageFmt};base64,${S.avatarImageB64}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid #F97316"/>`
+    : `<div style="width:80px;height:80px;border:2px dashed #D4D0C8;border-radius:10px;display:flex;align-items:center;justify-content:center">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+       </div>`;
 
   return `${sb}<div class="tab-page">
     <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="section-label" style="margin-bottom:0">选择数字人形象</div>
-        <span style="font-size:12px;color:#F97316;cursor:pointer" onclick="showToast('上传形象功能即将上线')">上传新形象</span>
-      </div>
-      <div style="display:flex;gap:12px">
-        ${avHtml}
-        <div class="av-card" onclick="showToast('上传功能即将开放')">
-          <div class="av-card-img" style="border:2px dashed #D4D0C8">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <div class="section-label" style="margin-bottom:10px">上传人脸图片</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        ${imgPreview}
+        <div style="flex:1">
+          <div style="font-size:13px;color:#1A1814;margin-bottom:4px">${S.avatarImageName ? esc(S.avatarImageName) : '未选择图片'}</div>
+          <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">建议：正脸清晰照片，JPG/PNG，人脸占画面 1/3 以上</div>
+          <input type="file" id="avatarImgInput" accept="image/jpeg,image/png,image/jpg" style="display:none" onchange="handleAvatarImageSelect(event)"/>
+          <div class="btn-action-sec" style="font-size:13px;display:inline-block" onclick="document.getElementById('avatarImgInput').click()">
+            ${S.avatarImageB64 ? '重新选择' : '选择图片'}
           </div>
-          <div style="font-size:12px;color:#A8A49C">上传</div>
         </div>
       </div>
     </div>
     <div class="section-card">
-      <div class="section-label">视频特效</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0EEE8">
-        <span style="font-size:14px;color:#1A1814">剪辑气口</span>
-        <div class="tog-sw ${S.avatarClipBreath?'tog-sw-on':'tog-sw-off'}" onclick="setState({avatarClipBreath:!S.avatarClipBreath})">
-          <div class="tog-sw-ball"></div>
-        </div>
-      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
-        <span style="font-size:14px;color:#1A1814">添加美颜</span>
+        <span style="font-size:14px;color:#1A1814">GFPGAN 面部增强</span>
         <div class="tog-sw ${S.avatarBeauty?'tog-sw-on':'tog-sw-off'}" onclick="setState({avatarBeauty:!S.avatarBeauty})">
           <div class="tog-sw-ball"></div>
         </div>
       </div>
+      <div style="font-size:12px;color:#A8A49C">开启后画质更清晰，但生成速度约慢 30 秒</div>
     </div>
     <div style="background:#FFF7ED;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#9A3412;margin-bottom:2px">预计生成时间</div>
-        <div style="font-size:12px;color:#C2410C;line-height:1.5">约 2-3 分钟，生成后可在任务列表查看进度</div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div style="font-size:12px;color:#92400E;line-height:1.6">
+        需要本机启动 <b>start_sadtalker.bat</b>（SadTalker服务），生成约需 1~3 分钟。<br/>
+        语音合成完成后才能生成视频。
       </div>
     </div>
+    ${S.avatarErr?`<div class="err-text" style="margin-bottom:10px">${esc(S.avatarErr)}</div>`:''}
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:3})">上一步</div>
-      <div class="btn-action-main" onclick="handleAvatarGenerate()">生成数字人视频</div>
+      <div class="btn-action-main ${(!S.ttsAudioUrl||!S.avatarImageB64||S.avatarGenerating)?'btn-disabled':''}"
+        onclick="handleAvatarGenerate()">
+        ${S.avatarGenerating ? '生成中...' : '开始生成数字人视频'}
+      </div>
     </div>
+    ${!S.ttsAudioUrl?`<div style="text-align:center;font-size:12px;color:#EF4444;margin-top:8px">请先完成步骤3语音合成</div>`:''}
   </div>`;
 }
 
@@ -2814,13 +2833,91 @@ function onSpeedInput(val) {
 }
 
 function goToCloneStep4() {
-  setState({ extractStep: 4, avatarErr: '' });
+  setState({ extractStep: 5, avatarErr: '' });
 }
 
+async function handleAvatarImageSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  if (file.size > 5 * 1024 * 1024) { showToast('图片过大（>5MB），请压缩后上传'); return; }
+  const fmt = file.type.includes('png') ? 'png' : 'jpg';
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const b64 = e.target.result.split(',')[1];
+    setState({ avatarImageB64: b64, avatarImageName: file.name, avatarImageFmt: fmt, avatarErr: '' });
+  };
+  reader.readAsDataURL(file);
+}
+
+let _avatarPoller = null;
+
 async function handleAvatarGenerate() {
-  // 数字人生成服务接入后在此对接；当前直接跳转后期步骤
-  setState({ extractStep: 5 });
-  showToast('数字人视频任务已提交，完成后在任务列表查看');
+  if (!S.ttsAudioUrl) { showToast('请先完成步骤3语音合成'); return; }
+  if (!S.avatarImageB64) { showToast('请先上传人脸图片'); return; }
+  if (S.avatarGenerating) return;
+
+  // 把 Blob URL 转成 base64
+  let audioB64 = null;
+  try {
+    const resp = await fetch(S.ttsAudioUrl);
+    const buf = await resp.arrayBuffer();
+    audioB64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  } catch (e) {
+    setState({ avatarErr: '音频读取失败: ' + e.message }); return;
+  }
+
+  setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null });
+
+  try {
+    const r = await api.post('/ai/video/generate', {
+      audio_b64: audioB64,
+      image_b64: S.avatarImageB64,
+      audio_fmt: 'wav',
+      image_fmt: S.avatarImageFmt || 'jpg',
+      enhancer: S.avatarBeauty,
+    });
+    if (r.code !== 200) {
+      setState({ avatarGenerating: false, avatarErr: r.msg || '提交失败', extractStep: 4 }); return;
+    }
+    const taskId = r.data.task_id;
+    setState({ avatarTaskId: taskId });
+    // 开始轮询
+    _startAvatarPoller(taskId);
+  } catch (e) {
+    setState({ avatarGenerating: false, avatarErr: '网络错误: ' + e.message, extractStep: 4 });
+  }
+}
+
+function _startAvatarPoller(taskId) {
+  if (_avatarPoller) clearInterval(_avatarPoller);
+  let elapsed = 0;
+  _avatarPoller = setInterval(async () => {
+    elapsed += 5;
+    try {
+      const r = await api.get('/ai/video/task/' + taskId);
+      if (r.code !== 200) return;
+      const t = r.data;
+      // 更新进度条
+      const fill = document.getElementById('avatarProgressFill');
+      const msg = document.getElementById('avatarProgressMsg');
+      const pct = Math.min(90, 10 + elapsed * 1.2);
+      if (fill) fill.style.width = pct + '%';
+      if (msg) msg.textContent = t.msg || '处理中...';
+
+      if (t.status === 'done' && t.video_b64) {
+        clearInterval(_avatarPoller); _avatarPoller = null;
+        const raw = atob(t.video_b64);
+        const buf = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
+        setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: t.video_b64, extractStep: 4 });
+      } else if (t.status === 'error') {
+        clearInterval(_avatarPoller); _avatarPoller = null;
+        setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });
+      }
+    } catch (_) {}
+  }, 5000);
 }
 
 function goToCloneStep6() {

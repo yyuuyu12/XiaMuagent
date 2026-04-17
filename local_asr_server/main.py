@@ -149,3 +149,31 @@ async def tts_indextts_proxy(payload: dict):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ===================== SadTalker 代理接口 =====================
+SADTALKER_URL = "http://localhost:7861"
+
+@app.post("/video/generate")
+async def video_generate_proxy(payload: dict):
+    """代理到 SadTalker 服务（端口 7861），需要先启动 start_sadtalker.bat"""
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(f"{SADTALKER_URL}/video/generate", json=payload)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text[:400])
+        return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="SadTalker 服务未启动，请运行 start_sadtalker.bat 后重试")
+
+@app.get("/video/task/{task_id}")
+async def video_task_proxy(task_id: str):
+    """轮询 SadTalker 任务状态"""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{SADTALKER_URL}/video/task/{task_id}")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text[:200])
+        return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="SadTalker 服务连接失败")
