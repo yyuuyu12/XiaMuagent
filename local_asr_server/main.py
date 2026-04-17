@@ -135,7 +135,7 @@ INDEXTTS_URL = "http://localhost:8766"
 async def tts_indextts_proxy(payload: dict):
     """代理到 IndexTTS 服务（端口 8766），需要先启动 start_indextts.bat"""
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=210) as client:  # 3.5分钟，低于Zeabur的4分钟
             resp = await client.post(f"{INDEXTTS_URL}/tts/generate", json=payload)
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text[:400])
@@ -143,7 +143,7 @@ async def tts_indextts_proxy(payload: dict):
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="IndexTTS 服务未启动，请运行 start_indextts.bat 后重试")
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="IndexTTS 推理超时（文本过长或 GPU 繁忙）")
+        raise HTTPException(status_code=504, detail="IndexTTS 推理超时（>3.5分钟）。建议：参考音频控制在10~30秒，文案不超过500字")
 
 
 @app.get("/health")
