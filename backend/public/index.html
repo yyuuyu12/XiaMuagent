@@ -2999,7 +2999,7 @@ async function handleAvatarGenerate() {
 
     const resp = await fetch(`${asrUrl}/video/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
       body: JSON.stringify({
         audio_b64: audioB64,
         video_b64: S.avatarSrcVideoB64,
@@ -3027,7 +3027,7 @@ function _startAvatarPoller(taskId, asrUrl) {
   _avatarPoller = setInterval(async () => {
     elapsed += 5;
     try {
-      const resp = await fetch(`${asrUrl}/video/task/${taskId}`);
+      const resp = await fetch(`${asrUrl}/video/task/${taskId}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
       const r = resp.ok ? { code: 200, data: await resp.json() } : { code: 500 };
       if (r.code !== 200) return;
       const t = r.data;
