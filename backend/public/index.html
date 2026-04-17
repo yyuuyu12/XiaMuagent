@@ -793,6 +793,16 @@ function setState(updates) {
 }
 function render() {
   document.getElementById('app').innerHTML = tMain();
+  // 步骤条滚动：在浏览器第一帧绘制前完成，避免可见抖动
+  requestAnimationFrame(() => {
+    const bar = document.querySelector('.clone-step-bar');
+    if (!bar) return;
+    const cur = cloneCurrentStep();
+    const activeEl = bar.querySelector(`[data-step="${cur}"]`);
+    if (activeEl) {
+      bar.scrollLeft = activeEl.offsetLeft - (bar.offsetWidth - activeEl.offsetWidth) / 2;
+    }
+  });
 }
 
 function openAuthSheet() { setState({ showAuthSheet: true, authErr: '' }); }
@@ -1274,17 +1284,6 @@ function tCloneStepBar() {
     parts.push(`<div class="csb-step" ${onclick} data-step="${n}"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
     if (n < 6) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
   });
-  // 渲染后自动滚动到当前步骤可见
-  setTimeout(() => {
-    const bar = document.querySelector('.clone-step-bar');
-    const activeEl = bar && bar.querySelector(`[data-step="${cur}"]`);
-    if (bar && activeEl) {
-      const barW = bar.offsetWidth;
-      const elLeft = activeEl.offsetLeft;
-      const elW = activeEl.offsetWidth;
-      bar.scrollLeft = elLeft - (barW - elW) / 2;
-    }
-  }, 30);
   return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
 }
 
@@ -1491,10 +1490,7 @@ function tCloneStep3(sb) {
 
   // ── 3. 语速 ──
   const speedPct = ((S.ttsSpeed * 100 - 50) / 150) * 100;
-  setTimeout(() => {
-    const sl = document.getElementById('speedSlider');
-    if (sl) sl.style.background = `linear-gradient(to right,#FF6B35 0%,#FF6B35 ${speedPct}%,#E8E4DC ${speedPct}%,#E8E4DC 100%)`;
-  }, 30);
+  const speedBg = `linear-gradient(to right,#FF6B35 0%,#FF6B35 ${speedPct}%,#E8E4DC ${speedPct}%,#E8E4DC 100%)`;
   const speedSection = `
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -1502,7 +1498,7 @@ function tCloneStep3(sb) {
         <span id="speedDisplay" style="font-size:15px;color:#F97316;font-weight:700">${S.ttsSpeed.toFixed(1)}x</span>
       </div>
       <input id="speedSlider" type="range" class="speed-slider" min="50" max="200" step="5" value="${Math.round(S.ttsSpeed*100)}"
-        oninput="onSpeedInput(this)" />
+        style="background:${speedBg}" oninput="onSpeedInput(this)" />
       <div style="display:flex;justify-content:space-between;margin-top:8px">
         <span style="font-size:11px;color:#A8A49C">0.5x 慢</span>
         <span style="font-size:11px;color:#A8A49C">快 2.0x</span>
