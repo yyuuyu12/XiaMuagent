@@ -1555,28 +1555,30 @@ function tCloneStep4(sb) {
     </div>`;
   }
 
-  // 上传视频 + 触发生成
-  const vidPreview = S.avatarSrcVideoB64
-    ? `<video src="data:video/${S.avatarSrcVideoFmt};base64,${S.avatarSrcVideoB64}" style="width:100px;height:70px;object-fit:cover;border-radius:10px;border:2px solid #F97316" muted playsinline></video>`
-    : `<div style="width:100px;height:70px;border:2px dashed #D4D0C8;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3V10z"/></svg>
-        <span style="font-size:10px;color:#C4C0B8">视频</span>
+  // 上传视频区域
+  const vidSection = S.avatarSrcVideoB64
+    ? `<div style="position:relative">
+        <video src="data:video/${S.avatarSrcVideoFmt};base64,${S.avatarSrcVideoB64}"
+          controls playsinline
+          style="width:100%;border-radius:12px;max-height:220px;background:#000;display:block"></video>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <span style="font-size:12px;color:#A8A49C;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.avatarSrcVideoName)}</span>
+          <input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
+          <span style="font-size:12px;color:#F97316;cursor:pointer;flex-shrink:0;margin-left:10px" onclick="document.getElementById('avatarVidInput').click()">重新选择</span>
+        </div>
+       </div>`
+    : `<input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
+       <div onclick="document.getElementById('avatarVidInput').click()"
+         style="border:2px dashed #D4D0C8;border-radius:12px;padding:32px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;background:#FAFAF8">
+         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="1.5"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3V10z"/></svg>
+         <div style="font-size:14px;color:#A8A49C;font-weight:500">点击上传人脸视频</div>
+         <div style="font-size:12px;color:#C4C0B8;text-align:center">建议 3~10 秒不说话正脸视频<br/>MP4 / MOV，正脸居中清晰</div>
        </div>`;
 
   return `${sb}<div class="tab-page">
     <div class="section-card">
-      <div class="section-label" style="margin-bottom:10px">上传静默人脸视频</div>
-      <div style="display:flex;align-items:center;gap:14px">
-        ${vidPreview}
-        <div style="flex:1">
-          <div style="font-size:13px;color:#1A1814;margin-bottom:4px">${S.avatarSrcVideoName ? esc(S.avatarSrcVideoName) : '未选择视频'}</div>
-          <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">建议：3~10秒不说话正脸视频，MP4/MOV，正脸居中清晰</div>
-          <input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
-          <div class="btn-action-sec" style="font-size:13px;display:inline-block" onclick="document.getElementById('avatarVidInput').click()">
-            ${S.avatarSrcVideoB64 ? '重新选择' : '选择视频'}
-          </div>
-        </div>
-      </div>
+      <div class="section-label" style="margin-bottom:12px">上传静默人脸视频</div>
+      ${vidSection}
     </div>
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
@@ -2949,7 +2951,13 @@ async function handleAvatarGenerate() {
   try {
     const resp = await fetch(S.ttsAudioUrl);
     const buf = await resp.arrayBuffer();
-    audioB64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    // 分块转 base64，避免大文件一次展开导致 call stack overflow
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    }
+    audioB64 = btoa(bin);
   } catch (e) {
     setState({ avatarErr: '音频读取失败: ' + e.message }); return;
   }
