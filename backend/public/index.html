@@ -2628,7 +2628,8 @@ async function handleTTSGenerate() {
       if (!myVoice) { setState({ ttsGenerating: false, ttsErr: '声音不存在，请重新选择', extractStep: 3 }); return; }
       voiceId = 'indextts';
       indexRefAudio = myVoice.audio_b64;
-      indexEmotion = myVoice.emotion || 'neutral';
+      // 优先用UI上用户实时选的情绪，没选才降级到声音入库时保存的值
+      indexEmotion = S.ttsIndexEmotion || myVoice.emotion || 'neutral';
     }
     const payload = { text: text.slice(0, 2000), voice: voiceId, speed: S.ttsSpeed };
     if (voiceId === 'cloned' && S.ttsCloneVoiceId) payload.cloneVoiceId = S.ttsCloneVoiceId;
