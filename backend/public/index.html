@@ -1268,13 +1268,13 @@ function tHome() {
 // ===== 克隆流程步骤条 =====
 function cloneCurrentStep() {
   const s = S.extractStep;
-  if (s === 'cloning' || s === 'review') return 1;
+  if (s === 0 || s === 'cloning' || s === 'review') return 1;
   if (s === 'rewriting' || s === 2) return 2;
   if (s === 3 || s === 'tts_gen') return 3;
   if (s === 4 || s === 'avatar_gen') return 4;
   if (s === 5) return 5;
   if (s === 6) return 6;
-  return 0;
+  return 1;
 }
 
 function tCloneStepBar() {
