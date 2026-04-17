@@ -403,11 +403,11 @@ ${script.slice(0, 800)}
 
 // ==================== 数字人视频生成 ====================
 router.post('/video/generate', requireAuth, async (req, res) => {
-  const { audio_b64, image_b64, audio_fmt, image_fmt, enhancer } = req.body;
+  const { audio_b64, video_b64, audio_fmt, video_fmt, enhancer } = req.body;
   if (!audio_b64) return res.json({ code: 400, msg: '请先完成语音合成' });
-  if (!image_b64) return res.json({ code: 400, msg: '请上传人脸图片' });
+  if (!video_b64) return res.json({ code: 400, msg: '请上传静默人脸视频' });
   if (audio_b64.length > 6 * 1024 * 1024) return res.json({ code: 400, msg: '音频过大（>4.5MB），请缩短语音' });
-  if (image_b64.length > 4 * 1024 * 1024) return res.json({ code: 400, msg: '图片过大（>3MB），请压缩图片' });
+  if (video_b64.length > 50 * 1024 * 1024) return res.json({ code: 400, msg: '视频过大（>37MB），请压缩后上传' });
 
   const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
   const asrUrl = (rows[0]?.value || '').trim();
@@ -417,7 +417,7 @@ router.post('/video/generate', requireAuth, async (req, res) => {
     const resp = await fetch(`${asrUrl}/video/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audio_b64, image_b64, audio_fmt: audio_fmt || 'wav', image_fmt: image_fmt || 'jpg', enhancer: !!enhancer }),
+      body: JSON.stringify({ audio_b64, video_b64, audio_fmt: audio_fmt || 'wav', video_fmt: video_fmt || 'mp4', enhancer: !!enhancer }),
       signal: AbortSignal.timeout(30000),
     });
     if (!resp.ok) {

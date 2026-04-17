@@ -689,7 +689,7 @@ const S = {
   vmPlayingId: '',
   // 步骤4：数字人
   selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
-  avatarImageB64: null, avatarImageName: '', avatarImageFmt: 'jpg',
+  avatarSrcVideoB64: null, avatarSrcVideoName: '', avatarSrcVideoFmt: 'mp4',
   avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false,
   // 步骤5：后期制作
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
@@ -1555,24 +1555,25 @@ function tCloneStep4(sb) {
     </div>`;
   }
 
-  // 上传图片 + 触发生成
-  const imgPreview = S.avatarImageB64
-    ? `<img src="data:image/${S.avatarImageFmt};base64,${S.avatarImageB64}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid #F97316"/>`
-    : `<div style="width:80px;height:80px;border:2px dashed #D4D0C8;border-radius:10px;display:flex;align-items:center;justify-content:center">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  // 上传视频 + 触发生成
+  const vidPreview = S.avatarSrcVideoB64
+    ? `<video src="data:video/${S.avatarSrcVideoFmt};base64,${S.avatarSrcVideoB64}" style="width:100px;height:70px;object-fit:cover;border-radius:10px;border:2px solid #F97316" muted playsinline></video>`
+    : `<div style="width:100px;height:70px;border:2px dashed #D4D0C8;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3V10z"/></svg>
+        <span style="font-size:10px;color:#C4C0B8">视频</span>
        </div>`;
 
   return `${sb}<div class="tab-page">
     <div class="section-card">
-      <div class="section-label" style="margin-bottom:10px">上传人脸图片</div>
+      <div class="section-label" style="margin-bottom:10px">上传静默人脸视频</div>
       <div style="display:flex;align-items:center;gap:14px">
-        ${imgPreview}
+        ${vidPreview}
         <div style="flex:1">
-          <div style="font-size:13px;color:#1A1814;margin-bottom:4px">${S.avatarImageName ? esc(S.avatarImageName) : '未选择图片'}</div>
-          <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">建议：正脸清晰照片，JPG/PNG，人脸占画面 1/3 以上</div>
-          <input type="file" id="avatarImgInput" accept="image/jpeg,image/png,image/jpg" style="display:none" onchange="handleAvatarImageSelect(event)"/>
-          <div class="btn-action-sec" style="font-size:13px;display:inline-block" onclick="document.getElementById('avatarImgInput').click()">
-            ${S.avatarImageB64 ? '重新选择' : '选择图片'}
+          <div style="font-size:13px;color:#1A1814;margin-bottom:4px">${S.avatarSrcVideoName ? esc(S.avatarSrcVideoName) : '未选择视频'}</div>
+          <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">建议：3~10秒不说话正脸视频，MP4/MOV，正脸居中清晰</div>
+          <input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
+          <div class="btn-action-sec" style="font-size:13px;display:inline-block" onclick="document.getElementById('avatarVidInput').click()">
+            ${S.avatarSrcVideoB64 ? '重新选择' : '选择视频'}
           </div>
         </div>
       </div>
@@ -1596,7 +1597,7 @@ function tCloneStep4(sb) {
     ${S.avatarErr?`<div class="err-text" style="margin-bottom:10px">${esc(S.avatarErr)}</div>`:''}
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:3})">上一步</div>
-      <div class="btn-action-main ${(!S.ttsAudioUrl||!S.avatarImageB64||S.avatarGenerating)?'btn-disabled':''}"
+      <div class="btn-action-main ${(!S.ttsAudioUrl||!S.avatarSrcVideoB64||S.avatarGenerating)?'btn-disabled':''}"
         onclick="handleAvatarGenerate()">
         ${S.avatarGenerating ? '生成中...' : '开始生成数字人视频'}
       </div>
@@ -2920,16 +2921,18 @@ function goToCloneStep4() {
   setState({ extractStep: 5, avatarErr: '' });
 }
 
-async function handleAvatarImageSelect(event) {
+async function handleAvatarVideoSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
   event.target.value = '';
-  if (file.size > 5 * 1024 * 1024) { showToast('图片过大（>5MB），请压缩后上传'); return; }
-  const fmt = file.type.includes('png') ? 'png' : 'jpg';
+  if (file.size > 50 * 1024 * 1024) { showToast('视频过大（>50MB），请压缩后上传'); return; }
+  const fmt = file.type.includes('quicktime') || file.name.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
+  showToast('读取视频中...');
   const reader = new FileReader();
   reader.onload = (e) => {
     const b64 = e.target.result.split(',')[1];
-    setState({ avatarImageB64: b64, avatarImageName: file.name, avatarImageFmt: fmt, avatarErr: '' });
+    setState({ avatarSrcVideoB64: b64, avatarSrcVideoName: file.name, avatarSrcVideoFmt: fmt, avatarErr: '' });
+    showToast('视频已选择 ✓');
   };
   reader.readAsDataURL(file);
 }
@@ -2938,7 +2941,7 @@ let _avatarPoller = null;
 
 async function handleAvatarGenerate() {
   if (!S.ttsAudioUrl) { showToast('请先完成步骤3语音合成'); return; }
-  if (!S.avatarImageB64) { showToast('请先上传人脸图片'); return; }
+  if (!S.avatarSrcVideoB64) { showToast('请先上传静默人脸视频'); return; }
   if (S.avatarGenerating) return;
 
   // 把 Blob URL 转成 base64
@@ -2956,9 +2959,9 @@ async function handleAvatarGenerate() {
   try {
     const r = await api.post('/ai/video/generate', {
       audio_b64: audioB64,
-      image_b64: S.avatarImageB64,
+      video_b64: S.avatarSrcVideoB64,
       audio_fmt: 'wav',
-      image_fmt: S.avatarImageFmt || 'jpg',
+      video_fmt: S.avatarSrcVideoFmt || 'mp4',
       enhancer: S.avatarBeauty,
     });
     if (r.code !== 200) {

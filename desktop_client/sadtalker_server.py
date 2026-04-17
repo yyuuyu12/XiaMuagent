@@ -27,9 +27,9 @@ tasks: dict[str, dict] = {}
 
 class GenerateReq(BaseModel):
     audio_b64: str          # base64 WAV/MP3
-    image_b64: str          # base64 JPG/PNG 人脸图片
+    video_b64: str          # base64 MP4/MOV 静默人脸视频
     audio_fmt: str = "wav"  # wav | mp3
-    image_fmt: str = "jpg"  # jpg | png
+    video_fmt: str = "mp4"  # mp4 | mov
     enhancer: bool = False  # 是否启用 GFPGAN 增强（慢但清晰）
 
 @app.get("/health")
@@ -43,15 +43,15 @@ async def generate(req: GenerateReq):
 
     # 写临时文件
     audio_path = TMP_DIR / f"{task_id}.{req.audio_fmt}"
-    image_path = TMP_DIR / f"{task_id}.{req.image_fmt}"
+    video_path = TMP_DIR / f"{task_id}_src.{req.video_fmt}"
     try:
         audio_path.write_bytes(base64.b64decode(req.audio_b64))
-        image_path.write_bytes(base64.b64decode(req.image_b64))
+        video_path.write_bytes(base64.b64decode(req.video_b64))
     except Exception as e:
         raise HTTPException(400, f"base64解码失败: {e}")
 
     # 后台跑推理
-    asyncio.create_task(_run_sadtalker(task_id, str(audio_path), str(image_path), req.enhancer))
+    asyncio.create_task(_run_sadtalker(task_id, str(audio_path), str(video_path), req.enhancer))
     return {"task_id": task_id}
 
 @app.get("/video/task/{task_id}")
@@ -61,12 +61,12 @@ def get_task(task_id: str):
         raise HTTPException(404, "任务不存在")
     return t
 
-async def _run_sadtalker(task_id: str, audio_path: str, image_path: str, enhancer: bool):
+async def _run_sadtalker(task_id: str, audio_path: str, source_video_path: str, enhancer: bool):
     tasks[task_id].update({"status": "running", "progress": 5, "msg": "启动推理..."})
     cmd = [
         str(PYTHON_EXE), str(INFERENCE_PY),
         "--driven_audio", audio_path,
-        "--source_image", image_path,
+        "--source_image", source_video_path,   # SadTalker 支持视频作为 source_image
         "--result_dir", str(RESULT_DIR),
         "--preprocess", "full",
         "--still",
@@ -74,6 +74,7 @@ async def _run_sadtalker(task_id: str, audio_path: str, image_path: str, enhance
     if enhancer:
         cmd += ["--enhancer", "gfpgan"]
 
+    output_video_path = None
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -96,14 +97,14 @@ async def _run_sadtalker(task_id: str, audio_path: str, image_path: str, enhance
             tasks[task_id].update({"status": "error", "error": "未找到输出视频"})
             return
 
-        video_path = mp4s[0]
-        video_b64 = base64.b64encode(video_path.read_bytes()).decode()
+        output_video_path = mp4s[0]
+        video_b64 = base64.b64encode(output_video_path.read_bytes()).decode()
         tasks[task_id].update({
             "status": "done",
             "progress": 100,
             "msg": "完成",
             "video_b64": video_b64,
-            "video_size": video_path.stat().st_size,
+            "video_size": output_video_path.stat().st_size,
         })
 
     except asyncio.TimeoutError:
@@ -112,7 +113,7 @@ async def _run_sadtalker(task_id: str, audio_path: str, image_path: str, enhance
         tasks[task_id].update({"status": "error", "error": str(e)})
     finally:
         # 清理临时文件
-        for p in [audio_path, image_path]:
+        for p in [audio_path, source_video_path]:
             try: Path(p).unlink()
             except: pass
 
