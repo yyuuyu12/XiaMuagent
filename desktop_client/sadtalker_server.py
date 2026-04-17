@@ -68,7 +68,7 @@ async def _run_sadtalker(task_id: str, audio_path: str, source_video_path: str, 
         "--driven_audio", audio_path,
         "--source_image", source_video_path,   # SadTalker 支持视频作为 source_image
         "--result_dir", str(RESULT_DIR),
-        "--preprocess", "full",
+        "--preprocess", "crop",  # crop比full快3~5倍，正脸视频效果足够
         "--still",
     ]
     if enhancer:
@@ -84,7 +84,7 @@ async def _run_sadtalker(task_id: str, audio_path: str, source_video_path: str, 
         )
         tasks[task_id].update({"progress": 20, "msg": "GPU推理中..."})
 
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=600)
 
         if proc.returncode != 0:
             err = stderr.decode("utf-8", errors="replace")[-500:]
