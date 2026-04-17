@@ -401,6 +401,14 @@ ${script.slice(0, 800)}
   }
 });
 
+// 返回 asr_url，前端大文件直接走 ngrok，不经过 Zeabur 中转
+router.get('/asr-url', requireAuth, async (req, res) => {
+  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+  const asrUrl = (rows[0]?.value || '').trim();
+  if (!asrUrl) return res.json({ code: 500, msg: '未配置 asr_url' });
+  return res.json({ code: 200, data: { url: asrUrl } });
+});
+
 // ==================== 数字人视频生成 ====================
 router.post('/video/generate', requireAuth, async (req, res) => {
   const { audio_b64, video_b64, audio_fmt, video_fmt, enhancer } = req.body;

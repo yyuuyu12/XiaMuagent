@@ -2990,32 +2990,45 @@ async function handleAvatarGenerate() {
   setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null });
 
   try {
-    const r = await api.post('/ai/video/generate', {
-      audio_b64: audioB64,
-      video_b64: S.avatarSrcVideoB64,
-      audio_fmt: 'wav',
-      video_fmt: S.avatarSrcVideoFmt || 'mp4',
-      enhancer: S.avatarBeauty,
-    });
-    if (r.code !== 200) {
-      setState({ avatarGenerating: false, avatarErr: r.msg || '提交失败', extractStep: 4 }); return;
+    // 先拿 ngrok 地址，大文件直接传给本地服务，绕过 Zeabur 代理限制
+    const urlR = await api.get('/ai/asr-url');
+    if (urlR.code !== 200) {
+      setState({ avatarGenerating: false, avatarErr: urlR.msg || '获取服务地址失败', extractStep: 4 }); return;
     }
-    const taskId = r.data.task_id;
+    const asrUrl = urlR.data.url.replace(/\/$/, '');
+
+    const resp = await fetch(`${asrUrl}/video/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio_b64: audioB64,
+        video_b64: S.avatarSrcVideoB64,
+        audio_fmt: 'wav',
+        video_fmt: S.avatarSrcVideoFmt || 'mp4',
+        enhancer: S.avatarBeauty,
+      }),
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      setState({ avatarGenerating: false, avatarErr: '视频服务出错: ' + t.slice(0, 100), extractStep: 4 }); return;
+    }
+    const data = await resp.json();
+    const taskId = data.task_id;
     setState({ avatarTaskId: taskId });
-    // 开始轮询
-    _startAvatarPoller(taskId);
+    _startAvatarPoller(taskId, asrUrl);
   } catch (e) {
     setState({ avatarGenerating: false, avatarErr: '网络错误: ' + e.message, extractStep: 4 });
   }
 }
 
-function _startAvatarPoller(taskId) {
+function _startAvatarPoller(taskId, asrUrl) {
   if (_avatarPoller) clearInterval(_avatarPoller);
   let elapsed = 0;
   _avatarPoller = setInterval(async () => {
     elapsed += 5;
     try {
-      const r = await api.get('/ai/video/task/' + taskId);
+      const resp = await fetch(`${asrUrl}/video/task/${taskId}`);
+      const r = resp.ok ? { code: 200, data: await resp.json() } : { code: 500 };
       if (r.code !== 200) return;
       const t = r.data;
       // 更新进度条
