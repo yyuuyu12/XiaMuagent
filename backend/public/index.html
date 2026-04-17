@@ -1589,13 +1589,6 @@ function tCloneStep4(sb) {
       </div>
       <div style="font-size:12px;color:#A8A49C">开启后画质更清晰，但生成速度约慢 30 秒</div>
     </div>
-    <div style="background:#FFF7ED;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <div style="font-size:12px;color:#92400E;line-height:1.6">
-        需要本机启动 <b>start_sadtalker.bat</b>（SadTalker服务），生成约需 1~3 分钟。<br/>
-        语音合成完成后才能生成视频。
-      </div>
-    </div>
     ${S.avatarErr?`<div class="err-text" style="margin-bottom:10px">${esc(S.avatarErr)}</div>`:''}
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:3})">上一步</div>
