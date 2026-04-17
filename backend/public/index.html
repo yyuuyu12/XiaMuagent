@@ -2086,6 +2086,10 @@ function tVoiceManager() {
         </div>
       </div>`).join('');
 
+  const addTip = `<div style="background:#FFF7ED;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12px;color:#92400E;line-height:1.6">
+    💡 <b>最佳效果：</b>录制 10~30 秒，语速自然、环境安静、普通话清晰。过短或过长都会影响克隆质量和合成速度。
+  </div>`;
+
   const addUI = isRecording ? `
     <div style="background:#FEF2F2;border-radius:12px;padding:14px;margin-top:12px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -2120,7 +2124,7 @@ function tVoiceManager() {
         <div class="section-label" style="margin-bottom:0">我的声音 <span style="font-size:12px;color:#A8A49C;font-weight:400">${myVoices.length}/8</span></div>
       </div>
       ${myRows}
-      ${myVoices.length < 8 ? addUI : `<div style="font-size:12px;color:#A8A49C;text-align:center;margin-top:10px">最多保存8个声音</div>`}
+      ${myVoices.length < 8 ? addTip + addUI : `<div style="font-size:12px;color:#A8A49C;text-align:center;margin-top:10px">最多保存8个声音</div>`}
     </div>
     <div style="height:20px"></div>
   </div>`;
@@ -2686,13 +2690,47 @@ function saveMyVoices(arr) {
   setState({ myVoices: arr });
 }
 
-function addToMyVoiceLibrary(name, audio_b64, emotion) {
+// 检查 base64 音频时长，返回 Promise<{ok, seconds, msg}>
+async function checkAudioB64(b64) {
+  try {
+    const raw = atob(b64);
+    const buf = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await ctx.decodeAudioData(buf.buffer.slice(0));
+    ctx.close();
+    const secs = decoded.duration;
+    if (secs < 3) return { ok: false, seconds: secs, msg: `音频太短（${secs.toFixed(1)}s），建议 5~30 秒清晰语音` };
+    if (secs > 60) return { ok: false, seconds: secs, msg: `音频太长（${secs.toFixed(0)}s），请裁剪到 60 秒以内` };
+    if (secs > 30) return { ok: true, seconds: secs, msg: `音频较长（${secs.toFixed(0)}s），建议使用 5~30 秒，过长会导致超时` };
+    return { ok: true, seconds: secs, msg: '' };
+  } catch {
+    // 解码失败时不拦截，由服务端判断
+    return { ok: true, seconds: 0, msg: '' };
+  }
+}
+
+// 检查 base64 大小（字节）
+function checkAudioSize(b64) {
+  const bytes = Math.round(b64.length * 3 / 4);
+  if (bytes > 8 * 1024 * 1024) return { ok: false, msg: `文件过大（${(bytes/1024/1024).toFixed(1)} MB），请压缩到 8 MB 以内` };
+  return { ok: true };
+}
+
+async function addToMyVoiceLibrary(name, audio_b64, emotion) {
   const arr = [...(S.myVoices || [])];
   if (arr.length >= 8) { showToast('声音库已满（最多8个）'); return; }
+  // 大小校验
+  const sizeCheck = checkAudioSize(audio_b64);
+  if (!sizeCheck.ok) { showToast(sizeCheck.msg); return; }
+  // 时长校验
+  const durCheck = await checkAudioB64(audio_b64);
+  if (!durCheck.ok) { showToast(durCheck.msg); return; }
+  if (durCheck.msg) showToast(durCheck.msg); // 仅警告，不拦截
   const id = Date.now().toString(36);
   arr.push({ id, name, audio_b64, emotion: emotion || 'neutral' });
   saveMyVoices(arr);
-  showToast('声音已添加到声音库');
+  showToast(`声音已添加（${durCheck.seconds > 0 ? durCheck.seconds.toFixed(1)+'s' : ''}）`);
 }
 
 function deleteMyVoice(id) {

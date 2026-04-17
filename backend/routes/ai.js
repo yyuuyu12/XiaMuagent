@@ -234,11 +234,6 @@ router.post('/tts', requireAuth, async (req, res) => {
   const { text, voice, speed, cloneVoiceId } = req.body;
   if (!text?.trim()) return res.json({ code: 400, msg: '文案内容不能为空' });
   const trimText = text.trim().slice(0, 4096);
-  // 拦截超大 base64 音频（>8MB），避免超时或OOM
-  const refAudio = req.body.indexRefAudio || '';
-  if (refAudio.length > 8 * 1024 * 1024) {
-    return res.json({ code: 400, msg: '参考音频文件太大（>6MB），请上传 30 秒以内的录音' });
-  }
 
   // ===== 通道1：Fish Audio 克隆音色 =====
   if (cloneVoiceId) {
@@ -276,7 +271,7 @@ router.post('/tts', requireAuth, async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', speed: parseFloat(speed) || 1.0 }),
-        signal: AbortSignal.timeout(120000),
+        signal: AbortSignal.timeout(240000), // 4分钟，GPU首次推理较慢
       });
       if (!resp.ok) {
         const errText = await resp.text();
@@ -286,7 +281,10 @@ router.post('/tts', requireAuth, async (req, res) => {
       if (data.audio) return res.json({ code: 200, data: { audio: data.audio, format: data.format || 'wav' } });
       return res.json({ code: 500, msg: 'IndexTTS 返回数据异常' });
     } catch (e) {
-      return res.json({ code: 500, msg: `IndexTTS 出错: ${e.message}` });
+      const isTimeout = e.message && (e.message.includes('timeout') || e.message.includes('aborted'));
+      return res.json({ code: 500, msg: isTimeout
+        ? 'IndexTTS 合成超时（超过4分钟）。建议：参考音频控制在10~30秒，文案不要过长，或重试一次'
+        : `IndexTTS 出错: ${e.message}` });
     }
   }
 
