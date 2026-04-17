@@ -2574,17 +2574,24 @@ function stopClonePoller() {
 }
 
 async function handleCloneRewrite() {
-  const taskId = S.cloneTaskId;
-  if (!taskId || !S.extractedScript.trim()) return;
-  // 同步 textarea 最新内容（防止 oninput 未触发）
+  // 先从 DOM 读最新内容（oninput 可能未触发）
   const ta = document.getElementById('f-extracted-script');
   if (ta) S.extractedScript = ta.value;
+  const text = S.extractedScript.trim();
+  if (!text) return;
+
   setState({ extractStep: 'rewriting', extractErr: '' });
   try {
-    const r = await api.post(`/tasks/${taskId}/start-rewrite`, { editedTranscript: S.extractedScript });
-    if (r.code === 200) startClonePoller(taskId);
-    else setState({ extractStep: 'review', extractErr: r.msg || '触发改写失败，请重试' });
-  } catch { setState({ extractStep: 'review', extractErr: '网络错误，请重试' }); }
+    // 直接把用户编辑好的文案传给 AI 改写，不经过 task 队列
+    const r = await api.post('/ai/rewrite', { text });
+    if (r.code === 200) {
+      setState({ extractStep: 2, rewrittenScript: r.data.result, extractErr: '' });
+    } else {
+      setState({ extractStep: 'review', extractErr: r.msg || '改写失败，请重试' });
+    }
+  } catch (e) {
+    setState({ extractStep: 'review', extractErr: '网络错误，请重试' });
+  }
 }
 
 // ===== 克隆步骤3-6 handlers =====
