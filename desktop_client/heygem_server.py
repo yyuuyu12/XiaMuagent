@@ -3,6 +3,9 @@ HeyGem 数字人视频生成服务
 端口: 7861
 启动: start_heygem.bat
 """
+import multiprocessing
+multiprocessing.freeze_support()   # Windows spawn 必须最先调用
+
 import os
 import sys
 import uuid
@@ -22,24 +25,13 @@ TEMP_DIR   = Path(__file__).parent / "heygem_temp"
 OUTPUT_DIR.mkdir(exist_ok=True)
 TEMP_DIR.mkdir(exist_ok=True)
 
-# 切换工作目录并加入 sys.path（HeyGem 用相对路径加载配置和模型）
-os.chdir(str(HEYGEM_DIR))
-sys.path.insert(0, str(HEYGEM_DIR))
-os.environ["RESULT_DIR"] = str(OUTPUT_DIR)
-os.environ["TEMP_DIR"]   = str(TEMP_DIR)
-
-# ===== 主线程初始化模型（multiprocessing spawn 需要主线程）=====
-print("[HeyGem] 正在初始化数字人模型，请稍候（约30~60秒）...")
-from service.trans_dh_service import TransDhTask
-_dh_task = TransDhTask.instance()
-print("[HeyGem] 模型初始化完成，服务就绪")
-
 # ===== FastAPI =====
 app = FastAPI(title="HeyGem Server")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 tasks: dict[str, dict] = {}
 _task_lock = threading.Lock()
+_dh_task = None   # 仅主进程初始化，子进程（spawn）不会执行 __main__ 块
 
 
 class GenerateReq(BaseModel):
@@ -57,6 +49,8 @@ def health():
 
 @app.post("/video/generate")
 async def generate(req: GenerateReq):
+    if _dh_task is None:
+        raise HTTPException(503, "模型尚未初始化")
     task_id = uuid.uuid4().hex
     with _task_lock:
         tasks[task_id] = {"status": "pending", "progress": 0, "msg": "等待中", "video_b64": None, "error": None}
@@ -82,10 +76,8 @@ def get_task(task_id: str):
 
 
 def _do_work(task_id, audio_path, video_path):
-    """在线程池里同步跑 HeyGem 推理"""
     with _task_lock:
         tasks[task_id].update({"status": "running", "progress": 10, "msg": "GPU推理中..."})
-    # work(audio_url, video_url, code, watermark_switch, digital_auth, chaofen, pn)
     _dh_task.work(audio_path, video_path, task_id, 0, 0, 0, 0)
 
 
@@ -96,16 +88,13 @@ async def _run_heygem(task_id: str, audio_path: str, video_path: str):
             timeout=600
         )
 
-        # 拿结果
         task_info = _dh_task.task_dic.get(task_id, {})
         result_path = task_info.get("result_path") or str(OUTPUT_DIR / f"{task_id}.mp4")
-
         if not os.path.exists(result_path):
             result_path = str(OUTPUT_DIR / f"{task_id}.mp4")
-
         if not os.path.exists(result_path):
             with _task_lock:
-                tasks[task_id].update({"status": "error", "error": "未找到输出视频，推理可能失败"})
+                tasks[task_id].update({"status": "error", "error": "未找到输出视频"})
             return
 
         video_b64 = base64.b64encode(Path(result_path).read_bytes()).decode()
@@ -115,7 +104,6 @@ async def _run_heygem(task_id: str, audio_path: str, video_path: str):
                 "video_b64": video_b64,
                 "video_size": os.path.getsize(result_path),
             })
-
     except asyncio.TimeoutError:
         with _task_lock:
             tasks[task_id].update({"status": "error", "error": "推理超时（超过10分钟）"})
@@ -132,7 +120,18 @@ async def _run_heygem(task_id: str, audio_path: str, video_path: str):
                 pass
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    # Windows spawn 保护：只有主进程才执行初始化
+    os.chdir(str(HEYGEM_DIR))
+    sys.path.insert(0, str(HEYGEM_DIR))
+    os.environ["RESULT_DIR"] = str(OUTPUT_DIR)
+    os.environ["TEMP_DIR"]   = str(TEMP_DIR)
+
+    print("[HeyGem] 正在初始化数字人模型，请稍候（约30~60秒）...")
+    from service.trans_dh_service import TransDhTask
+    _dh_task = TransDhTask.instance()
+    print("[HeyGem] 模型初始化完成，服务就绪")
     print(f"   模型目录: {HEYGEM_DIR}")
     print(f"   输出目录: {OUTPUT_DIR}")
+
     uvicorn.run(app, host="0.0.0.0", port=7861)
