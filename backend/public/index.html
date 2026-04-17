@@ -1510,16 +1510,18 @@ function tCloneStep3(sb) {
     ${emotionSection}
     ${audioSection}
     ${S.ttsErr?`<span class="err-text">${esc(S.ttsErr)}</span>`:''}
+    ${S.ttsAudioUrl ? `
+    <div class="action-row" style="gap:8px">
+      <div class="btn-action-sec" onclick="handleTTSGenerate()">重新合成</div>
+      <div class="btn-action-main" onclick="goToCloneStep4()">下一步：选择数字人 →</div>
+    </div>` : `
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:2})">上一步</div>
-      <div class="btn-action-main ${S.ttsGenerating?'btn-disabled':''}" onclick="handleTTSGenerate()">
-        ${S.ttsAudioUrl?'重新合成':'合成语音试听'}
-      </div>
+      <div class="btn-action-main ${S.ttsGenerating?'btn-disabled':''}" onclick="handleTTSGenerate()">合成语音试听</div>
     </div>
-    <div style="text-align:center;margin-top:12px">
-      <span style="font-size:13px;color:${S.ttsAudioUrl?'#F97316':'#A8A49C'};font-weight:${S.ttsAudioUrl?'600':'400'};cursor:pointer"
-        onclick="goToCloneStep4()">${S.ttsAudioUrl?'下一步：选择数字人 →':'跳过语音合成 →'}</span>
-    </div>
+    <div style="text-align:center;margin-top:10px">
+      <span style="font-size:13px;color:#A8A49C;cursor:pointer" onclick="goToCloneStep4()">跳过语音合成 →</span>
+    </div>`}
   </div>`;
 }
 
