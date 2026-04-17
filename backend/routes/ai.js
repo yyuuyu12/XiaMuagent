@@ -418,7 +418,7 @@ router.post('/video/generate', requireAuth, async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audio_b64, video_b64, audio_fmt: audio_fmt || 'wav', video_fmt: video_fmt || 'mp4', enhancer: !!enhancer }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(120000), // 2分钟：大base64数据上传通过ngrok需要时间
     });
     if (!resp.ok) {
       const t = await resp.text();
