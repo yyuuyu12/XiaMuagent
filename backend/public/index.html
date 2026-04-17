@@ -556,7 +556,17 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .publish-tag { font-size:12px; color:#9A3412; background:#FFF1E8; padding:4px 10px; border-radius:50px; display:inline-block; }
 /* 音频播放器 */
 .audio-player-row { background:#F7F6F2; border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; margin-bottom:12px; }
-.audio-play-btn { width:40px; height:40px; background:#FF6B35; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+.audio-play-btn { width:44px; height:44px; background:#FF6B35; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; box-shadow:0 3px 10px rgba(255,107,53,.35); }
+.audio-stop-btn { width:36px; height:36px; background:#F5F4F0; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+/* 语速滑动条 */
+.speed-slider { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:3px; outline:none; cursor:pointer; border:none; }
+.speed-slider::-webkit-slider-thumb { -webkit-appearance:none; width:28px; height:28px; border-radius:50%; background:#FF6B35; cursor:pointer; box-shadow:0 2px 8px rgba(255,107,53,.40); border:3px solid #fff; }
+.speed-slider::-moz-range-thumb { width:28px; height:28px; border-radius:50%; background:#FF6B35; cursor:pointer; border:3px solid #fff; box-shadow:0 2px 8px rgba(255,107,53,.40); }
+/* 我的声音库 */
+.my-voice-item { display:flex; align-items:center; gap:10px; background:#F7F6F2; border-radius:10px; padding:10px 12px; margin-bottom:6px; cursor:pointer; border:1.5px solid transparent; transition:border-color .15s,background .15s; }
+.my-voice-item-active { border-color:#F97316; background:#FFF1E8; }
+.my-voice-icon { width:36px; height:36px; background:#E8E4DC; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.my-voice-icon-active { background:#F97316; }
   </style>
 </head>
 <body>
@@ -660,6 +670,9 @@ const S = {
   ttsVoice: 'xiaoxiao', ttsSpeed: 1.0, ttsGenerating: false, ttsAudioUrl: null, ttsErr: '',
   ttsCloneVoiceId: localStorage.getItem('ttsCloneVoiceId') || null, ttsCloning: false, ttsCloneErr: '',
   ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral',
+  myVoices: (()=>{ try{ return JSON.parse(localStorage.getItem('myVoices')||'[]'); }catch(e){ return []; } })(),
+  selectedMyVoiceId: localStorage.getItem('selectedMyVoiceId')||null,
+  ttsPlaying: false,
   // 步骤4：数字人
   selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
   // 步骤5：后期制作
@@ -1404,102 +1417,123 @@ function tCloneStep3(sb) {
     </div>`;
   }
 
-  const voices = [
-    { id:'xiaoxiao', name:'女声·温柔', sub:'系统音色' },
-    { id:'yunjian',  name:'男声·磁性', sub:'系统音色' },
-    { id:'xiaoyi',   name:'女声·活泼', sub:'系统音色' },
-    { id:'yunxi',    name:'男声·阳光', sub:'系统音色' },
-    { id:'indextts', name:'克隆音色',  sub:'我的声音' },
+  // ── 1. 系统音色 ──
+  const sysVoices = [
+    { id:'xiaoxiao', name:'女声·温柔' },
+    { id:'yunjian',  name:'男声·磁性' },
+    { id:'xiaoyi',   name:'女声·活泼' },
+    { id:'yunxi',    name:'男声·阳光' },
   ];
-  if (S.ttsCloneVoiceId) voices.push({ id:'cloned', name:'Fish克隆', sub:'我的声音' });
-
-  const voiceHtml = voices.map(v => {
+  const sysVoiceHtml = sysVoices.map(v => {
     const on = S.ttsVoice === v.id;
-    const isClone = v.id === 'indextts';
-    return `<div class="voice-card ${on?'voice-card-active':''}" onclick="setState({ttsVoice:'${v.id}'})" style="min-width:68px">
+    return `<div class="voice-card ${on?'voice-card-active':''}" onclick="selectSysVoice('${v.id}')" style="min-width:72px">
       <div class="voice-card-icon ${on?'voice-card-icon-on':'voice-card-icon-off'}">
-        ${isClone
-          ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
-          : `<svg width="15" height="15" viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/></svg>`}
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/></svg>
       </div>
       <div style="font-size:12px;font-weight:600;color:${on?'#9A3412':'#1A1814'}">${v.name}</div>
-      <div style="font-size:10px;color:${on?'#F97316':'#A8A49C'};margin-top:2px">${on?'已选择':v.sub}</div>
+      <div style="font-size:10px;color:${on?'#F97316':'#A8A49C'};margin-top:2px">${on?'已选择':'系统音色'}</div>
     </div>`;
   }).join('');
 
-  const audioSection = S.ttsAudioUrl ? `
-    <div class="audio-player-row">
-      <div class="audio-play-btn" onclick="playTTSAudio()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+  // ── 2. 我的克隆声音库 ──
+  const selVoice = S.myVoices.find(v => v.id === S.selectedMyVoiceId);
+  const isCloneSelected = S.ttsVoice === 'indextts';
+  const voiceListHtml = S.myVoices.map(v => {
+    const on = S.selectedMyVoiceId === v.id && isCloneSelected;
+    return `<div class="my-voice-item ${on?'my-voice-item-active':''}" onclick="selectMyVoice('${v.id}')">
+      <div class="my-voice-icon ${on?'my-voice-icon-active':''}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${on?'#fff':'#8B8880'}" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
       </div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:3px">语音预览</div>
-        <div style="font-size:11px;color:#A8A49C">点击播放试听</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:${on?'#9A3412':'#1A1814'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.name)}</div>
+        <div style="font-size:11px;color:${on?'#F97316':'#A8A49C'};margin-top:2px">${on?'已选择·':''}${v.emotion==='neutral'?'自然':v.emotion==='happy'?'开心':v.emotion==='excited'?'激动':v.emotion==='sad'?'忧郁':'平静'}</div>
       </div>
-      <span style="font-size:11px;color:#059669;background:#ECFDF5;padding:4px 10px;border-radius:50px">✓ 合成完成</span>
+      ${on?`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>`:''}
+      <div onclick="event.stopPropagation();deleteMyVoice('${v.id}')" style="padding:4px 6px;cursor:pointer;color:#C4C0B8;font-size:16px;line-height:1;flex-shrink:0">×</div>
+    </div>`;
+  }).join('');
+
+  // 选中克隆音色时，展示情绪选择
+  const emotionHtml = (isCloneSelected && selVoice) ? `
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid #F0EEE8">
+      <div style="font-size:12px;font-weight:600;color:#9A3412;margin-bottom:8px">情绪风格</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${[['neutral','自然'],['happy','开心'],['excited','激动'],['sad','忧郁'],['calm','平静']].map(([id,name])=>{
+          const on = (selVoice.emotion||'neutral') === id;
+          return `<div onclick="setMyVoiceEmotion('${selVoice.id}','${id}')"
+            style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid ${on?'#F97316':'#E8E4DC'};background:${on?'#FFF1E8':'#F7F6F2'};color:${on?'#9A3412':'#6B7280'}">${name}</div>`;
+        }).join('')}
+      </div>
     </div>` : '';
 
-  // ===== IndexTTS 区域：仅当选中克隆音色时显示 =====
-  const indexTTSSection = S.ttsVoice === 'indextts' ? `
-    <div class="section-card" style="background:#FFF8F3;border:1.5px solid #FFD5B8">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="section-label" style="margin-bottom:0;color:#9A3412">参考音频（你的声音）</div>
-        ${S.ttsIndexRefName ? `<span style="font-size:11px;color:#059669;background:#ECFDF5;padding:3px 8px;border-radius:50px">✓ 已上传</span>` : ''}
-      </div>
-      <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">上传 5~30 秒清晰语音，模型会克隆该音色来朗读你的文案</div>
-      <input type="file" id="indexRefAudioInput" accept="audio/*" style="display:none" onchange="handleIndexRefAudioSelect(event)" />
-      <div class="btn-action-sec" style="font-size:13px;margin-bottom:${S.ttsIndexRefName?'8px':'0'}" onclick="document.getElementById('indexRefAudioInput').click()">
-        ${S.ttsIndexRefName ? '重新上传' : '选择音频文件'}
-      </div>
-      ${S.ttsIndexRefName ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">📎 ${esc(S.ttsIndexRefName)}</div>` : ''}
-      <div style="margin-top:14px">
-        <div class="section-label" style="margin-bottom:8px;color:#9A3412">情绪风格</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${[['neutral','自然'],['happy','开心'],['excited','激动'],['sad','忧郁'],['calm','平静']].map(([id,name])=>{
-            const on = S.ttsIndexEmotion === id;
-            return `<div onclick="setState({ttsIndexEmotion:'${id}'})"
-              style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid ${on?'#F97316':'#E8E4DC'};background:${on?'#FFF1E8':'#F7F6F2'};color:${on?'#9A3412':'#6B7280'}">${name}</div>`;
-          }).join('')}
+  const myVoiceSection = `
+    <div class="section-card" style="${isCloneSelected?'border:1.5px solid #FFD5B8;background:#FFF8F3':''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:32px;height:32px;background:${isCloneSelected?'#F97316':'#E8E4DC'};border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:${isCloneSelected?'#9A3412':'#1A1814'}">克隆我的声音</div>
+            <div style="font-size:11px;color:#A8A49C">上传声音样本，AI克隆你的专属音色</div>
+          </div>
         </div>
+        ${isCloneSelected?`<span style="font-size:11px;color:#059669;background:#ECFDF5;padding:3px 10px;border-radius:50px">✓ 已选择</span>`:''}
       </div>
-    </div>` : '';
-
-  const cloneSection = `
-    <div class="section-card" style="border:1.5px dashed #E8E4DC">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div class="section-label" style="margin-bottom:0">克隆我的音色（可选）</div>
-        ${S.ttsCloneVoiceId ? `<span style="font-size:11px;color:#059669;background:#ECFDF5;padding:3px 8px;border-radius:50px">✓ 已克隆</span>` : ''}
+      ${S.myVoices.length > 0 ? voiceListHtml : `<div style="text-align:center;padding:12px 0;color:#A8A49C;font-size:13px">还没有克隆声音，先上传一个吧</div>`}
+      <input type="file" id="myVoiceInput" accept="audio/*" style="display:none" onchange="handleMyVoiceUpload(event)" />
+      <div onclick="document.getElementById('myVoiceInput').click()"
+        style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;background:${isCloneSelected?'#FFE8D6':'#F5F4F0'};border-radius:10px;padding:10px;cursor:pointer;border:1.5px dashed ${isCloneSelected?'#F97316':'#D4D0C8'}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${isCloneSelected?'#F97316':'#8B8880'}" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span style="font-size:13px;font-weight:600;color:${isCloneSelected?'#F97316':'#6B7280'}">添加声音样本</span>
       </div>
-      <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">上传 5~30 秒清晰语音，一键克隆专属音色</div>
-      <input type="file" id="cloneAudioInput" accept="audio/*" style="display:none" onchange="handleCloneAudioSelect(event)" />
-      ${S.ttsCloning
-        ? `<div style="font-size:13px;color:#F97316">正在克隆中，请稍候...</div>`
-        : `<div class="btn-action-sec" style="font-size:13px" onclick="document.getElementById('cloneAudioInput').click()">
-            ${S.ttsCloneVoiceId ? '重新上传样本' : '上传语音样本'}
-           </div>`}
-      ${S.ttsCloneErr ? `<div class="err-text" style="margin-top:6px">${esc(S.ttsCloneErr)}</div>` : ''}
+      ${emotionHtml}
     </div>`;
 
-  return `${sb}<div class="tab-page">
+  // ── 3. 语速 ──
+  const speedPct = ((S.ttsSpeed * 100 - 50) / 150) * 100;
+  setTimeout(() => {
+    const sl = document.getElementById('speedSlider');
+    if (sl) sl.style.background = `linear-gradient(to right,#FF6B35 0%,#FF6B35 ${speedPct}%,#E8E4DC ${speedPct}%,#E8E4DC 100%)`;
+  }, 30);
+  const speedSection = `
     <div class="section-card">
-      <div class="section-label">选择音色</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${voiceHtml}</div>
-    </div>
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div class="section-label" style="margin-bottom:0">语速</div>
-        <span style="font-size:14px;color:#F97316;font-weight:600">${S.ttsSpeed.toFixed(1)}x</span>
+        <span style="font-size:15px;color:#F97316;font-weight:700">${S.ttsSpeed.toFixed(1)}x</span>
       </div>
-      <input type="range" min="50" max="200" step="10" value="${Math.round(S.ttsSpeed*100)}"
-        oninput="setState({ttsSpeed:this.value/100})"
-        style="width:100%;accent-color:#FF6B35;cursor:pointer" />
-      <div style="display:flex;justify-content:space-between;margin-top:4px">
+      <input id="speedSlider" type="range" class="speed-slider" min="50" max="200" step="5" value="${Math.round(S.ttsSpeed*100)}"
+        oninput="onSpeedInput(this)" />
+      <div style="display:flex;justify-content:space-between;margin-top:8px">
         <span style="font-size:11px;color:#A8A49C">0.5x 慢</span>
         <span style="font-size:11px;color:#A8A49C">快 2.0x</span>
       </div>
+    </div>`;
+
+  // ── 4. 音频播放器 ──
+  const audioSection = S.ttsAudioUrl ? `
+    <div class="audio-player-row">
+      <div class="audio-play-btn" onclick="playTTSAudio()">
+        ${S.ttsPlaying
+          ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+          : `<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>`}
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:3px">语音预览</div>
+        <div style="font-size:11px;color:${S.ttsPlaying?'#F97316':'#A8A49C'}">${S.ttsPlaying?'播放中…':'点击播放试听'}</div>
+      </div>
+      ${S.ttsPlaying
+        ? `<div class="audio-stop-btn" onclick="stopTTSAudio()"><svg width="12" height="12" viewBox="0 0 24 24" fill="#6B7280"><rect x="4" y="4" width="16" height="16" rx="2"/></svg></div>`
+        : `<span style="font-size:11px;color:#059669;background:#ECFDF5;padding:4px 10px;border-radius:50px">✓ 合成完成</span>`}
+    </div>` : '';
+
+  return `${sb}<div class="tab-page">
+    <div class="section-card">
+      <div class="section-label">系统音色</div>
+      <div style="display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">${sysVoiceHtml}</div>
     </div>
-    ${indexTTSSection}
-    ${cloneSection}
+    ${myVoiceSection}
+    ${speedSection}
     ${audioSection}
     ${S.ttsErr?`<span class="err-text">${esc(S.ttsErr)}</span>`:''}
     <div class="action-row" style="gap:8px">
@@ -2480,9 +2514,10 @@ async function handleTTSGenerate() {
     const payload = { text: text.slice(0, 2000), voice: S.ttsVoice, speed: S.ttsSpeed };
     if (S.ttsVoice === 'cloned' && S.ttsCloneVoiceId) payload.cloneVoiceId = S.ttsCloneVoiceId;
     if (S.ttsVoice === 'indextts') {
-      if (!S.ttsIndexRefAudio) { setState({ ttsGenerating: false, ttsErr: '请先上传参考音频', extractStep: 3 }); return; }
-      payload.indexRefAudio = S.ttsIndexRefAudio;
-      payload.indexEmotion = S.ttsIndexEmotion;
+      const selVoice = S.myVoices.find(v => v.id === S.selectedMyVoiceId);
+      if (!selVoice) { setState({ ttsGenerating: false, ttsErr: '请先在"克隆我的声音"中上传并选择一个声音样本', extractStep: 3 }); return; }
+      payload.indexRefAudio = selVoice.audio_b64;
+      payload.indexEmotion = selVoice.emotion || 'neutral';
     }
     const r = await api.post('/ai/tts', payload);
     if (r.code === 200) {
@@ -2495,6 +2530,7 @@ async function handleTTSGenerate() {
   } catch {
     setState({ ttsGenerating: false, ttsErr: '网络错误，请重试', extractStep: 3 });
   }
+  stopTTSAudio(); // 重新合成前停止当前播放
 }
 
 function _b64ToBlobUrl(b64, mime) {
@@ -2508,21 +2544,74 @@ function _b64ToBlobUrl(b64, mime) {
 
 function playTTSAudio() {
   if (!S.ttsAudioUrl) return;
-  try {
-    const a = new Audio(S.ttsAudioUrl);
-    a.addEventListener('error', () => showToast('播放失败'));
-    a.play().catch(e => showToast('播放失败：' + (e.message || e)));
-  } catch (e) { showToast('播放失败：' + e.message); }
+  // 暂停 → 继续
+  if (_ttsAudio && !_ttsAudio.paused && !_ttsAudio.ended) {
+    _ttsAudio.pause();
+    setState({ ttsPlaying: false });
+    return;
+  }
+  // 已暂停 → 继续
+  if (_ttsAudio && _ttsAudio.paused && !_ttsAudio.ended) {
+    _ttsAudio.play().then(() => setState({ ttsPlaying: true })).catch(e => showToast('播放失败：' + e.message));
+    return;
+  }
+  // 新建
+  _ttsAudio = new Audio(S.ttsAudioUrl);
+  _ttsAudio.addEventListener('ended', () => setState({ ttsPlaying: false }));
+  _ttsAudio.addEventListener('error', () => { showToast('播放失败'); setState({ ttsPlaying: false }); });
+  _ttsAudio.play().then(() => setState({ ttsPlaying: true })).catch(e => { showToast('播放失败：' + e.message); setState({ ttsPlaying: false }); });
 }
 
-async function handleIndexRefAudioSelect(event) {
+function stopTTSAudio() {
+  if (_ttsAudio) { _ttsAudio.pause(); _ttsAudio.currentTime = 0; _ttsAudio = null; }
+  setState({ ttsPlaying: false });
+}
+
+function onSpeedInput(el) {
+  const pct = ((el.value - el.min) / (el.max - el.min)) * 100;
+  el.style.background = `linear-gradient(to right,#FF6B35 0%,#FF6B35 ${pct}%,#E8E4DC ${pct}%,#E8E4DC 100%)`;
+  setState({ ttsSpeed: el.value / 100 });
+}
+
+function selectSysVoice(id) {
+  setState({ ttsVoice: id, selectedMyVoiceId: null, ttsIndexRefAudio: null });
+}
+
+function selectMyVoice(id) {
+  const v = S.myVoices.find(x => x.id === id);
+  if (!v) return;
+  setState({ ttsVoice: 'indextts', selectedMyVoiceId: id, ttsIndexRefAudio: v.audio_b64, ttsIndexEmotion: v.emotion || 'neutral' });
+  localStorage.setItem('selectedMyVoiceId', id);
+}
+
+function setMyVoiceEmotion(voiceId, emotion) {
+  const voices = S.myVoices.map(v => v.id === voiceId ? {...v, emotion} : v);
+  localStorage.setItem('myVoices', JSON.stringify(voices));
+  setState({ myVoices: voices, ttsIndexEmotion: emotion });
+}
+
+function deleteMyVoice(id) {
+  const voices = S.myVoices.filter(v => v.id !== id);
+  localStorage.setItem('myVoices', JSON.stringify(voices));
+  const newSel = S.selectedMyVoiceId === id ? null : S.selectedMyVoiceId;
+  if (newSel === null) setState({ myVoices: voices, selectedMyVoiceId: null, ttsVoice: 'xiaoxiao', ttsIndexRefAudio: null });
+  else setState({ myVoices: voices });
+  localStorage.setItem('selectedMyVoiceId', newSel || '');
+}
+
+function handleMyVoiceUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
+  if (S.myVoices.length >= 8) { showToast('最多保存8个声音，请先删除旧的'); return; }
   const reader = new FileReader();
   reader.onload = (e) => {
-    const base64 = e.target.result.split(',')[1];
-    setState({ ttsIndexRefAudio: base64, ttsIndexRefName: file.name });
-    showToast('参考音频已加载');
+    const audio_b64 = e.target.result.split(',')[1];
+    const newVoice = { id: Date.now().toString(36), name: file.name, audio_b64, emotion: 'neutral' };
+    const voices = [...S.myVoices, newVoice];
+    try { localStorage.setItem('myVoices', JSON.stringify(voices)); } catch(err) { showToast('存储空间不足，请删除旧声音'); return; }
+    localStorage.setItem('selectedMyVoiceId', newVoice.id);
+    setState({ myVoices: voices, selectedMyVoiceId: newVoice.id, ttsVoice: 'indextts', ttsIndexRefAudio: audio_b64, ttsIndexEmotion: 'neutral' });
+    showToast('声音已添加，已自动选择');
   };
   reader.readAsDataURL(file);
   event.target.value = '';
