@@ -62,19 +62,19 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # 没有情感参考音频时，用 examples/ 里的样本做默认情绪模板
 EXAMPLES_DIR = os.path.join(VOICE_MODULE_DIR, "examples")
 EMOTION_TEMPLATES = {
-    "neutral": None,                                                     # 自然：不加情感
-    "happy":   os.path.join(EXAMPLES_DIR, "voice_01.wav"),              # 开心：用正常语音
+    "neutral": os.path.join(EXAMPLES_DIR, "voice_03.wav"),              # 自然：用平静模板轻量引导，避免模型默认激动腔
+    "happy":   os.path.join(EXAMPLES_DIR, "voice_01.wav"),              # 开心
     "excited": os.path.join(EXAMPLES_DIR, "voice_02.wav"),              # 激动
-    "sad":     os.path.join(EXAMPLES_DIR, "emo_sad.wav"),               # 忧郁：用sad示例
+    "sad":     os.path.join(EXAMPLES_DIR, "emo_sad.wav"),               # 忧郁
     "calm":    os.path.join(EXAMPLES_DIR, "voice_03.wav"),              # 平静
 }
 # emo_alpha 权重：0=忽略情感，1=完全按情感音频
 EMOTION_ALPHA = {
-    "neutral": 0.0,
+    "neutral": 0.3,   # 轻量引导平静，不要默认的夸张表现
     "happy":   0.6,
     "excited": 0.9,
     "sad":     0.8,
-    "calm":    0.5,
+    "calm":    0.75,  # 提高平静权重，效果更明显
 }
 # ==============================
 

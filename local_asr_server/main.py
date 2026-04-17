@@ -100,6 +100,28 @@ EDGE_VOICES = {
     'yunyang':  'zh-CN-YunyangNeural',     # 男声·播报
 }
 
+# 使用 SSML express-as 风格让声音更自然平和（避免默认激动腔调）
+# 各声音支持的最平和风格（经过测试验证可用）
+EDGE_STYLES = {
+    'yunjian':  'narration-professional',  # 专业叙述，不激动
+    'yunxi':    'narration-relaxed',       # 放松叙述
+    'xiaoxiao': 'calm',                    # 平静
+    'xiaoyi':   'affectionate',            # 亲切，比 lyrical 平和
+    'yunyang':  'narration-professional',
+}
+
+def _build_ssml(voice_name: str, style: str, rate_str: str, text: str) -> str:
+    import html as html_mod
+    safe_text = html_mod.escape(text)
+    return (
+        f"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' "
+        f"xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='zh-CN'>"
+        f"<voice name='{voice_name}'>"
+        f"<mstts:express-as style='{style}'>"
+        f"<prosody rate='{rate_str}'>{safe_text}</prosody>"
+        f"</mstts:express-as></voice></speak>"
+    )
+
 @app.post("/tts/synthesize")
 async def tts_synthesize(payload: dict):
     text = payload.get("text", "").strip()
@@ -110,16 +132,28 @@ async def tts_synthesize(payload: dict):
         raise HTTPException(status_code=400, detail="text 不能为空")
 
     voice = EDGE_VOICES.get(voice_key, "zh-CN-XiaoxiaoNeural")
+    style = EDGE_STYLES.get(voice_key)
     rate_str = f"+{rate_pct}%" if rate_pct >= 0 else f"{rate_pct}%"
 
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
         tmp_path = f.name
 
     try:
-        communicate = edge_tts.Communicate(text, voice, rate=rate_str)
+        if style:
+            # SSML 方式：指定风格，声音更平和自然
+            ssml = _build_ssml(voice, style, rate_str, text)
+            communicate = edge_tts.Communicate(ssml, voice)
+        else:
+            communicate = edge_tts.Communicate(text, voice, rate=rate_str)
         await communicate.save(tmp_path)
         with open(tmp_path, "rb") as f:
             audio_bytes = f.read()
+        if not audio_bytes:
+            # SSML 失败时降级为普通模式
+            communicate = edge_tts.Communicate(text, voice, rate=rate_str)
+            await communicate.save(tmp_path)
+            with open(tmp_path, "rb") as f:
+                audio_bytes = f.read()
         return {"audio": base64.b64encode(audio_bytes).decode(), "format": "mp3"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"edge-tts 合成失败: {str(e)[:300]}")
