@@ -686,6 +686,7 @@ const S = {
   selectedMyVoiceId: localStorage.getItem('selectedMyVoiceId') || '',
   recordingState: 'idle', // idle | recording
   recordingSeconds: 0,
+  vmPlayingId: '',
   // 步骤4：数字人
   selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
   avatarImageB64: null, avatarImageName: '', avatarImageFmt: 'jpg',
@@ -2089,21 +2090,28 @@ function tVoiceManager() {
       </div>
     </div>`).join('');
 
+  const playingId = S.vmPlayingId || '';
+  const PLAY_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="#F97316"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+  const PAUSE_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="#F97316"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+
   const myRows = myVoices.length === 0
     ? `<div style="font-size:13px;color:#A8A49C;padding:14px 0;text-align:center">暂无克隆声音，点击下方按钮添加</div>`
-    : myVoices.map(v => `
+    : myVoices.map(v => {
+      const isPlaying = playingId === v.id;
+      return `
       <div class="vm-voice-row">
-        <div class="vm-voice-avatar" style="background:#FFF1E8">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div class="vm-voice-avatar" style="background:#FFF1E8;cursor:pointer" onclick="playMyVoice('${v.id}')">
+          ${isPlaying ? PAUSE_ICON : PLAY_ICON}
         </div>
         <div style="flex:1">
           <div class="vm-voice-name">${esc(v.name)}</div>
-          <div class="vm-voice-sub">我的声音 · ${emoLabel(v.emotion)}</div>
+          <div class="vm-voice-sub">我的声音 · ${emoLabel(v.emotion)}${isPlaying ? ' · <span style="color:#F97316">播放中</span>' : ''}</div>
         </div>
         <div class="vm-del-btn" onclick="deleteMyVoice('${v.id}')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
   const addTip = `<div style="background:#FFF7ED;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12px;color:#92400E;line-height:1.6">
     💡 <b>最佳效果：</b>录制 10~30 秒，语速自然、环境安静、普通话清晰。过短或过长都会影响克隆质量和合成速度。
@@ -2786,6 +2794,44 @@ async function addToMyVoiceLibrary(name, audio_b64, emotion) {
   arr.push({ id, name, audio_b64, emotion: emotion || 'neutral' });
   saveMyVoices(arr);
   showToast(`声音已添加（${durCheck.seconds > 0 ? durCheck.seconds.toFixed(1)+'s' : ''}）`);
+}
+
+let _vmAudio = null;
+
+function playMyVoice(id) {
+  const voice = (S.myVoices || []).find(v => v.id === id);
+  if (!voice) return;
+
+  // 同一个 — 切换播放/暂停
+  if (_vmAudio && _vmAudio._vmId === id) {
+    if (_vmAudio.paused) {
+      _vmAudio.play();
+      setState({ vmPlayingId: id });
+    } else {
+      _vmAudio.pause();
+      setState({ vmPlayingId: '' });
+    }
+    return;
+  }
+
+  // 停掉上一个
+  if (_vmAudio) { _vmAudio.pause(); _vmAudio = null; }
+
+  // 把 base64 转成 Blob URL 再播（移动端兼容好）
+  try {
+    const raw = atob(voice.audio_b64);
+    const buf = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    _vmAudio = new Audio(url);
+    _vmAudio._vmId = id;
+    _vmAudio.onended = () => setState({ vmPlayingId: '' });
+    _vmAudio.onerror = () => { showToast('播放失败'); setState({ vmPlayingId: '' }); };
+    _vmAudio.play().catch(e => { showToast('播放失败：' + e.message); setState({ vmPlayingId: '' }); });
+    setState({ vmPlayingId: id });
+  } catch (e) {
+    showToast('播放失败：' + e.message);
+  }
 }
 
 function deleteMyVoice(id) {
