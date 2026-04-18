@@ -279,11 +279,11 @@ def _build_ass(segments: list, fontsize: int, sub_color: str,
         ol_width = outline_width
 
     # ASS PlayResX = 视频宽度，Margin 相对于 PlayResX
-    # 中文全角字符宽 ≈ fontsize * 1.15（含字间距），两边各留 10% 空白
-    margin_lr = max(40, int(vid_w * 0.10))   # 10% 左右边距，最少 40px
+    # 中文全角字符宽 ≈ fontsize * 1.5（粗体+字间距），两边各留 12% 空白
+    margin_lr = max(60, int(vid_w * 0.12))   # 12% 左右边距，最少 60px
     usable_w  = vid_w - margin_lr * 2
-    char_w    = fontsize * 1.15              # 保守估算避免贴边
-    max_chars = max(5, int(usable_w / char_w))
+    char_w    = fontsize * 1.5               # 粗体中文实际宽度更大
+    max_chars = min(14, max(5, int(usable_w / char_w)))  # 硬上限14字/行
 
     header = (
         "[Script Info]\n"

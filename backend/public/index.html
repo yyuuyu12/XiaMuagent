@@ -1642,17 +1642,38 @@ function tCloneStep5(sb) {
   const videoSrc = S.postProcessedVideoUrl || S.avatarVideoUrl || '';
   const hasResult = !!S.postProcessedVideoUrl;
 
+  // 模板卡片——用 text-shadow 模拟描边（兼容所有浏览器）
   const tplHtml = SUBTITLE_TEMPLATES.map(t => {
     const active = S.subTemplate === t.id;
-    const olStyle = t.ol === 'none' ? '' : `-webkit-text-stroke:${t.ow * 0.6}px ${t.ol};text-shadow:0 0 ${t.ow}px ${t.ol}`;
+    const shadow = t.ol === 'none' ? 'none'
+      : `1px 1px 0 ${t.ol},-1px 1px 0 ${t.ol},1px -1px 0 ${t.ol},-1px -1px 0 ${t.ol},0 2px 4px rgba(0,0,0,.8)`;
     return `<div onclick="applySubTemplate('${t.id}')"
-      style="flex:1;min-width:calc(50% - 4px);background:#1A1814;border-radius:10px;padding:10px 8px;cursor:pointer;
-             border:2px solid ${active ? '#F97316' : 'transparent'};position:relative;box-sizing:border-box">
-      ${active ? `<div style="position:absolute;top:5px;right:6px;width:14px;height:14px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center">
-        <svg width="8" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg></div>` : ''}
-      <div style="font-size:13px;font-weight:700;color:${t.color};${olStyle};letter-spacing:.5px;margin-bottom:3px">字幕示例</div>
-      <div style="font-size:11px;color:#F97316;font-weight:600">${t.name}</div>
-      <div style="font-size:10px;color:#6B6860;margin-top:1px">${t.desc} · ${t.size}px</div>
+      style="flex:1;min-width:calc(50% - 4px);background:#2C2820;border-radius:10px;padding:10px 8px 8px;cursor:pointer;
+             border:2.5px solid ${active ? '#F97316' : '#3A3630'};position:relative;box-sizing:border-box">
+      ${active ? `<div style="position:absolute;top:5px;right:6px;width:16px;height:16px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center">
+        <svg width="9" height="9" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>` : ''}
+      <div style="font-size:14px;font-weight:800;color:${t.color};text-shadow:${shadow};margin-bottom:5px;letter-spacing:.5px">字幕示例</div>
+      <div style="font-size:11px;color:${active?'#F97316':'#A8A49C'};font-weight:600">${t.name}</div>
+      <div style="font-size:10px;color:#6B6860;margin-top:2px">${t.desc} · ${t.size}px</div>
+    </div>`;
+  }).join('');
+
+  // 自定义颜色色板
+  const COLORS = ['#FFFFFF','#FFEE00','#00E87A','#FF6B35','#FF3B3B','#00BFFF'];
+  const colorDots = COLORS.map(c => {
+    const active = S.subColor === c;
+    return `<div onclick="setState({subColor:'${c}',subTemplate:'custom'})"
+      style="width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;flex-shrink:0;
+             box-shadow:0 0 0 ${active?'3px #F97316':'2px #D4D0C8'};border:2px solid #fff;transition:.15s"></div>`;
+  }).join('');
+
+  const OL_COLORS = [['#000000','黑'],['#FFFFFF','白'],['none','无']];
+  const olDots = OL_COLORS.map(([c,label]) => {
+    const active = S.subOutlineColor === c;
+    const bg = c === 'none' ? 'repeating-linear-gradient(45deg,#ddd 0,#ddd 4px,#fff 4px,#fff 8px)' : c;
+    return `<div onclick="setState({subOutlineColor:'${c}',subTemplate:'custom'})" style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+      <div style="width:26px;height:26px;border-radius:50%;background:${bg};box-shadow:0 0 0 ${active?'3px #F97316':'2px #D4D0C8'};border:2px solid #fff"></div>
+      <span style="font-size:9px;color:${active?'#F97316':'#A8A49C'}">${label}</span>
     </div>`;
   }).join('');
 
@@ -1660,17 +1681,43 @@ function tCloneStep5(sb) {
 
     ${videoSrc ? `<div class="section-card" style="padding:10px">
       <video src="${videoSrc}" controls playsinline style="width:100%;border-radius:10px;max-height:40vh"></video>
-      ${hasResult ? `<div style="font-size:12px;color:#059669;text-align:center;margin-top:6px;font-weight:600">✓ 字幕已烧录</div>`
-                  : `<div style="font-size:12px;color:#A8A49C;text-align:center;margin-top:6px">原始视频（未加字幕）</div>`}
+      <div style="font-size:12px;color:${hasResult?'#059669':'#A8A49C'};text-align:center;margin-top:6px;font-weight:${hasResult?600:400}">
+        ${hasResult ? '✓ 字幕已烧录' : '原始视频（未加字幕）'}
+      </div>
     </div>` : ''}
 
     <div class="section-card">
-      <div class="section-label" style="margin-bottom:10px">字幕模板</div>
+      <div class="section-label" style="margin-bottom:10px">快速选择模板</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">${tplHtml}</div>
     </div>
 
-    ${S.postProcessErr ? `<div class="err-text">${esc(S.postProcessErr)}</div>` : ''}
+    <div class="section-card">
+      <div class="section-label" style="margin-bottom:12px">自定义微调</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;color:#6B6860">字幕颜色</span>
+        <div style="display:flex;gap:8px;align-items:center">${colorDots}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;color:#6B6860">描边颜色</span>
+        <div style="display:flex;gap:10px;align-items:center">${olDots}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;color:#6B6860">字体大小</span>
+        <span style="font-size:13px;font-weight:600;color:#F97316">${S.subFontsize}px</span>
+      </div>
+      <input type="range" min="24" max="48" step="4" value="${S.subFontsize}"
+        style="width:100%;accent-color:#F97316;margin-bottom:10px"
+        oninput="setState({subFontsize:+this.value,subTemplate:'custom'})"/>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;color:#6B6860">描边粗细</span>
+        <span style="font-size:13px;font-weight:600;color:#F97316">${S.subOutlineWidth}</span>
+      </div>
+      <input type="range" min="0" max="4" step="0.5" value="${S.subOutlineWidth}"
+        style="width:100%;accent-color:#F97316"
+        oninput="setState({subOutlineWidth:+this.value,subTemplate:'custom'})"/>
+    </div>
 
+    ${S.postProcessErr ? `<div class="err-text">${esc(S.postProcessErr)}</div>` : ''}
     ${S.postProcessing ? `
       <div class="input-card" style="text-align:center;padding:16px">
         <div style="font-size:14px;color:#6366F1;font-weight:500;margin-bottom:8px">识别语音并烧录字幕中...</div>
@@ -1684,7 +1731,6 @@ function tCloneStep5(sb) {
         ${S.postProcessing ? '处理中...' : (hasResult ? '重新烧录' : '开始烧录字幕')}
       </div>
     </div>
-
     ${hasResult ? `<div class="action-row" style="margin-top:8px">
       <div class="btn-action-main" onclick="goToCloneStep6()">下一步：发布 →</div>
     </div>` : ''}
