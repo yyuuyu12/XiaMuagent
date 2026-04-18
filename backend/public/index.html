@@ -3456,7 +3456,15 @@ async function openExtractWithTask(taskId, fromHistory) {
     const task = r.data;
     setState({ cloneTaskData: task });
     if (task.status === 'extracted') {
-      setState({ extractStep: 'review', extractedScript: task.result?.transcript || '' });
+      // 先尝试恢复 session（用户可能已经推进到步骤3+）
+      const restoredEx = await restoreCloneSession(taskId);
+      if (!restoredEx) {
+        // 没有 session，从头开始（文案审核）
+        setState({ extractStep: 'review', extractedScript: task.result?.transcript || '' });
+      } else {
+        // session 恢复成功，保证 extractedScript 也有值
+        setState({ extractedScript: task.result?.transcript || '' });
+      }
     } else if (task.status === 'pending' || task.status === 'running') {
       setState({ extractStep: 'cloning' });
       startClonePoller(taskId);
