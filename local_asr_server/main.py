@@ -7,7 +7,9 @@ import os
 import glob
 import httpx
 import base64
+import asyncio
 import edge_tts
+from pathlib import Path
 
 # 计划任务以管理员运行时 WinGet/用户 PATH 可能缺失，手动补上 ffmpeg 路径
 _FFMPEG_PATTERNS = [
@@ -213,3 +215,169 @@ async def video_task_proxy(task_id: str):
         return resp.json()
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="SadTalker 服务连接失败")
+
+
+# ===================== 视频后期制作（字幕烧录）=====================
+
+def _hex_to_ass(hex_color: str, alpha: int = 0) -> str:
+    """#RRGGBB → &HAABBGGRR (ASS颜色格式)"""
+    h = hex_color.lstrip('#')
+    if len(h) != 6:
+        return f"&H00{alpha:02X}FFFFFF"
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"&H{alpha:02X}{b:02X}{g:02X}{r:02X}"
+
+
+def _seconds_to_ass_time(s: float) -> str:
+    h = int(s // 3600)
+    m = int((s % 3600) // 60)
+    sec = s % 60
+    return f"{h}:{m:02d}:{sec:05.2f}"
+
+
+def _wrap_subtitle(text: str, max_chars: int) -> str:
+    """中文字幕自动换行，超出max_chars换行，最多两行"""
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    # 超出则截成两行
+    mid = max_chars
+    return text[:mid] + r"\N" + text[mid:mid * 2]
+
+
+def _build_ass(segments: list, fontsize: int, sub_color: str,
+               outline_color: str, outline_width: float) -> str:
+    primary = _hex_to_ass(sub_color)
+    # 描边为 none 时宽度设 0
+    if outline_color.lower() in ('none', 'transparent', ''):
+        ol_color = "&H00000000"
+        ol_width = 0.0
+    else:
+        ol_color = _hex_to_ass(outline_color)
+        ol_width = outline_width
+
+    # 估算每行最大字符数：视频宽度约 720~1080，字号越大每行越少
+    max_chars = max(8, int(900 / fontsize))
+
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        "WrapStyle: 2\n"
+        "ScaledBorderAndShadow: yes\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
+        "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
+        "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,Microsoft YaHei,{fontsize},{primary},&H000000FF,"
+        f"{ol_color},&H00000000,-1,0,0,0,100,100,0,0,1,{ol_width:.1f},0,2,20,20,60,1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+    lines = []
+    for seg in segments:
+        text = _wrap_subtitle(seg["text"].strip(), max_chars)
+        if not text:
+            continue
+        start = _seconds_to_ass_time(max(0.0, seg["start"]))
+        end = _seconds_to_ass_time(seg["end"])
+        lines.append(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{text}")
+    return header + "\n".join(lines)
+
+
+async def _ffmpeg_burn_subtitles(video_path: str, ass_path: str, output_path: str):
+    """用 FFmpeg 把 ASS 字幕烧录进视频"""
+    # Windows路径转义：反斜杠→正斜杠，驱动器冒号前加反斜杠
+    ass_esc = ass_path.replace("\\", "/")
+    if len(ass_esc) >= 2 and ass_esc[1] == ":":
+        ass_esc = ass_esc[0] + "\\:" + ass_esc[2:]
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-vf", f"ass='{ass_esc}'",
+        "-c:a", "aac",
+        "-c:v", "libx264",
+        "-preset", "faster",
+        "-crf", "18",
+        output_path,
+    ]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+    if proc.returncode != 0:
+        raise RuntimeError(f"FFmpeg字幕烧录失败: {stderr.decode(errors='replace')[-400:]}")
+
+
+@app.post("/video/postprocess")
+async def video_postprocess(payload: dict):
+    """
+    视频后期制作：Whisper识别时间轴 → ASS字幕 → FFmpeg烧录
+    payload: video_b64, audio_b64, audio_fmt,
+             sub_color(#RRGGBB), outline_color(#RRGGBB|none),
+             outline_width(0~4), fontsize(24~60)
+    """
+    video_b64   = payload.get("video_b64", "")
+    audio_b64   = payload.get("audio_b64", "")
+    audio_fmt   = payload.get("audio_fmt", "mp3")
+    sub_color   = payload.get("sub_color", "#FFFFFF")
+    outline_col = payload.get("outline_color", "#000000")
+    outline_w   = float(payload.get("outline_width", 2.0))
+    fontsize    = int(payload.get("fontsize", 36))
+
+    if not video_b64 or not audio_b64:
+        raise HTTPException(400, "video_b64 和 audio_b64 不能为空")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        video_in  = os.path.join(tmpdir, "input.mp4")
+        audio_in  = os.path.join(tmpdir, f"audio.{audio_fmt}")
+        ass_file  = os.path.join(tmpdir, "subs.ass")
+        video_out = os.path.join(tmpdir, "output.mp4")
+
+        try:
+            Path(video_in).write_bytes(base64.b64decode(video_b64))
+            Path(audio_in).write_bytes(base64.b64decode(audio_b64))
+        except Exception as e:
+            raise HTTPException(400, f"base64解码失败: {e}")
+
+        # Whisper 识别音频时间轴
+        try:
+            result = await asyncio.to_thread(
+                model.transcribe,
+                audio_in,
+                language="zh",
+                task="transcribe",
+                word_timestamps=False,
+                condition_on_previous_text=True,
+                initial_prompt="以下是普通话内容，请加上标点符号。",
+            )
+        except Exception as e:
+            raise HTTPException(500, f"Whisper识别失败: {e}")
+
+        segments = [
+            {"start": s["start"], "end": s["end"], "text": s["text"]}
+            for s in result.get("segments", [])
+        ]
+        if not segments:
+            raise HTTPException(500, "未识别到任何语音内容，无法生成字幕")
+
+        # 生成 ASS 字幕
+        ass_content = _build_ass(segments, fontsize, sub_color, outline_col, outline_w)
+        Path(ass_file).write_text(ass_content, encoding="utf-8-sig")
+
+        # FFmpeg 烧录
+        try:
+            await _ffmpeg_burn_subtitles(video_in, ass_file, video_out)
+        except Exception as e:
+            raise HTTPException(500, str(e))
+
+        result_b64 = base64.b64encode(Path(video_out).read_bytes()).decode()
+        return {
+            "video_b64": result_b64,
+            "format": "mp4",
+            "segments_count": len(segments),
+        }

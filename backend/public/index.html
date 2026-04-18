@@ -691,6 +691,9 @@ const S = {
   selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
   avatarSrcVideoB64: null, avatarSrcVideoName: '', avatarSrcVideoFmt: 'mp4',
   avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false, avatarProgressMsg: '初始化中...', avatarProgressPct: 20,
+  ttsAudioB64: null,
+  subColor: '#FFFFFF', subOutlineColor: '#000000', subFontsize: 36, subOutlineWidth: 2,
+  postProcessing: false, postProcessedVideoUrl: null, postProcessedB64: null, postProcessErr: '',
   // 步骤5：后期制作
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
   // 步骤6：发布
@@ -1620,61 +1623,105 @@ function tCloneStep4(sb) {
 
 // ===== 步骤5：后期制作 =====
 function tCloneStep5(sb) {
-  const colors = [
-    { id:'warm', name:'暖色调', style:'background:linear-gradient(135deg,#f5af19,#f12711)' },
-    { id:'cool', name:'冷色调', style:'background:linear-gradient(135deg,#667eea,#764ba2)' },
-    { id:'bw',   name:'黑白',   style:'background:linear-gradient(135deg,#bdc3c7,#2c3e50)' },
-    { id:'none', name:'无调色', style:'background:#e5e5e5' },
+  // 字幕颜色预设
+  const SUB_COLORS = [
+    { hex:'#FFFFFF', label:'白色' },
+    { hex:'#FFEE00', label:'黄色' },
+    { hex:'#00FF88', label:'绿色' },
+    { hex:'#FF6B35', label:'橙色' },
+    { hex:'#FF3B3B', label:'红色' },
   ];
-  const colorHtml = colors.map(c => `
-    <div class="color-opt ${S.videoColorStyle===c.id?'color-opt-active':''}" onclick="setState({videoColorStyle:'${c.id}'})">
-      <div class="color-opt-preview" style="${c.style}"></div>
-      <div class="color-opt-name">${c.name}</div>
-    </div>`).join('');
+  // 描边颜色预设
+  const OL_COLORS = [
+    { hex:'#000000', label:'黑色' },
+    { hex:'#FFFFFF', label:'白色' },
+    { hex:'none',    label:'无描边' },
+  ];
 
-  const previewTitle = esc((S.rewrittenScript||S.extractedScript||'').slice(0,20));
+  const subColorHtml = SUB_COLORS.map(c => {
+    const active = S.subColor === c.hex;
+    return `<div onclick="setState({subColor:'${c.hex}'})" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+      <div style="width:32px;height:32px;border-radius:50%;background:${c.hex};border:3px solid ${active?'#F97316':'#E8E4DC'};box-shadow:${active?'0 0 0 2px #F9731666':''};transition:.2s"></div>
+      <span style="font-size:10px;color:${active?'#F97316':'#6B6860'}">${c.label}</span>
+    </div>`;
+  }).join('');
+
+  const olColorHtml = OL_COLORS.map(c => {
+    const active = S.subOutlineColor === c.hex;
+    const bg = c.hex === 'none' ? 'repeating-linear-gradient(45deg,#eee 0,#eee 5px,#fff 5px,#fff 10px)' : c.hex;
+    return `<div onclick="setState({subOutlineColor:'${c.hex}'})" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+      <div style="width:32px;height:32px;border-radius:50%;background:${bg};border:3px solid ${active?'#F97316':'#E8E4DC'}"></div>
+      <span style="font-size:10px;color:${active?'#F97316':'#6B6860'}">${c.label}</span>
+    </div>`;
+  }).join('');
+
+  const videoSrc = S.postProcessedVideoUrl || S.avatarVideoUrl || '';
+  const hasResult = !!S.postProcessedVideoUrl;
 
   return `${sb}<div class="tab-page">
-    <div style="background:#F0EDE8;border-radius:14px;aspect-ratio:9/10;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:12px;position:relative;overflow:hidden">
-      <div style="width:50px;height:50px;background:#FF6B35;border-radius:50%;display:flex;align-items:center;justify-content:center">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-      </div>
-      <div style="position:absolute;bottom:12px;left:12px;right:12px;background:rgba(0,0,0,.5);border-radius:8px;padding:8px 12px;text-align:center">
-        <span style="font-size:13px;color:#fff">${previewTitle}${previewTitle.length>=20?'...':''}</span>
-      </div>
-      <div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.4);border-radius:6px;padding:3px 8px">
-        <span style="font-size:11px;color:#fff">预览</span>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px">
-      ${['调色','字幕','配乐','封面'].map((t,i)=>`
-        <div style="min-width:62px;background:${i===0?'#FFF1E8':'#fff'};border:1.5px solid ${i===0?'#F97316':'#E4E2DA'};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;flex-shrink:0"
-          onclick="showToast('${t}设置在步骤6发布时可调整')">
-          <div style="font-size:11px;color:${i===0?'#9A3412':'#6B6860'};font-weight:${i===0?600:400}">${t}</div>
-        </div>`).join('')}
-    </div>
+
+    ${videoSrc ? `<div class="section-card" style="padding:10px">
+      <video src="${videoSrc}" controls playsinline style="width:100%;border-radius:10px;max-height:42vh"></video>
+      ${hasResult ? `<div style="font-size:12px;color:#059669;text-align:center;margin-top:8px;font-weight:600">✓ 字幕已烧录</div>` : `<div style="font-size:12px;color:#A8A49C;text-align:center;margin-top:8px">原始视频（未加字幕）</div>`}
+    </div>` : ''}
+
     <div class="section-card">
-      <div class="section-label">调色风格</div>
-      <div style="display:flex;gap:8px">${colorHtml}</div>
+      <div class="section-label" style="margin-bottom:14px">字幕颜色</div>
+      <div style="display:flex;gap:16px;justify-content:center">${subColorHtml}</div>
     </div>
+
     <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0EEE8">
-        <span style="font-size:14px;color:#1A1814">自动添加字幕</span>
-        <div class="tog-sw ${S.videoSubtitle?'tog-sw-on':'tog-sw-off'}" onclick="setState({videoSubtitle:!S.videoSubtitle})">
-          <div class="tog-sw-ball"></div>
-        </div>
+      <div class="section-label" style="margin-bottom:14px">描边颜色</div>
+      <div style="display:flex;gap:16px;justify-content:center">${olColorHtml}</div>
+    </div>
+
+    <div class="section-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span class="section-label" style="margin:0">字体大小</span>
+        <span style="font-size:14px;font-weight:600;color:#F97316">${S.subFontsize}px</span>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
-        <span style="font-size:14px;color:#1A1814">添加背景音乐</span>
-        <div class="tog-sw ${S.videoMusic?'tog-sw-on':'tog-sw-off'}" onclick="setState({videoMusic:!S.videoMusic})">
-          <div class="tog-sw-ball"></div>
-        </div>
+      <input type="range" min="24" max="56" step="4" value="${S.subFontsize}"
+        style="width:100%;accent-color:#F97316"
+        oninput="setState({subFontsize:+this.value})"/>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#C4C0B8;margin-top:4px">
+        <span>小</span><span>大</span>
       </div>
     </div>
+
+    <div class="section-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span class="section-label" style="margin:0">描边粗细</span>
+        <span style="font-size:14px;font-weight:600;color:#F97316">${S.subOutlineWidth}</span>
+      </div>
+      <input type="range" min="0" max="4" step="0.5" value="${S.subOutlineWidth}"
+        style="width:100%;accent-color:#F97316"
+        oninput="setState({subOutlineWidth:+this.value})"/>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#C4C0B8;margin-top:4px">
+        <span>无描边</span><span>粗</span>
+      </div>
+    </div>
+
+    ${S.postProcessErr ? `<div class="err-text">${esc(S.postProcessErr)}</div>` : ''}
+
+    ${S.postProcessing ? `
+      <div class="input-card" style="text-align:center;padding:20px">
+        <div style="font-size:14px;color:#6366F1;font-weight:500;margin-bottom:10px">正在识别语音并烧录字幕...</div>
+        <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:60%;animation:none;background:linear-gradient(90deg,#6366F1,#8B5CF6)"></div></div>
+        <div style="font-size:12px;color:#A8A49C;margin-top:8px">Whisper识别中，约30~60秒</div>
+      </div>` : ''}
+
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:4})">上一步</div>
-      <div class="btn-action-main" onclick="goToCloneStep6()">下一步：发布 →</div>
+      <div class="btn-action-main ${S.postProcessing?'btn-disabled':''}"
+        onclick="handlePostProcess()">
+        ${S.postProcessing ? '处理中...' : (hasResult ? '重新烧录字幕' : '开始烧录字幕')}
+      </div>
     </div>
+
+    ${hasResult ? `<div class="action-row" style="margin-top:8px">
+      <div class="btn-action-main" onclick="goToCloneStep6()">下一步：发布 →</div>
+    </div>` : ''}
+
   </div>`;
 }
 
@@ -2657,7 +2704,7 @@ async function handleTTSGenerate() {
     if (r.code === 200) {
       // 转成 Blob URL，移动端大 base64 直接用 new Audio() 会静默失败
       const audioUrl = _b64ToBlobUrl(r.data.audio, 'audio/mp3');
-      setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, extractStep: 3 });
+      setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
     } else {
       setState({ ttsGenerating: false, ttsErr: r.msg || '语音合成失败，请重试', extractStep: 3 });
     }
@@ -3050,6 +3097,47 @@ function _startAvatarPoller(taskId, asrUrl) {
       console.error('[avatar poller]', e);
     }
   }, 5000);
+}
+
+async function handlePostProcess() {
+  if (S.postProcessing) return;
+  if (!S.avatarVideoB64) { showToast('请先生成数字人视频'); return; }
+  if (!S.ttsAudioB64)    { showToast('未找到语音数据，请返回步骤3重新合成'); return; }
+
+  setState({ postProcessing: true, postProcessErr: '' });
+  try {
+    const asrUrl = S.asrUrl || (await (async () => {
+      const r = await api.get('/ai/asr-url');
+      if (r.code !== 200) throw new Error('获取服务地址失败');
+      setState({ asrUrl: r.data.url });
+      return r.data.url;
+    })());
+
+    const resp = await fetch(`${asrUrl}/video/postprocess`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+      body: JSON.stringify({
+        video_b64:     S.avatarVideoB64,
+        audio_b64:     S.ttsAudioB64,
+        audio_fmt:     'mp3',
+        sub_color:     S.subColor,
+        outline_color: S.subOutlineColor,
+        outline_width: S.subOutlineWidth,
+        fontsize:      S.subFontsize,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || '后期处理失败');
+
+    // base64 → blob URL
+    const raw = atob(data.video_b64);
+    const buf = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
+    setState({ postProcessing: false, postProcessedVideoUrl: url, postProcessedB64: data.video_b64 });
+  } catch (e) {
+    setState({ postProcessing: false, postProcessErr: e.message });
+  }
 }
 
 function goToCloneStep6() {
