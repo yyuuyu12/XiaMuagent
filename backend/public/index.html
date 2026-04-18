@@ -1578,7 +1578,7 @@ function tCloneStep4(sb) {
   // 上传视频区域
   const vidSection = S.avatarSrcVideoB64
     ? `<div style="position:relative">
-        <video src="data:video/${S.avatarSrcVideoFmt};base64,${S.avatarSrcVideoB64}"
+        <video src="${S._avatarSrcBlobUrl||''}"
           controls playsinline
           style="width:100%;border-radius:12px;max-height:220px;background:#000;display:block"></video>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
@@ -3001,11 +3001,14 @@ async function handleAvatarVideoSelect(event) {
   event.target.value = '';
   if (file.size > 50 * 1024 * 1024) { showToast('视频过大（>50MB），请压缩后上传'); return; }
   const fmt = file.type.includes('quicktime') || file.name.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
+  // blob URL 用于预览（兼容 MOV/任意格式），base64 用于上传
+  if (S._avatarSrcBlobUrl) URL.revokeObjectURL(S._avatarSrcBlobUrl);
+  const previewUrl = URL.createObjectURL(file);
   showToast('读取视频中...');
   const reader = new FileReader();
   reader.onload = (e) => {
     const b64 = e.target.result.split(',')[1];
-    setState({ avatarSrcVideoB64: b64, avatarSrcVideoName: file.name, avatarSrcVideoFmt: fmt, avatarErr: '' });
+    setState({ avatarSrcVideoB64: b64, avatarSrcVideoName: file.name, avatarSrcVideoFmt: fmt, avatarErr: '', _avatarSrcBlobUrl: previewUrl });
     showToast('视频已选择 ✓');
   };
   reader.readAsDataURL(file);
