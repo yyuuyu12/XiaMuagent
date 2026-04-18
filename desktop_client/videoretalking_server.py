@@ -42,8 +42,11 @@ async def generate(req: GenerateReq):
     task_id = uuid.uuid4().hex
     tasks[task_id] = {"status": "pending", "progress": 0, "msg": "等待中", "video_b64": None, "error": None}
 
-    audio_path = TMP_DIR / f"{task_id}.{req.audio_fmt}"
-    video_path = TMP_DIR / f"{task_id}_src.{req.video_fmt}"
+    # ★ 文件放在 VRT 目录的 temp/ 下，使用简短文件名（避免绝对路径含冒号导致Windows报错）
+    vrt_temp = VRT_DIR / "temp"
+    vrt_temp.mkdir(exist_ok=True)
+    audio_path = vrt_temp / f"{task_id}.{req.audio_fmt}"
+    video_path = vrt_temp / f"{task_id}.{req.video_fmt}"
     out_path   = OUT_DIR / f"{task_id}.mp4"
 
     try:
@@ -65,27 +68,62 @@ def get_task(task_id: str):
 
 
 async def _run_vrt(task_id: str, audio_path: str, video_path: str, out_path: str):
-    tasks[task_id].update({"status": "running", "progress": 10, "msg": "推理中..."})
+    tasks[task_id].update({"status": "running", "progress": 10, "msg": "模型加载中..."})
     cmd = [
         str(PYTHON_EXE), str(INFER_PY),
         "--face",    video_path,
         "--audio",   audio_path,
         "--outfile", out_path,
         "--exp_img", "neutral",
+        "--LNet_batch_size", "32",
     ]
+    proc = None
     try:
+        # 禁用 torch.compile / dynamo（避免triton缺失导致回退CPU，速度极慢）
+        env = os.environ.copy()
+        env["TORCHDYNAMO_DISABLE"] = "1"
+        env["TORCH_COMPILE_DISABLE"] = "1"
+
+        # 输出直接打到VRT窗口，不用PIPE（避免tqdm \r导致readline阻塞）
         proc = await asyncio.create_subprocess_exec(
             *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=None,   # 继承父进程stdout，直接显示在VRT窗口
+            stderr=None,   # 继承父进程stderr
             cwd=str(VRT_DIR),
+            env=env,
         )
-        tasks[task_id].update({"progress": 30, "msg": "GPU推理中..."})
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=600)
+        print(f"[VRT {task_id[:8]}] 推理开始 PID={proc.pid}", flush=True)
+
+        # 每5秒更新一次进度（基于时间估算），同时等待进程完成
+        TIMEOUT = 1800  # 30分钟
+        steps = [
+            (60,  20, "模型加载中..."),
+            (120, 40, "Step1: 帧对齐..."),
+            (240, 60, "Step2: 口型合成..."),
+            (360, 80, "Step3: 画质增强..."),
+            (600, 90, "收尾处理..."),
+        ]
+        elapsed = 0
+        while True:
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=5)
+                break  # 进程结束
+            except asyncio.TimeoutError:
+                elapsed += 5
+                if elapsed >= TIMEOUT:
+                    proc.kill()
+                    tasks[task_id].update({"status": "error", "error": "推理超时（超过30分钟）"})
+                    return
+                # 按时间估算进度
+                for sec, pct, msg in reversed(steps):
+                    if elapsed >= sec:
+                        tasks[task_id].update({"progress": pct, "msg": msg})
+                        break
+
+        print(f"[VRT {task_id[:8]}] 结束 returncode={proc.returncode}", flush=True)
 
         if proc.returncode != 0:
-            err = stderr.decode("utf-8", errors="replace")[-600:]
-            tasks[task_id].update({"status": "error", "error": f"推理失败:\n{err}"})
+            tasks[task_id].update({"status": "error", "error": f"推理失败（退出码 {proc.returncode}），请查看VRT窗口日志"})
             return
 
         if not os.path.exists(out_path):
@@ -98,8 +136,6 @@ async def _run_vrt(task_id: str, audio_path: str, video_path: str, out_path: str
             "video_b64": video_b64,
             "video_size": os.path.getsize(out_path),
         })
-    except asyncio.TimeoutError:
-        tasks[task_id].update({"status": "error", "error": "推理超时（超过10分钟）"})
     except Exception as e:
         tasks[task_id].update({"status": "error", "error": str(e)[:300]})
     finally:

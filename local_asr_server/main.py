@@ -193,8 +193,8 @@ def health():
     return {"status": "ok"}
 
 
-# ===================== 数字人视频代理接口（VideoReTalking 端口 7862）=====================
-SADTALKER_URL = "http://localhost:7862"
+# ===================== 数字人视频代理接口（SadTalker/HeyGem 端口 7861）=====================
+SADTALKER_URL = "http://localhost:7861"
 AVATARS_DIR = Path(__file__).parent / "avatars"
 AVATARS_DIR.mkdir(exist_ok=True)
 
@@ -228,7 +228,7 @@ async def video_task_proxy(task_id: str):
             raise HTTPException(status_code=resp.status_code, detail=resp.text[:200])
         return resp.json()
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="数字人服务连接失败，请确认 VideoReTalking 已启动")
+        raise HTTPException(status_code=503, detail="数字人服务连接失败，请确认数字人服务已启动")
 
 
 # ===================== 视频后期制作（字幕烧录）=====================
