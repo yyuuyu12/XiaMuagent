@@ -3154,7 +3154,8 @@ async function handleAvatarGenerate() {
     }
     const data = await resp.json();
     const taskId = data.task_id;
-    setState({ avatarTaskId: taskId });
+    setState({ avatarTaskId: taskId, avatarAsrUrl: asrUrl });
+    saveCloneSession(4); // 生成任务已提交，立即保存 taskId 以便跨会话恢复
     _startAvatarPoller(taskId, asrUrl);
   } catch (e) {
     setState({ avatarGenerating: false, avatarErr: '网络错误: ' + e.message, extractStep: 4 });
@@ -3180,8 +3181,8 @@ function _startAvatarPoller(taskId, asrUrl) {
         const buf = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
         const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
-        setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: t.video_b64, extractStep: 4 });
-        saveCloneSession(4); // ★ 步骤4：数字人生成完成，保存 session
+        setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: t.video_b64, avatarTaskId: null, extractStep: 4 });
+        saveCloneSession(4); // ★ 步骤4：数字人生成完成，保存 session（avatarTaskId已清空）
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });
@@ -3375,6 +3376,8 @@ async function saveCloneSession(cloneStep) {
     ttsAudioB64:      S.ttsAudioB64      || null,   // 步骤3完成后有值
     ttsIndexEmotion:  S.ttsIndexEmotion  || 'neutral',
     avatarVideoB64:   S.avatarVideoB64   || null,   // 步骤4完成后有值
+    avatarTaskId:     S.avatarTaskId     || null,   // 数字人生成任务ID（生成中时有值）
+    avatarAsrUrl:     S.avatarAsrUrl     || null,   // 数字人服务地址（用于恢复poller）
     avatarLibKey:     S.avatarLibKey     || null,
     avatarLibName:    S.avatarLibName    || '',
     avatarLibThumb:   S.avatarLibThumb   || '',
@@ -3432,6 +3435,16 @@ async function restoreCloneSession(taskId) {
     if (s.avatarVideoB64) {
       patch.avatarVideoB64 = s.avatarVideoB64;
       patch.avatarVideoUrl = _b64ToBlobUrl(s.avatarVideoB64, 'video/mp4');
+    } else if (s.avatarTaskId && s.avatarAsrUrl) {
+      // 视频未完成但有任务ID → 恢复"生成中"状态并重启poller
+      patch.avatarTaskId    = s.avatarTaskId;
+      patch.avatarAsrUrl    = s.avatarAsrUrl;
+      patch.avatarGenerating = true;
+      patch.extractStep     = 'avatar_gen';
+      patch.avatarProgressMsg = '恢复中，继续等待生成...';
+      patch.avatarProgressPct = 30;
+      // setState 之后再启动 poller
+      setTimeout(() => _startAvatarPoller(s.avatarTaskId, s.avatarAsrUrl), 500);
     }
     // 后期视频 base64 → Blob URL 恢复
     if (s.postProcessedB64) {
