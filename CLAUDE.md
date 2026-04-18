@@ -127,6 +127,48 @@ XiaMuagent/
 
 ---
 
+## 文件分布地图（代码 / 模型 / 数据在哪里）
+
+### 代码文件
+| 内容 | 路径 |
+|------|------|
+| H5前端 + 管理后台 | `C:\AIClaudecode\backend\public\` |
+| 云后端 API | `C:\AIClaudecode\backend\routes\` |
+| 本地服务（ASR/TTS/字幕/数字人管理） | `C:\AIClaudecode\local_asr_server\main.py` |
+| IndexTTS 服务 | `C:\AIClaudecode\local_asr_server\indextts_server.py` |
+| HeyGem 数字人服务 | `C:\AIClaudecode\desktop_client\heygem_server.py` |
+| VideoReTalking 服务 | `C:\AIClaudecode\desktop_client\videoretalking_server.py` |
+
+### 模型文件（大文件，不进 Git）
+| 模型 | 路径 | 大小参考 |
+|------|------|---------|
+| **Whisper medium**（语音转写） | `C:\Users\木木\.cache\whisper\medium.pt` | ~1.5GB |
+| **IndexTTS**（语音克隆） | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\checkpoints\` | ~数GB |
+| **HeyGem**（数字人） | `C:\ChaojiIP\aigc-human\python-modules\humanModule\pretrain_models\` | ~数GB |
+| **VideoReTalking**（数字人，安装中） | `C:\AIClaudecode\desktop_client\VideoReTalking\third_part\` | ~数GB，待下载 |
+
+### Python 环境（venv）
+| 服务 | venv 路径 |
+|------|-----------|
+| ASR + IndexTTS + HeyGem 共用 | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\` |
+| VideoReTalking 独立 | `C:\AIClaudecode\desktop_client\VideoReTalking\venv\` |
+
+### 运行时数据（用户数据）
+| 内容 | 路径 |
+|------|------|
+| 数字人形象视频（用户上传） | `C:\AIClaudecode\local_asr_server\avatars\u{userId}\` |
+| TTS 临时输出 | `C:\AIClaudecode\local_asr_server\tts_outputs\` |
+| HeyGem 生成输出 | `C:\AIClaudecode\desktop_client\heygem_outputs\` |
+| 数据库（用户/配置/历史） | Zeabur MySQL 云端，不在本地 |
+
+### 如何管理
+- **代码**：全部在 `C:\AIClaudecode\`，通过 Git 管理，push 到 GitHub 自动部署
+- **模型**：在 `C:\ChaojiIP\` 下，不进 Git，机器迁移时需单独拷贝（几十GB）
+- **用户数据**：`avatars/` 目录在本地磁盘，需定期备份；数据库在 Zeabur 云端自动维护
+- **venv**：不进 Git，换机器需重新建（`pip install -r requirements.txt`）
+
+---
+
 ## 功能进展
 
 ### ✅ 已完成
