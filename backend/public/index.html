@@ -1565,7 +1565,7 @@ function tCloneStep3(sb) {
     ${S.ttsErr?`<span class="err-text">${esc(S.ttsErr)}</span>`:''}
     ${S.ttsAudioUrl ? `
     <div style="margin-top:4px">
-      <div class="btn-action-main" onclick="setState({extractStep:4,avatarErr:''})">下一步：选择数字人 →</div>
+      <div class="btn-action-main" onclick="goToCloneStep4()">下一步：选择数字人 →</div>
       <div class="action-row" style="gap:8px;margin-top:8px">
         <div class="btn-action-sec" onclick="setState({extractStep:2})">上一步</div>
         <div class="btn-action-sec" onclick="handleTTSGenerate()">重新合成</div>
@@ -1777,7 +1777,7 @@ function tCloneStep5(sb) {
       </div>` : ''}
 
     <div class="action-row" style="gap:8px">
-      <div class="btn-action-sec" onclick="setState({extractStep:4})">上一步</div>
+      <div class="btn-action-sec" onclick="goToCloneStep4()">上一步</div>
       <div class="btn-action-main ${S.postProcessing?'btn-disabled':''}" onclick="handlePostProcess()">
         ${S.postProcessing ? '处理中...' : (hasResult ? '重新烧录' : '开始烧录字幕')}
       </div>
@@ -3080,6 +3080,7 @@ function onSpeedInput(val) {
 
 function goToCloneStep4() {
   setState({ extractStep: 4, avatarErr: '' });
+  saveCloneSession(4); // 进入步骤4时立刻保存，防止离开后恢复回步骤3
 }
 
 async function handleAvatarVideoSelect(event) {
