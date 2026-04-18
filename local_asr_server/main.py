@@ -278,18 +278,18 @@ def _build_ass(segments: list, fontsize: int, sub_color: str,
         ol_color = _hex_to_ass(outline_color)
         ol_width = outline_width
 
-    # 每行字符数：可用宽度 / 字符像素宽
-    # 中文字符宽 ≈ fontsize * 1.05（含间距），左右各留 margin_lr 像素
-    margin_lr = max(30, int(vid_w * 0.05))   # 5% 边距，最少 30px
+    # ASS PlayResX = 视频宽度，Margin 相对于 PlayResX
+    # 中文全角字符宽 ≈ fontsize * 1.15（含字间距），两边各留 10% 空白
+    margin_lr = max(40, int(vid_w * 0.10))   # 10% 左右边距，最少 40px
     usable_w  = vid_w - margin_lr * 2
-    char_w    = fontsize * 1.05
-    max_chars = max(6, int(usable_w / char_w))
+    char_w    = fontsize * 1.15              # 保守估算避免贴边
+    max_chars = max(5, int(usable_w / char_w))
 
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
         f"PlayResX: {vid_w}\n"
-        "WrapStyle: 1\n"          # 超宽自动折行
+        "WrapStyle: 1\n"          # 超宽自动折行（libass 支持）
         "ScaledBorderAndShadow: yes\n"
         "\n"
         "[V4+ Styles]\n"

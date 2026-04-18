@@ -692,7 +692,7 @@ const S = {
   avatarSrcVideoB64: null, avatarSrcVideoName: '', avatarSrcVideoFmt: 'mp4',
   avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false, avatarProgressMsg: '初始化中...', avatarProgressPct: 20,
   ttsAudioB64: null,
-  subColor: '#FFFFFF', subOutlineColor: '#000000', subFontsize: 36, subOutlineWidth: 2,
+  subColor: '#FFFFFF', subOutlineColor: '#000000', subFontsize: 36, subOutlineWidth: 2.5, subTemplate: 'classic',
   postProcessing: false, postProcessedVideoUrl: null, postProcessedB64: null, postProcessErr: '',
   // 步骤5：后期制作
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
@@ -1622,99 +1622,65 @@ function tCloneStep4(sb) {
 }
 
 // ===== 步骤5：后期制作 =====
+const SUBTITLE_TEMPLATES = [
+  { id:'classic',  name:'经典白字', desc:'百搭首选',   color:'#FFFFFF', ol:'#000000', size:36, ow:2.5 },
+  { id:'variety',  name:'综艺黄字', desc:'活泼抢眼',   color:'#FFEE00', ol:'#000000', size:40, ow:3   },
+  { id:'movie',    name:'电影字幕', desc:'沉稳专业',   color:'#F0F0F0', ol:'#111111', size:30, ow:1.5 },
+  { id:'fresh',    name:'清新绿字', desc:'知识科普',   color:'#00E87A', ol:'#000000', size:34, ow:2   },
+  { id:'vibrant',  name:'活力橙字', desc:'带货推荐',   color:'#FF6B35', ol:'#FFFFFF', size:38, ow:2   },
+  { id:'minimal',  name:'极简白字', desc:'无描边简洁', color:'#FFFFFF', ol:'none',    size:34, ow:0   },
+];
+
+function applySubTemplate(id) {
+  const t = SUBTITLE_TEMPLATES.find(x => x.id === id);
+  if (!t) return;
+  setState({ subTemplate: id, subColor: t.color, subOutlineColor: t.ol, subFontsize: t.size, subOutlineWidth: t.ow });
+}
+
 function tCloneStep5(sb) {
-  // 字幕颜色预设
-  const SUB_COLORS = [
-    { hex:'#FFFFFF', label:'白色' },
-    { hex:'#FFEE00', label:'黄色' },
-    { hex:'#00FF88', label:'绿色' },
-    { hex:'#FF6B35', label:'橙色' },
-    { hex:'#FF3B3B', label:'红色' },
-  ];
-  // 描边颜色预设
-  const OL_COLORS = [
-    { hex:'#000000', label:'黑色' },
-    { hex:'#FFFFFF', label:'白色' },
-    { hex:'none',    label:'无描边' },
-  ];
-
-  const subColorHtml = SUB_COLORS.map(c => {
-    const active = S.subColor === c.hex;
-    return `<div onclick="setState({subColor:'${c.hex}'})" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
-      <div style="width:32px;height:32px;border-radius:50%;background:${c.hex};border:3px solid ${active?'#F97316':'#E8E4DC'};box-shadow:${active?'0 0 0 2px #F9731666':''};transition:.2s"></div>
-      <span style="font-size:10px;color:${active?'#F97316':'#6B6860'}">${c.label}</span>
-    </div>`;
-  }).join('');
-
-  const olColorHtml = OL_COLORS.map(c => {
-    const active = S.subOutlineColor === c.hex;
-    const bg = c.hex === 'none' ? 'repeating-linear-gradient(45deg,#eee 0,#eee 5px,#fff 5px,#fff 10px)' : c.hex;
-    return `<div onclick="setState({subOutlineColor:'${c.hex}'})" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
-      <div style="width:32px;height:32px;border-radius:50%;background:${bg};border:3px solid ${active?'#F97316':'#E8E4DC'}"></div>
-      <span style="font-size:10px;color:${active?'#F97316':'#6B6860'}">${c.label}</span>
-    </div>`;
-  }).join('');
-
   const videoSrc = S.postProcessedVideoUrl || S.avatarVideoUrl || '';
   const hasResult = !!S.postProcessedVideoUrl;
+
+  const tplHtml = SUBTITLE_TEMPLATES.map(t => {
+    const active = S.subTemplate === t.id;
+    const olStyle = t.ol === 'none' ? '' : `-webkit-text-stroke:${t.ow * 0.6}px ${t.ol};text-shadow:0 0 ${t.ow}px ${t.ol}`;
+    return `<div onclick="applySubTemplate('${t.id}')"
+      style="flex:1;min-width:calc(50% - 4px);background:#1A1814;border-radius:10px;padding:10px 8px;cursor:pointer;
+             border:2px solid ${active ? '#F97316' : 'transparent'};position:relative;box-sizing:border-box">
+      ${active ? `<div style="position:absolute;top:5px;right:6px;width:14px;height:14px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center">
+        <svg width="8" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg></div>` : ''}
+      <div style="font-size:13px;font-weight:700;color:${t.color};${olStyle};letter-spacing:.5px;margin-bottom:3px">字幕示例</div>
+      <div style="font-size:11px;color:#F97316;font-weight:600">${t.name}</div>
+      <div style="font-size:10px;color:#6B6860;margin-top:1px">${t.desc} · ${t.size}px</div>
+    </div>`;
+  }).join('');
 
   return `${sb}<div class="tab-page">
 
     ${videoSrc ? `<div class="section-card" style="padding:10px">
-      <video src="${videoSrc}" controls playsinline style="width:100%;border-radius:10px;max-height:42vh"></video>
-      ${hasResult ? `<div style="font-size:12px;color:#059669;text-align:center;margin-top:8px;font-weight:600">✓ 字幕已烧录</div>` : `<div style="font-size:12px;color:#A8A49C;text-align:center;margin-top:8px">原始视频（未加字幕）</div>`}
+      <video src="${videoSrc}" controls playsinline style="width:100%;border-radius:10px;max-height:40vh"></video>
+      ${hasResult ? `<div style="font-size:12px;color:#059669;text-align:center;margin-top:6px;font-weight:600">✓ 字幕已烧录</div>`
+                  : `<div style="font-size:12px;color:#A8A49C;text-align:center;margin-top:6px">原始视频（未加字幕）</div>`}
     </div>` : ''}
 
     <div class="section-card">
-      <div class="section-label" style="margin-bottom:14px">字幕颜色</div>
-      <div style="display:flex;gap:16px;justify-content:center">${subColorHtml}</div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-label" style="margin-bottom:14px">描边颜色</div>
-      <div style="display:flex;gap:16px;justify-content:center">${olColorHtml}</div>
-    </div>
-
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span class="section-label" style="margin:0">字体大小</span>
-        <span style="font-size:14px;font-weight:600;color:#F97316">${S.subFontsize}px</span>
-      </div>
-      <input type="range" min="24" max="48" step="4" value="${S.subFontsize}"
-        style="width:100%;accent-color:#F97316"
-        oninput="setState({subFontsize:+this.value})"/>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:#C4C0B8;margin-top:4px">
-        <span>小</span><span>大</span>
-      </div>
-    </div>
-
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span class="section-label" style="margin:0">描边粗细</span>
-        <span style="font-size:14px;font-weight:600;color:#F97316">${S.subOutlineWidth}</span>
-      </div>
-      <input type="range" min="0" max="4" step="0.5" value="${S.subOutlineWidth}"
-        style="width:100%;accent-color:#F97316"
-        oninput="setState({subOutlineWidth:+this.value})"/>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:#C4C0B8;margin-top:4px">
-        <span>无描边</span><span>粗</span>
-      </div>
+      <div class="section-label" style="margin-bottom:10px">字幕模板</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">${tplHtml}</div>
     </div>
 
     ${S.postProcessErr ? `<div class="err-text">${esc(S.postProcessErr)}</div>` : ''}
 
     ${S.postProcessing ? `
-      <div class="input-card" style="text-align:center;padding:20px">
-        <div style="font-size:14px;color:#6366F1;font-weight:500;margin-bottom:10px">正在识别语音并烧录字幕...</div>
+      <div class="input-card" style="text-align:center;padding:16px">
+        <div style="font-size:14px;color:#6366F1;font-weight:500;margin-bottom:8px">识别语音并烧录字幕中...</div>
         <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:60%;animation:none;background:linear-gradient(90deg,#6366F1,#8B5CF6)"></div></div>
-        <div style="font-size:12px;color:#A8A49C;margin-top:8px">Whisper识别中，约30~60秒</div>
+        <div style="font-size:12px;color:#A8A49C;margin-top:6px">约30~60秒</div>
       </div>` : ''}
 
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:4})">上一步</div>
-      <div class="btn-action-main ${S.postProcessing?'btn-disabled':''}"
-        onclick="handlePostProcess()">
-        ${S.postProcessing ? '处理中...' : (hasResult ? '重新烧录字幕' : '开始烧录字幕')}
+      <div class="btn-action-main ${S.postProcessing?'btn-disabled':''}" onclick="handlePostProcess()">
+        ${S.postProcessing ? '处理中...' : (hasResult ? '重新烧录' : '开始烧录字幕')}
       </div>
     </div>
 
@@ -3001,14 +2967,14 @@ async function handleAvatarVideoSelect(event) {
   event.target.value = '';
   if (file.size > 50 * 1024 * 1024) { showToast('视频过大（>50MB），请压缩后上传'); return; }
   const fmt = file.type.includes('quicktime') || file.name.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
-  // blob URL 用于预览（兼容 MOV/任意格式），base64 用于上传
+  // blob URL 立即设置用于预览，base64 后台读取（避免等待卡顿和抖动）
   if (S._avatarSrcBlobUrl) URL.revokeObjectURL(S._avatarSrcBlobUrl);
   const previewUrl = URL.createObjectURL(file);
-  showToast('读取视频中...');
+  setState({ avatarSrcVideoName: file.name, avatarSrcVideoFmt: fmt, avatarErr: '', _avatarSrcBlobUrl: previewUrl, avatarSrcVideoB64: null });
   const reader = new FileReader();
   reader.onload = (e) => {
     const b64 = e.target.result.split(',')[1];
-    setState({ avatarSrcVideoB64: b64, avatarSrcVideoName: file.name, avatarSrcVideoFmt: fmt, avatarErr: '', _avatarSrcBlobUrl: previewUrl });
+    setState({ avatarSrcVideoB64: b64 });
     showToast('视频已选择 ✓');
   };
   reader.readAsDataURL(file);
