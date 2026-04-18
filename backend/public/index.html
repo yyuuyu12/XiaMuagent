@@ -690,7 +690,10 @@ const S = {
   // 步骤4：数字人
   selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
   avatarSrcVideoB64: null, avatarSrcVideoName: '', avatarSrcVideoFmt: 'mp4',
+  avatarLibKey: null, avatarLibName: '', avatarLibThumb: '',
   avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false, avatarProgressMsg: '初始化中...', avatarProgressPct: 20,
+  showAvatarMgmt: false, avatarMgmtList: [], avatarMgmtLoading: false,
+  avatarMgmtUploading: false, avatarMgmtUploadName: '', avatarMgmtErr: '', avatarMgmtMode: 'manage',
   ttsAudioB64: null,
   subColor: '#FFFFFF', subOutlineColor: '#000000', subFontsize: 36, subOutlineWidth: 2.5, subTemplate: 'classic',
   postProcessing: false, postProcessedVideoUrl: null, postProcessedB64: null, postProcessErr: '',
@@ -996,6 +999,7 @@ function tMain() {
     ${S.avatarCropOpen?tAvatarCropModal():''}
     ${S.showAuthSheet?tAuthSheet():''}
     ${S.showAuthCodeSheet?tAuthCodeSheet():''}
+    ${S.showAvatarMgmt?tAvatarMgmt():''}
     ${S.showSetPwdSheet?tSetPasswordSheet():''}
   </div>`;
 }
@@ -1576,29 +1580,48 @@ function tCloneStep4(sb) {
     </div>`;
   }
 
-  // 上传视频区域
-  const vidSection = S.avatarSrcVideoB64
-    ? `<div style="position:relative">
-        <video src="${S._avatarSrcBlobUrl||''}"
-          controls playsinline
-          style="width:100%;border-radius:12px;max-height:220px;background:#000;display:block"></video>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
-          <span style="font-size:12px;color:#A8A49C;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.avatarSrcVideoName)}</span>
-          <input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
-          <span style="font-size:12px;color:#F97316;cursor:pointer;flex-shrink:0;margin-left:10px" onclick="document.getElementById('avatarVidInput').click()">重新选择</span>
-        </div>
-       </div>`
-    : `<input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
-       <div onclick="document.getElementById('avatarVidInput').click()"
-         style="border:2px dashed #D4D0C8;border-radius:12px;padding:32px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;background:#FAFAF8">
-         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="1.5"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3V10z"/></svg>
-         <div style="font-size:14px;color:#A8A49C;font-weight:500">点击上传人脸视频</div>
-         <div style="font-size:12px;color:#C4C0B8;text-align:center">建议 3~10 秒不说话正脸视频<br/>MP4 / MOV，正脸居中清晰</div>
-       </div>`;
+  // 视频来源：数字人库已选 > 本次上传 > 空
+  const hasVideo = !!(S.avatarLibKey || S.avatarSrcVideoB64);
+  let vidSection;
+  if (S.avatarLibKey) {
+    // 从库中选择的数字人
+    vidSection = `<div style="display:flex;gap:12px;align-items:center;background:#F0FFF4;border-radius:12px;padding:12px">
+      ${S.avatarLibThumb ? `<img src="${S.avatarLibThumb}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0"/>` : ''}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:#1A1814;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(S.avatarLibName)}</div>
+        <div style="font-size:12px;color:#10B981;margin-top:2px">✓ 已从数字人库选择</div>
+      </div>
+      <span style="font-size:12px;color:#F97316;cursor:pointer;flex-shrink:0"
+        onclick="setState({avatarLibKey:null,avatarLibName:'',avatarLibThumb:''})">换一个</span>
+    </div>`;
+  } else if (S.avatarSrcVideoB64) {
+    vidSection = `<div style="position:relative">
+      <video src="${S._avatarSrcBlobUrl||''}" controls playsinline
+        style="width:100%;border-radius:12px;max-height:220px;background:#000;display:block"></video>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+        <span style="font-size:12px;color:#A8A49C;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.avatarSrcVideoName)}</span>
+        <input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
+        <span style="font-size:12px;color:#F97316;cursor:pointer;flex-shrink:0;margin-left:10px" onclick="document.getElementById('avatarVidInput').click()">重新选择</span>
+      </div>
+    </div>`;
+  } else {
+    vidSection = `<input type="file" id="avatarVidInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none" onchange="handleAvatarVideoSelect(event)"/>
+      <div onclick="document.getElementById('avatarVidInput').click()"
+        style="border:2px dashed #D4D0C8;border-radius:12px;padding:28px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;background:#FAFAF8">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="1.5"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3V10z"/></svg>
+        <div style="font-size:14px;color:#A8A49C;font-weight:500">点击上传人脸视频</div>
+        <div style="font-size:12px;color:#C4C0B8;text-align:center">建议 3~10 秒不说话正脸视频<br/>MP4 / MOV，正脸居中清晰</div>
+      </div>
+      <div onclick="openAvatarMgmt('select')"
+        style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;padding:10px;border-radius:10px;background:#F0FFF4;cursor:pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span style="font-size:13px;color:#10B981;font-weight:600">从数字人库选择</span>
+      </div>`;
+  }
 
   return `${sb}<div class="tab-page">
     <div class="section-card">
-      <div class="section-label" style="margin-bottom:12px">上传静默人脸视频</div>
+      <div class="section-label" style="margin-bottom:12px">选择人脸视频</div>
       ${vidSection}
     </div>
     <div class="section-card">
@@ -1613,7 +1636,7 @@ function tCloneStep4(sb) {
     ${S.avatarErr?`<div class="err-text" style="margin-bottom:10px">${esc(S.avatarErr)}</div>`:''}
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:3})">上一步</div>
-      <div class="btn-action-main ${(!S.ttsAudioUrl||!S.avatarSrcVideoB64||S.avatarGenerating)?'btn-disabled':''}"
+      <div class="btn-action-main ${(!S.ttsAudioUrl||!hasVideo||S.avatarGenerating)?'btn-disabled':''}"
         onclick="handleAvatarGenerate()">
         ${S.avatarGenerating ? '生成中...' : '开始生成数字人视频'}
       </div>
@@ -2128,6 +2151,16 @@ function tProfile() {
         <div class="profile-menu-body">
           <span class="profile-menu-title">声音管理</span>
           <span class="profile-menu-sub">上传 · 录制 · 管理我的克隆声音</span>
+        </div>
+        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="profile-menu-item" onclick="openAvatarMgmt('manage')">
+        <div class="profile-menu-icon" style="background:#F0FFF4">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </div>
+        <div class="profile-menu-body">
+          <span class="profile-menu-title">数字人管理</span>
+          <span class="profile-menu-sub">上传 · 管理我的形象视频</span>
         </div>
         <svg width="7" height="12" viewBox="0 0 7 12" fill="none" class="profile-menu-arrow"><path d="M1 1L6 6L1 11" stroke="#C8C4BB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -3036,7 +3069,7 @@ let _avatarPoller = null;
 
 async function handleAvatarGenerate() {
   if (!S.ttsAudioUrl) { showToast('请先完成步骤3语音合成'); return; }
-  if (!S.avatarSrcVideoB64) { showToast('请先上传静默人脸视频'); return; }
+  if (!S.avatarSrcVideoB64 && !S.avatarLibKey) { showToast('请先上传或选择人脸视频'); return; }
   if (S.avatarGenerating) return;
 
   // 把 Blob URL 转成 base64
@@ -3065,15 +3098,17 @@ async function handleAvatarGenerate() {
     }
     const asrUrl = urlR.data.url.replace(/\/$/, '');
 
+    const videoPayload = S.avatarLibKey
+      ? { avatar_key: S.avatarLibKey }
+      : { video_b64: S.avatarSrcVideoB64, video_fmt: S.avatarSrcVideoFmt || 'mp4' };
     const resp = await fetch(`${asrUrl}/video/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
       body: JSON.stringify({
         audio_b64: audioB64,
-        video_b64: S.avatarSrcVideoB64,
         audio_fmt: 'wav',
-        video_fmt: S.avatarSrcVideoFmt || 'mp4',
         enhancer: S.avatarBeauty,
+        ...videoPayload,
       }),
     });
     if (!resp.ok) {
@@ -3624,6 +3659,137 @@ function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return;
   clearAuth();
   setState({ page:'login', currentTab:'home', showAuthSheet:false, userInfo:null, userName:'创作者', userPhone:'', userAvatar:0, phone:'', password:'', smsCode:'', smsSent:false, smsCountdown:0, authErr:'', authMode:'sms', recentHistory:[], recentHistoryLoaded:false, homeHistory:[], homeHistoryLoaded:false, extractHistory:[], extractHistoryLoaded:false, inspireHistory:[], historyLoaded:false, cloneHistory:[], cloneHistoryLoaded:false, nicknamePrompt:false, nicknamePromptDismissed:false, profileView:'main', avatarCropOpen:false, avatarCropDataUrl:'' });
+}
+
+// ===== 数字人管理 =====
+async function openAvatarMgmt(mode) {
+  if (!S.userInfo) { showToast('请先登录'); return; }
+  setState({ showAvatarMgmt: true, avatarMgmtMode: mode || 'manage', avatarMgmtErr: '', avatarMgmtUploadName: '' });
+  await loadAvatarList();
+}
+
+async function loadAvatarList() {
+  const u = S.userInfo;
+  if (!u) return;
+  setState({ avatarMgmtLoading: true, avatarMgmtErr: '' });
+  try {
+    const urlR = await api.get('/ai/asr-url');
+    if (urlR.code !== 200) { setState({ avatarMgmtLoading: false, avatarMgmtErr: '获取服务地址失败' }); return; }
+    const asrUrl = urlR.data.url.replace(/\/$/, '');
+    const r = await fetch(`${asrUrl}/avatar/list/${u.id}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
+    const data = await r.json();
+    setState({ avatarMgmtList: data.avatars || [], avatarMgmtLoading: false });
+  } catch(e) {
+    setState({ avatarMgmtLoading: false, avatarMgmtErr: '加载失败：' + e.message });
+  }
+}
+
+async function uploadAvatarFile(file) {
+  const u = S.userInfo;
+  if (!u) return;
+  setState({ avatarMgmtUploading: true, avatarMgmtErr: '' });
+  try {
+    const urlR = await api.get('/ai/asr-url');
+    if (urlR.code !== 200) throw new Error('获取服务地址失败');
+    const asrUrl = urlR.data.url.replace(/\/$/, '');
+    const fd = new FormData();
+    fd.append('user_id', String(u.id));
+    fd.append('name', S.avatarMgmtUploadName.trim() || file.name.replace(/\.[^.]+$/, ''));
+    fd.append('video', file);
+    const r = await fetch(`${asrUrl}/avatar/upload`, { method: 'POST', body: fd, headers: { 'ngrok-skip-browser-warning': '1' } });
+    if (!r.ok) { const t = await r.json(); throw new Error(t.detail || r.statusText); }
+    setState({ avatarMgmtUploading: false, avatarMgmtUploadName: '' });
+    showToast('上传成功 ✓');
+    await loadAvatarList();
+  } catch(e) {
+    setState({ avatarMgmtUploading: false, avatarMgmtErr: '上传失败：' + e.message });
+  }
+}
+
+async function deleteAvatar(avatarId) {
+  if (!confirm('确定删除这个数字人吗？')) return;
+  const u = S.userInfo;
+  try {
+    const urlR = await api.get('/ai/asr-url');
+    const asrUrl = urlR.data.url.replace(/\/$/, '');
+    await fetch(`${asrUrl}/avatar/${u.id}/${avatarId}`, { method: 'DELETE', headers: { 'ngrok-skip-browser-warning': '1' } });
+    setState({ avatarMgmtList: S.avatarMgmtList.filter(a => a.id !== avatarId) });
+    showToast('已删除');
+  } catch(e) { showToast('删除失败'); }
+}
+
+function selectAvatarFromLib(avatar) {
+  setState({
+    showAvatarMgmt: false,
+    avatarLibKey: avatar.key,
+    avatarLibName: avatar.name,
+    avatarLibThumb: avatar.thumbnail || '',
+    avatarSrcVideoB64: null,
+    avatarSrcVideoName: '',
+    _avatarSrcBlobUrl: null,
+  });
+  showToast(`已选择：${avatar.name}`);
+}
+
+function tAvatarMgmt() {
+  const mode = S.avatarMgmtMode;
+  const isSelect = mode === 'select';
+  const list = S.avatarMgmtList;
+
+  const listHtml = S.avatarMgmtLoading
+    ? `<div style="text-align:center;padding:24px;color:#A8A49C;font-size:13px">加载中...</div>`
+    : list.length === 0
+      ? `<div style="text-align:center;padding:32px 16px">
+           <div style="font-size:32px;margin-bottom:8px">🎭</div>
+           <div style="font-size:13px;color:#A8A49C">还没有数字人，上传第一个吧</div>
+         </div>`
+      : list.map(a => `
+        <div style="display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #F0EDE6">
+          ${a.thumbnail
+            ? `<img src="${a.thumbnail}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0"/>`
+            : `<div style="width:60px;height:60px;border-radius:8px;background:#E8E4DC;flex-shrink:0;display:flex;align-items:center;justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A8A49C" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>`}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:#1A1814;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</div>
+            <div style="font-size:11px;color:#A8A49C;margin-top:2px">${a.created_at||''}</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            ${isSelect ? `<div onclick="selectAvatarFromLib(${JSON.stringify(a).replace(/"/g,'&quot;')})"
+              style="font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:20px;padding:5px 12px;cursor:pointer">选用</div>` : ''}
+            <div onclick="deleteAvatar('${a.id}')"
+              style="font-size:12px;color:#EF4444;cursor:pointer;padding:5px 8px">删除</div>
+          </div>
+        </div>`).join('');
+
+  return `<div style="position:fixed;inset:0;z-index:200;background:#F7F6F2;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;padding:12px 16px;background:#fff;border-bottom:1px solid #EAE7DF;flex-shrink:0">
+      <div onclick="setState({showAvatarMgmt:false})" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:-8px">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span style="flex:1;text-align:center;font-size:16px;font-weight:700;color:#1A1814">${isSelect ? '选择数字人' : '数字人管理'}</span>
+      <div style="width:40px"></div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px">
+      <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:10px">上传新数字人</div>
+        <input type="text" placeholder="命名（可选）" value="${esc(S.avatarMgmtUploadName)}"
+          oninput="setState({avatarMgmtUploadName:this.value})"
+          style="width:100%;box-sizing:border-box;background:#F7F6F2;border:1px solid #E4E2DA;border-radius:8px;height:40px;padding:0 12px;font-size:14px;color:#1A1814;margin-bottom:10px"/>
+        <input type="file" id="avatarMgmtFileInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none"
+          onchange="if(this.files[0])uploadAvatarFile(this.files[0])"/>
+        <div onclick="${S.avatarMgmtUploading?'':'document.getElementById(\'avatarMgmtFileInput\').click()'}"
+          style="display:flex;align-items:center;justify-content:center;gap:8px;background:${S.avatarMgmtUploading?'#E8E4DC':'#10B981'};color:#fff;border-radius:10px;height:44px;font-size:14px;font-weight:600;cursor:${S.avatarMgmtUploading?'default':'pointer'}">
+          ${S.avatarMgmtUploading
+            ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 上传中...'
+            : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> 选择视频上传'}
+        </div>
+        ${S.avatarMgmtErr ? `<div style="font-size:12px;color:#EF4444;margin-top:8px">${esc(S.avatarMgmtErr)}</div>` : ''}
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:14px">
+        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:4px">我的数字人 <span style="color:#A8A49C;font-weight:400">(${list.length})</span></div>
+        ${listHtml}
+      </div>
+    </div>
+  </div>`;
 }
 
 // ===== VIP =====

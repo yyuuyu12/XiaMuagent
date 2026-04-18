@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import whisper
 import ffmpeg
 import tempfile
@@ -9,6 +10,9 @@ import httpx
 import base64
 import asyncio
 import edge_tts
+import json
+import uuid
+from datetime import datetime
 from pathlib import Path
 
 # 计划任务以管理员运行时 WinGet/用户 PATH 可能缺失，手动补上 ffmpeg 路径
@@ -191,10 +195,20 @@ def health():
 
 # ===================== SadTalker 代理接口 =====================
 SADTALKER_URL = "http://localhost:7861"
+AVATARS_DIR = Path(__file__).parent / "avatars"
+AVATARS_DIR.mkdir(exist_ok=True)
 
 @app.post("/video/generate")
 async def video_generate_proxy(payload: dict):
-    """代理到 SadTalker 服务（端口 7861），需要先启动 start_sadtalker.bat"""
+    """代理到数字人服务（端口 7861）。支持 avatar_key（本地文件key）代替 video_b64"""
+    # 若传入 avatar_key，从本地磁盘读取视频，避免前端重复上传大文件
+    avatar_key = payload.pop("avatar_key", None)
+    if avatar_key and not payload.get("video_b64"):
+        avatar_path = AVATARS_DIR / avatar_key
+        if not avatar_path.exists():
+            raise HTTPException(404, f"数字人文件不存在: {avatar_key}")
+        payload["video_b64"] = base64.b64encode(avatar_path.read_bytes()).decode()
+        payload.setdefault("video_fmt", avatar_path.suffix.lstrip(".") or "mp4")
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(f"{SADTALKER_URL}/video/generate", json=payload)
@@ -202,7 +216,7 @@ async def video_generate_proxy(payload: dict):
             raise HTTPException(status_code=resp.status_code, detail=resp.text[:400])
         return resp.json()
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="SadTalker 服务未启动，请运行 start_sadtalker.bat 后重试")
+        raise HTTPException(status_code=503, detail="数字人服务未启动，请运行对应的启动脚本")
 
 @app.get("/video/task/{task_id}")
 async def video_task_proxy(task_id: str):
@@ -412,3 +426,105 @@ async def video_postprocess(payload: dict):
             "format": "mp4",
             "segments_count": len(segments),
         }
+
+
+# ===================== 数字人管理 =====================
+
+async def _extract_thumbnail(video_path: str) -> str:
+    """抽取第一帧作为缩略图，返回 data:image/jpeg;base64,xxx"""
+    thumb_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            thumb_path = f.name
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-i", video_path,
+            "-vframes", "1", "-q:v", "5", "-vf", "scale=320:-1",
+            thumb_path,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=15)
+        if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+            data = base64.b64encode(Path(thumb_path).read_bytes()).decode()
+            return f"data:image/jpeg;base64,{data}"
+    except Exception:
+        pass
+    finally:
+        if thumb_path and os.path.exists(thumb_path):
+            try: os.unlink(thumb_path)
+            except: pass
+    return ""
+
+
+@app.post("/avatar/upload")
+async def avatar_upload(
+    user_id: str = Form(...),
+    name: str = Form("未命名数字人"),
+    video: UploadFile = File(...),
+):
+    if not user_id:
+        raise HTTPException(400, "user_id 不能为空")
+    user_dir = AVATARS_DIR / f"u{user_id}"
+    user_dir.mkdir(exist_ok=True)
+
+    avatar_id = uuid.uuid4().hex[:12]
+    ext = "mp4"
+    if video.filename and "." in video.filename:
+        ext = video.filename.rsplit(".", 1)[-1].lower()
+    video_path = user_dir / f"{avatar_id}.{ext}"
+
+    try:
+        video_bytes = await video.read()
+        video_path.write_bytes(video_bytes)
+    except Exception as e:
+        raise HTTPException(400, f"视频保存失败: {e}")
+
+    thumbnail = await _extract_thumbnail(str(video_path))
+    meta = {
+        "id": avatar_id,
+        "name": (name.strip() or "未命名数字人")[:30],
+        "filename": f"{avatar_id}.{ext}",
+        "key": f"u{user_id}/{avatar_id}.{ext}",
+        "size": len(video_bytes),
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "thumbnail": thumbnail,
+    }
+    (user_dir / f"{avatar_id}.json").write_text(
+        json.dumps(meta, ensure_ascii=False), encoding="utf-8"
+    )
+    return {"ok": True, "avatar_id": avatar_id, "name": meta["name"],
+            "key": meta["key"], "thumbnail": thumbnail}
+
+
+@app.get("/avatar/list/{user_id}")
+async def avatar_list(user_id: str):
+    user_dir = AVATARS_DIR / f"u{user_id}"
+    if not user_dir.exists():
+        return {"avatars": []}
+    avatars = []
+    for mf in sorted(user_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            meta = json.loads(mf.read_text(encoding="utf-8"))
+            if (user_dir / meta["filename"]).exists():
+                avatars.append(meta)
+        except Exception:
+            pass
+    return {"avatars": avatars}
+
+
+@app.delete("/avatar/{user_id}/{avatar_id}")
+async def avatar_delete(user_id: str, avatar_id: str):
+    user_dir = AVATARS_DIR / f"u{user_id}"
+    for p in user_dir.glob(f"{avatar_id}.*"):
+        try: p.unlink()
+        except: pass
+    return {"ok": True}
+
+
+@app.get("/avatar/file/{user_id}/{avatar_id}")
+async def avatar_file(user_id: str, avatar_id: str):
+    user_dir = AVATARS_DIR / f"u{user_id}"
+    for ext in ["mp4", "mov", "avi", "mkv"]:
+        f = user_dir / f"{avatar_id}.{ext}"
+        if f.exists():
+            return FileResponse(str(f), media_type="video/mp4")
+    raise HTTPException(404, "数字人视频不存在")
