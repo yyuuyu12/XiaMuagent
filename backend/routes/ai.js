@@ -372,6 +372,20 @@ router.post('/tts/clone', requireAuth, async (req, res) => {
 });
 
 // ==================== 发布信息生成（标题+话题标签）====================
+// 封面短标题（≤8字）
+router.post('/cover-title', requireAuth, async (req, res) => {
+  const { script } = req.body;
+  if (!script?.trim()) return res.json({ code: 400, msg: '文案不能为空' });
+  try {
+    const prompt = `根据以下短视频文案，生成一句封面标题。要求：不超过8个字，无标点符号，吸引眼球，直击核心价值点，适合放在视频封面上。只输出标题文字本身，不要引号和解释。\n\n文案：${script.slice(0, 400)}`;
+    const raw = await callAI(prompt);
+    const title = raw.trim().replace(/["""''《》【】「」\n\r]/g, '').slice(0, 8);
+    return res.json({ code: 200, data: { title } });
+  } catch (e) {
+    return res.json({ code: 500, msg: e.message });
+  }
+});
+
 router.post('/publish-info', requireAuth, async (req, res) => {
   const { script } = req.body;
   if (!script?.trim()) return res.json({ code: 400, msg: '文案内容不能为空' });
