@@ -1142,22 +1142,22 @@ function tHomeTaskSection() {
     ${bigCards.map(t => {
       if (t.status === 'done') {
         if (t.type === 'clone_video') {
-          // 克隆任务：显示6步进度条，标注已完成到第几步
-          const cloneStep = t.clone_step || 2;
+          // 克隆任务：显示6步进度条，标注已完成到第几步（done 最少2步）
+          const cloneStep = Math.max(2, parseInt(t.clone_step) || 2);
           const stepLabels = ['提取','改写','语音','数字人','后期','发布'];
           const stepDots = stepLabels.map((lbl, i) => {
-            const n = i + 1;
-            const done = n <= cloneStep;
+            const n = i + 1; const isDone = n <= cloneStep;
             return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
-              <div style="width:18px;height:18px;border-radius:50%;background:${done?'#F97316':'#E4E2DA'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${done?'✓':n}</div>
-              <span style="font-size:9px;color:${done?'#F97316':'#C4C0B8'};white-space:nowrap">${lbl}</span>
+              <div style="width:18px;height:18px;border-radius:50%;background:${isDone?'#F97316':'#E4E2DA'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${isDone?'✓':n}</div>
+              <span style="font-size:9px;color:${isDone?'#F97316':'#C4C0B8'};white-space:nowrap">${lbl}</span>
             </div>`;
           }).join('<div style="flex:none;width:14px;height:1px;background:#E4E2DA;margin-top:9px"></div>');
-          const stepDesc = cloneStep >= 6 ? '全部完成' : cloneStep >= 5 ? '已完成后期，待发布' : cloneStep >= 4 ? '已生成数字人，待后期' : cloneStep >= 3 ? '已合成语音，待数字人' : '文案已改写，待语音';
+          const stepDesc = cloneStep >= 6 ? '🎉 全部完成！' : cloneStep >= 5 ? '后期已完成，去发布' : cloneStep >= 4 ? '数字人已生成，去后期制作' : cloneStep >= 3 ? '语音已合成，去生成数字人' : '文案已改写，去合成语音';
+          const btnLabel = cloneStep >= 6 ? '再做一个 ›' : '继续 ›';
           return `<div class="home-task-card" onclick="openExtractWithTask('${t.id}')" style="flex-direction:column;align-items:stretch;cursor:pointer">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(t.title)}</div>
-              <span style="font-size:11px;color:#E8650A;flex-shrink:0;margin-left:8px">继续 ›</span>
+              <span style="font-size:11px;color:#E8650A;flex-shrink:0;margin-left:8px">${btnLabel}</span>
             </div>
             <div style="display:flex;align-items:flex-start;margin-bottom:8px">${stepDots}</div>
             <div style="font-size:11px;color:#A8A49C">${stepDesc}</div>
@@ -1174,22 +1174,25 @@ function tHomeTaskSection() {
         </div>`;
       }
       if (t.status === 'extracted') {
+        // extracted: server defaults clone_step=1 (no session), or higher if session exists
+        const cloneStep = parseInt(t.clone_step) || 1;
+        const descMap = {1:'文案已提取，点击继续AI改写', 2:'文案已改写，点击继续语音合成', 3:'语音已合成，点击继续生成数字人', 4:'数字人已生成，点击继续后期制作', 5:'后期已完成，点击发布'};
+        const btnLabel = cloneStep >= 5 ? '去发布 ›' : cloneStep >= 4 ? '去后期 ›' : cloneStep >= 3 ? '去数字人 ›' : cloneStep >= 2 ? '去语音 ›' : '去改写 ›';
         const stepLabels = ['提取','改写','语音','数字人','后期','发布'];
         const stepDots = stepLabels.map((lbl, i) => {
-          const n = i + 1;
-          const done = n <= 1; // extracted = 步骤1完成
+          const n = i + 1; const isDone = n <= cloneStep;
           return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
-            <div style="width:18px;height:18px;border-radius:50%;background:${done?'#F97316':'#E4E2DA'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${done?'✓':n}</div>
-            <span style="font-size:9px;color:${done?'#F97316':'#C4C0B8'};white-space:nowrap">${lbl}</span>
+            <div style="width:18px;height:18px;border-radius:50%;background:${isDone?'#F97316':'#E4E2DA'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${isDone?'✓':n}</div>
+            <span style="font-size:9px;color:${isDone?'#F97316':'#C4C0B8'};white-space:nowrap">${lbl}</span>
           </div>`;
         }).join('<div style="flex:none;width:14px;height:1px;background:#E4E2DA;margin-top:9px"></div>');
         return `<div class="home-task-card" onclick="openExtractWithTask('${t.id}')" style="flex-direction:column;align-items:stretch;cursor:pointer">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(t.title)}</div>
-            <span style="font-size:11px;color:#E8650A;flex-shrink:0;margin-left:8px">去改写 ›</span>
+            <span style="font-size:11px;color:#E8650A;flex-shrink:0;margin-left:8px">${btnLabel}</span>
           </div>
           <div style="display:flex;align-items:flex-start;margin-bottom:8px">${stepDots}</div>
-          <div style="font-size:11px;color:#A8A49C">文案已提取，点击继续AI改写</div>
+          <div style="font-size:11px;color:#A8A49C">${descMap[cloneStep]||'点击继续创作'}</div>
         </div>`;
       }
       const cd = taskCountdown(t);
@@ -2731,7 +2734,14 @@ async function handleCloneRewrite() {
     // 直接把用户编辑好的文案传给 AI 改写，不经过 task 队列
     const r = await api.post('/ai/rewrite', { text });
     if (r.code === 200) {
-      setState({ extractStep: 2, rewrittenScript: r.data.result, extractErr: '' });
+      const rewritten = r.data.result;
+      setState({ extractStep: 2, rewrittenScript: rewritten, extractErr: '' });
+      // 把任务状态更新为 done，并保存 session（step=2），首页进度条才能更新
+      if (S.cloneTaskId) {
+        api.post(`/tasks/${S.cloneTaskId}/set-rewritten`, { rewrittenScript: rewritten }).catch(() => {});
+        saveCloneSession(2);
+        loadTasks(); // 刷新首页任务列表
+      }
     } else {
       setState({ extractStep: 'review', extractErr: r.msg || '改写失败，请重试' });
     }

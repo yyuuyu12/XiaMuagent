@@ -8,7 +8,7 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT t.id, t.type, t.title, t.status, t.stage, t.progress, t.thinking, t.error_msg, t.created_at, t.updated_at,
-              COALESCE(ts.clone_step, 2) AS clone_step
+              COALESCE(ts.clone_step, CASE WHEN t.status = 'done' THEN 2 ELSE 1 END) AS clone_step
        FROM tasks t
        LEFT JOIN task_sessions ts ON ts.task_id = t.id AND ts.user_id = t.user_id
        WHERE t.user_id = $1
@@ -76,6 +76,34 @@ router.post('/:id/start-rewrite', requireAuth, async (req, res) => {
     }
     require('../taskRunner').enqueue({ taskId: req.params.id, type: 'clone_video' });
     res.json({ code: 200, msg: '改写任务已提交' });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/tasks/:id/set-rewritten - 前端改写完成后把任务状态改为 done
+router.post('/:id/set-rewritten', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, status, type, result FROM tasks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
+    if (rows[0].type !== 'clone_video') return res.status(400).json({ code: 400, msg: '仅支持克隆任务' });
+
+    const { rewrittenScript } = req.body;
+    if (!rewrittenScript?.trim()) return res.status(400).json({ code: 400, msg: '改写内容不能为空' });
+
+    // 合并到已有 result（保留 transcript 等）
+    let existing = {};
+    try { existing = JSON.parse(rows[0].result || '{}'); } catch {}
+    existing.rewritten = rewrittenScript.trim();
+
+    await db.query(
+      "UPDATE tasks SET status='done', result=$2, updated_at=NOW() WHERE id=$1",
+      [req.params.id, JSON.stringify(existing)]
+    );
+    res.json({ code: 200, msg: 'ok' });
   } catch (err) {
     res.status(500).json({ code: 500, msg: err.message });
   }
