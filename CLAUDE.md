@@ -83,19 +83,17 @@ XiaMuagent/
 
 | 服务 | 端口 | 启动脚本 | 开机自启 | Python 路径 |
 |------|------|----------|----------|-------------|
-| **ASR 主服务** | 8765 | `start.bat` | ⚠️ 未配置（见下） | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe` |
-| **ngrok 穿透** | — | `start_ngrok.bat` | ⚠️ 未配置（见下） | — |
-| **IndexTTS** | 8766 | `start_indextts.bat` | ✅ 计划任务（`IndexTTS-Service`） | 同上 |
+| **ASR 主服务** | 8765 | `start.bat` | ✅ 计划任务（`ASR-Service`，登录后30秒） | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe` |
+| **ngrok 穿透** | — | `start_ngrok.bat` | ✅ 计划任务（`Ngrok-Service`，登录后30秒，失败自动重试） | — |
+| **IndexTTS** | 8766 | `start_indextts.bat` | ✅ 计划任务（`IndexTTS-Service`，登录后2分钟） | 同上 |
 | **HeyGem 数字人** | 7861 | `desktop_client/start_heygem.bat` | ❌ 需手动启动 | HeyGem venv |
 | **VideoReTalking** | 7861 | `desktop_client/start_videoretalking.bat` | ❌ 安装中 | `desktop_client/VideoReTalking/venv/` |
 
-> ⚠️ **已知问题**：`start_services.bat` 引用了 `start_asr.bat`，但该文件已不存在（应为 `start.bat`），自启配置失效，需修复。
-
 ### 开机需手动启动的服务
-每次开机需手动运行：
-1. `local_asr_server\start.bat`（ASR + Whisper）
-2. `local_asr_server\start_ngrok.bat`（公网穿透）
-3. `desktop_client\start_heygem.bat`（数字人生成，用到时才需要开）
+只有一个：
+- `desktop_client\start_heygem.bat`（数字人生成，用到时才需要开）
+
+其余服务（ASR、ngrok、IndexTTS）均已配置 Windows 计划任务，**登录系统后自动启动，无需手动操作**。
 
 ---
 
@@ -177,8 +175,3 @@ git commit -m "说明"
 git push        # 3. 改完立刻推
 ```
 
-### 待修复：start_services.bat 自启失效
-```bat
-:: 把第7行的 start_asr.bat 改为 start.bat
-wscript.exe "...\run_hidden.vbs" "...\local_asr_server\start.bat"
-```
