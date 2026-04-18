@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/ChaojiIP/aigc-human/python-modules/hdModule/**)",
+      "Read(//c/ChaojiIP/aigc-human/python-modules/humanModule/service//**)",
+      "Read(//c/ChaojiIP/aigc-human//**)",
+      "Read(//c/ChaojiIP/aigc-human/python-modules/humanModule/config//**)",
+      "Bash(powershell.exe -Command \"Get-Process -Name '超级IP智能体' -ErrorAction SilentlyContinue | Select-Object Id,Name\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(nvcc --version)",
+      "Bash(conda --version)",
+      "Bash(python:*)",
+      "Bash(C:/ChaojiIP/aigc-human/python-modules/humanModule/venv/python.exe:*)",
+      "Bash(printf:*)"
+    ]
+  }
+}

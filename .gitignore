@@ -2,9 +2,28 @@ node_modules/
 backend/node_modules/
 backend/data/
 backend/.env
-local_asr_server/__pycache__/
 *.db
 *.db-shm
 *.db-wal
 .DS_Store
 Thumbs.db
+
+# Python 缓存
+**/__pycache__/
+*.pyc
+*.pyo
+
+# 本地服务运行时目录（用户数据 / 临时文件，不入库）
+local_asr_server/avatars/
+local_asr_server/tts_outputs/
+local_asr_server/__pycache__/
+
+# 数字人服务运行时目录
+desktop_client/heygem_temp/
+desktop_client/heygem_outputs/
+desktop_client/tmp_video/
+desktop_client/vrt_outputs/
+desktop_client/vrt_tmp/
+
+# 测试文件
+local_asr_server/test_*.py

@@ -16,11 +16,16 @@ Zeabur 云后端（Node.js Express）   ← 认证、API、数据库
         ↕ HTTP（通过 ngrok 穿透）
 你的本地机器（Windows 11, RTX 5070Ti）
     ├── ASR服务     :8765   Whisper + edge-tts + 字幕 + 数字人代理
-    ├── IndexTTS    :8766   语音克隆（声音复刻）
-    └── 数字人服务  :7861   HeyGem（当前）/ VideoReTalking（安装中）
+    ├── IndexTTS    :8766   语音克隆（按需手动启动）
+    └── HeyGem      :7861   数字人视频生成
         ↕
 ngrok 固定域名（把 8765 暴露到公网）
 ```
+
+### 开机自启（已配置，无需手动操作）
+登录 Windows 后自动启动：**HeyGem(7861) + ASR(8765)** 同时启动 → 等待 90 秒模型加载 → **ngrok** 启动
+- 自启脚本：`local_asr_server/startup.ps1`
+- 日志：`local_asr_server/startup.log`
 
 ---
 
@@ -33,6 +38,9 @@ XiaMuagent/
 │   ├── server.js                   ← Express 入口，挂载所有路由
 │   ├── db.js                       ← MySQL 连接池
 │   ├── initDb.js                   ← 建表（每次启动自动跑）
+│   ├── lib/callAI.js               ← AI 调用封装
+│   ├── worker.js                   ← 后台任务处理器
+│   ├── taskRunner.js               ← 内存任务队列（串行）
 │   ├── package.json
 │   ├── zbpack.json                 ← Zeabur 构建配置，不要动
 │   │
@@ -42,35 +50,27 @@ XiaMuagent/
 │   │
 │   └── routes/
 │       ├── auth.js                 ← 注册/登录/JWT/个人信息
-│       ├── ai.js                   ← AI 文案生成 + cover-title
+│       ├── ai.js                   ← AI文案/TTS/数字人视频代理
+│       ├── inspire.js              ← 灵感发现（账号/视频分析）
 │       ├── douyinToText.js         ← 抖音视频 → 文字
 │       ├── extract.js              ← 文案提取
 │       ├── history.js              ← 用户历史记录
+│       ├── tasks.js                ← 任务状态查询
 │       ├── config.js               ← 后台配置读写
-│       ├── codes.js                ← 授权码管理
-│       ├── tasks.js                ← 任务队列
-│       └── inspire.js              ← 灵感发现
+│       └── codes.js                ← 授权码管理
 │
-├── local_asr_server/               ← 本地服务（Python，运行在你电脑上）
-│   ├── main.py                     ← ★ 本地服务入口（端口 8765）
-│   │                                  功能：Whisper转写、edge-tts、IndexTTS代理、
-│   │                                       字幕烧录、数字人管理、视频生成代理
-│   ├── indextts_server.py          ← IndexTTS 语音克隆服务（端口 8766）
-│   ├── avatars/                    ← 数字人形象视频存储（按 u{userId}/ 分目录）
-│   ├── tts_outputs/                ← TTS 临时输出
-│   ├── start.bat                   ← 启动 ASR 服务（手动）
-│   ├── start_indextts.bat          ← 启动 IndexTTS（手动）
-│   ├── start_ngrok.bat             ← 启动 ngrok 穿透
-│   ├── start_services.bat          ← 同时启动 ASR + ngrok（自启脚本用）
-│   └── register_task.bat           ← 注册 IndexTTS 开机自启任务
+├── local_asr_server/               ← 本地综合服务（端口 8765）
+│   ├── main.py                     ← ★ 服务入口（Whisper/TTS/字幕/数字人代理）
+│   ├── indextts_server.py          ← IndexTTS 语音克隆（端口 8766，按需启动）
+│   ├── startup.ps1                 ← ★ 开机自启脚本（HeyGem+ASR+ngrok）
+│   ├── register_autostart.bat      ← 重新注册自启用（管理员运行一次）
+│   ├── start_asr.bat               ← 手动启动 ASR（调试用）
+│   ├── start_ngrok.bat             ← 手动启动 ngrok（调试用）
+│   └── start_indextts.bat          ← 手动启动 IndexTTS（声音克隆时用）
 │
-├── desktop_client/                 ← 数字人生成服务（端口 7861）
-│   ├── heygem_server.py            ← HeyGem 服务（当前使用）
-│   ├── videoretalking_server.py    ← VideoReTalking 服务（安装中）
-│   ├── start_heygem.bat            ← 启动 HeyGem
-│   ├── start_videoretalking.bat    ← 启动 VideoReTalking
-│   ├── VideoReTalking/             ← VideoReTalking 模型目录
-│   └── SadTalker/                  ← SadTalker（已弃用）
+├── desktop_client/                 ← 数字人生成服务
+│   ├── heygem_server.py            ← ★ HeyGem 服务（端口 7861）
+│   └── start_heygem.bat            ← 手动启动（调试用，开机已自动启动）
 │
 ├── docs/                           ← 需求文档（只读参考）
 ├── CLAUDE.md                       ← 本文件
@@ -81,19 +81,14 @@ XiaMuagent/
 
 ## 本地服务一览
 
-| 服务 | 端口 | 启动脚本 | 开机自启 | Python 路径 |
-|------|------|----------|----------|-------------|
-| **ASR 主服务** | 8765 | `start.bat` | ✅ 计划任务（`ASR-Service`，登录后30秒） | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe` |
-| **ngrok 穿透** | — | `start_ngrok.bat` | ✅ 计划任务（`Ngrok-Service`，登录后30秒，失败自动重试） | — |
-| **IndexTTS** | 8766 | `start_indextts.bat` | ✅ 计划任务（`IndexTTS-Service`，登录后2分钟） | 同上 |
-| **HeyGem 数字人** | 7861 | `desktop_client/start_heygem.bat` | ❌ 需手动启动 | HeyGem venv |
-| **VideoReTalking** | 7861 | `desktop_client/start_videoretalking.bat` | ❌ 安装中 | `desktop_client/VideoReTalking/venv/` |
+| 服务 | 端口 | 开机自启 | 手动启动脚本 |
+|------|------|----------|-------------|
+| **ASR 主服务** | 8765 | ✅ 自动 | `local_asr_server/start_asr.bat` |
+| **HeyGem 数字人** | 7861 | ✅ 自动 | `desktop_client/start_heygem.bat` |
+| **ngrok 穿透** | — | ✅ 自动（模型加载后90秒） | `local_asr_server/start_ngrok.bat` |
+| **IndexTTS 声音克隆** | 8766 | ❌ 手动（按需） | `local_asr_server/start_indextts.bat` |
 
-### 开机需手动启动的服务
-只有一个：
-- `desktop_client\start_heygem.bat`（数字人生成，用到时才需要开）
-
-其余服务（ASR、ngrok、IndexTTS）均已配置 Windows 计划任务，**登录系统后自动启动，无需手动操作**。
+**开机无需任何手动操作**，所有核心服务自动启动。IndexTTS 仅在用声音克隆功能时才需要手动开启。
 
 ---
 
@@ -137,21 +132,19 @@ XiaMuagent/
 | 本地服务（ASR/TTS/字幕/数字人管理） | `C:\AIClaudecode\local_asr_server\main.py` |
 | IndexTTS 服务 | `C:\AIClaudecode\local_asr_server\indextts_server.py` |
 | HeyGem 数字人服务 | `C:\AIClaudecode\desktop_client\heygem_server.py` |
-| VideoReTalking 服务 | `C:\AIClaudecode\desktop_client\videoretalking_server.py` |
 
 ### 模型文件（大文件，不进 Git）
-| 模型 | 路径 | 大小参考 |
-|------|------|---------|
-| **Whisper medium**（语音转写） | `C:\Users\木木\.cache\whisper\medium.pt` | ~1.5GB |
-| **IndexTTS**（语音克隆） | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\checkpoints\` | ~数GB |
-| **HeyGem**（数字人） | `C:\ChaojiIP\aigc-human\python-modules\humanModule\pretrain_models\` | ~数GB |
-| **VideoReTalking**（数字人，安装中） | `C:\AIClaudecode\desktop_client\VideoReTalking\third_part\` | ~数GB，待下载 |
+| 模型 | 路径 |
+|------|------|
+| **Whisper medium**（语音转写） | `C:\Users\木木\.cache\whisper\medium.pt` |
+| **IndexTTS**（语音克隆） | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\checkpoints\` |
+| **HeyGem**（数字人） | `C:\ChaojiIP\aigc-human\python-modules\humanModule\pretrain_models\` |
 
 ### Python 环境（venv）
 | 服务 | venv 路径 |
 |------|-----------|
-| ASR + IndexTTS + HeyGem 共用 | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\` |
-| VideoReTalking 独立 | `C:\AIClaudecode\desktop_client\VideoReTalking\venv\` |
+| ASR + IndexTTS 共用 | `C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\` |
+| HeyGem | `C:\ChaojiIP\aigc-human\python-modules\humanModule\venv\` |
 
 ### 运行时数据（用户数据）
 | 内容 | 路径 |
@@ -186,14 +179,10 @@ XiaMuagent/
 - 数字人管理（上传/库选/删除，本地磁盘存储）
 - 管理后台（AI Key、提示词、行业、用户管理）
 
-### 🔄 进行中
-- **VideoReTalking 安装**：torch 2.11.0+cu128 已装，正在装 basicsr/facexlib 等依赖
-  - 安装命令：`venv\Scripts\pip install basicsr facexlib gfpgan kornia==0.6.12 face-alignment librosa==0.9.2 einops numpy==1.23.4 ninja`
-  - 装完后运行 `venv\Scripts\python -c "import basicsr"` 验证
-
 ### ❌ 未做 / 已放弃
 - 会员付费系统（已决定不做）
 - 微信小程序（已暂停）
+- VideoReTalking / SadTalker（效果不佳，已删除，使用 HeyGem）
 
 ---
 
