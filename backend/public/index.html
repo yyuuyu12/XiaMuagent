@@ -690,7 +690,7 @@ const S = {
   // 步骤4：数字人
   selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true, avatarErr: '',
   avatarSrcVideoB64: null, avatarSrcVideoName: '', avatarSrcVideoFmt: 'mp4',
-  avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false,
+  avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false, avatarProgressMsg: '初始化中...', avatarProgressPct: 20,
   // 步骤5：后期制作
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
   // 步骤6：发布
@@ -1551,8 +1551,8 @@ function tCloneStep4(sb) {
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="1.5" style="margin-bottom:12px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
         <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在生成数字人视频</div>
         <div style="font-size:12px;color:#A8A49C;margin-bottom:16px">GPU 渲染中，通常 1~3 分钟</div>
-        <div class="path-a-progress-bar"><div class="path-a-progress-fill" id="avatarProgressFill" style="width:20%"></div></div>
-        <div id="avatarProgressMsg" style="font-size:12px;color:#6B6860;margin-top:8px">初始化中...</div>
+        <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:${S.avatarProgressPct||20}%"></div></div>
+        <div style="font-size:12px;color:#6B6860;margin-top:8px">${S.avatarProgressMsg||'初始化中...'}</div>
       </div>
     </div>`;
   }
@@ -2987,7 +2987,7 @@ async function handleAvatarGenerate() {
     setState({ avatarErr: '音频读取失败: ' + e.message }); return;
   }
 
-  setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null });
+  setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '初始化中...', avatarProgressPct: 20 });
 
   try {
     // 先拿 ngrok 地址，大文件直接传给本地服务，绕过 Zeabur 代理限制
@@ -3031,12 +3031,8 @@ function _startAvatarPoller(taskId, asrUrl) {
       const r = resp.ok ? { code: 200, data: await resp.json() } : { code: 500 };
       if (r.code !== 200) return;
       const t = r.data;
-      // 更新进度条
-      const fill = document.getElementById('avatarProgressFill');
-      const msg = document.getElementById('avatarProgressMsg');
       const pct = Math.min(90, 10 + elapsed * 1.2);
-      if (fill) fill.style.width = pct + '%';
-      if (msg) msg.textContent = t.msg || '处理中...';
+      setState({ avatarProgressPct: pct, avatarProgressMsg: t.msg || '处理中...' });
 
       if (t.status === 'done' && t.video_b64) {
         clearInterval(_avatarPoller); _avatarPoller = null;
@@ -3049,7 +3045,10 @@ function _startAvatarPoller(taskId, asrUrl) {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });
       }
-    } catch (_) {}
+    } catch (e) {
+      setState({ avatarProgressMsg: '轮询错误: ' + e.message });
+      console.error('[avatar poller]', e);
+    }
   }, 5000);
 }
 

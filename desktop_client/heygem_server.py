@@ -89,12 +89,27 @@ async def _run_heygem(task_id: str, audio_path: str, video_path: str):
         )
 
         task_info = _dh_task.task_dic.get(task_id, {})
-        result_path = task_info.get("result_path") or str(OUTPUT_DIR / f"{task_id}.mp4")
-        if not os.path.exists(result_path):
-            result_path = str(OUTPUT_DIR / f"{task_id}.mp4")
-        if not os.path.exists(result_path):
+        result_path = task_info.get("result_path")
+
+        # HeyGem 默认输出在 HEYGEM_DIR/outputs/{task_id}-r.mp4
+        candidates = []
+        if result_path:
+            candidates.append(result_path)
+            # result_path 可能是相对路径，补全绝对路径
+            candidates.append(str(HEYGEM_DIR / result_path.lstrip("./\\")))
+        candidates.append(str(HEYGEM_DIR / "outputs" / f"{task_id}-r.mp4"))
+        candidates.append(str(HEYGEM_DIR / "outputs" / f"{task_id}.mp4"))
+        candidates.append(str(OUTPUT_DIR / f"{task_id}.mp4"))
+
+        result_path = None
+        for p in candidates:
+            if os.path.exists(p):
+                result_path = p
+                break
+
+        if not result_path:
             with _task_lock:
-                tasks[task_id].update({"status": "error", "error": "未找到输出视频"})
+                tasks[task_id].update({"status": "error", "error": f"未找到输出视频，检查路径: {candidates[0] if candidates else '无'}"})
             return
 
         video_b64 = base64.b64encode(Path(result_path).read_bytes()).decode()
