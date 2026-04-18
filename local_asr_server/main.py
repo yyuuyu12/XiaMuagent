@@ -235,20 +235,42 @@ def _seconds_to_ass_time(s: float) -> str:
     return f"{h}:{m:02d}:{sec:05.2f}"
 
 
+async def _get_video_size(video_path: str) -> tuple[int, int]:
+    """ffprobe 检测视频宽高，失败返回 (720, 1280)"""
+    try:
+        import json as _json
+        proc = await asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", video_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+        info = _json.loads(stdout)
+        for s in info.get("streams", []):
+            if s.get("codec_type") == "video":
+                return int(s.get("width", 720)), int(s.get("height", 1280))
+    except Exception:
+        pass
+    return 720, 1280
+
+
 def _wrap_subtitle(text: str, max_chars: int) -> str:
-    """中文字幕自动换行，超出max_chars换行，最多两行"""
+    """中文字幕折行：每行不超过 max_chars 个字符，最多保留前两行"""
     text = text.strip()
-    if len(text) <= max_chars:
+    if not text:
         return text
-    # 超出则截成两行
-    mid = max_chars
-    return text[:mid] + r"\N" + text[mid:mid * 2]
+    lines = []
+    while text and len(lines) < 2:
+        lines.append(text[:max_chars])
+        text = text[max_chars:]
+    return r"\N".join(lines)
 
 
 def _build_ass(segments: list, fontsize: int, sub_color: str,
-               outline_color: str, outline_width: float) -> str:
+               outline_color: str, outline_width: float,
+               vid_w: int = 720) -> str:
     primary = _hex_to_ass(sub_color)
-    # 描边为 none 时宽度设 0
     if outline_color.lower() in ('none', 'transparent', ''):
         ol_color = "&H00000000"
         ol_width = 0.0
@@ -256,13 +278,18 @@ def _build_ass(segments: list, fontsize: int, sub_color: str,
         ol_color = _hex_to_ass(outline_color)
         ol_width = outline_width
 
-    # 估算每行最大字符数：视频宽度约 720~1080，字号越大每行越少
-    max_chars = max(8, int(900 / fontsize))
+    # 每行字符数：可用宽度 / 字符像素宽
+    # 中文字符宽 ≈ fontsize * 1.05（含间距），左右各留 margin_lr 像素
+    margin_lr = max(30, int(vid_w * 0.05))   # 5% 边距，最少 30px
+    usable_w  = vid_w - margin_lr * 2
+    char_w    = fontsize * 1.05
+    max_chars = max(6, int(usable_w / char_w))
 
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
-        "WrapStyle: 2\n"
+        f"PlayResX: {vid_w}\n"
+        "WrapStyle: 1\n"          # 超宽自动折行
         "ScaledBorderAndShadow: yes\n"
         "\n"
         "[V4+ Styles]\n"
@@ -270,7 +297,8 @@ def _build_ass(segments: list, fontsize: int, sub_color: str,
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Default,Microsoft YaHei,{fontsize},{primary},&H000000FF,"
-        f"{ol_color},&H00000000,-1,0,0,0,100,100,0,0,1,{ol_width:.1f},0,2,20,20,60,1\n"
+        f"{ol_color},&H00000000,-1,0,0,0,100,100,0,0,1,{ol_width:.1f},0,"
+        f"2,{margin_lr},{margin_lr},60,1\n"
         "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -281,7 +309,7 @@ def _build_ass(segments: list, fontsize: int, sub_color: str,
         if not text:
             continue
         start = _seconds_to_ass_time(max(0.0, seg["start"]))
-        end = _seconds_to_ass_time(seg["end"])
+        end   = _seconds_to_ass_time(seg["end"])
         lines.append(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{text}")
     return header + "\n".join(lines)
 
@@ -365,8 +393,11 @@ async def video_postprocess(payload: dict):
         if not segments:
             raise HTTPException(500, "未识别到任何语音内容，无法生成字幕")
 
+        # 检测视频宽度（决定折行字符数）
+        vid_w, _ = await _get_video_size(video_in)
+
         # 生成 ASS 字幕
-        ass_content = _build_ass(segments, fontsize, sub_color, outline_col, outline_w)
+        ass_content = _build_ass(segments, fontsize, sub_color, outline_col, outline_w, vid_w)
         Path(ass_file).write_text(ass_content, encoding="utf-8-sig")
 
         # FFmpeg 烧录
