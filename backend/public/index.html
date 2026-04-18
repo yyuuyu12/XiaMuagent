@@ -3480,7 +3480,20 @@ async function restoreCloneSession(taskId) {
 }
 
 async function openExtractWithTask(taskId, fromHistory) {
-  setState({ currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null, extractErr: '', extractFromHistory: !!fromHistory });
+  // ★ 停掉上一个任务的 avatar poller，防止它继续污染全局状态
+  if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
+
+  // ★ 立即重置所有生成中状态，防止切换任务时上一个任务的状态残留
+  setState({
+    currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null,
+    extractErr: '', extractFromHistory: !!fromHistory,
+    avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null,
+    avatarVideoUrl: null, avatarVideoB64: null, avatarErr: '',
+    avatarProgressPct: 0, avatarProgressMsg: '',
+    ttsAudioUrl: null, ttsAudioB64: null, ttsGenerating: false, ttsErr: '',
+    postProcessedVideoUrl: null, postProcessedB64: null, postProcessing: false,
+    coverFrameUrl: null, rewrittenScript: '', extractedScript: '',
+  });
   try {
     const r = await api.get(`/tasks/${taskId}`);
     if (r.code !== 200) { setState({ extractStep: 0 }); return; }
