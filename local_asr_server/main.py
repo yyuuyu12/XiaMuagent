@@ -312,7 +312,7 @@ def _build_ass(segments: list, fontsize: int, sub_color: str,
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Default,Microsoft YaHei,{fontsize},{primary},&H000000FF,"
         f"{ol_color},&H00000000,-1,0,0,0,100,100,0,0,1,{ol_width:.1f},0,"
-        f"2,{margin_lr},{margin_lr},60,1\n"
+        f"2,{margin_lr},{margin_lr},120,1\n"
         "\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -369,7 +369,7 @@ async def video_postprocess(payload: dict):
     sub_color   = payload.get("sub_color", "#FFFFFF")
     outline_col = payload.get("outline_color", "#000000")
     outline_w   = float(payload.get("outline_width", 2.0))
-    fontsize    = int(payload.get("fontsize", 36))
+    fontsize    = int(payload.get("fontsize", 44))
 
     if not video_b64 or not audio_b64:
         raise HTTPException(400, "video_b64 和 audio_b64 不能为空")
