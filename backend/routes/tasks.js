@@ -3,11 +3,16 @@ const db = require('../db');
 const { requireAuth } = require('./auth');
 const router = express.Router();
 
-// GET /api/tasks - 列出当前用户任务（最近 30 条）
+// GET /api/tasks - 列出当前用户任务（最近 30 条），联查 session clone_step
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, type, title, status, stage, progress, thinking, error_msg, created_at, updated_at FROM tasks WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30',
+      `SELECT t.id, t.type, t.title, t.status, t.stage, t.progress, t.thinking, t.error_msg, t.created_at, t.updated_at,
+              COALESCE(ts.clone_step, 2) AS clone_step
+       FROM tasks t
+       LEFT JOIN task_sessions ts ON ts.task_id = t.id AND ts.user_id = t.user_id
+       WHERE t.user_id = $1
+       ORDER BY t.created_at DESC LIMIT 30`,
       [req.userId]
     );
     res.json({ code: 200, data: rows });
@@ -71,6 +76,49 @@ router.post('/:id/start-rewrite', requireAuth, async (req, res) => {
     }
     require('../taskRunner').enqueue({ taskId: req.params.id, type: 'clone_video' });
     res.json({ code: 200, msg: '改写任务已提交' });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// GET /api/tasks/:id/session - 读取克隆任务跨会话状态
+router.get('/:id/session', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT clone_step, session_json FROM task_sessions WHERE task_id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!rows[0]) return res.json({ code: 200, data: null }); // 未保存过，返回 null
+    let session = null;
+    try { session = JSON.parse(rows[0].session_json); } catch { session = null; }
+    res.json({ code: 200, data: { clone_step: rows[0].clone_step, session } });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/tasks/:id/session - 保存克隆任务跨会话状态（upsert）
+router.post('/:id/session', requireAuth, async (req, res) => {
+  try {
+    // 先验证任务属于该用户
+    const { rows } = await db.query(
+      'SELECT id FROM tasks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
+
+    const { clone_step, session } = req.body;
+    if (clone_step == null) return res.status(400).json({ code: 400, msg: 'clone_step 必填' });
+
+    const sessionJson = JSON.stringify(session || {});
+    // MySQL UPSERT：存在则更新，不存在则插入
+    await db.query(
+      `INSERT INTO task_sessions (task_id, user_id, clone_step, session_json)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE clone_step = VALUES(clone_step), session_json = VALUES(session_json), updated_at = NOW()`,
+      [req.params.id, req.userId, clone_step, sessionJson]
+    );
+    res.json({ code: 200, msg: 'ok' });
   } catch (err) {
     res.status(500).json({ code: 500, msg: err.message });
   }

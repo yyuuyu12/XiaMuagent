@@ -209,6 +209,20 @@ async function initDb() {
     ) CHARACTER SET utf8mb4
   `);
 
+  // task_sessions 表（克隆任务跨会话状态：语音/数字人/后期/封面的中间产物与步骤进度）
+  // LONGTEXT 最大 4GB，够存 base64 音视频；clone_step 冗余出来便于列表页直接用
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS task_sessions (
+      task_id      VARCHAR(36) NOT NULL,
+      user_id      INT NOT NULL,
+      clone_step   INT NOT NULL DEFAULT 2,
+      session_json LONGTEXT NOT NULL,
+      updated_at   TIMESTAMP DEFAULT NOW() ON UPDATE NOW(),
+      PRIMARY KEY (task_id, user_id),
+      INDEX idx_user_updated (user_id, updated_at)
+    ) CHARACTER SET utf8mb4
+  `);
+
   console.log('✅ 数据库初始化完成');
 }
 

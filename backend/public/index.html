@@ -1141,7 +1141,29 @@ function tHomeTaskSection() {
     </div>
     ${bigCards.map(t => {
       if (t.status === 'done') {
-        const clickFn = t.type === 'clone_video' ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
+        if (t.type === 'clone_video') {
+          // 克隆任务：显示6步进度条，标注已完成到第几步
+          const cloneStep = t.clone_step || 2;
+          const stepLabels = ['提取','改写','语音','数字人','后期','发布'];
+          const stepDots = stepLabels.map((lbl, i) => {
+            const n = i + 1;
+            const done = n <= cloneStep;
+            return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+              <div style="width:18px;height:18px;border-radius:50%;background:${done?'#F97316':'#E4E2DA'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${done?'✓':n}</div>
+              <span style="font-size:9px;color:${done?'#F97316':'#C4C0B8'};white-space:nowrap">${lbl}</span>
+            </div>`;
+          }).join('<div style="flex:none;width:14px;height:1px;background:#E4E2DA;margin-top:9px"></div>');
+          const stepDesc = cloneStep >= 6 ? '全部完成' : cloneStep >= 5 ? '已完成后期，待发布' : cloneStep >= 4 ? '已生成数字人，待后期' : cloneStep >= 3 ? '已合成语音，待数字人' : '文案已改写，待语音';
+          return `<div class="home-task-card" onclick="openExtractWithTask('${t.id}')" style="flex-direction:column;align-items:stretch;cursor:pointer">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(t.title)}</div>
+              <span style="font-size:11px;color:#E8650A;flex-shrink:0;margin-left:8px">继续 ›</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;margin-bottom:8px">${stepDots}</div>
+            <div style="font-size:11px;color:#A8A49C">${stepDesc}</div>
+          </div>`;
+        }
+        const clickFn = `openTaskFromHome('${t.id}')`;
         return `<div class="home-task-card home-task-card-done" onclick="${clickFn}">
           <span style="display:flex;align-items:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="20 6 9 17 4 12"/></svg></span>
           <div style="flex:1;min-width:0">
@@ -1152,19 +1174,22 @@ function tHomeTaskSection() {
         </div>`;
       }
       if (t.status === 'extracted') {
-        return `<div class="home-task-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="min-width:0;flex:1">
-              <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</div>
-              <div style="font-size:11px;color:#A8A49C;margin-top:2px">克隆</div>
-            </div>
-            <span style="font-size:11px;color:#10B981;flex-shrink:0;margin-left:8px">提取完成 ✓</span>
+        const stepLabels = ['提取','改写','语音','数字人','后期','发布'];
+        const stepDots = stepLabels.map((lbl, i) => {
+          const n = i + 1;
+          const done = n <= 1; // extracted = 步骤1完成
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+            <div style="width:18px;height:18px;border-radius:50%;background:${done?'#F97316':'#E4E2DA'};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${done?'✓':n}</div>
+            <span style="font-size:9px;color:${done?'#F97316':'#C4C0B8'};white-space:nowrap">${lbl}</span>
+          </div>`;
+        }).join('<div style="flex:none;width:14px;height:1px;background:#E4E2DA;margin-top:9px"></div>');
+        return `<div class="home-task-card" onclick="openExtractWithTask('${t.id}')" style="flex-direction:column;align-items:stretch;cursor:pointer">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:600;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(t.title)}</div>
+            <span style="font-size:11px;color:#E8650A;flex-shrink:0;margin-left:8px">去改写 ›</span>
           </div>
-          <div class="path-a-progress-bar" style="margin-bottom:8px"><div class="path-a-progress-fill" style="width:50%"></div></div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:12px;color:#6B6860;flex:1">文案已提取，查看内容后可AI改写</span>
-            <div style="background:#E8650A;color:#fff;font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;cursor:pointer;white-space:nowrap" onclick="openExtractWithTask('${t.id}')">去改写 ›</div>
-          </div>
+          <div style="display:flex;align-items:flex-start;margin-bottom:8px">${stepDots}</div>
+          <div style="font-size:11px;color:#A8A49C">文案已提取，点击继续AI改写</div>
         </div>`;
       }
       const cd = taskCountdown(t);
@@ -2756,6 +2781,7 @@ async function handleTTSGenerate() {
       // 转成 Blob URL，移动端大 base64 直接用 new Audio() 会静默失败
       const audioUrl = _b64ToBlobUrl(r.data.audio, 'audio/mp3');
       setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
+      saveCloneSession(3); // ★ 步骤3：语音合成完成，保存 session
     } else {
       setState({ ttsGenerating: false, ttsErr: r.msg || '语音合成失败，请重试', extractStep: 3 });
     }
@@ -3144,6 +3170,7 @@ function _startAvatarPoller(taskId, asrUrl) {
         for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
         const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
         setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: t.video_b64, extractStep: 4 });
+        saveCloneSession(4); // ★ 步骤4：数字人生成完成，保存 session
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });
@@ -3191,6 +3218,7 @@ async function handlePostProcess() {
     for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
     const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
     setState({ postProcessing: false, postProcessedVideoUrl: url, postProcessedB64: data.video_b64 });
+    saveCloneSession(5); // ★ 步骤5：后期制作完成，保存 session
   } catch (e) {
     setState({ postProcessing: false, postProcessErr: e.message });
   }
@@ -3271,6 +3299,7 @@ async function generateCover(seekSec, retitleOnly) {
     // 叠加文字
     const coverUrl = await _drawCoverText(dataUrl, title, w, h);
     setState({ coverGenerating: false, coverFrameUrl: coverUrl, coverTitle: title, coverSeekTime: t });
+    saveCloneSession(6); // ★ 步骤6：封面生成完成，保存 session
   } catch (e) {
     setState({ coverGenerating: false });
     showToast('封面生成失败: ' + e.message);
@@ -3321,6 +3350,94 @@ function handlePublishCopy() {
   }
 }
 
+// ===== 任务 Session 持久化 =====
+// 保存当前克隆流程的关键状态到服务器（静默，失败不影响用户）
+async function saveCloneSession(cloneStep) {
+  const taskId = S.cloneTaskId;
+  if (!taskId) return;
+  // 只保存纯数据（base64），不保存 Blob URL（跨会话无效）
+  const session = {
+    extractedScript:  S.extractedScript  || '',
+    rewrittenScript:  S.rewrittenScript  || '',
+    ttsVoice:         S.ttsVoice,
+    ttsSpeed:         S.ttsSpeed,
+    ttsAudioB64:      S.ttsAudioB64      || null,   // 步骤3完成后有值
+    ttsIndexEmotion:  S.ttsIndexEmotion  || 'neutral',
+    avatarVideoB64:   S.avatarVideoB64   || null,   // 步骤4完成后有值
+    avatarLibKey:     S.avatarLibKey     || null,
+    avatarLibName:    S.avatarLibName    || '',
+    avatarLibThumb:   S.avatarLibThumb   || '',
+    subColor:         S.subColor,
+    subOutlineColor:  S.subOutlineColor,
+    subFontsize:      S.subFontsize,
+    subOutlineWidth:  S.subOutlineWidth,
+    subTemplate:      S.subTemplate,
+    postProcessedB64: S.postProcessedB64 || null,   // 步骤5完成后有值
+    coverFrameUrl:    S.coverFrameUrl    || null,   // 封面（dataURL，不大）
+    coverTitle:       S.coverTitle       || '',
+    publishTitle:     S.publishTitle     || '',
+    publishTags:      S.publishTags      || [],
+  };
+  try {
+    await api.post(`/tasks/${taskId}/session`, { clone_step: cloneStep, session });
+  } catch (e) {
+    console.warn('[saveCloneSession] 保存失败', e);
+  }
+}
+
+// 从服务器恢复克隆任务 session 状态，并跳到对应步骤
+async function restoreCloneSession(taskId) {
+  try {
+    const r = await api.get(`/tasks/${taskId}/session`);
+    if (r.code !== 200 || !r.data) return false;
+    const { clone_step, session: s } = r.data;
+    if (!s) return false;
+
+    const patch = {
+      extractedScript: s.extractedScript || '',
+      rewrittenScript: s.rewrittenScript || '',
+      ttsVoice:        s.ttsVoice        || 'xiaoxiao',
+      ttsSpeed:        s.ttsSpeed        || 1.0,
+      ttsIndexEmotion: s.ttsIndexEmotion || 'neutral',
+      avatarLibKey:    s.avatarLibKey    || null,
+      avatarLibName:   s.avatarLibName   || '',
+      avatarLibThumb:  s.avatarLibThumb  || '',
+      subColor:        s.subColor        || '#FFFFFF',
+      subOutlineColor: s.subOutlineColor || '#000000',
+      subFontsize:     s.subFontsize     || 44,
+      subOutlineWidth: s.subOutlineWidth || 2.5,
+      subTemplate:     s.subTemplate     || 'classic',
+      coverTitle:      s.coverTitle      || '',
+      publishTitle:    s.publishTitle    || '',
+      publishTags:     s.publishTags     || [],
+      extractStep:     clone_step        || 2,
+    };
+    // 音频 base64 → Blob URL 恢复
+    if (s.ttsAudioB64) {
+      patch.ttsAudioB64 = s.ttsAudioB64;
+      patch.ttsAudioUrl = _b64ToBlobUrl(s.ttsAudioB64, 'audio/mp3');
+    }
+    // 数字人视频 base64 → Blob URL 恢复
+    if (s.avatarVideoB64) {
+      patch.avatarVideoB64 = s.avatarVideoB64;
+      patch.avatarVideoUrl = _b64ToBlobUrl(s.avatarVideoB64, 'video/mp4');
+    }
+    // 后期视频 base64 → Blob URL 恢复
+    if (s.postProcessedB64) {
+      patch.postProcessedB64 = s.postProcessedB64;
+      patch.postProcessedVideoUrl = _b64ToBlobUrl(s.postProcessedB64, 'video/mp4');
+    }
+    // 封面（dataURL 可直接用）
+    if (s.coverFrameUrl) patch.coverFrameUrl = s.coverFrameUrl;
+
+    setState(patch);
+    return true;
+  } catch (e) {
+    console.warn('[restoreCloneSession] 恢复失败', e);
+    return false;
+  }
+}
+
 async function openExtractWithTask(taskId, fromHistory) {
   setState({ currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null, extractErr: '', extractFromHistory: !!fromHistory });
   try {
@@ -3335,7 +3452,13 @@ async function openExtractWithTask(taskId, fromHistory) {
       startClonePoller(taskId);
     } else if (task.status === 'done') {
       const rewritten = task.result?.rewritten || task.result?.scripts?.[0]?.content || '';
-      setState({ extractStep: 2, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
+      // 先恢复 session（有步骤3-6的进度），再设基础字段
+      const restored = await restoreCloneSession(taskId);
+      if (!restored) {
+        setState({ extractStep: 2, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
+      }
+      // 如果 session 恢复成功，extractStep 已被 session 覆盖，但保证 rewrittenScript 最新
+      if (restored) setState({ rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
     } else {
       setState({ extractStep: 0 });
     }
