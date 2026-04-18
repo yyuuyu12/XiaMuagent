@@ -415,13 +415,23 @@ ${script.slice(0, 800)}
   }
 });
 
-// 返回 asr_url，前端大文件直接走 ngrok，不经过 Zeabur 中转
+// 返回数字人视频服务地址（video_url 优先，无则降级到 asr_url）
 router.get('/asr-url', requireAuth, async (req, res) => {
-  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
-  const asrUrl = (rows[0]?.value || '').trim();
-  if (!asrUrl) return res.json({ code: 500, msg: '未配置 asr_url' });
-  return res.json({ code: 200, data: { url: asrUrl } });
+  const { rows } = await db.query("SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','video_url')");
+  const cfg = {};
+  rows.forEach(r => { cfg[r.config_key] = (r.value || '').trim(); });
+  const url = cfg.video_url || cfg.asr_url || '';
+  if (!url) return res.json({ code: 500, msg: '请在后台配置数字人服务地址（video_url）' });
+  return res.json({ code: 200, data: { url } });
 });
+
+// 获取视频服务 URL 的内部工具函数
+async function getVideoUrl() {
+  const { rows } = await db.query("SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','video_url')");
+  const cfg = {};
+  rows.forEach(r => { cfg[r.config_key] = (r.value || '').trim(); });
+  return cfg.video_url || cfg.asr_url || '';
+}
 
 // ==================== 数字人视频生成 ====================
 router.post('/video/generate', requireAuth, async (req, res) => {
@@ -431,16 +441,15 @@ router.post('/video/generate', requireAuth, async (req, res) => {
   if (audio_b64.length > 6 * 1024 * 1024) return res.json({ code: 400, msg: '音频过大（>4.5MB），请缩短语音' });
   if (video_b64.length > 50 * 1024 * 1024) return res.json({ code: 400, msg: '视频过大（>37MB），请压缩后上传' });
 
-  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
-  const asrUrl = (rows[0]?.value || '').trim();
-  if (!asrUrl) return res.json({ code: 500, msg: '请在后台配置 asr_url（本地服务地址）' });
+  const videoUrl = await getVideoUrl();
+  if (!videoUrl) return res.json({ code: 500, msg: '请在后台配置数字人服务地址（video_url）' });
 
   try {
-    const resp = await fetch(`${asrUrl}/video/generate`, {
+    const resp = await fetch(`${videoUrl}/video/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audio_b64, video_b64, audio_fmt: audio_fmt || 'wav', video_fmt: video_fmt || 'mp4', enhancer: !!enhancer }),
-      signal: AbortSignal.timeout(120000), // 2分钟：大base64数据上传通过ngrok需要时间
+      signal: AbortSignal.timeout(120000),
     });
     if (!resp.ok) {
       const t = await resp.text();
@@ -450,19 +459,18 @@ router.post('/video/generate', requireAuth, async (req, res) => {
     return res.json({ code: 200, data });
   } catch (e) {
     const msg = e.message || '';
-    if (msg.includes('503') || msg.includes('ECONNREFUSED')) return res.json({ code: 503, msg: 'SadTalker 服务未启动，请在本机运行 start_sadtalker.bat' });
+    if (msg.includes('503') || msg.includes('ECONNREFUSED')) return res.json({ code: 503, msg: '数字人服务未启动，请检查本机服务是否运行' });
     return res.json({ code: 500, msg: `视频生成出错: ${msg}` });
   }
 });
 
 router.get('/video/task/:taskId', requireAuth, async (req, res) => {
   const { taskId } = req.params;
-  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
-  const asrUrl = (rows[0]?.value || '').trim();
-  if (!asrUrl) return res.json({ code: 500, msg: '未配置 asr_url' });
+  const videoUrl = await getVideoUrl();
+  if (!videoUrl) return res.json({ code: 500, msg: '未配置数字人服务地址' });
 
   try {
-    const resp = await fetch(`${asrUrl}/video/task/${taskId}`, { signal: AbortSignal.timeout(10000) });
+    const resp = await fetch(`${videoUrl}/video/task/${taskId}`, { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) return res.json({ code: 500, msg: '查询失败' });
     const data = await resp.json();
     return res.json({ code: 200, data });

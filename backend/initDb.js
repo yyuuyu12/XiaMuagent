@@ -162,6 +162,11 @@ async function initDb() {
      WHERE config_key = 'asr_url' AND value NOT LIKE 'http%'`
   );
 
+  // video_url：数字人视频生成服务地址（VideoReTalking / SadTalker / HeyGem）
+  await db.query(
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('video_url', '')`
+  );
+
   // tasks 表
   await db.query(`
     CREATE TABLE IF NOT EXISTS tasks (

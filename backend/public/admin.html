@@ -150,8 +150,13 @@
       </div>
       <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
         <label>🎙️ ASR 语音识别服务地址</label>
-        <input id="asr_url" placeholder="例如：http://your-server:9000" />
+        <input id="asr_url" placeholder="例如：https://xxxx.ngrok-free.app" />
         <div class="hint">本地 Whisper 服务地址，用于抖音视频转文字。留空则禁用该功能。</div>
+      </div>
+      <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
+        <label>🎭 数字人视频服务地址（video_url）</label>
+        <input id="video_url" placeholder="例如：https://xxxx.ngrok-free.app" />
+        <div class="hint">VideoReTalking / SadTalker / HeyGem 的 ngrok 公网地址。配置后优先于 ASR 地址用于数字人生成。</div>
       </div>
       <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
         <label>🐟 Fish Audio API Key（音色克隆）</label>
@@ -365,6 +370,7 @@ async function loadKeys() {
   document.getElementById('zhipu_model').value = d.zhipu_model || '';
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
   document.getElementById('asr_url').value = d.asr_url || '';
+  document.getElementById('video_url').value = d.video_url || '';
   document.getElementById('fish_audio_api_key').value = d.fish_audio_api_key || '';
 }
 
@@ -378,6 +384,7 @@ async function saveKeys() {
     zhipu_model: document.getElementById('zhipu_model').value,
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
     asr_url: document.getElementById('asr_url').value,
+    video_url: document.getElementById('video_url').value,
     fish_audio_api_key: document.getElementById('fish_audio_api_key').value,
   };
   const r = await req('/config/ai-keys', { method:'POST', body: JSON.stringify(body) });
