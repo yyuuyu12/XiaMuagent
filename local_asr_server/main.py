@@ -193,14 +193,14 @@ def health():
     return {"status": "ok"}
 
 
-# ===================== SadTalker 代理接口 =====================
-SADTALKER_URL = "http://localhost:7861"
+# ===================== 数字人视频代理接口（VideoReTalking 端口 7862）=====================
+SADTALKER_URL = "http://localhost:7862"
 AVATARS_DIR = Path(__file__).parent / "avatars"
 AVATARS_DIR.mkdir(exist_ok=True)
 
 @app.post("/video/generate")
 async def video_generate_proxy(payload: dict):
-    """代理到数字人服务（端口 7861）。支持 avatar_key（本地文件key）代替 video_b64"""
+    """代理到数字人服务（端口 7862 VideoReTalking）。支持 avatar_key（本地文件key）代替 video_b64"""
     # 若传入 avatar_key，从本地磁盘读取视频，避免前端重复上传大文件
     avatar_key = payload.pop("avatar_key", None)
     if avatar_key and not payload.get("video_b64"):
@@ -220,7 +220,7 @@ async def video_generate_proxy(payload: dict):
 
 @app.get("/video/task/{task_id}")
 async def video_task_proxy(task_id: str):
-    """轮询 SadTalker 任务状态"""
+    """轮询数字人任务状态"""
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(f"{SADTALKER_URL}/video/task/{task_id}")
@@ -228,7 +228,7 @@ async def video_task_proxy(task_id: str):
             raise HTTPException(status_code=resp.status_code, detail=resp.text[:200])
         return resp.json()
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="SadTalker 服务连接失败")
+        raise HTTPException(status_code=503, detail="数字人服务连接失败，请确认 VideoReTalking 已启动")
 
 
 # ===================== 视频后期制作（字幕烧录）=====================
