@@ -532,29 +532,10 @@ async def avatar_file(user_id: str, avatar_id: str):
 
 # ===================== 行业精选视频采集（本地执行）=====================
 
-@app.post("/industry/collect")
-async def industry_collect(payload: dict):
-    """
-    由 Zeabur 后台触发，在本地执行视频搜索+ASR转录，
-    结果直接 POST 到 Zeabur 的 /api/industry-videos/admin/submit
-    """
-    tikhub_key  = payload.get("tikhub_key", "")
-    submit_url  = payload.get("submit_url", "")
-    admin_token = payload.get("admin_token", "")
-    industries  = payload.get("industries", {})
-    keep_latest = payload.get("keep_latest", 15)
-    min_chars   = payload.get("min_chars", 15)
-
-    if not tikhub_key:
-        raise HTTPException(400, "tikhub_key 未提供")
-    if not submit_url:
-        raise HTTPException(400, "submit_url 未提供")
-
-    # 异步后台执行，立即返回
-    asyncio.create_task(_run_industry_collect(
-        tikhub_key, submit_url, admin_token, industries, keep_latest, min_chars
-    ))
-    return {"ok": True, "msg": "采集任务已在本地启动"}
+@app.on_event("startup")
+async def start_collect_poller():
+    """启动时开始轮询 Zeabur 的采集任务标志"""
+    asyncio.create_task(_collect_poller())
 
 
 async def _search_videos(keyword: str, tikhub_key: str, count: int = 20):
@@ -633,50 +614,100 @@ async def _transcribe_local(video_url: str):
     return result["text"].strip()
 
 
-async def _run_industry_collect(tikhub_key, submit_url, admin_token, industries, keep_latest, min_chars):
-    print("[IndustryCollect] 本地采集开始")
-    seen = set()
-    for industry, keywords in industries.items():
-        print(f"[IndustryCollect] 行业: {industry}")
-        results = []
-        for keyword in keywords:
-            print(f"[IndustryCollect]   搜索: {keyword}")
-            try:
-                videos = await _search_videos(keyword, tikhub_key)
-                print(f"[IndustryCollect]   找到 {len(videos)} 个视频")
-            except Exception as e:
-                print(f"[IndustryCollect]   搜索失败: {e}")
-                continue
+_collect_running = False
 
-            for v in videos:
-                if v["aweme_id"] in seen:
-                    continue
-                seen.add(v["aweme_id"])
-                print(f"[IndustryCollect]   转录: {v['aweme_id']} ({v['likes']}赞)")
-                try:
-                    text = await _transcribe_local(v["video_url"])
-                    print(f"[IndustryCollect]   结果: {text[:50]!r} ({len(text)}字)")
-                    if len(text) >= min_chars:
-                        results.append({**v, "transcript": text})
-                    else:
-                        print(f"[IndustryCollect]   跳过（无口播{len(text)}字）")
-                except Exception as e:
-                    print(f"[IndustryCollect]   转录失败: {e}")
+# Zeabur 服务地址（从 ngrok 地址推断，去掉端口直接用域名）
+ZEABUR_API = "https://xiamuagent.preview.aliyun-zeabur.cn"
 
-        # 按点赞降序，只提交前 keep_latest 条
-        results.sort(key=lambda x: -x["likes"])
-        to_submit = results[:keep_latest]
-        print(f"[IndustryCollect] {industry} 提交 {len(to_submit)} 条到 Zeabur")
-
+async def _collect_poller():
+    """每30秒轮询一次 Zeabur，看是否有待采集任务"""
+    global _collect_running
+    print("[IndustryCollect] 轮询器已启动，每30秒检查一次")
+    while True:
+        await asyncio.sleep(30)
+        if _collect_running:
+            continue
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                r = await client.post(
-                    submit_url,
-                    json={"industry": industry, "videos": to_submit},
-                    headers={"Authorization": f"Bearer {admin_token}"},
-                )
-            print(f"[IndustryCollect] submit 响应: {r.status_code} {r.text[:100]}")
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(f"{ZEABUR_API}/api/industry-videos/collect-job")
+            if r.status_code != 200:
+                continue
+            job = r.json()
+            if not job.get("pending"):
+                continue
+            print("[IndustryCollect] 收到采集任务，开始执行...")
+            _collect_running = True
+            asyncio.create_task(_run_industry_collect(job))
         except Exception as e:
-            print(f"[IndustryCollect] submit 失败: {e}")
+            print(f"[IndustryCollect] 轮询失败: {e}")
 
-    print("[IndustryCollect] 本地采集完成")
+
+async def _run_industry_collect(job: dict):
+    global _collect_running
+    tikhub_key = job.get("tikhub_key", "")
+    industries  = job.get("industries", {})
+    keep_latest = job.get("keep_latest", 15)
+    min_chars   = job.get("min_chars", 15)
+    total_saved = 0
+    total_skipped = 0
+    error_msg = None
+
+    print("[IndustryCollect] 本地采集开始")
+    try:
+        seen = set()
+        for industry, keywords in industries.items():
+            print(f"[IndustryCollect] 行业: {industry}")
+            results = []
+            for keyword in keywords:
+                print(f"[IndustryCollect]   搜索: {keyword}")
+                try:
+                    videos = await _search_videos(keyword, tikhub_key)
+                    print(f"[IndustryCollect]   找到 {len(videos)} 个视频")
+                except Exception as e:
+                    print(f"[IndustryCollect]   搜索失败: {e}")
+                    continue
+
+                for v in videos:
+                    if v["aweme_id"] in seen:
+                        continue
+                    seen.add(v["aweme_id"])
+                    print(f"[IndustryCollect]   转录: {v['aweme_id']} ({v['likes']}赞)")
+                    try:
+                        text = await _transcribe_local(v["video_url"])
+                        print(f"[IndustryCollect]   结果: {text[:60]!r} ({len(text)}字)")
+                        if len(text) >= min_chars:
+                            results.append({**v, "transcript": text})
+                        else:
+                            print(f"[IndustryCollect]   跳过无口播({len(text)}字)")
+                            total_skipped += 1
+                    except Exception as e:
+                        print(f"[IndustryCollect]   转录失败: {e}")
+
+            results.sort(key=lambda x: -x["likes"])
+            to_submit = results[:keep_latest]
+            print(f"[IndustryCollect] {industry} 提交 {len(to_submit)} 条")
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    r = await client.post(
+                        f"{ZEABUR_API}/api/industry-videos/admin/submit",
+                        json={"industry": industry, "videos": to_submit},
+                    )
+                print(f"[IndustryCollect] submit: {r.status_code} {r.text[:100]}")
+                total_saved += len(to_submit)
+            except Exception as e:
+                print(f"[IndustryCollect] submit 失败: {e}")
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[IndustryCollect] 采集异常: {e}")
+    finally:
+        # 通知 Zeabur 完成
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(
+                    f"{ZEABUR_API}/api/industry-videos/collect-done",
+                    json={"total_saved": total_saved, "total_skipped": total_skipped, "error": error_msg},
+                )
+        except Exception as e:
+            print(f"[IndustryCollect] collect-done 通知失败: {e}")
+        _collect_running = False
+        print(f"[IndustryCollect] 完成，入库{total_saved}条，跳过{total_skipped}条")
