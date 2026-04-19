@@ -108,8 +108,8 @@ setInterval(async () => {
 
 // ==================== 对外查询接口（用户端）====================
 
-// GET /api/industry-videos?industry=二手车&limit=15
-router.get('/', requireAuth, async (req, res) => {
+// GET /api/industry-videos?industry=二手车&limit=15 （公开，无需登录）
+router.get('/', async (req, res) => {
   const { industry, limit = 15 } = req.query;
   if (!industry) return res.status(400).json({ code: 400, msg: '请传入 industry 参数' });
   const { rows } = await db.query(
