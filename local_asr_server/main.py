@@ -616,13 +616,25 @@ async def _transcribe_local(video_url: str):
 
 _collect_running = False
 
-# Zeabur 服务地址（从 ngrok 地址推断，去掉端口直接用域名）
-ZEABUR_API = "https://xiamuagent.preview.aliyun-zeabur.cn"
+# Zeabur 服务地址：优先读 zeabur_url.txt（与 main.py 同目录），其次用硬编码默认值
+import json as _json
+def _load_zeabur_api():
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _f = os.path.join(_here, "zeabur_url.txt")
+    if os.path.exists(_f):
+        url = open(_f, encoding="utf-8").read().strip().rstrip("/")
+        if url:
+            print(f"[IndustryCollect] ZEABUR_API 来自 zeabur_url.txt: {url}")
+            return url
+    return "https://xiamuagent.preview.aliyun-zeabur.cn"
+
+ZEABUR_API = _load_zeabur_api()
 
 async def _collect_poller():
     """每30秒轮询一次 Zeabur，看是否有待采集任务"""
     global _collect_running
-    print("[IndustryCollect] 轮询器已启动，每30秒检查一次")
+    print(f"[IndustryCollect] 轮询器已启动，每30秒检查 {ZEABUR_API}")
+    _fail_count = 0
     while True:
         await asyncio.sleep(30)
         if _collect_running:
@@ -631,15 +643,18 @@ async def _collect_poller():
             async with httpx.AsyncClient(timeout=10) as client:
                 r = await client.get(f"{ZEABUR_API}/api/industry-videos/collect-job")
             if r.status_code != 200:
+                print(f"[IndustryCollect] 轮询返回 HTTP {r.status_code}，响应: {r.text[:200]}")
                 continue
             job = r.json()
             if not job.get("pending"):
+                _fail_count = 0
                 continue
             print("[IndustryCollect] 收到采集任务，开始执行...")
             _collect_running = True
             asyncio.create_task(_run_industry_collect(job))
         except Exception as e:
-            print(f"[IndustryCollect] 轮询失败: {e}")
+            _fail_count += 1
+            print(f"[IndustryCollect] 轮询失败({_fail_count}次): {type(e).__name__}: {e}")
 
 
 async def _run_industry_collect(job: dict):
