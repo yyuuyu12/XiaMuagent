@@ -1077,8 +1077,13 @@ async function ivPollProgress() {
 
     if (!window._ivAutoRefreshTimer) {
       window._ivAutoRefreshTimer = setInterval(() => {
-        if (ivIndustry) loadIndustryVideos(ivIndustry, 1);
-      }, 5000);
+        // 自动切到当前采集的行业 tab（若用户没手动选其他行业）
+        const activeInd = p.industry && !p.industry.includes('等待') ? p.industry : ivIndustry;
+        if (activeInd) {
+          if (ivIndustry !== activeInd) ivSelectTab(activeInd);
+          else loadIndustryVideos(activeInd, 1);
+        }
+      }, 4000);
     }
   } else {
     spinner.style.display = 'none';

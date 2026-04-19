@@ -680,13 +680,15 @@ async def _run_industry_collect(job: dict):
         except Exception:
             pass
 
-    async def _report_item(industry="", aweme_id="", author="", likes=0, action="saved", transcript=""):
-        """向 Zeabur 上报单条采集结果（忽略失败）"""
+    async def _report_item(industry="", aweme_id="", author="", likes=0,
+                            cover_url="", video_url="", action="saved", transcript=""):
+        """向 Zeabur 上报单条采集结果并立即入库（忽略失败）"""
         try:
             async with httpx.AsyncClient(timeout=5) as hc:
                 await hc.post(f"{ZEABUR_API}/api/industry-videos/collect-item", json={
                     "industry": industry, "aweme_id": aweme_id,
                     "author": author, "likes": likes,
+                    "cover_url": cover_url, "video_url": video_url,
                     "action": action, "transcript": transcript,
                 })
         except Exception:
@@ -753,9 +755,10 @@ async def _run_industry_collect(job: dict):
                         print(f"[IndustryCollect]   结果: ({len(text)}字)")
                         if len(text) >= min_chars:
                             kw_results.append({**v, "transcript": text})
-                            # 每条保存立即上报
+                            # 每条保存立即上报（含 cover_url/video_url，后端直接入库）
                             await _report_item(industry=industry, aweme_id=v["aweme_id"],
                                                author=v.get("author", ""), likes=v.get("likes", 0),
+                                               cover_url=v.get("cover_url", ""), video_url=v.get("video_url", ""),
                                                action="saved", transcript=text)
                             total_saved += 1
                         else:

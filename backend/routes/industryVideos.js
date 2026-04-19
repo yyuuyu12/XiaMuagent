@@ -365,23 +365,41 @@ router.get('/collect-status', (req, res) => {
   res.json({ paused: collectState.paused, stop: collectState.stop });
 });
 
-// POST /api/industry-videos/collect-item — 本地 ASR 每处理一条视频后上报
-router.post('/collect-item', (req, res) => {
-  const { industry, aweme_id, author, likes, action, transcript } = req.body || {};
+// POST /api/industry-videos/collect-item — 本地 ASR 每处理一条视频后上报（并立即入库）
+router.post('/collect-item', async (req, res) => {
+  const { industry, aweme_id, author, likes, cover_url, video_url, action, transcript } = req.body || {};
   if (action === 'saved') {
+    // 立即写入 DB，前台/后台内容列表实时可见
+    try {
+      await db.query(
+        `INSERT IGNORE INTO industry_videos (industry, aweme_id, author, cover_url, video_url, likes, transcript)
+         VALUES (?,?,?,?,?,?,?)`,
+        [industry || '', aweme_id || '', author || '', cover_url || '', video_url || '', parseInt(likes) || 0, transcript || '']
+      );
+      // 超额降级（保留最新 KEEP_LATEST 条）
+      const { rows: all } = await db.query(
+        `SELECT id FROM industry_videos WHERE industry=? AND status='ok' ORDER BY likes DESC`, [industry]
+      );
+      if (all.length > KEEP_LATEST) {
+        const toOld = all.slice(KEEP_LATEST).map(r => r.id);
+        await db.query(
+          `UPDATE industry_videos SET status='old' WHERE id IN (${toOld.map(() => '?').join(',')})`, toOld
+        );
+      }
+    } catch (e) {
+      console.warn('[collect-item] DB写入失败:', e.message);
+    }
     collectState.saved++;
-    const item = {
+    collectState.items.unshift({
       industry: industry || '',
-      aweme_id: aweme_id || '',
       author: author || '匿名',
       likes: parseInt(likes) || 0,
       action: 'saved',
       preview: (transcript || '').slice(0, 60),
       at: new Date().toISOString(),
-    };
-    collectState.items.unshift(item);
+    });
     if (collectState.items.length > 30) collectState.items.pop();
-    csLog(`✓ ${industry} | ${item.preview.slice(0, 30)}...`);
+    csLog(`✓ 入库 ${industry} | ${(transcript || '').slice(0, 30)}...`);
   } else if (action === 'skipped') {
     collectState.skipped++;
   }
