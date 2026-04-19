@@ -9,10 +9,9 @@ const db = require('../db');
 const { requireAuth, requireAdmin } = require('./auth');
 
 // 行业关键词配置（管理员可在后台扩展）
-// 话题关键词（用于 hashtag 搜索，单词效果更好）
 const INDUSTRY_KEYWORDS = {
-  '二手车': ['二手车', '买二手车', '二手车推荐'],
-  '餐饮':   ['餐饮', '开餐厅', '美食探店'],
+  '二手车': ['二手车选车', '买二手车', '二手车推荐'],
+  '餐饮':   ['餐饮开店', '餐厅经营', '美食探店'],
 };
 
 const KEEP_LATEST = 15;    // 每行业保留最新 N 条
@@ -152,66 +151,54 @@ async function getAsrUrl() {
   return rows[0]?.value?.trim() || null;
 }
 
-// 步骤1：通过关键词搜索话题，取第一个话题的 ch_id
-async function getHashtagId(keyword, tikhubKey) {
-  const url = `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_hashtag_search_result?keyword=${encodeURIComponent(keyword)}&count=5`;
-  const resp = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${tikhubKey}` },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '');
-    throw new Error(`TikHub hashtag search HTTP ${resp.status}: ${errText.slice(0, 200)}`);
-  }
-  const json = await resp.json();
-  const dataObj = json?.data || {};
-  console.log(`[IndustryVideos] hashtag search keys=[${Object.keys(dataObj).join(',')}]`);
-  // 兼容不同数据结构
-  const list = dataObj.challenge_list || dataObj.data || dataObj.hashtag_list || [];
-  const first = list[0];
-  if (!first) return null;
-  const ch = first.challenge_info || first.challenge || first;
-  const chId = ch.cid || ch.id || ch.ch_id;
-  const chName = ch.cha_name || ch.name || keyword;
-  console.log(`[IndustryVideos] 话题 "${keyword}" -> ch_id=${chId} name=${chName}`);
-  return chId;
-}
-
-// 步骤2：通过 ch_id 获取话题下高赞视频
-async function getHashtagVideos(chId, tikhubKey, count = 20) {
-  const url = `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_hashtag_video_list?ch_id=${chId}&count=${count}&sort_type=1`;
-  const resp = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${tikhubKey}` },
+// 搜索抖音高赞视频 — POST /api/v1/douyin/search/fetch_general_search_v1
+async function searchVideos(keyword, tikhubKey, count = 20) {
+  const payload = {
+    keyword,
+    cursor: 0,
+    sort_type: "1",       // 最多点赞
+    publish_time: "0",
+    filter_duration: "0",
+    content_type: "1",   // 只要视频
+    search_id: "",
+    backtrace: "",
+  };
+  const resp = await fetch('https://api.tikhub.io/api/v1/douyin/search/fetch_general_search_v1', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${tikhubKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(30000),
   });
   if (!resp.ok) {
     const errText = await resp.text().catch(() => '');
-    throw new Error(`TikHub hashtag videos HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+    const msg = `TikHub HTTP ${resp.status}: ${errText.slice(0, 300)}`;
+    console.error('[IndustryVideos] search error:', msg);
+    throw new Error(msg);
   }
   const json = await resp.json();
   const dataObj = json?.data || {};
-  console.log(`[IndustryVideos] hashtag videos keys=[${Object.keys(dataObj).join(',')}]`);
-  const items = dataObj.aweme_list || dataObj.data || [];
-  return items.map(item => {
-    const v = item.aweme_info || item;
-    return {
-      aweme_id: v.aweme_id,
-      author:   v.author?.nickname || '',
-      cover_url: v.video?.cover?.url_list?.[0] || v.cover?.url_list?.[0] || '',
-      video_url: v.video?.play_addr?.url_list?.[0] || v.video?.download_addr?.url_list?.[0] || '',
-      likes:    v.statistics?.digg_count || 0,
-    };
-  }).filter(v => v.aweme_id && v.video_url);
-}
-
-// 搜索抖音高赞视频（话题两步法）
-async function searchVideos(keyword, tikhubKey, count = 20) {
-  const chId = await getHashtagId(keyword, tikhubKey);
-  if (!chId) {
-    console.log(`[IndustryVideos] 未找到关键词"${keyword}"对应话题`);
-    return [];
-  }
-  return await getHashtagVideos(chId, tikhubKey, count);
+  console.log(`[IndustryVideos] keyword="${keyword}" keys=[${Object.keys(dataObj).join(',')}]`);
+  // 返回的是 data 数组，每项有 type 和 aweme_info
+  const rawList = dataObj.data || [];
+  const items = rawList
+    .filter(item => item.type === 1 && item.aweme_info)
+    .slice(0, count)
+    .map(item => {
+      const v = item.aweme_info;
+      return {
+        aweme_id: v.aweme_id,
+        author:   v.author?.nickname || '',
+        cover_url: v.video?.cover?.url_list?.[0] || '',
+        video_url: v.video?.play_addr?.url_list?.[0] || v.video?.download_addr?.url_list?.[0] || '',
+        likes:    v.statistics?.digg_count || 0,
+      };
+    })
+    .filter(v => v.aweme_id && v.video_url);
+  console.log(`[IndustryVideos] keyword="${keyword}" 有效视频=${items.length}`);
+  return items;
 }
 
 // 调用本地 ASR 提取文案
