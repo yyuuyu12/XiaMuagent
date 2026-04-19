@@ -205,7 +205,10 @@ async function searchVideos(keyword, tikhubKey, count = 20) {
 async function transcribeVideo(mp4Url, asrUrl) {
   const resp = await fetch(`${asrUrl}/asr/transcribe`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',  // 跳过 ngrok 免费域名警告页
+    },
     body: JSON.stringify({ taskId: 'industry_' + Date.now(), mp4Url }),
     signal: AbortSignal.timeout(180000), // 3分钟超时
   });
