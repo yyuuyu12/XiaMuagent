@@ -207,11 +207,16 @@ async function transcribeVideo(mp4Url, asrUrl) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ taskId: 'industry_' + Date.now(), mp4Url }),
-    signal: AbortSignal.timeout(120000), // 2分钟超时
+    signal: AbortSignal.timeout(180000), // 3分钟超时
   });
-  if (!resp.ok) return null;
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`ASR HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
   const json = await resp.json();
-  return json?.text?.trim() || null;
+  const text = json?.text?.trim() || '';
+  console.log(`[IndustryVideos] ASR result: "${text.slice(0, 60)}" (${text.length}字)`);
+  return text || null;
 }
 
 // 主采集函数
@@ -277,13 +282,15 @@ async function runCollect() {
             csLog(`ASR转录: ${v.aweme_id} (${v.likes}赞)`);
             transcript = await transcribeVideo(v.video_url, asrUrl);
           } catch (e) {
-            csLog(`ASR失败: ${v.aweme_id} — ${e.message}`);
-            collectState.skipped++;
+            // ASR出错（网络/超时等），跳过此条但不算"无口播"
+            csLog(`ASR出错跳过: ${v.aweme_id} — ${e.message}`);
+            collected.add(v.aweme_id);
+            continue;
           }
 
-          // 自动过滤无口播
+          // 自动过滤无口播（ASR成功但文字太少）
           if (!transcript || transcript.length < MIN_CHARS) {
-            csLog(`跳过（无口播）: ${v.aweme_id}`);
+            csLog(`跳过（无口播${transcript ? transcript.length+'字' : '空'}）: ${v.aweme_id}`);
             collectState.skipped++;
             continue;
           }
