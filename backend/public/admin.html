@@ -679,8 +679,8 @@ let ivPage = 1, ivIndustry = '';
 async function loadIndustryVideos(industry, page) {
   ivIndustry = industry || ivIndustry;
   ivPage = page || 1;
-  const url = `/api/industry-videos/admin?industry=${encodeURIComponent(ivIndustry)}&page=${ivPage}&pageSize=20`;
-  const r = await req(url, 'GET');
+  const url = `/industry-videos/admin?industry=${encodeURIComponent(ivIndustry)}&page=${ivPage}&pageSize=20`;
+  const r = await req(url);
   const tbody = document.getElementById('iv-tbody');
   const msg   = document.getElementById('iv-msg');
   if (!r || r.code !== 200) { msg.textContent = '加载失败'; return; }
@@ -702,7 +702,7 @@ async function loadIndustryVideos(industry, page) {
 
 async function ivDelete(id) {
   if (!confirm('确认删除这条视频文案？')) return;
-  const r = await req(`/api/industry-videos/admin/${id}`, 'DELETE');
+  const r = await req(`/industry-videos/admin/${id}`, {method:'DELETE'});
   if (r?.code === 200) { document.getElementById(`iv-row-${id}`).remove(); }
 }
 
@@ -711,7 +711,7 @@ let ivProgressTimer = null;
 async function ivTrigger() {
   const btn = document.getElementById('iv-trigger-btn');
   btn.disabled = true; btn.textContent = '采集中...';
-  const r = await req('/api/industry-videos/admin/trigger', {method:'POST'});
+  const r = await req('/industry-videos/admin/trigger', {method:'POST'});
   document.getElementById('iv-msg').textContent = r?.msg || '已触发';
   // 立即开始轮询进度
   ivStartProgressPoll();
@@ -726,7 +726,7 @@ function ivStartProgressPoll() {
 async function ivPollProgress() {
   let p;
   try {
-    const r = await req('/api/industry-videos/admin/progress', {method:'GET'});
+    const r = await req('/industry-videos/admin/progress');
     p = r?.data;
   } catch(e) { return; }
   if (!p) return;
@@ -801,7 +801,7 @@ async function ivPollProgress() {
 // 页面加载时检查是否有进行中的采集
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(async () => {
-    const r = await req('/api/industry-videos/admin/progress', 'GET').catch(() => null);
+    const r = await req('/industry-videos/admin/progress').catch(() => null);
     if (r?.data?.running) ivStartProgressPoll();
     else if (r?.data?.startedAt) ivPollProgress(); // 显示上次结果
   }, 1000);
