@@ -1058,7 +1058,7 @@ function tTopBar() {
       backAction = "setState({inspireMode:null});render()";
     } else if (S.inspireMode === 'featured') {
       title = '行业精选';
-      backAction = "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}switchTab('home')";
+      backAction = "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}setState({inspireMode:null});render()";
     } else {
       title = '灵感发现';
     }
@@ -1910,8 +1910,7 @@ function tCloneStep6(sb) {
 function tInspire() {
   if (S.inspireMode === 'analyze') return tInspireAnalyze();
   if (S.inspireMode === 'featured') return tInspireFeatured();
-  // 默认直接进精选
-  return tInspireFeatured();
+  return tInspireEntry();
 }
 
 function tInspireEntry() {
@@ -1920,10 +1919,6 @@ function tInspireEntry() {
       <div class="inspire-entry-badge">推荐 · 效果更好</div>
       <div class="inspire-entry-title">对标拆解 →</div>
       <div class="inspire-entry-desc">粘贴抖音主页或视频链接，AI帮你拆解爆款套路并仿写</div>
-    </div>
-    <div class="inspire-entry-card" onclick="setState({inspireMode:'industry',pathBState:'form',pathBErr:'',pathBScripts:[]});render()">
-      <div class="inspire-entry-title">行业生成 →</div>
-      <div class="inspire-entry-desc">没有对标也能用，选行业回答几个问题即可生成</div>
     </div>
     <div class="inspire-entry-card" onclick="enterFeaturedMode()">
       <div class="inspire-entry-title">行业精选 →</div>
@@ -2773,7 +2768,6 @@ function switchTab(tab) {
     loadTasks();
   }
   if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
-  if (tab === 'inspire') enterFeaturedMode();
 }
 function goBack() {
   if (S.currentTab === 'history') {
