@@ -752,13 +752,23 @@ async function ivPollProgress() {
     const elapsed = p.startedAt ? Math.round((Date.now() - new Date(p.startedAt).getTime()) / 1000) : 0;
     const elapsedStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed/60)}分${elapsed%60}秒`;
 
+    const isWaiting = p.industry && p.industry.includes('等待');
+    const industryLine = isWaiting
+      ? `<b>状态:</b> 本地服务采集中，每完成一个关键词就入库（每约15分钟更新一次）`
+      : (p.industry ? `<b>当前行业:</b> ${p.industry} (${p.industryIdx}/${p.industryTotal})` : '');
+
     detail.innerHTML = [
-      p.industry ? `<b>当前行业:</b> ${p.industry} (${p.industryIdx}/${p.industryTotal})` : '',
-      p.keyword  ? `<b>当前关键词:</b> ${p.keyword} (${p.keywordIdx}/${p.keywordTotal})` : '',
-      p.current  ? `<b>正在转录:</b> ${p.current}` : '',
+      industryLine,
+      !isWaiting && p.keyword  ? `<b>当前关键词:</b> ${p.keyword} (${p.keywordIdx}/${p.keywordTotal})` : '',
       `<b>已入库:</b> ${p.saved} 条　<b>已跳过:</b> ${p.skipped} 条`,
       `<b>已用时:</b> ${elapsedStr}`,
+      `<span style="color:#6366F1;font-size:12px">💡 视频列表已实时更新，可滚动下方查看已入库的内容</span>`,
     ].filter(Boolean).join('<br>');
+
+    // 采集中每10秒刷新一次视频列表（实时看到新入库内容）
+    if (!window._ivAutoRefreshTimer) {
+      window._ivAutoRefreshTimer = setInterval(() => loadIndustryVideos(ivIndustry, 1), 10000);
+    }
   } else {
     // 已完成或出错
     spinner.style.display = 'none';
@@ -785,7 +795,8 @@ async function ivPollProgress() {
       p.error ? `<span style="color:#DC2626">错误: ${p.error}</span>` : '',
     ].filter(Boolean).join('<br>');
 
-    // 完成后自动刷新数据表
+    // 停止自动刷新，最终刷一次
+    if (window._ivAutoRefreshTimer) { clearInterval(window._ivAutoRefreshTimer); window._ivAutoRefreshTimer = null; }
     loadIndustryVideos(ivIndustry, ivPage);
   }
 

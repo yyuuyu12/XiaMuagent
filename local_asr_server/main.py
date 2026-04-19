@@ -665,14 +665,12 @@ async def _run_industry_collect(job: dict):
             pass
 
     print("[IndustryCollect] 本地采集开始")
-    all_industries = list(industries.keys())
     try:
         seen = set()
         for ind_idx, (industry, keywords) in enumerate(industries.items()):
             print(f"[IndustryCollect] 行业: {industry}")
-            results = []
             for ki, keyword in enumerate(keywords):
-                print(f"[IndustryCollect]   搜索: {keyword}")
+                print(f"[IndustryCollect]   关键词 [{ki+1}/{len(keywords)}]: {keyword}")
                 # 发送心跳：开始这个关键词
                 await _heartbeat(industry=industry, keyword=keyword,
                                   ki=ki+1, kt=len(keywords),
@@ -684,6 +682,8 @@ async def _run_industry_collect(job: dict):
                     print(f"[IndustryCollect]   搜索失败: {e}")
                     continue
 
+                # 每个关键词的结果单独收集 → 立即提交
+                kw_results = []
                 for v in videos:
                     if v["aweme_id"] in seen:
                         continue
@@ -693,7 +693,7 @@ async def _run_industry_collect(job: dict):
                         text = await _transcribe_local(v["video_url"])
                         print(f"[IndustryCollect]   结果: ({len(text)}字)")
                         if len(text) >= min_chars:
-                            results.append({**v, "transcript": text})
+                            kw_results.append({**v, "transcript": text})
                         else:
                             print(f"[IndustryCollect]   跳过无口播({len(text)}字)")
                             total_skipped += 1
@@ -701,23 +701,26 @@ async def _run_industry_collect(job: dict):
                         err_safe = str(e).encode('utf-8', errors='replace').decode('ascii', errors='replace')
                         print(f"[IndustryCollect]   转录失败: {err_safe}")
 
-            results.sort(key=lambda x: -x["likes"])
-            to_submit = results[:keep_latest]
-            print(f"[IndustryCollect] {industry} 提交 {len(to_submit)} 条")
-            try:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    r = await client.post(
-                        f"{ZEABUR_API}/api/industry-videos/admin/submit",
-                        json={"industry": industry, "videos": to_submit},
-                    )
-                print(f"[IndustryCollect] submit: {r.status_code} {r.text[:100]}")
-                total_saved += len(to_submit)
-                # 提交后发心跳更新入库数
-                await _heartbeat(industry=industry, keyword="提交完成",
-                                  ki=len(keywords), kt=len(keywords),
-                                  saved=total_saved, skipped=total_skipped)
-            except Exception as e:
-                print(f"[IndustryCollect] submit 失败: {e}")
+                # ★ 关键词搜完立即提交，数据马上出现在后台
+                if kw_results:
+                    kw_results.sort(key=lambda x: -x["likes"])
+                    print(f"[IndustryCollect]   {keyword} 提交 {len(kw_results)} 条")
+                    try:
+                        async with httpx.AsyncClient(timeout=30) as client:
+                            r = await client.post(
+                                f"{ZEABUR_API}/api/industry-videos/admin/submit",
+                                json={"industry": industry, "videos": kw_results},
+                            )
+                        print(f"[IndustryCollect]   submit: {r.status_code} {r.text[:120]}")
+                        total_saved += len(kw_results)
+                    except Exception as e:
+                        print(f"[IndustryCollect]   submit 失败: {e}")
+                    # 提交后发心跳更新入库数
+                    await _heartbeat(industry=industry, keyword=f"{keyword}(提交完成)",
+                                      ki=ki+1, kt=len(keywords),
+                                      saved=total_saved, skipped=total_skipped)
+                else:
+                    print(f"[IndustryCollect]   {keyword} 无有效口播视频，跳过提交")
     except Exception as e:
         error_msg = str(e)
         print(f"[IndustryCollect] 采集异常: {e}")
