@@ -1058,7 +1058,7 @@ function tTopBar() {
       backAction = "setState({inspireMode:null});render()";
     } else if (S.inspireMode === 'featured') {
       title = '行业精选';
-      backAction = "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}setState({inspireMode:null});render()";
+      backAction = "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}switchTab('home')";
     } else {
       title = '灵感发现';
     }
@@ -1909,9 +1909,9 @@ function tCloneStep6(sb) {
 // ===== INSPIRE =====
 function tInspire() {
   if (S.inspireMode === 'analyze') return tInspireAnalyze();
-  if (S.inspireMode === 'industry') return tInspireIndustry();
   if (S.inspireMode === 'featured') return tInspireFeatured();
-  return tInspireEntry();
+  // 默认直接进精选
+  return tInspireFeatured();
 }
 
 function tInspireEntry() {
@@ -2130,9 +2130,8 @@ async function loadFeaturedIndustries() {
   try {
     const r = await api.get('/api/industry-videos/industries');
     if (r.code === 200 && r.data && r.data.length > 0) {
-      // 后端返回 [{industry, cnt, ...}]，提取名称列表
-      const names = r.data.map(row => row.industry || row);
-      setState({ featuredIndustriesList: names });
+      // 后端返回字符串数组 ['餐饮', '二手车', ...]
+      setState({ featuredIndustriesList: r.data });
       render();
     }
   } catch(e) { /* 静默失败，行业列表为空时前台提示 */ }
@@ -2774,6 +2773,7 @@ function switchTab(tab) {
     loadTasks();
   }
   if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
+  if (tab === 'inspire') enterFeaturedMode();
 }
 function goBack() {
   if (S.currentTab === 'history') {

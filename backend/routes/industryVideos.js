@@ -122,14 +122,12 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ code: 200, data: rows });
 });
 
-// GET /api/industry-videos/industries — 返回已有数据的行业列表
+// GET /api/industry-videos/industries — 返回所有行业名称列表（从 industries 表，不依赖是否已采集）
 router.get('/industries', requireAuth, async (req, res) => {
   const { rows } = await db.query(
-    `SELECT industry, COUNT(*) AS cnt, MAX(collected_at) AS last_collected
-     FROM industry_videos WHERE status = 'ok'
-     GROUP BY industry ORDER BY industry`
+    `SELECT name FROM industries ORDER BY sort_order ASC, id ASC`
   );
-  res.json({ code: 200, data: rows });
+  res.json({ code: 200, data: rows.map(r => r.name) });
 });
 
 // POST /api/industry-videos/start-clone/:id — 从精选视频创建克隆任务
