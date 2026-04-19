@@ -652,14 +652,31 @@ async def _run_industry_collect(job: dict):
     total_skipped = 0
     error_msg = None
 
+    async def _heartbeat(industry="", keyword="", ki=0, kt=0, saved=0, skipped=0):
+        """向 Zeabur 推送进度心跳（忽略失败）"""
+        try:
+            async with httpx.AsyncClient(timeout=5) as hc:
+                await hc.post(f"{ZEABUR_API}/api/industry-videos/collect-heartbeat", json={
+                    "industry": industry, "keyword": keyword,
+                    "keyword_idx": ki, "keyword_total": kt,
+                    "saved": saved, "skipped": skipped,
+                })
+        except Exception:
+            pass
+
     print("[IndustryCollect] 本地采集开始")
+    all_industries = list(industries.keys())
     try:
         seen = set()
-        for industry, keywords in industries.items():
+        for ind_idx, (industry, keywords) in enumerate(industries.items()):
             print(f"[IndustryCollect] 行业: {industry}")
             results = []
-            for keyword in keywords:
+            for ki, keyword in enumerate(keywords):
                 print(f"[IndustryCollect]   搜索: {keyword}")
+                # 发送心跳：开始这个关键词
+                await _heartbeat(industry=industry, keyword=keyword,
+                                  ki=ki+1, kt=len(keywords),
+                                  saved=total_saved, skipped=total_skipped)
                 try:
                     videos = await _search_videos(keyword, tikhub_key)
                     print(f"[IndustryCollect]   找到 {len(videos)} 个视频")
@@ -674,14 +691,15 @@ async def _run_industry_collect(job: dict):
                     print(f"[IndustryCollect]   转录: {v['aweme_id']} ({v['likes']}赞)")
                     try:
                         text = await _transcribe_local(v["video_url"])
-                        print(f"[IndustryCollect]   结果: {text[:60]!r} ({len(text)}字)")
+                        print(f"[IndustryCollect]   结果: ({len(text)}字)")
                         if len(text) >= min_chars:
                             results.append({**v, "transcript": text})
                         else:
                             print(f"[IndustryCollect]   跳过无口播({len(text)}字)")
                             total_skipped += 1
                     except Exception as e:
-                        print(f"[IndustryCollect]   转录失败: {e}")
+                        err_safe = str(e).encode('utf-8', errors='replace').decode('ascii', errors='replace')
+                        print(f"[IndustryCollect]   转录失败: {err_safe}")
 
             results.sort(key=lambda x: -x["likes"])
             to_submit = results[:keep_latest]
@@ -694,6 +712,10 @@ async def _run_industry_collect(job: dict):
                     )
                 print(f"[IndustryCollect] submit: {r.status_code} {r.text[:100]}")
                 total_saved += len(to_submit)
+                # 提交后发心跳更新入库数
+                await _heartbeat(industry=industry, keyword="提交完成",
+                                  ki=len(keywords), kt=len(keywords),
+                                  saved=total_saved, skipped=total_skipped)
             except Exception as e:
                 print(f"[IndustryCollect] submit 失败: {e}")
     except Exception as e:

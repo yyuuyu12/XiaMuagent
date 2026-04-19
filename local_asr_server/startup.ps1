@@ -34,9 +34,11 @@ if (IsPortInUse 8765) {
     Log "[ASR] already running, skip"
 } else {
     Log "[ASR] starting..."
+    $env:PYTHONIOENCODING = "utf-8"
+    $env:PYTHONUNBUFFERED = "1"
     Start-Process `
         -FilePath "C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe" `
-        -ArgumentList "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765" `
+        -ArgumentList "-u", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8765" `
         -WorkingDirectory "C:\AIClaudecode\local_asr_server" `
         -WindowStyle Hidden
     Log "[ASR] process started (Whisper loading ~60s)"
