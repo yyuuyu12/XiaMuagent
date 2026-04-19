@@ -771,7 +771,11 @@ function ivRenderConfig(industries) {
   }
   list.innerHTML = industries.map(ind => `
     <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;padding:10px 12px;background:#F9F9FF;border-radius:8px;border:1px solid #E8EDFF">
-      <div style="flex:0 0 70px;font-weight:600;font-size:13px;padding-top:6px;color:#1E1B4B">${ind.name}</div>
+      <div style="flex:0 0 90px">
+        <div id="ind-name-${ind.id}" style="font-weight:600;font-size:13px;color:#1E1B4B;padding-top:6px">${ind.name}</div>
+        <input id="ind-name-input-${ind.id}" value="${ind.name}"
+          style="display:none;width:80px;padding:2px 6px;border:1.5px solid #6366F1;border-radius:5px;font-size:12px;font-weight:600" />
+      </div>
       <textarea id="kw-${ind.id}" rows="2"
         style="flex:1;padding:6px 10px;border:1.5px solid #E8EDFF;border-radius:6px;font-size:12px;resize:vertical;font-family:inherit"
         placeholder="采集关键词，逗号分隔（如：${ind.name}推荐,${ind.name}教程）">${ind.collect_keywords || ''}</textarea>
@@ -780,10 +784,49 @@ function ivRenderConfig(industries) {
       </div>
       <div style="display:flex;flex-direction:column;gap:4px">
         <button onclick="ivSaveKeywords(${ind.id},'${ind.name}')"
-          style="font-size:12px;padding:4px 10px;border:1.5px solid #6366F1;color:#6366F1;background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">保存</button>
+          style="font-size:12px;padding:4px 10px;border:1.5px solid #6366F1;color:#6366F1;background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">保存关键词</button>
+        <button id="ind-rename-btn-${ind.id}" onclick="ivStartRename(${ind.id})"
+          style="font-size:12px;padding:4px 10px;border:1.5px solid #10B981;color:#10B981;background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">改名</button>
+        <button id="ind-rename-ok-${ind.id}" onclick="ivConfirmRename(${ind.id})"
+          style="display:none;font-size:12px;padding:4px 10px;border:1.5px solid #10B981;color:#fff;background:#10B981;border-radius:6px;cursor:pointer;white-space:nowrap">确认</button>
+        <button onclick="ivDeleteIndustry(${ind.id},'${ind.name}')"
+          style="font-size:12px;padding:4px 10px;border:1.5px solid #EF4444;color:#EF4444;background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">删除</button>
       </div>
     </div>
   `).join('');
+}
+
+function ivStartRename(id) {
+  document.getElementById(`ind-name-${id}`).style.display = 'none';
+  document.getElementById(`ind-name-input-${id}`).style.display = 'block';
+  document.getElementById(`ind-rename-btn-${id}`).style.display = 'none';
+  document.getElementById(`ind-rename-ok-${id}`).style.display = 'block';
+  document.getElementById(`ind-name-input-${id}`).focus();
+}
+
+async function ivConfirmRename(id) {
+  const input = document.getElementById(`ind-name-input-${id}`);
+  const newName = input?.value?.trim();
+  if (!newName) { showMsg('iv-msg', '名称不能为空', 'error'); return; }
+  const r = await req(`/config/industries/${id}/rename`, { method: 'PATCH', body: JSON.stringify({ name: newName }) });
+  if (r?.code === 200) {
+    showMsg('iv-msg', `已重命名为"${newName}"`, 'success');
+    ivLoadConfig();
+  } else {
+    showMsg('iv-msg', r?.msg || '重命名失败', 'error');
+  }
+}
+
+async function ivDeleteIndustry(id, name) {
+  if (!confirm(`确定删除行业"${name}"？\n该行业下所有精选视频也将一并删除，且不可恢复！`)) return;
+  const r = await req(`/config/industries/${id}`, { method: 'DELETE' });
+  if (r?.code === 200) {
+    showMsg('iv-msg', `行业"${name}"及其视频已删除`, 'success');
+    if (ivIndustry === name) ivIndustry = null;
+    ivLoadConfig();
+  } else {
+    showMsg('iv-msg', r?.msg || '删除失败', 'error');
+  }
 }
 
 async function ivSaveKeywords(id, name) {

@@ -122,8 +122,25 @@ router.post('/industries', requireAuth, requireAdmin, async (req, res) => {
 });
 
 router.delete('/industries/:id', requireAuth, requireAdmin, async (req, res) => {
+  // 先取行业名，再级联删除视频
+  const { rows } = await db.query('SELECT name FROM industries WHERE id=$1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ code: 404, msg: '行业不存在' });
+  const name = rows[0].name;
+  await db.query('DELETE FROM industry_videos WHERE industry=?', [name]);
   await db.query('DELETE FROM industries WHERE id=$1', [req.params.id]);
   res.json({ code: 200, msg: '删除成功' });
+});
+
+// 改行业名称 — 同时更新 industry_videos 里的 industry 字段
+router.patch('/industries/:id/rename', requireAuth, requireAdmin, async (req, res) => {
+  const { name } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ code: 400, msg: '名称不能为空' });
+  const { rows } = await db.query('SELECT name FROM industries WHERE id=$1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ code: 404, msg: '行业不存在' });
+  const oldName = rows[0].name;
+  await db.query('UPDATE industries SET name=$1 WHERE id=$2', [name.trim(), req.params.id]);
+  await db.query('UPDATE industry_videos SET industry=? WHERE industry=?', [name.trim(), oldName]);
+  res.json({ code: 200, msg: '重命名成功' });
 });
 
 // ==================== ASR 诊断 ====================
