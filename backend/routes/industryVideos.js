@@ -213,6 +213,20 @@ router.get('/collect-job', async (req, res) => {
   });
 });
 
+// POST /api/industry-videos/collect-heartbeat — 本地 ASR 推送进度心跳（内部接口，无需鉴权）
+router.post('/collect-heartbeat', (req, res) => {
+  const { industry, keyword, keyword_idx, keyword_total, industry_idx, industry_total, saved, skipped } = req.body || {};
+  if (industry)       collectState.industry    = industry;
+  if (keyword)        collectState.keyword     = keyword;
+  if (keyword_idx != null)   collectState.keywordIdx   = keyword_idx;
+  if (keyword_total != null) collectState.keywordTotal = keyword_total;
+  if (industry_idx != null)  { /* for display, store in log */ }
+  if (saved    != null) collectState.saved    = saved;
+  if (skipped  != null) collectState.skipped  = skipped;
+  csLog(`[心跳] ${industry || '?'} / ${keyword || '?'}`);
+  res.json({ code: 200 });
+});
+
 // POST /api/industry-videos/collect-done — 本地 ASR 通知采集完成（内部接口）
 router.post('/collect-done', async (req, res) => {
   await db.query(
