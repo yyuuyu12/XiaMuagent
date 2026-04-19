@@ -386,25 +386,20 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .ind-select-title { font-size: 19px; font-weight: 800; color: #1E1B4B; text-align: center; margin-bottom: 6px; }
 .ind-select-sub { font-size: 13px; color: #9CA3AF; text-align: center; margin-bottom: 20px; }
 .ind-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.ind-card { background: #F8F9FF; border: 2px solid #E8EDFF; border-radius: 14px; padding: 15px 13px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.15s; }
-.ind-card.sel { background: rgba(99,102,241,0.08); border-color: #6366F1; }
-.ind-card-name { font-size: 15px; font-weight: 600; color: #1E1B4B; }
-.ind-card.sel .ind-card-name { color: #6366F1; }
-.ind-card-icon { font-size: 22px; }
-.ind-confirm-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 20px 32px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 10; }
-.ind-confirm-btn { width: 100%; padding: 15px; background: linear-gradient(135deg,#6366F1,#818CF8); color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
-.ind-confirm-btn:disabled { background: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
+.ind-card { background: #F8F9FF; border: 2px solid #E8EDFF; border-radius: 14px; padding: 15px 13px; display: flex; align-items: center; cursor: pointer; transition: all 0.15s; }
+.ind-card:active { background: #FFF6F3; border-color: #FF6B35; }
+.ind-card-name { font-size: 15px; font-weight: 600; color: #1A1814; }
 /* 行业精选 - 内容页 */
-.feat-page-title { font-size: 15px; font-weight: 700; color: #1E1B4B; margin-bottom: 14px; text-align: center; }
+.feat-page-title { font-size: 15px; font-weight: 700; color: #1A1814; margin-bottom: 14px; text-align: center; }
 .feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
 .feat-card { background: #fff; border: 2px solid #F3F4F6; border-radius: 14px; padding: 13px 11px 10px; cursor: pointer; transition: border-color 0.15s,background 0.15s; }
-.feat-card.sel { border-color: #6366F1; background: rgba(99,102,241,0.04); }
-.feat-card-text { font-size: 13px; color: #374151; line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; word-break: break-all; }
-.feat-card-likes { font-size: 12px; color: #9CA3AF; }
-.feat-card.sel .feat-card-likes { color: #6366F1; }
+.feat-card.sel { border-color: #FF6B35; background: #FFF6F3; }
+.feat-card-text { font-size: 13px; color: #3D3A35; line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; word-break: break-all; }
+.feat-card-likes { font-size: 12px; color: #A8A49C; }
+.feat-card.sel .feat-card-likes { color: #FF6B35; }
 .feat-action-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px 32px; background: #fff; border-top: 1px solid #F3F4F6; display: flex; gap: 10px; z-index: 10; }
-.feat-btn-sec { flex: 1; padding: 14px; background: #F3F4F6; color: #374151; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
-.feat-btn-pri { flex: 1.4; padding: 14px; background: linear-gradient(135deg,#6366F1,#818CF8); color: #fff; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.feat-btn-sec { flex: 1; padding: 14px; background: #F5F4F2; color: #6B6860; border: none; border-radius: 50px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.feat-btn-pri { flex: 1.4; padding: 14px; background: #FF6B35; color: #fff; border: none; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; }
 .feat-btn-sec:disabled,.feat-btn-pri:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* === PATH A · 对标拆解 === */
@@ -2169,17 +2164,13 @@ function tFeaturedSelect() {
     return `<div class="tab-page"><div style="text-align:center;color:#9CA3AF;margin-top:60px;font-size:14px">暂无行业数据，请联系管理员</div></div>`;
   }
   const cards = list.map(ind => `
-    <div class="ind-card ${S.featuredIndustry===ind?'sel':''}" onclick="setState({featuredIndustry:'${esc(ind)}'});render()">
+    <div class="ind-card" onclick="featuredSelectIndustry('${esc(ind)}')">
       <span class="ind-card-name">${esc(ind)}</span>
-      <span class="ind-card-icon">${_IND_ICONS[ind]||'📋'}</span>
     </div>`).join('');
-  return `<div class="tab-page" style="padding-bottom:110px">
+  return `<div class="tab-page">
     <div class="ind-select-title">选择更符合你的行业</div>
     <div class="ind-select-sub">帮助精准匹配同行爆款口播文案</div>
     <div class="ind-grid">${cards}</div>
-    <div class="ind-confirm-bar">
-      <button class="ind-confirm-btn" ${!S.featuredIndustry?'disabled':''} onclick="featuredConfirm()">确认</button>
-    </div>
   </div>`;
 }
 
@@ -2219,7 +2210,7 @@ function fmtLikes(n) {
 
 async function featuredSelectIndustry(ind) {
   if (S.featuredLoading) return;
-  setState({ featuredIndustry: ind, featuredVideos: [], featuredLoading: true, featuredErr: '' });
+  setState({ featuredIndustry: ind, featuredPage: 'content', featuredSelectedIdx: null, featuredVideos: [], featuredLoading: true, featuredErr: '' });
   render();
   try {
     const r = await fetch(`/api/industry-videos?industry=${encodeURIComponent(ind)}&limit=15`).then(x => x.json());
@@ -2284,13 +2275,21 @@ function featuredCopySelected() {
 function featuredRewrite() {
   const v = (S.featuredVideos || [])[S.featuredSelectedIdx];
   if (!v) return;
-  // 跳到创作tab，预填爆款文案作为改写素材
-  setState({ pathBInputText: v.transcript, pathBState: 'form', inspireMode: null });
+  // 跳到克隆流程第1步，预填行业精选文案到原始文案输入框
   if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
-  switchTab('inspire');
-  setState({ inspireMode: 'analyze' });
+  setState({
+    inspireMode: null,
+    extractedScript: v.transcript,
+    extractStep: 'review',
+    extractErr: '',
+    extractRawErr: '',
+    videoUrl: '',
+    cloneTaskData: null,
+    taskId: null,
+  });
+  switchTab('extract');
   render();
-  showToast('已填入爆款文案，点击分析仿写');
+  showToast('已填入爆款文案，点击开始AI改写');
 }
 
 // ===== PROFILE =====
