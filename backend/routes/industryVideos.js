@@ -161,7 +161,9 @@ async function searchVideos(keyword, tikhubKey, count = 20) {
   });
   if (!resp.ok) {
     const errText = await resp.text().catch(() => '');
-    throw new Error(`TikHub HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+    const msg = `TikHub HTTP ${resp.status}: ${errText.slice(0, 300)}`;
+    console.error('[IndustryVideos] search error:', msg);
+    throw new Error(msg);
   }
   const json = await resp.json();
   // 兼容多种数据结构，打印实际 key 便于调试
