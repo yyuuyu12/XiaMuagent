@@ -100,6 +100,51 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
   res.json({ code: 200, msg: '已删除' });
 });
 
+// POST /api/industry-videos/admin/submit — 本地 ASR 服务提交采集结果
+router.post('/admin/submit', requireAdmin, async (req, res) => {
+  const { industry, videos } = req.body;
+  if (!industry || !Array.isArray(videos)) {
+    return res.status(400).json({ code: 400, msg: '参数错误' });
+  }
+  let inserted = 0;
+  for (const v of videos) {
+    if (!v.aweme_id || !v.transcript || v.transcript.length < 15) continue;
+    await db.query(
+      `INSERT IGNORE INTO industry_videos
+       (industry, aweme_id, author, cover_url, video_url, likes, transcript)
+       VALUES (?,?,?,?,?,?,?)`,
+      [industry, v.aweme_id, v.author || '', v.cover_url || '', v.video_url || '', v.likes || 0, v.transcript]
+    ).catch(() => {});
+    inserted++;
+  }
+  // 保留最新 KEEP_LATEST 条
+  const { rows: all } = await db.query(
+    `SELECT id FROM industry_videos WHERE industry = ? AND status = 'ok' ORDER BY likes DESC`,
+    [industry]
+  );
+  if (all.length > KEEP_LATEST) {
+    const toDelete = all.slice(KEEP_LATEST).map(r => r.id);
+    await db.query(
+      `UPDATE industry_videos SET status = 'old' WHERE id IN (${toDelete.map(() => '?').join(',')})`,
+      toDelete
+    );
+  }
+  // 更新进度
+  collectState.saved += inserted;
+  collectState.industry = industry;
+  csLog(`${industry} 提交完成，入库 ${inserted} 条`);
+  // 如果所有行业都提交完了（由本地服务决定），标记完成
+  const allIndustries = Object.keys(INDUSTRY_KEYWORDS);
+  const lastIndustry = allIndustries[allIndustries.length - 1];
+  if (industry === lastIndustry) {
+    collectState.running = false;
+    collectState.finishedAt = new Date().toISOString();
+    csLog(`全部完成！共入库 ${collectState.saved} 条`);
+  }
+  console.log(`[IndustryVideos] submit: ${industry} 入库 ${inserted} 条`);
+  res.json({ code: 200, msg: `入库 ${inserted} 条`, inserted });
+});
+
 // GET /api/industry-videos/admin/progress — 查询采集进度
 router.get('/admin/progress', requireAdmin, (req, res) => {
   const industries = Object.keys(INDUSTRY_KEYWORDS);
@@ -125,14 +170,54 @@ router.get('/admin/progress', requireAdmin, (req, res) => {
   });
 });
 
-// POST /api/industry-videos/admin/trigger — 手动触发一次采集
+// POST /api/industry-videos/admin/trigger — 通知本地 ASR 服务触发采集
 router.post('/admin/trigger', requireAdmin, async (req, res) => {
   if (collectState.running) {
     return res.json({ code: 200, msg: '采集任务已在运行中' });
   }
-  res.json({ code: 200, msg: '采集任务已触发' });
-  // 异步执行，不阻塞响应
-  runCollect().catch(e => console.error('[IndustryVideos] collect error:', e));
+  // 获取本地 ASR 地址，通知它来做采集
+  const { rows } = await db.query(`SELECT value FROM system_config WHERE config_key = 'asr_url'`);
+  const asrUrl = rows[0]?.value?.trim();
+  if (!asrUrl) return res.status(503).json({ code: 503, msg: 'ASR URL 未配置' });
+
+  // 更新进度状态为运行中
+  Object.assign(collectState, {
+    running: true, startedAt: new Date().toISOString(), finishedAt: null, error: null,
+    industry: '等待本地服务响应...', keyword: '', keywordIdx: 0, keywordTotal: 0,
+    saved: 0, skipped: 0, current: '', log: ['已通知本地ASR服务开始采集...'],
+  });
+
+  res.json({ code: 200, msg: '已通知本地ASR服务采集，请等待...' });
+
+  // 异步通知本地 ASR 服务
+  (async () => {
+    try {
+      const tikhubRows = await db.query(`SELECT value FROM system_config WHERE config_key = 'tikhub_api_key'`);
+      const tikhubKey = tikhubRows.rows[0]?.value;
+      const zeaburUrl = `${process.env.ZEABUR_URL || 'https://' + (process.env.RAILWAY_STATIC_URL || '')}`;
+
+      const r = await fetch(`${asrUrl}/industry/collect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({
+          tikhub_key: tikhubKey,
+          submit_url: zeaburUrl + '/api/industry-videos/admin/submit',
+          admin_token: req.headers.authorization?.replace('Bearer ', '') || '',
+          industries: INDUSTRY_KEYWORDS,
+          keep_latest: KEEP_LATEST,
+          min_chars: MIN_CHARS,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!r.ok) throw new Error(`ASR HTTP ${r.status}: ${await r.text()}`);
+      csLog('本地服务已接受任务，采集进行中...');
+    } catch(e) {
+      csLog(`通知本地服务失败: ${e.message}`);
+      collectState.error = e.message;
+      collectState.running = false;
+      collectState.finishedAt = new Date().toISOString();
+    }
+  })();
 });
 
 // ==================== 采集核心逻辑 ====================

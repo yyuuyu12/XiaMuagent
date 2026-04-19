@@ -528,3 +528,155 @@ async def avatar_file(user_id: str, avatar_id: str):
         if f.exists():
             return FileResponse(str(f), media_type="video/mp4")
     raise HTTPException(404, "数字人视频不存在")
+
+
+# ===================== 行业精选视频采集（本地执行）=====================
+
+@app.post("/industry/collect")
+async def industry_collect(payload: dict):
+    """
+    由 Zeabur 后台触发，在本地执行视频搜索+ASR转录，
+    结果直接 POST 到 Zeabur 的 /api/industry-videos/admin/submit
+    """
+    tikhub_key  = payload.get("tikhub_key", "")
+    submit_url  = payload.get("submit_url", "")
+    admin_token = payload.get("admin_token", "")
+    industries  = payload.get("industries", {})
+    keep_latest = payload.get("keep_latest", 15)
+    min_chars   = payload.get("min_chars", 15)
+
+    if not tikhub_key:
+        raise HTTPException(400, "tikhub_key 未提供")
+    if not submit_url:
+        raise HTTPException(400, "submit_url 未提供")
+
+    # 异步后台执行，立即返回
+    asyncio.create_task(_run_industry_collect(
+        tikhub_key, submit_url, admin_token, industries, keep_latest, min_chars
+    ))
+    return {"ok": True, "msg": "采集任务已在本地启动"}
+
+
+async def _search_videos(keyword: str, tikhub_key: str, count: int = 20):
+    """搜索抖音高赞视频"""
+    payload = {
+        "keyword": keyword,
+        "cursor": 0,
+        "sort_type": "1",
+        "publish_time": "0",
+        "filter_duration": "0",
+        "content_type": "1",
+        "search_id": "",
+        "backtrace": "",
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            "https://api.tikhub.io/api/v1/douyin/search/fetch_general_search_v1",
+            json=payload,
+            headers={"Authorization": f"Bearer {tikhub_key}"},
+        )
+    if r.status_code != 200:
+        raise Exception(f"TikHub HTTP {r.status_code}: {r.text[:200]}")
+    data = r.json().get("data", {})
+    raw = data.get("data", [])
+    videos = []
+    for item in raw:
+        if item.get("type") != 1:
+            continue
+        v = item.get("aweme_info", {})
+        aweme_id = v.get("aweme_id")
+        video_url = (v.get("video", {}).get("play_addr", {}).get("url_list") or
+                     v.get("video", {}).get("download_addr", {}).get("url_list") or [None])[0]
+        if not aweme_id or not video_url:
+            continue
+        videos.append({
+            "aweme_id": aweme_id,
+            "author":   v.get("author", {}).get("nickname", ""),
+            "cover_url": (v.get("video", {}).get("cover", {}).get("url_list") or [""])[0],
+            "video_url": video_url,
+            "likes":    v.get("statistics", {}).get("digg_count", 0),
+        })
+    videos.sort(key=lambda x: -x["likes"])
+    return videos[:count]
+
+
+async def _transcribe_local(video_url: str):
+    """本地直接下载+Whisper转录（不走ngrok）"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+        "Referer": "https://www.douyin.com/",
+    }
+    async with httpx.AsyncClient(timeout=120, headers=headers, follow_redirects=True) as client:
+        resp = await client.get(video_url)
+    if resp.status_code != 200:
+        raise Exception(f"视频下载失败 HTTP {resp.status_code}")
+    content = resp.content
+    if len(content) < 1000:
+        raise Exception(f"视频内容异常({len(content)}字节)")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        mp4_path   = os.path.join(tmpdir, "video.mp4")
+        audio_path = os.path.join(tmpdir, "audio.wav")
+        with open(mp4_path, "wb") as f:
+            f.write(content)
+        (
+            ffmpeg.input(mp4_path)
+            .output(audio_path, ar=16000, ac=1)
+            .overwrite_output()
+            .run(quiet=True)
+        )
+        result = model.transcribe(
+            audio_path, language="zh", task="transcribe",
+            word_timestamps=False, condition_on_previous_text=True,
+            initial_prompt="以下是普通话内容，请加上标点符号。"
+        )
+    return result["text"].strip()
+
+
+async def _run_industry_collect(tikhub_key, submit_url, admin_token, industries, keep_latest, min_chars):
+    print("[IndustryCollect] 本地采集开始")
+    seen = set()
+    for industry, keywords in industries.items():
+        print(f"[IndustryCollect] 行业: {industry}")
+        results = []
+        for keyword in keywords:
+            print(f"[IndustryCollect]   搜索: {keyword}")
+            try:
+                videos = await _search_videos(keyword, tikhub_key)
+                print(f"[IndustryCollect]   找到 {len(videos)} 个视频")
+            except Exception as e:
+                print(f"[IndustryCollect]   搜索失败: {e}")
+                continue
+
+            for v in videos:
+                if v["aweme_id"] in seen:
+                    continue
+                seen.add(v["aweme_id"])
+                print(f"[IndustryCollect]   转录: {v['aweme_id']} ({v['likes']}赞)")
+                try:
+                    text = await _transcribe_local(v["video_url"])
+                    print(f"[IndustryCollect]   结果: {text[:50]!r} ({len(text)}字)")
+                    if len(text) >= min_chars:
+                        results.append({**v, "transcript": text})
+                    else:
+                        print(f"[IndustryCollect]   跳过（无口播{len(text)}字）")
+                except Exception as e:
+                    print(f"[IndustryCollect]   转录失败: {e}")
+
+        # 按点赞降序，只提交前 keep_latest 条
+        results.sort(key=lambda x: -x["likes"])
+        to_submit = results[:keep_latest]
+        print(f"[IndustryCollect] {industry} 提交 {len(to_submit)} 条到 Zeabur")
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.post(
+                    submit_url,
+                    json={"industry": industry, "videos": to_submit},
+                    headers={"Authorization": f"Bearer {admin_token}"},
+                )
+            print(f"[IndustryCollect] submit 响应: {r.status_code} {r.text[:100]}")
+        except Exception as e:
+            print(f"[IndustryCollect] submit 失败: {e}")
+
+    print("[IndustryCollect] 本地采集完成")
