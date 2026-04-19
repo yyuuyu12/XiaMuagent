@@ -8,6 +8,11 @@ multiprocessing.freeze_support()   # Windows spawn 必须最先调用
 
 import os
 import sys
+
+# HeyGem 依赖 Waves Audio DLL，确保 PATH 包含该目录（无论从哪个脚本启动）
+_WAVES_PATH = r"C:\ProgramData\Waves Audio\Modules\AdditionalDLLs_x64"
+if _WAVES_PATH not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = _WAVES_PATH + os.pathsep + os.environ.get("PATH", "")
 import uuid
 import base64
 import asyncio
