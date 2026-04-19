@@ -153,22 +153,23 @@ async function getAsrUrl() {
 
 // 搜索抖音高赞视频
 async function searchVideos(keyword, tikhubKey, count = 20) {
-  const url = `https://api.tikhub.io/api/v1/douyin/web/fetch_search_result?keyword=${encodeURIComponent(keyword)}&count=${count}&sort_type=1&publish_time=1`;
+  const url = `https://api.tikhub.io/api/v1/douyin/web/fetch_video_search_result?keyword=${encodeURIComponent(keyword)}&count=${count}&sort_type=1&publish_time=1`;
   const resp = await fetch(url, {
     headers: { 'Authorization': `Bearer ${tikhubKey}` },
     signal: AbortSignal.timeout(20000),
   });
   if (!resp.ok) throw new Error(`TikHub HTTP ${resp.status}`);
   const json = await resp.json();
-  // 返回视频列表
-  const items = json?.data?.data || [];
+  // 兼容多种数据结构
+  const items = json?.data?.data || json?.data?.aweme_list || json?.data?.business_data || [];
+  console.log(`[IndustryVideos] TikHub raw keys: data.keys=${Object.keys(json?.data||{}).join(',')}, items=${items.length}`);
   return items.map(item => {
     const v = item.aweme_info || item;
     return {
       aweme_id: v.aweme_id,
       author:   v.author?.nickname || '',
       cover_url: v.video?.cover?.url_list?.[0] || v.cover?.url_list?.[0] || '',
-      video_url: v.video?.play_addr?.url_list?.[0] || '',
+      video_url: v.video?.play_addr?.url_list?.[0] || v.video?.download_addr?.url_list?.[0] || '',
       likes:    v.statistics?.digg_count || 0,
     };
   }).filter(v => v.aweme_id && v.video_url);
