@@ -219,18 +219,24 @@ router.post('/admin/stop', requireAdmin, async (req, res) => {
 });
 
 // POST /api/industry-videos/admin/trigger — 触发采集
+// body: { industry: '餐饮' } 单行业; 不传或传空字符串 = 全部行业
 router.post('/admin/trigger', requireAdmin, async (req, res) => {
   if (collectState.running) {
-    return res.json({ code: 200, msg: '采集任务已在运行中' });
+    return res.json({ code: 400, msg: '采集任务已在运行中，请先停止' });
   }
+  const targetIndustry = (req.body?.industry || '').trim();
+  // 写入 pending 标志和目标行业
   await db.query(`INSERT INTO system_config (config_key, value) VALUES ('collect_pending','1') ON DUPLICATE KEY UPDATE value='1'`);
+  await db.query(`INSERT INTO system_config (config_key, value) VALUES ('collect_pending_industry',?) ON DUPLICATE KEY UPDATE value=?`,
+    [targetIndustry, targetIndustry]);
+  const label = targetIndustry ? `[${targetIndustry}]` : '全部行业';
   Object.assign(collectState, {
     running: true, paused: false, stop: false,
     startedAt: new Date().toISOString(), finishedAt: null, error: null,
-    industry: '等待本地服务拉取任务...', keyword: '', keywordIdx: 0, keywordTotal: 0,
-    saved: 0, skipped: 0, current: '', log: ['采集请求已写入，本地服务将在30秒内开始...'], items: [],
+    industry: `等待本地服务接单 (${label})...`, keyword: '', keywordIdx: 0, keywordTotal: 0,
+    saved: 0, skipped: 0, current: '', log: [`采集请求已写入（${label}），本地服务将在30秒内开始...`], items: [],
   });
-  res.json({ code: 200, msg: '采集请求已发出，本地服务将自动开始' });
+  res.json({ code: 200, msg: `已触发${label}采集，本地服务将自动开始` });
 });
 
 // GET /api/industry-videos/admin/progress — 采集进度查询
@@ -260,28 +266,40 @@ router.get('/admin/progress', requireAdmin, (req, res) => {
 
 // GET /api/industry-videos/collect-job — 本地 ASR 轮询，获取采集任务
 router.get('/collect-job', async (req, res) => {
-  const { rows } = await db.query(`SELECT value FROM system_config WHERE config_key = 'collect_pending'`);
-  const pending = rows[0]?.value === '1';
+  const { rows: pendingRows } = await db.query(
+    `SELECT config_key, value FROM system_config WHERE config_key IN ('collect_pending','collect_pending_industry')`
+  );
+  const cfgMap = {};
+  pendingRows.forEach(r => { cfgMap[r.config_key] = r.value; });
+  const pending = cfgMap['collect_pending'] === '1';
   if (!pending) return res.json({ code: 200, pending: false });
 
-  // 读取配置
+  const targetIndustry = (cfgMap['collect_pending_industry'] || '').trim();
+
+  // 读取 AI/ASR 配置
   const { rows: cfgRows } = await db.query(
     `SELECT config_key, value FROM system_config WHERE config_key IN ('tikhub_api_key','asr_url')`
   );
   const cfg = {};
-  cfgRows.forEach(r => cfg[r.config_key] = r.value);
+  cfgRows.forEach(r => { cfg[r.config_key] = r.value; });
 
-  // 从 industries 表动态读取关键词
-  const { rows: indRows } = await db.query(
-    `SELECT name, collect_keywords FROM industries WHERE collect_keywords IS NOT NULL AND collect_keywords != '' ORDER BY sort_order ASC, id ASC`
-  );
+  // 从 industries 表动态读取关键词，按需过滤
+  let sql = `SELECT name, collect_keywords FROM industries WHERE collect_keywords IS NOT NULL AND collect_keywords != '' ORDER BY sort_order ASC, id ASC`;
+  const sqlParams = [];
+  if (targetIndustry) {
+    sql = `SELECT name, collect_keywords FROM industries WHERE name = ? AND collect_keywords IS NOT NULL AND collect_keywords != ''`;
+    sqlParams.push(targetIndustry);
+  }
+  const { rows: indRows } = await db.query(sql, sqlParams);
+
   const industries = {};
   for (const row of indRows) {
     const kws = row.collect_keywords.split(',').map(k => k.trim()).filter(Boolean);
     if (kws.length > 0) industries[row.name] = kws;
   }
-  // 若无配置关键词，使用硬编码兜底
-  if (Object.keys(industries).length === 0) {
+
+  // 若目标行业未配置关键词，则用兜底（仅全量模式下兜底）
+  if (Object.keys(industries).length === 0 && !targetIndustry) {
     Object.assign(industries, DEFAULT_KEYWORDS);
   }
 
@@ -290,6 +308,7 @@ router.get('/collect-job', async (req, res) => {
     pending: true,
     tikhub_key: cfg.tikhub_api_key || '',
     industries,
+    target_industry: targetIndustry || null,
     keep_latest: KEEP_LATEST,
     min_chars: MIN_CHARS,
     paused: collectState.paused,

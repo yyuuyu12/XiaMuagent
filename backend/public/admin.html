@@ -252,7 +252,7 @@
     <!-- 采集控制栏 -->
     <div style="background:#F8F9FF;border:1.5px solid #E8EDFF;border-radius:10px;padding:14px;margin-bottom:14px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button id="iv-trigger-btn" onclick="ivTrigger()" class="btn-primary" style="font-size:13px;padding:8px 18px">立即采集</button>
+        <button id="iv-trigger-btn" onclick="ivTrigger('')" class="btn-primary" style="font-size:13px;padding:8px 18px">全部采集</button>
         <button id="iv-pause-btn" onclick="ivPause()" style="font-size:13px;padding:8px 14px;border:2px solid #F59E0B;color:#B45309;background:#FEF3C7;border-radius:8px;cursor:pointer">暂停</button>
         <button onclick="ivStop()" style="font-size:13px;padding:8px 14px;border:2px solid #EF4444;color:#DC2626;background:#FEF2F2;border-radius:8px;cursor:pointer">停止</button>
         <span style="color:#D1D5DB">|</span>
@@ -718,12 +718,23 @@ async function deleteIndustry(id) {
 let ivPage = 1, ivIndustry = '', ivConfigData = null, ivProgressTimer = null;
 
 // ---- 采集控制 ----
-async function ivTrigger() {
+async function ivTrigger(industry) {
+  if (document.getElementById('iv-trigger-btn').disabled) return;
+  const label = industry ? `[${industry}]` : '全部行业';
+  if (!confirm(`确认触发 ${label} 采集？`)) return;
   const btn = document.getElementById('iv-trigger-btn');
   btn.disabled = true; btn.textContent = '采集中...';
-  const r = await req('/industry-videos/admin/trigger', { method: 'POST' });
-  showMsg('iv-msg', r?.msg || '已触发', 'success');
-  ivStartProgressPoll();
+  const r = await req('/industry-videos/admin/trigger', {
+    method: 'POST',
+    body: JSON.stringify({ industry: industry || '' })
+  });
+  if (r?.code === 200) {
+    showMsg('iv-msg', r.msg || '已触发', 'success');
+    ivStartProgressPoll();
+  } else {
+    btn.disabled = false; btn.textContent = '全部采集';
+    showMsg('iv-msg', r?.msg || '触发失败', 'error');
+  }
 }
 
 async function ivPause() {
@@ -811,6 +822,8 @@ function ivRenderConfig(industries) {
       <div style="display:flex;flex-direction:column;gap:4px">
         <button onclick="ivSaveKeywords(${ind.id},'${ind.name}')"
           style="font-size:12px;padding:4px 10px;border:1.5px solid #6366F1;color:#6366F1;background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">保存关键词</button>
+        <button onclick="ivTrigger('${ind.name}')"
+          style="font-size:12px;padding:4px 10px;border:1.5px solid #6366F1;color:#fff;background:#6366F1;border-radius:6px;cursor:pointer;white-space:nowrap">单独采集</button>
         <button id="ind-rename-btn-${ind.id}" onclick="ivStartRename(${ind.id})"
           style="font-size:12px;padding:4px 10px;border:1.5px solid #10B981;color:#10B981;background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">改名</button>
         <button id="ind-rename-ok-${ind.id}" onclick="ivConfirmRename(${ind.id})"
