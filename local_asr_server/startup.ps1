@@ -1,5 +1,5 @@
 # XiamuAgent - Local Services Auto-Start
-# Services: HeyGem(7861) + ASR(8765) + ngrok
+# Services: HeyGem(7861) + ASR(8765) + IndexTTS(8766) + ngrok
 
 $logFile = "$PSScriptRoot\startup.log"
 
@@ -42,11 +42,24 @@ if (IsPortInUse 8765) {
     Log "[ASR] process started (Whisper loading ~60s)"
 }
 
+# 3. IndexTTS (8766)
+if (IsPortInUse 8766) {
+    Log "[IndexTTS] already running, skip"
+} else {
+    Log "[IndexTTS] starting..."
+    Start-Process `
+        -FilePath "C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe" `
+        -ArgumentList "C:\AIClaudecode\local_asr_server\indextts_server.py" `
+        -WorkingDirectory "C:\AIClaudecode\local_asr_server" `
+        -WindowStyle Hidden
+    Log "[IndexTTS] process started (model loading ~30s)"
+}
+
 # wait for models to load
 Log "[wait] waiting 90s for models to load..."
 Start-Sleep -Seconds 90
 
-# 3. ngrok
+# 4. ngrok
 $ngrokRunning = Get-Process -Name "ngrok" -ErrorAction SilentlyContinue
 if ($ngrokRunning) {
     Log "[ngrok] already running, skip"
