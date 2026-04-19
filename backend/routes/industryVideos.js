@@ -115,7 +115,7 @@ router.get('/', requireAuth, async (req, res) => {
   const { rows } = await db.query(
     `SELECT id, industry, author, cover_url, likes, transcript, collected_at
      FROM industry_videos
-     WHERE industry = ? AND status = 'ok' AND transcript IS NOT NULL
+     WHERE industry = ? AND status != 'deleted' AND transcript IS NOT NULL AND transcript != ''
      ORDER BY likes DESC LIMIT ?`,
     [industry, parseInt(limit)]
   );
