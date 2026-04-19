@@ -344,6 +344,9 @@ router.get('/collect-job', async (req, res) => {
     Object.assign(industries, DEFAULT_KEYWORDS);
   }
 
+  // 接单时立即清 pending 标志（防止 collect-done 覆盖新触发的任务）
+  await db.query(`INSERT INTO system_config (config_key, value) VALUES ('collect_pending','0') ON DUPLICATE KEY UPDATE value='0'`);
+
   res.json({
     code: 200,
     pending: true,
@@ -433,7 +436,8 @@ router.post('/admin/submit', async (req, res) => {
 
 // POST /api/industry-videos/collect-done — 本地 ASR 通知采集完成
 router.post('/collect-done', async (req, res) => {
-  await db.query(`INSERT INTO system_config (config_key, value) VALUES ('collect_pending','0') ON DUPLICATE KEY UPDATE value='0'`);
+  // 注意：不在此处清 collect_pending，已在 collect-job 接单时清
+  // 避免旧任务完成时覆盖新触发的 pending 标志
   const { total_saved = 0, total_skipped = 0, error = null } = req.body || {};
   collectState.running    = false;
   collectState.paused     = false;
