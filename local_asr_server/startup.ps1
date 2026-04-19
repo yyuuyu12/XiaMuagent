@@ -75,7 +75,7 @@ if ($ngrokRunning) {
     if (Test-Path $ngrokExe) {
         Start-Process `
             -FilePath $ngrokExe `
-            -ArgumentList "http", "--domain=baculitic-derivable-sherilyn.ngrok-free.dev", "8765" `
+            -ArgumentList "http", "--domain=unburned-dollhouse-armhole.ngrok-free.dev", "8765" `
             -WindowStyle Hidden
         Log "[ngrok] tunnel started: baculitic-derivable-sherilyn.ngrok-free.dev"
     } else {
