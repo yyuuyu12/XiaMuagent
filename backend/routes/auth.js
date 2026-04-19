@@ -392,4 +392,11 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { router, requireAuth };
+function requireAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.userRole !== 'admin') return res.status(403).json({ code: 403, msg: '需要管理员权限' });
+    next();
+  });
+}
+
+module.exports = { router, requireAuth, requireAdmin };
