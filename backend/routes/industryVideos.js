@@ -43,6 +43,44 @@ function csLog(msg) {
   if (collectState.log.length > 15) collectState.log.shift();
 }
 
+// 把 collectState 关键字段持久化到 DB（忽略 items/log，只保核心进度）
+async function persistState() {
+  const snap = JSON.stringify({
+    running:      collectState.running,
+    paused:       collectState.paused,
+    startedAt:    collectState.startedAt,
+    finishedAt:   collectState.finishedAt,
+    industry:     collectState.industry,
+    keyword:      collectState.keyword,
+    keywordIdx:   collectState.keywordIdx,
+    keywordTotal: collectState.keywordTotal,
+    saved:        collectState.saved,
+    skipped:      collectState.skipped,
+    error:        collectState.error,
+  });
+  await db.query(
+    `INSERT INTO system_config (config_key, value) VALUES ('collect_state_json',?) ON DUPLICATE KEY UPDATE value=?`,
+    [snap, snap]
+  ).catch(() => {});
+}
+
+// 启动时从 DB 恢复上次进度（Zeabur 冷启/刷新页面都能看到历史状态）
+async function restoreStateFromDb() {
+  try {
+    const { rows } = await db.query(`SELECT value FROM system_config WHERE config_key='collect_state_json'`);
+    if (!rows[0]?.value) return;
+    const s = JSON.parse(rows[0].value);
+    // 若上次记录是 running=true，重启后视为异常中断
+    if (s.running) {
+      s.running = false;
+      s.error = '服务重启，采集中断';
+      s.finishedAt = new Date().toISOString();
+    }
+    Object.assign(collectState, s);
+  } catch (e) { console.warn('[IndustryVideos] restoreState 失败:', e.message); }
+}
+restoreStateFromDb();
+
 // ==================== 定时采集 ====================
 setInterval(async () => {
   try {
@@ -198,9 +236,10 @@ router.post('/admin/schedule', requireAdmin, async (req, res) => {
 });
 
 // POST /api/industry-videos/admin/pause — 暂停/继续采集
-router.post('/admin/pause', requireAdmin, (req, res) => {
+router.post('/admin/pause', requireAdmin, async (req, res) => {
   collectState.paused = !collectState.paused;
   csLog(collectState.paused ? '⏸ 采集已暂停' : '▶ 采集继续');
+  await persistState();
   res.json({ code: 200, paused: collectState.paused });
 });
 
@@ -213,6 +252,7 @@ router.post('/admin/stop', requireAdmin, async (req, res) => {
   collectState.finishedAt = new Date().toISOString();
   await db.query(`INSERT INTO system_config (config_key, value) VALUES ('collect_pending','0') ON DUPLICATE KEY UPDATE value='0'`);
   csLog('⛔ 采集已停止');
+  await persistState();
   // 短暂后清 stop 标志，以免影响下次触发
   setTimeout(() => { collectState.stop = false; }, 10000);
   res.json({ code: 200, msg: wasRunning ? '采集已停止' : '任务已取消' });
@@ -236,6 +276,7 @@ router.post('/admin/trigger', requireAdmin, async (req, res) => {
     industry: `等待本地服务接单 (${label})...`, keyword: '', keywordIdx: 0, keywordTotal: 0,
     saved: 0, skipped: 0, current: '', log: [`采集请求已写入（${label}），本地服务将在30秒内开始...`], items: [],
   });
+  await persistState();
   res.json({ code: 200, msg: `已触发${label}采集，本地服务将自动开始` });
 });
 
@@ -345,15 +386,17 @@ router.post('/collect-item', (req, res) => {
 });
 
 // POST /api/industry-videos/collect-heartbeat — 本地 ASR 推送进度心跳
-router.post('/collect-heartbeat', (req, res) => {
+router.post('/collect-heartbeat', async (req, res) => {
   const { industry, keyword, keyword_idx, keyword_total, saved, skipped } = req.body || {};
-  if (industry)           collectState.industry    = industry;
-  if (keyword)            collectState.keyword     = keyword;
-  if (keyword_idx != null) collectState.keywordIdx = keyword_idx;
-  if (keyword_total != null) collectState.keywordTotal = keyword_total;
-  if (saved    != null)   collectState.saved    = saved;
-  if (skipped  != null)   collectState.skipped  = skipped;
-  csLog(`[心跳] ${industry || '?'} / ${keyword || '?'}`);
+  if (industry)             collectState.industry    = industry;
+  if (keyword)              collectState.keyword     = keyword;
+  if (keyword_idx  != null) collectState.keywordIdx  = keyword_idx;
+  if (keyword_total!= null) collectState.keywordTotal= keyword_total;
+  // 心跳里的 saved/skipped 是 ASR 侧累计值，只在大于当前值时才更新（防止旧心跳覆盖）
+  if (saved   != null && saved   > collectState.saved)   collectState.saved   = saved;
+  if (skipped != null && skipped > collectState.skipped) collectState.skipped = skipped;
+  csLog(`[心跳] ${industry || '?'} / ${keyword || '?'} 已入库${collectState.saved}`);
+  await persistState();
   res.json({ code: 200 });
 });
 
@@ -392,14 +435,15 @@ router.post('/admin/submit', async (req, res) => {
 router.post('/collect-done', async (req, res) => {
   await db.query(`INSERT INTO system_config (config_key, value) VALUES ('collect_pending','0') ON DUPLICATE KEY UPDATE value='0'`);
   const { total_saved = 0, total_skipped = 0, error = null } = req.body || {};
-  collectState.running = false;
-  collectState.paused  = false;
-  collectState.stop    = false;
+  collectState.running    = false;
+  collectState.paused     = false;
+  collectState.stop       = false;
   collectState.finishedAt = new Date().toISOString();
-  collectState.error   = error;
-  collectState.saved   = total_saved;
-  collectState.skipped = total_skipped;
-  csLog(error ? `采集出错: ${error}` : `✅ 采集完成！入库 ${total_saved} 条，跳过 ${total_skipped} 条`);
+  collectState.error      = error;
+  if (total_saved  > collectState.saved)   collectState.saved   = total_saved;
+  if (total_skipped> collectState.skipped) collectState.skipped = total_skipped;
+  csLog(error ? `采集出错: ${error}` : `✅ 采集完成！入库 ${collectState.saved} 条，跳过 ${collectState.skipped} 条`);
+  await persistState();
   res.json({ code: 200, msg: 'ok' });
 });
 
