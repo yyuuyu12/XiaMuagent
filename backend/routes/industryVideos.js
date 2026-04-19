@@ -153,16 +153,22 @@ async function getAsrUrl() {
 
 // 搜索抖音高赞视频
 async function searchVideos(keyword, tikhubKey, count = 20) {
-  const url = `https://api.tikhub.io/api/v1/douyin/web/fetch_video_search_result?keyword=${encodeURIComponent(keyword)}&count=${count}&sort_type=1&publish_time=1`;
+  // 用 app/v3 接口，参数更简洁稳定
+  const url = `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_search_result?keyword=${encodeURIComponent(keyword)}&count=${count}&sort_type=1`;
   const resp = await fetch(url, {
     headers: { 'Authorization': `Bearer ${tikhubKey}` },
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(30000),
   });
-  if (!resp.ok) throw new Error(`TikHub HTTP ${resp.status}`);
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`TikHub HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
   const json = await resp.json();
-  // 兼容多种数据结构
-  const items = json?.data?.data || json?.data?.aweme_list || json?.data?.business_data || [];
-  console.log(`[IndustryVideos] TikHub raw keys: data.keys=${Object.keys(json?.data||{}).join(',')}, items=${items.length}`);
+  // 兼容多种数据结构，打印实际 key 便于调试
+  const dataObj = json?.data || {};
+  const dataKeys = Object.keys(dataObj).join(',');
+  const items = dataObj.aweme_list || dataObj.data || dataObj.business_data || [];
+  console.log(`[IndustryVideos] keyword="${keyword}" data.keys=[${dataKeys}] items=${items.length}`);
   return items.map(item => {
     const v = item.aweme_info || item;
     return {
