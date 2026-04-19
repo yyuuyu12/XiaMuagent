@@ -17,6 +17,28 @@ const INDUSTRY_KEYWORDS = {
 const KEEP_LATEST = 15;    // 每行业保留最新 N 条
 const MIN_CHARS   = 15;    // 文案少于此字数视为无口播，自动丢弃
 
+// ==================== 实时进度追踪 ====================
+const collectState = {
+  running: false,
+  startedAt: null,
+  industry: '',        // 当前行业
+  keyword: '',         // 当前关键词
+  keywordIdx: 0,
+  keywordTotal: 0,
+  saved: 0,            // 本次已入库总数
+  skipped: 0,          // 本次跳过（无口播/重复）
+  current: '',         // 当前正在处理的 aweme_id
+  log: [],             // 最近10条日志
+  finishedAt: null,
+  error: null,
+};
+
+function csLog(msg) {
+  console.log('[IndustryVideos]', msg);
+  collectState.log.push(msg);
+  if (collectState.log.length > 10) collectState.log.shift();
+}
+
 // ==================== 对外查询接口（用户端）====================
 
 // GET /api/industry-videos?industry=二手车&limit=15
@@ -78,9 +100,37 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
   res.json({ code: 200, msg: '已删除' });
 });
 
+// GET /api/industry-videos/admin/progress — 查询采集进度
+router.get('/admin/progress', requireAdmin, (req, res) => {
+  const industries = Object.keys(INDUSTRY_KEYWORDS);
+  const industryIdx = collectState.industry ? industries.indexOf(collectState.industry) : -1;
+  res.json({
+    code: 200,
+    data: {
+      running:      collectState.running,
+      startedAt:    collectState.startedAt,
+      finishedAt:   collectState.finishedAt,
+      error:        collectState.error,
+      industry:     collectState.industry,
+      industryIdx:  industryIdx + 1,
+      industryTotal: industries.length,
+      keyword:      collectState.keyword,
+      keywordIdx:   collectState.keywordIdx,
+      keywordTotal: collectState.keywordTotal,
+      saved:        collectState.saved,
+      skipped:      collectState.skipped,
+      current:      collectState.current,
+      log:          collectState.log,
+    }
+  });
+});
+
 // POST /api/industry-videos/admin/trigger — 手动触发一次采集
 router.post('/admin/trigger', requireAdmin, async (req, res) => {
-  res.json({ code: 200, msg: '采集任务已触发，后台执行中（约10-30分钟）' });
+  if (collectState.running) {
+    return res.json({ code: 200, msg: '采集任务已在运行中' });
+  }
+  res.json({ code: 200, msg: '采集任务已触发' });
   // 异步执行，不阻塞响应
   runCollect().catch(e => console.error('[IndustryVideos] collect error:', e));
 });
@@ -139,79 +189,116 @@ async function transcribeVideo(mp4Url, asrUrl) {
 
 // 主采集函数
 async function runCollect() {
-  console.log('[IndustryVideos] 开始采集...');
-  const tikhubKey = await getTikhubKey();
-  const asrUrl = await getAsrUrl();
+  if (collectState.running) { console.log('[IndustryVideos] 已在采集中，跳过'); return; }
 
-  if (!tikhubKey) { console.error('[IndustryVideos] TikHub Key 未配置'); return; }
-  if (!asrUrl)    { console.error('[IndustryVideos] ASR URL 未配置'); return; }
+  // 初始化进度
+  Object.assign(collectState, {
+    running: true, startedAt: new Date().toISOString(), finishedAt: null, error: null,
+    industry: '', keyword: '', keywordIdx: 0, keywordTotal: 0,
+    saved: 0, skipped: 0, current: '', log: [],
+  });
+  csLog('开始采集...');
 
-  for (const [industry, keywords] of Object.entries(INDUSTRY_KEYWORDS)) {
-    console.log(`[IndustryVideos] 采集行业: ${industry}`);
-    const collected = new Set();
+  try {
+    const tikhubKey = await getTikhubKey();
+    const asrUrl = await getAsrUrl();
 
-    for (const keyword of keywords) {
-      let videos = [];
-      try {
-        videos = await searchVideos(keyword, tikhubKey, 20);
-      } catch (e) {
-        console.warn(`[IndustryVideos] 搜索失败 keyword=${keyword}:`, e.message);
-        continue;
-      }
+    if (!tikhubKey) { collectState.error = 'TikHub Key 未配置'; csLog('错误：TikHub Key 未配置'); return; }
+    if (!asrUrl)    { collectState.error = 'ASR URL 未配置';    csLog('错误：ASR URL 未配置');    return; }
 
-      // 按点赞降序
-      videos.sort((a, b) => b.likes - a.likes);
+    for (const [industry, keywords] of Object.entries(INDUSTRY_KEYWORDS)) {
+      collectState.industry = industry;
+      collectState.keywordTotal = keywords.length;
+      collectState.keywordIdx = 0;
+      csLog(`开始行业: ${industry}`);
+      const collected = new Set();
 
-      for (const v of videos) {
-        if (collected.has(v.aweme_id)) continue;
+      for (let ki = 0; ki < keywords.length; ki++) {
+        const keyword = keywords[ki];
+        collectState.keyword = keyword;
+        collectState.keywordIdx = ki + 1;
+        csLog(`搜索关键词: "${keyword}"`);
 
-        // 已存在则跳过
-        const { rows: exist } = await db.query(
-          `SELECT id FROM industry_videos WHERE aweme_id = ?`, [v.aweme_id]
-        );
-        if (exist.length > 0) { collected.add(v.aweme_id); continue; }
-
-        // ASR 提取
-        let transcript = null;
+        let videos = [];
         try {
-          transcript = await transcribeVideo(v.video_url, asrUrl);
+          videos = await searchVideos(keyword, tikhubKey, 20);
+          csLog(`"${keyword}" 找到 ${videos.length} 个视频`);
         } catch (e) {
-          console.warn(`[IndustryVideos] ASR失败 aweme_id=${v.aweme_id}:`, e.message);
-        }
-
-        // 自动过滤无口播
-        if (!transcript || transcript.length < MIN_CHARS) {
-          console.log(`[IndustryVideos] 跳过（无口播/字数不足）: ${v.aweme_id}`);
+          csLog(`搜索失败: ${keyword} — ${e.message}`);
           continue;
         }
 
-        // 写库
-        await db.query(
-          `INSERT IGNORE INTO industry_videos
-           (industry, aweme_id, author, cover_url, video_url, likes, transcript)
-           VALUES (?,?,?,?,?,?,?)`,
-          [industry, v.aweme_id, v.author, v.cover_url, v.video_url, v.likes, transcript]
-        );
-        collected.add(v.aweme_id);
-        console.log(`[IndustryVideos] 已收录: ${industry} | ${v.aweme_id} | ${v.likes}赞`);
+        videos.sort((a, b) => b.likes - a.likes);
+
+        for (const v of videos) {
+          if (collected.has(v.aweme_id)) continue;
+          collectState.current = v.aweme_id;
+
+          // 已存在则跳过
+          const { rows: exist } = await db.query(
+            `SELECT id FROM industry_videos WHERE aweme_id = ?`, [v.aweme_id]
+          );
+          if (exist.length > 0) {
+            collected.add(v.aweme_id);
+            collectState.skipped++;
+            continue;
+          }
+
+          // ASR 提取
+          let transcript = null;
+          try {
+            csLog(`ASR转录: ${v.aweme_id} (${v.likes}赞)`);
+            transcript = await transcribeVideo(v.video_url, asrUrl);
+          } catch (e) {
+            csLog(`ASR失败: ${v.aweme_id} — ${e.message}`);
+            collectState.skipped++;
+          }
+
+          // 自动过滤无口播
+          if (!transcript || transcript.length < MIN_CHARS) {
+            csLog(`跳过（无口播）: ${v.aweme_id}`);
+            collectState.skipped++;
+            continue;
+          }
+
+          // 写库
+          await db.query(
+            `INSERT IGNORE INTO industry_videos
+             (industry, aweme_id, author, cover_url, video_url, likes, transcript)
+             VALUES (?,?,?,?,?,?,?)`,
+            [industry, v.aweme_id, v.author, v.cover_url, v.video_url, v.likes, transcript]
+          );
+          collected.add(v.aweme_id);
+          collectState.saved++;
+          csLog(`✓ 入库: ${industry} | ${v.aweme_id} | ${v.likes}赞`);
+        }
       }
+
+      // 保留最新 KEEP_LATEST 条，超出的软删除
+      const { rows: all } = await db.query(
+        `SELECT id FROM industry_videos WHERE industry = ? AND status = 'ok' ORDER BY likes DESC`,
+        [industry]
+      );
+      if (all.length > KEEP_LATEST) {
+        const toDelete = all.slice(KEEP_LATEST).map(r => r.id);
+        await db.query(
+          `UPDATE industry_videos SET status = 'old' WHERE id IN (${toDelete.map(() => '?').join(',')})`,
+          toDelete
+        );
+        csLog(`${industry} 超额 ${toDelete.length} 条降级`);
+      }
+      csLog(`行业 ${industry} 完成，本次入库 ${collectState.saved} 条`);
     }
 
-    // 保留最新 KEEP_LATEST 条，超出的软删除
-    const { rows: all } = await db.query(
-      `SELECT id FROM industry_videos WHERE industry = ? AND status = 'ok' ORDER BY likes DESC`,
-      [industry]
-    );
-    if (all.length > KEEP_LATEST) {
-      const toDelete = all.slice(KEEP_LATEST).map(r => r.id);
-      await db.query(
-        `UPDATE industry_videos SET status = 'old' WHERE id IN (${toDelete.map(() => '?').join(',')})`,
-        toDelete
-      );
-      console.log(`[IndustryVideos] ${industry} 超额 ${toDelete.length} 条降级为 old`);
-    }
+    csLog(`全部完成！共入库 ${collectState.saved} 条，跳过 ${collectState.skipped} 条`);
+  } catch (e) {
+    collectState.error = e.message;
+    csLog(`采集异常: ${e.message}`);
+  } finally {
+    collectState.running = false;
+    collectState.finishedAt = new Date().toISOString();
+    collectState.current = '';
   }
-  console.log('[IndustryVideos] 采集完成');
 }
 
 module.exports = { router, runCollect, INDUSTRY_KEYWORDS };

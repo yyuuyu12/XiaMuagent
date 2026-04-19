@@ -76,6 +76,7 @@
     .modal-bg.open { display: flex; }
     .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; }
     .modal-box h3 { font-size: 16px; font-weight: 700; color: #1E1B4B; margin-bottom: 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -249,7 +250,7 @@
   <!-- 行业精选视频管理 -->
   <div class="section">
     <h2>🎬 行业精选视频管理</h2>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
       <select id="iv-industry-sel" onchange="loadIndustryVideos(this.value,1)" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:9px;font-size:13px;outline:none">
         <option value="">全部行业</option>
         <option value="二手车">二手车</option>
@@ -258,6 +259,15 @@
       <button id="iv-trigger-btn" onclick="ivTrigger()" class="btn-primary" style="font-size:13px;padding:8px 18px">立即采集</button>
       <button onclick="loadIndustryVideos(ivIndustry,ivPage)" style="font-size:13px;padding:8px 14px;border:2px solid #E8EDFF;border-radius:9px;background:#fff;cursor:pointer">刷新</button>
       <span id="iv-total" style="font-size:12px;color:#9CA3AF"></span>
+    </div>
+    <!-- 采集进度面板 -->
+    <div id="iv-progress-box" style="display:none;background:#F0F4FF;border:1.5px solid #C7D2FE;border-radius:10px;padding:14px 16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span id="iv-progress-spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #6366F1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></span>
+        <span id="iv-progress-title" style="font-size:13px;font-weight:700;color:#3730A3">采集进行中...</span>
+      </div>
+      <div id="iv-progress-detail" style="font-size:12px;color:#4B5563;line-height:1.7"></div>
+      <div id="iv-progress-log" style="margin-top:8px;font-size:11px;color:#6B7280;font-family:monospace;background:#EEF2FF;border-radius:6px;padding:8px;max-height:80px;overflow-y:auto"></div>
     </div>
     <div id="iv-msg" class="msg" style="margin-bottom:8px"></div>
     <div style="overflow-x:auto">
@@ -696,13 +706,106 @@ async function ivDelete(id) {
   if (r?.code === 200) { document.getElementById(`iv-row-${id}`).remove(); }
 }
 
+let ivProgressTimer = null;
+
 async function ivTrigger() {
   const btn = document.getElementById('iv-trigger-btn');
-  btn.disabled = true; btn.textContent = '采集中…';
-  const r = await req('/api/industry-videos/admin/trigger', 'POST');
+  btn.disabled = true; btn.textContent = '采集中...';
+  const r = await req('/api/industry-videos/admin/trigger', {method:'POST'});
   document.getElementById('iv-msg').textContent = r?.msg || '已触发';
-  setTimeout(() => { btn.disabled = false; btn.textContent = '立即采集'; }, 3000);
+  // 立即开始轮询进度
+  ivStartProgressPoll();
 }
+
+function ivStartProgressPoll() {
+  if (ivProgressTimer) return;
+  ivPollProgress(); // 立即查一次
+  ivProgressTimer = setInterval(ivPollProgress, 3000);
+}
+
+async function ivPollProgress() {
+  let p;
+  try {
+    const r = await req('/api/industry-videos/admin/progress', {method:'GET'});
+    p = r?.data;
+  } catch(e) { return; }
+  if (!p) return;
+
+  const box = document.getElementById('iv-progress-box');
+  const btn = document.getElementById('iv-trigger-btn');
+  const title = document.getElementById('iv-progress-title');
+  const detail = document.getElementById('iv-progress-detail');
+  const logDiv = document.getElementById('iv-progress-log');
+  const spinner = document.getElementById('iv-progress-spinner');
+
+  if (!p.running && !p.startedAt) {
+    // 从未运行过
+    box.style.display = 'none';
+    return;
+  }
+
+  box.style.display = 'block';
+
+  if (p.running) {
+    spinner.style.display = 'inline-block';
+    title.textContent = '采集进行中...';
+    btn.disabled = true; btn.textContent = '采集中...';
+
+    const elapsed = p.startedAt ? Math.round((Date.now() - new Date(p.startedAt).getTime()) / 1000) : 0;
+    const elapsedStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed/60)}分${elapsed%60}秒`;
+
+    detail.innerHTML = [
+      p.industry ? `<b>当前行业:</b> ${p.industry} (${p.industryIdx}/${p.industryTotal})` : '',
+      p.keyword  ? `<b>当前关键词:</b> ${p.keyword} (${p.keywordIdx}/${p.keywordTotal})` : '',
+      p.current  ? `<b>正在转录:</b> ${p.current}` : '',
+      `<b>已入库:</b> ${p.saved} 条　<b>已跳过:</b> ${p.skipped} 条`,
+      `<b>已用时:</b> ${elapsedStr}`,
+    ].filter(Boolean).join('<br>');
+  } else {
+    // 已完成或出错
+    spinner.style.display = 'none';
+    btn.disabled = false; btn.textContent = '立即采集';
+
+    if (ivProgressTimer) { clearInterval(ivProgressTimer); ivProgressTimer = null; }
+
+    if (p.error) {
+      title.textContent = '❌ 采集出错';
+      title.style.color = '#DC2626';
+    } else {
+      title.textContent = `✅ 采集完成！共入库 ${p.saved} 条，跳过 ${p.skipped} 条`;
+      title.style.color = '#059669';
+    }
+
+    const finishTime = p.finishedAt ? new Date(p.finishedAt).toLocaleTimeString('zh-CN') : '';
+    const startTime  = p.startedAt  ? new Date(p.startedAt).toLocaleTimeString('zh-CN') : '';
+    const elapsed = p.startedAt && p.finishedAt
+      ? Math.round((new Date(p.finishedAt) - new Date(p.startedAt)) / 1000) : 0;
+    const elapsedStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed/60)}分${elapsed%60}秒`;
+
+    detail.innerHTML = [
+      `开始: ${startTime}　结束: ${finishTime}　耗时: ${elapsedStr}`,
+      p.error ? `<span style="color:#DC2626">错误: ${p.error}</span>` : '',
+    ].filter(Boolean).join('<br>');
+
+    // 完成后自动刷新数据表
+    loadIndustryVideos(ivIndustry, ivPage);
+  }
+
+  // 显示日志
+  if (p.log && p.log.length) {
+    logDiv.innerHTML = p.log.map(l => `<div>${l}</div>`).join('');
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
+}
+
+// 页面加载时检查是否有进行中的采集
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(async () => {
+    const r = await req('/api/industry-videos/admin/progress', 'GET').catch(() => null);
+    if (r?.data?.running) ivStartProgressPoll();
+    else if (r?.data?.startedAt) ivPollProgress(); // 显示上次结果
+  }, 1000);
+});
 </script>
 </body>
 </html>
