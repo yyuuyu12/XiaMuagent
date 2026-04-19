@@ -2136,11 +2136,14 @@ async function enterFeaturedMode() {
 
 async function loadFeaturedIndustries() {
   try {
-    const r = await api.get('/api/industry-videos/industries');
+    const r = await fetch('/api/industry-videos/industries').then(x => x.json());
     if (r.code === 200 && Array.isArray(r.data)) {
       setState({ featuredIndustriesList: r.data });
+      render();
     }
-  } catch(e) { /* 静默失败 */ }
+  } catch(e) {
+    console.error('[loadFeaturedIndustries]', e);
+  }
 }
 
 function tInspireFeatured() {

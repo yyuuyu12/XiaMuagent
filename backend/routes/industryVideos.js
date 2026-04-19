@@ -122,8 +122,8 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ code: 200, data: rows });
 });
 
-// GET /api/industry-videos/industries — 返回所有行业名称列表（从 industries 表，不依赖是否已采集）
-router.get('/industries', requireAuth, async (req, res) => {
+// GET /api/industry-videos/industries — 返回所有行业名称列表（无需登录，公开接口）
+router.get('/industries', async (req, res) => {
   const { rows } = await db.query(
     `SELECT name FROM industries ORDER BY sort_order ASC, id ASC`
   );
