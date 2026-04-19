@@ -382,16 +382,30 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .inspire-entry-desc { font-size: 13px; color: #6B6860; line-height: 1.6; }
 
 /* === FEATURED VIDEOS === */
-.featured-industry-tags { display: flex; flex-wrap: wrap; gap: 10px; }
-.industry-tag-btn { padding: 8px 18px; border-radius: 50px; background: #F5F4F2; color: #6B6860; font-size: 14px; font-weight: 500; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
-.industry-tag-active { background: #FFF6F3; border-color: #FF6B35; color: #FF6B35; font-weight: 700; }
-.featured-video-card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
-.featured-video-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.featured-video-author { font-size: 13px; font-weight: 600; color: #1A1814; }
-.featured-video-likes { font-size: 12px; color: #A8A49C; }
-.featured-video-text { font-size: 14px; color: #3D3A35; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
-.featured-video-actions { margin-top: 12px; display: flex; justify-content: flex-end; }
-.featured-copy-btn { background: #FF6B35; color: #fff; border: none; border-radius: 20px; padding: 7px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+/* 行业精选 - 选择页 */
+.ind-select-title { font-size: 19px; font-weight: 800; color: #1E1B4B; text-align: center; margin-bottom: 6px; }
+.ind-select-sub { font-size: 13px; color: #9CA3AF; text-align: center; margin-bottom: 20px; }
+.ind-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ind-card { background: #F8F9FF; border: 2px solid #E8EDFF; border-radius: 14px; padding: 15px 13px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.15s; }
+.ind-card.sel { background: rgba(99,102,241,0.08); border-color: #6366F1; }
+.ind-card-name { font-size: 15px; font-weight: 600; color: #1E1B4B; }
+.ind-card.sel .ind-card-name { color: #6366F1; }
+.ind-card-icon { font-size: 22px; }
+.ind-confirm-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 20px 32px; background: #fff; border-top: 1px solid #F3F4F6; z-index: 10; }
+.ind-confirm-btn { width: 100%; padding: 15px; background: linear-gradient(135deg,#6366F1,#818CF8); color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.ind-confirm-btn:disabled { background: #E5E7EB; color: #9CA3AF; cursor: not-allowed; }
+/* 行业精选 - 内容页 */
+.feat-page-title { font-size: 15px; font-weight: 700; color: #1E1B4B; margin-bottom: 14px; text-align: center; }
+.feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+.feat-card { background: #fff; border: 2px solid #F3F4F6; border-radius: 14px; padding: 13px 11px 10px; cursor: pointer; transition: border-color 0.15s,background 0.15s; }
+.feat-card.sel { border-color: #6366F1; background: rgba(99,102,241,0.04); }
+.feat-card-text { font-size: 13px; color: #374151; line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; word-break: break-all; }
+.feat-card-likes { font-size: 12px; color: #9CA3AF; }
+.feat-card.sel .feat-card-likes { color: #6366F1; }
+.feat-action-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px 32px; background: #fff; border-top: 1px solid #F3F4F6; display: flex; gap: 10px; z-index: 10; }
+.feat-btn-sec { flex: 1; padding: 14px; background: #F3F4F6; color: #374151; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.feat-btn-pri { flex: 1.4; padding: 14px; background: linear-gradient(135deg,#6366F1,#818CF8); color: #fff; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.feat-btn-sec:disabled,.feat-btn-pri:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* === PATH A · 对标拆解 === */
 .video-list-item { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
@@ -663,8 +677,9 @@ const S = {
   // ===== 灵感发现 · 新流程 =====
   inspireMode: null,          // null | 'analyze' | 'industry' | 'featured'
   // 行业精选
+  featuredPage: 'select',      // 'select' | 'content'
   featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredErr: '',
-  featuredIndustriesList: [],
+  featuredIndustriesList: [], featuredSelectedIdx: null,
   // 路径A
   pathAText: '', pathALoading: false, pathAErr: '',
   pathAState: 'input',        // 'input'|'videos'|'started'
@@ -1058,7 +1073,11 @@ function tTopBar() {
       backAction = "setState({inspireMode:null});render()";
     } else if (S.inspireMode === 'featured') {
       title = '行业精选';
-      backAction = "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}setState({inspireMode:null});render()";
+      if (S.featuredPage === 'content') {
+        backAction = "setState({featuredPage:'select',featuredSelectedIdx:null});render()";
+      } else {
+        backAction = "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}setState({inspireMode:null,featuredPage:'select'});render()";
+      }
     } else {
       title = '灵感发现';
     }
@@ -2109,26 +2128,18 @@ function tInspireIndustry() {
 let _featuredRefreshTimer = null;
 
 async function enterFeaturedMode() {
-  setState({ inspireMode: 'featured', featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredErr: '' });
+  setState({ inspireMode: 'featured', featuredPage: 'select', featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredErr: '', featuredSelectedIdx: null });
   render();
   await loadFeaturedIndustries();
   if (_featuredRefreshTimer) clearInterval(_featuredRefreshTimer);
-  // 每30秒刷新行业列表和当前行业内容
   _featuredRefreshTimer = setInterval(async () => {
     if (S.inspireMode !== 'featured') return;
     const prevList = (S.featuredIndustriesList || []).join(',');
     await loadFeaturedIndustries();
-    // 行业列表变了则重新渲染
     const newList = (S.featuredIndustriesList || []).join(',');
     if (prevList !== newList) render();
-    // 当前选中行业被删则清空
-    if (S.featuredIndustry && !(S.featuredIndustriesList || []).includes(S.featuredIndustry)) {
-      setState({ featuredIndustry: null, featuredVideos: [] });
-      render();
-      return;
-    }
-    // 刷新当前行业内容
-    if (S.featuredIndustry && !S.featuredLoading) {
+    // 内容页：刷新当前行业内容
+    if (S.featuredPage === 'content' && S.featuredIndustry && !S.featuredLoading) {
       featuredSelectIndustry(S.featuredIndustry);
     }
   }, 30000);
@@ -2146,45 +2157,57 @@ async function loadFeaturedIndustries() {
   }
 }
 
+const _IND_ICONS = {'餐饮':'🍳','美业':'💄','房产':'🏠','教育/教培':'📚','教育':'📚','大健康':'💪','装修':'🔨','国学':'☯️','情感':'💕','宠物':'🐾','旅游':'✈️','科技':'💻','养老':'👴','汽车':'🚗','二手车':'🚙','二手车1':'🚙','保险':'🛡️','法律':'⚖️','数码':'📱','职场成长':'💼','职场':'💼','新房销售':'🏡','新房':'🏡'};
+
 function tInspireFeatured() {
-  // 离开精选模式时清定时器
+  return S.featuredPage === 'content' ? tFeaturedContent() : tFeaturedSelect();
+}
+
+function tFeaturedSelect() {
   const list = S.featuredIndustriesList || [];
-  const industryTags = list.length === 0
-    ? `<div style="color:#A8A49C;font-size:13px">暂无行业数据，请联系管理员添加</div>`
-    : list.map(ind => `
-        <div class="industry-tag-btn ${S.featuredIndustry===ind?'industry-tag-active':''}"
-             onclick="featuredSelectIndustry('${ind}')">${ind}</div>
-      `).join('');
-
-  let content = '';
-  if (!S.featuredIndustry) {
-    content = `<div style="text-align:center;color:#A8A49C;font-size:14px;margin-top:32px">请选择行业查看精选文案</div>`;
-  } else if (S.featuredLoading) {
-    content = `<div style="text-align:center;padding:40px 0"><div class="loading-spinner"></div><div style="color:#A8A49C;font-size:13px;margin-top:8px">加载中...</div></div>`;
-  } else if (S.featuredErr) {
-    content = `<div class="err-text">${esc(S.featuredErr)}</div>`;
-  } else if (!S.featuredVideos || S.featuredVideos.length === 0) {
-    content = `<div style="text-align:center;color:#A8A49C;font-size:14px;margin-top:32px">暂无数据，管理员尚未采集该行业内容</div>`;
-  } else {
-    content = S.featuredVideos.map((v, i) => `
-      <div class="featured-video-card">
-        <div class="featured-video-meta">
-          <span class="featured-video-author">${esc(v.author || '匿名')}</span>
-          <span class="featured-video-likes">👍 ${fmtLikes(v.likes)}</span>
-        </div>
-        <div class="featured-video-text">${esc(v.transcript)}</div>
-        <div class="featured-video-actions">
-          <button class="featured-copy-btn" onclick="featuredCopy(${i})">复制文案</button>
-          <button class="featured-copy-btn" style="background:#F97316;color:#fff;border:none" onclick="startCloneFromFeatured(${v.id})">改写此文案</button>
-        </div>
-      </div>
-    `).join('');
+  if (list.length === 0) {
+    return `<div class="tab-page"><div style="text-align:center;color:#9CA3AF;margin-top:60px;font-size:14px">暂无行业数据，请联系管理员</div></div>`;
   }
+  const cards = list.map(ind => `
+    <div class="ind-card ${S.featuredIndustry===ind?'sel':''}" onclick="setState({featuredIndustry:'${esc(ind)}'});render()">
+      <span class="ind-card-name">${esc(ind)}</span>
+      <span class="ind-card-icon">${_IND_ICONS[ind]||'📋'}</span>
+    </div>`).join('');
+  return `<div class="tab-page" style="padding-bottom:110px">
+    <div class="ind-select-title">选择更符合你的行业</div>
+    <div class="ind-select-sub">帮助精准匹配同行爆款口播文案</div>
+    <div class="ind-grid">${cards}</div>
+    <div class="ind-confirm-bar">
+      <button class="ind-confirm-btn" ${!S.featuredIndustry?'disabled':''} onclick="featuredConfirm()">确认</button>
+    </div>
+  </div>`;
+}
 
-  return `<div class="tab-page">
-    <div style="font-size:13px;color:#A8A49C;margin-bottom:10px">选择行业</div>
-    <div class="featured-industry-tags">${industryTags}</div>
-    <div style="margin-top:16px">${content}</div>
+function tFeaturedContent() {
+  const ind = S.featuredIndustry || '';
+  const sel = S.featuredSelectedIdx;
+  let grid = '';
+  if (S.featuredLoading) {
+    grid = `<div style="grid-column:1/-1;text-align:center;padding:40px 0"><div class="loading-spinner"></div></div>`;
+  } else if (S.featuredErr) {
+    grid = `<div style="grid-column:1/-1;text-align:center;color:#EF4444;font-size:13px">${esc(S.featuredErr)}</div>`;
+  } else if (!S.featuredVideos || S.featuredVideos.length === 0) {
+    grid = `<div style="grid-column:1/-1;text-align:center;color:#9CA3AF;font-size:13px;padding:40px 0">该行业暂无采集数据</div>`;
+  } else {
+    grid = S.featuredVideos.map((v, i) => `
+      <div class="feat-card ${sel===i?'sel':''}" onclick="setState({featuredSelectedIdx:${i}});render()">
+        <div class="feat-card-text">${esc(v.transcript)}</div>
+        <div class="feat-card-likes">👍 ${fmtLikes(v.likes)}</div>
+      </div>`).join('');
+  }
+  const hasSel = sel !== null && sel !== undefined && S.featuredVideos && S.featuredVideos[sel];
+  return `<div class="tab-page" style="padding-bottom:110px">
+    <div class="feat-page-title">${esc(ind)}行业近期爆款文案</div>
+    <div class="feat-grid">${grid}</div>
+    <div class="feat-action-bar">
+      <button class="feat-btn-sec" ${!hasSel?'disabled':''} onclick="featuredCopySelected()">复制文案</button>
+      <button class="feat-btn-pri" ${!hasSel?'disabled':''} onclick="featuredRewrite()">仿写爆款</button>
+    </div>
   </div>`;
 }
 
@@ -2228,17 +2251,46 @@ async function startCloneFromFeatured(videoId) {
 function featuredCopy(i) {
   const v = (S.featuredVideos || [])[i];
   if (!v) return;
-  navigator.clipboard.writeText(v.transcript).then(() => {
-    showToast('已复制');
-  }).catch(() => {
+  navigator.clipboard.writeText(v.transcript).then(() => showToast('已复制')).catch(() => {
     const ta = document.createElement('textarea');
-    ta.value = v.transcript;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    showToast('已复制');
+    ta.value = v.transcript; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); showToast('已复制');
   });
+}
+
+async function featuredConfirm() {
+  if (!S.featuredIndustry) return;
+  setState({ featuredPage: 'content', featuredVideos: [], featuredLoading: true, featuredErr: '', featuredSelectedIdx: null });
+  render();
+  try {
+    const r = await fetch(`/api/industry-videos?industry=${encodeURIComponent(S.featuredIndustry)}&limit=15`).then(x => x.json());
+    setState({ featuredVideos: r.code === 200 ? (r.data || []) : [], featuredLoading: false, featuredErr: r.code !== 200 ? (r.msg || '加载失败') : '' });
+  } catch(e) {
+    setState({ featuredErr: '网络错误，请重试', featuredLoading: false });
+  }
+  render();
+}
+
+function featuredCopySelected() {
+  const v = (S.featuredVideos || [])[S.featuredSelectedIdx];
+  if (!v) return;
+  navigator.clipboard.writeText(v.transcript).then(() => showToast('已复制')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = v.transcript; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); showToast('已复制');
+  });
+}
+
+function featuredRewrite() {
+  const v = (S.featuredVideos || [])[S.featuredSelectedIdx];
+  if (!v) return;
+  // 跳到创作tab，预填爆款文案作为改写素材
+  setState({ pathBInputText: v.transcript, pathBState: 'form', inspireMode: null });
+  if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
+  switchTab('inspire');
+  setState({ inspireMode: 'analyze' });
+  render();
+  showToast('已填入爆款文案，点击分析仿写');
 }
 
 // ===== PROFILE =====
