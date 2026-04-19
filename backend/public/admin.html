@@ -263,18 +263,32 @@
       <div id="iv-collect-status" style="font-size:12px;color:#9CA3AF;margin-top:8px">加载中...</div>
     </div>
 
-    <!-- 采集进度面板（增强版） -->
+    <!-- 采集进度面板 -->
     <div id="iv-progress-box" style="display:none;background:#F0F4FF;border:1.5px solid #C7D2FE;border-radius:10px;padding:14px 16px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span id="iv-progress-spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #6366F1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></span>
-        <span id="iv-progress-title" style="font-size:13px;font-weight:700;color:#3730A3">采集进行中...</span>
+      <!-- 标题行 -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span id="iv-progress-spinner" style="flex-shrink:0;display:inline-block;width:14px;height:14px;border:2px solid #6366F1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></span>
+        <span id="iv-progress-title" style="font-size:14px;font-weight:700;color:#3730A3;flex:1">采集进行中...</span>
       </div>
-      <div id="iv-progress-detail" style="font-size:12px;color:#4B5563;line-height:1.8;margin-bottom:8px"></div>
+      <!-- 核心计数（醒目大字） -->
+      <div style="display:flex;gap:16px;margin-bottom:10px;padding:10px 14px;background:#fff;border-radius:8px;border:1px solid #C7D2FE">
+        <div style="text-align:center">
+          <div id="iv-cnt-saved" style="font-size:24px;font-weight:800;color:#059669;line-height:1">0</div>
+          <div style="font-size:11px;color:#6B7280;margin-top:2px">已入库</div>
+        </div>
+        <div style="text-align:center">
+          <div id="iv-cnt-skipped" style="font-size:24px;font-weight:800;color:#9CA3AF;line-height:1">0</div>
+          <div style="font-size:11px;color:#6B7280;margin-top:2px">已跳过</div>
+        </div>
+        <div style="text-align:center;flex:1;text-align:left;padding-left:12px;border-left:1px solid #E8EDFF">
+          <div id="iv-cur-industry" style="font-size:13px;font-weight:700;color:#1E1B4B">-</div>
+          <div id="iv-cur-keyword" style="font-size:12px;color:#6B7280;margin-top:2px">等待采集开始...</div>
+          <div id="iv-cur-elapsed" style="font-size:11px;color:#9CA3AF;margin-top:2px"></div>
+        </div>
+      </div>
       <!-- 实时入库 Feed -->
-      <div style="font-size:11px;color:#6B6860;margin-bottom:4px;font-weight:600">📡 实时入库（最新30条）</div>
-      <div id="iv-items-feed" style="font-size:11px;font-family:monospace;background:#EEF2FF;border-radius:6px;padding:8px;max-height:120px;overflow-y:auto;line-height:1.7"></div>
-      <!-- 日志 -->
-      <div id="iv-progress-log" style="margin-top:8px;font-size:10px;color:#9CA3AF;font-family:monospace;background:#F3F4F6;border-radius:6px;padding:6px;max-height:60px;overflow-y:auto"></div>
+      <div style="font-size:11px;color:#6B6860;margin-bottom:4px;font-weight:600">📡 实时入库记录</div>
+      <div id="iv-items-feed" style="font-size:11px;font-family:monospace;background:#EEF2FF;border-radius:6px;padding:8px;max-height:140px;overflow-y:auto;line-height:1.8"></div>
     </div>
 
     <!-- 行业关键词配置 -->
@@ -297,6 +311,7 @@
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
       <button onclick="loadIndustryVideos(ivIndustry,1)" style="font-size:12px;padding:6px 12px;border:2px solid #E8EDFF;border-radius:8px;background:#fff;cursor:pointer">刷新列表</button>
       <span id="iv-total" style="font-size:12px;color:#9CA3AF"></span>
+      <span id="iv-last-refresh" style="font-size:11px;color:#C4BFB8"></span>
     </div>
     <div style="overflow-x:auto">
       <table class="code-table">
@@ -894,6 +909,8 @@ async function loadIndustryVideos(industry, page) {
   if (!r || r.code !== 200) { if(msg) msg.textContent = '加载失败'; return; }
   if(msg) msg.textContent = '';
   document.getElementById('iv-total').textContent = `共 ${r.total} 条`;
+  const refreshEl = document.getElementById('iv-last-refresh');
+  if (refreshEl) refreshEl.textContent = `刷新于 ${new Date().toLocaleTimeString('zh-CN', {hour12:false})}`;
   if (!r.data.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">该行业暂无数据，请先触发采集</td></tr>';
     ivRenderPagination(0, ivPage);
@@ -913,7 +930,7 @@ async function loadIndustryVideos(industry, page) {
         </div>
       </td>
       <td style="font-size:12px;color:#6B7280;white-space:nowrap">${(v.likes||0).toLocaleString()}</td>
-      <td style="font-size:11px;color:#9CA3AF;white-space:nowrap">${v.collected_at ? new Date(v.collected_at).toLocaleDateString('zh-CN') : '-'}</td>
+      <td style="font-size:11px;color:#9CA3AF;white-space:nowrap">${v.collected_at ? new Date(v.collected_at).toLocaleString('zh-CN', {hour12:false}) : '-'}</td>
       <td><span style="display:inline-block;padding:2px 8px;border-radius:50px;font-size:11px;background:${v.status==='ok'?'#D1FAE5':'#FEE2E2'};color:${v.status==='ok'?'#065F46':'#991B1B'}">${v.status}</span></td>
       <td style="white-space:nowrap">
         <button onclick="ivEdit(${v.id})" style="font-size:12px;color:#6366F1;background:none;border:1px solid #C7D2FE;border-radius:6px;padding:3px 8px;cursor:pointer;margin-right:4px">编辑</button>
@@ -966,58 +983,89 @@ function ivStartProgressPoll() {
   ivProgressTimer = setInterval(ivPollProgress, 3000);
 }
 
+function fmtSec(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleString('zh-CN', { hour12: false });
+}
+function fmtElapsed(ms) {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}秒` : `${Math.floor(s/60)}分${s%60}秒`;
+}
+
 async function ivPollProgress() {
   let p;
   try { const r = await req('/industry-videos/admin/progress'); p = r?.data; } catch { return; }
   if (!p) return;
 
-  const box     = document.getElementById('iv-progress-box');
-  const btn     = document.getElementById('iv-trigger-btn');
+  const box      = document.getElementById('iv-progress-box');
+  const btn      = document.getElementById('iv-trigger-btn');
   const pauseBtn = document.getElementById('iv-pause-btn');
-  const title   = document.getElementById('iv-progress-title');
-  const detail  = document.getElementById('iv-progress-detail');
-  const logDiv  = document.getElementById('iv-progress-log');
-  const spinner = document.getElementById('iv-progress-spinner');
-  const feedDiv = document.getElementById('iv-items-feed');
+  const title    = document.getElementById('iv-progress-title');
+  const spinner  = document.getElementById('iv-progress-spinner');
+  const feedDiv  = document.getElementById('iv-items-feed');
+  const cntSaved   = document.getElementById('iv-cnt-saved');
+  const cntSkipped = document.getElementById('iv-cnt-skipped');
+  const curInd   = document.getElementById('iv-cur-industry');
+  const curKw    = document.getElementById('iv-cur-keyword');
+  const curEl    = document.getElementById('iv-cur-elapsed');
 
   if (!p.running && !p.startedAt) { box.style.display = 'none'; return; }
   box.style.display = 'block';
 
-  // 实时 Feed
-  if (feedDiv && p.items && p.items.length) {
-    feedDiv.innerHTML = p.items.map(item =>
-      `<div style="color:${item.action==='saved'?'#059669':'#6B7280'}">
-        ${item.action==='saved'?'✓':'–'} [${item.industry}] ${item.author} · ${(item.preview||'').slice(0,40)}${item.preview?.length>40?'...':''}
-      </div>`
-    ).join('');
-    feedDiv.scrollTop = 0;
-  } else if (feedDiv && (!p.items || !p.items.length)) {
-    feedDiv.innerHTML = '<div style="color:#9CA3AF">等待采集数据...</div>';
+  // 实时 Feed（含时间戳）
+  if (feedDiv) {
+    if (p.items && p.items.length) {
+      feedDiv.innerHTML = p.items.map(item => {
+        const t = item.at ? new Date(item.at).toLocaleTimeString('zh-CN', { hour12: false }) : '';
+        return `<div style="color:${item.action==='saved'?'#059669':'#9CA3AF'}">
+          <span style="color:#9CA3AF">${t}</span>
+          ${item.action==='saved'?'✓ 入库':'– 跳过'}
+          [${item.industry}] ${item.author||'匿名'} 👍${item.likes||0}
+          ${item.preview ? '· '+item.preview.slice(0,30)+(item.preview.length>30?'...':'') : ''}
+        </div>`;
+      }).join('');
+      feedDiv.scrollTop = 0;
+    } else {
+      feedDiv.innerHTML = '<div style="color:#9CA3AF;font-size:11px">等待采集开始，视频转录完成后实时显示...</div>';
+    }
   }
 
   if (p.running) {
     spinner.style.display = 'inline-block';
+    const isWaiting = !p.industry || p.industry.includes('等待') || p.industry.includes('定时');
     if (p.paused) {
       title.textContent = '⏸ 采集已暂停';
       title.style.color = '#B45309';
+    } else if (isWaiting) {
+      title.textContent = '⏳ 等待本地ASR接单...';
+      title.style.color = '#6B7280';
     } else {
-      title.textContent = '采集进行中...';
+      title.textContent = '🔄 采集进行中';
       title.style.color = '#3730A3';
     }
     btn.disabled = true; btn.textContent = '采集中...';
     if (pauseBtn) pauseBtn.textContent = p.paused ? '继续' : '暂停';
 
-    const elapsed = p.startedAt ? Math.round((Date.now() - new Date(p.startedAt).getTime()) / 1000) : 0;
-    const elapsedStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed/60)}分${elapsed%60}秒`;
-    const isWaiting = p.industry?.includes('等待') || p.industry?.includes('定时');
-    detail.innerHTML = [
-      isWaiting ? `<b>状态:</b> 等待本地服务拉取任务（约30秒内开始）` : (p.industry ? `<b>当前行业:</b> ${p.industry}` : ''),
-      !isWaiting && p.keyword ? `<b>当前关键词:</b> ${p.keyword} (${p.keywordIdx}/${p.keywordTotal})` : '',
-      `<b>已入库:</b> <span style="color:#059669;font-weight:700">${p.saved}</span> 条　<b>已跳过:</b> ${p.skipped} 条　<b>已用时:</b> ${elapsedStr}`,
-    ].filter(Boolean).join('<br>');
+    if (cntSaved)   cntSaved.textContent   = p.saved   || 0;
+    if (cntSkipped) cntSkipped.textContent = p.skipped || 0;
+    if (curInd) curInd.textContent = isWaiting ? '等待本地服务（约30秒）' : (p.industry || '-');
+    if (curKw) {
+      if (isWaiting) {
+        curKw.textContent = '本地ASR每30秒轮询一次任务队列';
+      } else if (p.keyword) {
+        curKw.textContent = `关键词 ${p.keywordIdx||'?'}/${p.keywordTotal||'?'}: ${p.keyword}`;
+      } else {
+        curKw.textContent = '正在搜索视频...';
+      }
+    }
+    if (curEl && p.startedAt) {
+      curEl.textContent = `开始: ${fmtSec(p.startedAt)}  已用: ${fmtElapsed(Date.now() - new Date(p.startedAt))}`;
+    }
 
     if (!window._ivAutoRefreshTimer) {
-      window._ivAutoRefreshTimer = setInterval(() => { if (ivIndustry) loadIndustryVideos(ivIndustry, 1); }, 8000);
+      window._ivAutoRefreshTimer = setInterval(() => {
+        if (ivIndustry) loadIndustryVideos(ivIndustry, 1);
+      }, 5000);
     }
   } else {
     spinner.style.display = 'none';
@@ -1025,20 +1073,21 @@ async function ivPollProgress() {
     if (ivProgressTimer) { clearInterval(ivProgressTimer); ivProgressTimer = null; }
     if (p.error) { title.textContent = '❌ 采集出错'; title.style.color = '#DC2626'; }
     else { title.textContent = `✅ 完成！入库 ${p.saved} 条，跳过 ${p.skipped} 条`; title.style.color = '#059669'; }
-    const start = p.startedAt ? new Date(p.startedAt).toLocaleTimeString('zh-CN') : '';
-    const end   = p.finishedAt ? new Date(p.finishedAt).toLocaleTimeString('zh-CN') : '';
-    const elapsed = p.startedAt && p.finishedAt ? Math.round((new Date(p.finishedAt) - new Date(p.startedAt)) / 1000) : 0;
-    detail.innerHTML = [`开始: ${start}　结束: ${end}　耗时: ${elapsed < 60 ? elapsed+'秒' : Math.floor(elapsed/60)+'分'+elapsed%60+'秒'}`,
-      p.error ? `<span style="color:#DC2626">错误: ${p.error}</span>` : ''
-    ].filter(Boolean).join('<br>');
+    if (pauseBtn) pauseBtn.textContent = '暂停';
+
+    if (cntSaved)   cntSaved.textContent   = p.saved   || 0;
+    if (cntSkipped) cntSkipped.textContent = p.skipped || 0;
+    if (curInd) curInd.textContent = '采集已结束';
+    if (curKw) {
+      const start = fmtSec(p.startedAt), end = fmtSec(p.finishedAt);
+      const elapsed = p.startedAt && p.finishedAt ? fmtElapsed(new Date(p.finishedAt) - new Date(p.startedAt)) : '';
+      curKw.textContent = `${start} → ${end}  耗时 ${elapsed}`;
+    }
+    if (curEl) curEl.textContent = p.error ? `错误: ${p.error}` : '';
+
     if (window._ivAutoRefreshTimer) { clearInterval(window._ivAutoRefreshTimer); window._ivAutoRefreshTimer = null; }
     if (ivIndustry) loadIndustryVideos(ivIndustry, ivPage);
-    ivLoadConfig(); // 刷新行业采集时间
-  }
-
-  if (p.log?.length) {
-    logDiv.innerHTML = p.log.map(l => `<div>${l}</div>`).join('');
-    logDiv.scrollTop = logDiv.scrollHeight;
+    ivLoadConfig();
   }
 }
 
