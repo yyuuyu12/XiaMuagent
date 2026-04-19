@@ -79,6 +79,21 @@ async function initDb() {
     ) CHARACTER SET utf8mb4
   `);
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS industry_videos (
+      id           INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      industry     VARCHAR(100) NOT NULL,
+      aweme_id     VARCHAR(100) NOT NULL UNIQUE,
+      author       VARCHAR(200) DEFAULT '',
+      cover_url    TEXT,
+      video_url    TEXT,
+      likes        BIGINT DEFAULT 0,
+      transcript   MEDIUMTEXT,
+      status       VARCHAR(20) DEFAULT 'ok',
+      collected_at TIMESTAMP DEFAULT NOW()
+    ) CHARACTER SET utf8mb4
+  `);
+
   // 默认会员价格
   const memberDefaults = [
     ['member_plan_day_price', '9.90'],

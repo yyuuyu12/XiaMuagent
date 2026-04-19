@@ -246,6 +246,33 @@
 
   </div>
 
+  <!-- 行业精选视频管理 -->
+  <div class="section">
+    <h2>🎬 行业精选视频管理</h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <select id="iv-industry-sel" onchange="loadIndustryVideos(this.value,1)" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:9px;font-size:13px;outline:none">
+        <option value="">全部行业</option>
+        <option value="二手车">二手车</option>
+        <option value="餐饮">餐饮</option>
+      </select>
+      <button id="iv-trigger-btn" onclick="ivTrigger()" class="btn-primary" style="font-size:13px;padding:8px 18px">立即采集</button>
+      <button onclick="loadIndustryVideos(ivIndustry,ivPage)" style="font-size:13px;padding:8px 14px;border:2px solid #E8EDFF;border-radius:9px;background:#fff;cursor:pointer">刷新</button>
+      <span id="iv-total" style="font-size:12px;color:#9CA3AF"></span>
+    </div>
+    <div id="iv-msg" class="msg" style="margin-bottom:8px"></div>
+    <div style="overflow-x:auto">
+      <table class="code-table">
+        <thead><tr>
+          <th>行业</th><th>作者</th><th>文案（前120字）</th><th>点赞</th><th>状态</th><th>操作</th>
+        </tr></thead>
+        <tbody id="iv-tbody"><tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">点击"刷新"加载数据</td></tr></tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:#9CA3AF">
+      每天凌晨 3:00 自动采集。自动过滤无口播视频（文案少于15字）。超过15条自动降级隐藏。
+    </div>
+  </div>
+
   <div class="section">
       <h2>📝 提示词配置</h2>
       <div id="prompt-msg" class="msg"></div>
@@ -635,6 +662,47 @@ async function deleteIndustry(id) {
     }
   }
 })();
+
+// ==================== 行业精选视频管理 ====================
+let ivPage = 1, ivIndustry = '';
+
+async function loadIndustryVideos(industry, page) {
+  ivIndustry = industry || ivIndustry;
+  ivPage = page || 1;
+  const url = `/api/industry-videos/admin?industry=${encodeURIComponent(ivIndustry)}&page=${ivPage}&pageSize=20`;
+  const r = await req(url, 'GET');
+  const tbody = document.getElementById('iv-tbody');
+  const msg   = document.getElementById('iv-msg');
+  if (!r || r.code !== 200) { msg.textContent = '加载失败'; return; }
+  msg.textContent = '';
+  document.getElementById('iv-total').textContent = `共 ${r.total} 条`;
+  if (!r.data.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">暂无数据，请先触发采集</td></tr>'; return; }
+  tbody.innerHTML = r.data.map(v => `
+    <tr id="iv-row-${v.id}">
+      <td style="color:#6B7280;font-size:12px">${v.industry}</td>
+      <td style="font-size:12px">${v.author || '-'}</td>
+      <td style="max-width:320px;font-size:12px;line-height:1.5;color:${v.transcript?'#1E1B4B':'#EF4444'}">${v.transcript ? v.transcript.substring(0,120)+'…' : '⚠️ 无文案'}</td>
+      <td style="font-size:12px;color:#6B7280">${(v.likes||0).toLocaleString()}</td>
+      <td><span style="display:inline-block;padding:2px 8px;border-radius:50px;font-size:11px;background:${v.status==='ok'?'#D1FAE5':'#FEE2E2'};color:${v.status==='ok'?'#065F46':'#991B1B'}">${v.status}</span></td>
+      <td>
+        <button onclick="ivDelete(${v.id})" style="font-size:12px;color:#EF4444;background:none;border:1px solid #FCA5A5;border-radius:6px;padding:3px 10px;cursor:pointer">删除</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function ivDelete(id) {
+  if (!confirm('确认删除这条视频文案？')) return;
+  const r = await req(`/api/industry-videos/admin/${id}`, 'DELETE');
+  if (r?.code === 200) { document.getElementById(`iv-row-${id}`).remove(); }
+}
+
+async function ivTrigger() {
+  const btn = document.getElementById('iv-trigger-btn');
+  btn.disabled = true; btn.textContent = '采集中…';
+  const r = await req('/api/industry-videos/admin/trigger', 'POST');
+  document.getElementById('iv-msg').textContent = r?.msg || '已触发';
+  setTimeout(() => { btn.disabled = false; btn.textContent = '立即采集'; }, 3000);
+}
 </script>
 </body>
 </html>

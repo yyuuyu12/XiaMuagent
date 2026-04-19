@@ -406,3 +406,31 @@ taskRunner.setHandler(async (job) => {
 })();
 
 console.log('✅ TaskRunner Worker 已就绪');
+
+// ==================== 行业视频每日定时采集 ====================
+(function scheduleIndustryCollect() {
+  const { runCollect } = require('./routes/industryVideos');
+
+  function msUntilNextRun(hour = 3, minute = 0) {
+    const now = new Date();
+    const next = new Date();
+    next.setHours(hour, minute, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    return next - now;
+  }
+
+  function scheduleNext() {
+    const delay = msUntilNextRun(3, 0); // 每天凌晨 3:00 跑
+    console.log(`[IndustryCollect] 下次采集：${new Date(Date.now() + delay).toLocaleString('zh-CN')}`);
+    setTimeout(async () => {
+      try {
+        await runCollect();
+      } catch (e) {
+        console.error('[IndustryCollect] 采集异常:', e.message);
+      }
+      scheduleNext(); // 执行完再安排下一次
+    }, delay);
+  }
+
+  scheduleNext();
+})();
