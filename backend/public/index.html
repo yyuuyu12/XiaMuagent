@@ -1110,12 +1110,13 @@ function tHomeTaskSection() {
   const typeTagLabel = t => t.type === 'clone_video' ? '克隆' : '灵感';
   const isRecentDone = t => t.status === 'done' && (Date.now() - new Date(t.updated_at || t.created_at).getTime()) < DONE_BIG_WINDOW;
 
+  const isRecentExtracted = t => t.status === 'extracted' && (Date.now() - new Date(t.updated_at || t.created_at).getTime()) < DONE_BIG_WINDOW;
   const bigCards = (S.tasksList || []).filter(t =>
-    t.status === 'pending' || t.status === 'running' || t.status === 'extracted' || isRecentDone(t)
+    t.status === 'pending' || t.status === 'running' || isRecentExtracted(t) || isRecentDone(t)
   );
 
   const oldDoneTasks = (S.tasksList || [])
-    .filter(t => t.status === 'done' && !isRecentDone(t))
+    .filter(t => (t.status === 'done' && !isRecentDone(t)) || (t.status === 'extracted' && !isRecentExtracted(t)))
     .map(t => ({ _type: 'task', label: typeTagLabel(t), text: t.title, created_at: t.created_at }));
   const cloneItems = (S.cloneHistory || [])
     .map((it, idx) => ({ _type: 'clone', idx, label: '克隆', text: it.input || '', created_at: it.created_at }));
