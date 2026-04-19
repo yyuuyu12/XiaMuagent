@@ -248,37 +248,65 @@
   <!-- 行业精选视频管理 -->
   <div class="section">
     <h2>🎬 行业精选视频管理</h2>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <select id="iv-industry-sel" onchange="loadIndustryVideos(this.value,1)" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:9px;font-size:13px;outline:none">
-        <option value="">全部行业</option>
-        <option value="二手车">二手车</option>
-        <option value="餐饮">餐饮</option>
-      </select>
-      <button id="iv-trigger-btn" onclick="ivTrigger()" class="btn-primary" style="font-size:13px;padding:8px 18px">立即采集</button>
-      <button onclick="loadIndustryVideos(ivIndustry,ivPage)" style="font-size:13px;padding:8px 14px;border:2px solid #E8EDFF;border-radius:9px;background:#fff;cursor:pointer">刷新</button>
-      <span id="iv-total" style="font-size:12px;color:#9CA3AF"></span>
+
+    <!-- 采集控制栏 -->
+    <div style="background:#F8F9FF;border:1.5px solid #E8EDFF;border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="iv-trigger-btn" onclick="ivTrigger()" class="btn-primary" style="font-size:13px;padding:8px 18px">立即采集</button>
+        <button id="iv-pause-btn" onclick="ivPause()" style="font-size:13px;padding:8px 14px;border:2px solid #F59E0B;color:#B45309;background:#FEF3C7;border-radius:8px;cursor:pointer">暂停</button>
+        <button onclick="ivStop()" style="font-size:13px;padding:8px 14px;border:2px solid #EF4444;color:#DC2626;background:#FEF2F2;border-radius:8px;cursor:pointer">停止</button>
+        <span style="color:#D1D5DB">|</span>
+        <span style="font-size:12px;color:#6B7280">定时采集：</span>
+        <input id="iv-schedule-time" type="time" style="padding:6px 10px;border:2px solid #E8EDFF;border-radius:8px;font-size:13px;outline:none" />
+        <button onclick="ivSaveSchedule()" style="font-size:13px;padding:8px 14px;border:2px solid #E8EDFF;border-radius:8px;background:#fff;cursor:pointer">保存定时</button>
+      </div>
+      <div id="iv-collect-status" style="font-size:12px;color:#9CA3AF;margin-top:8px">加载中...</div>
     </div>
-    <!-- 采集进度面板 -->
-    <div id="iv-progress-box" style="display:none;background:#F0F4FF;border:1.5px solid #C7D2FE;border-radius:10px;padding:14px 16px;margin-bottom:12px">
+
+    <!-- 采集进度面板（增强版） -->
+    <div id="iv-progress-box" style="display:none;background:#F0F4FF;border:1.5px solid #C7D2FE;border-radius:10px;padding:14px 16px;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span id="iv-progress-spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #6366F1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></span>
         <span id="iv-progress-title" style="font-size:13px;font-weight:700;color:#3730A3">采集进行中...</span>
       </div>
-      <div id="iv-progress-detail" style="font-size:12px;color:#4B5563;line-height:1.7"></div>
-      <div id="iv-progress-log" style="margin-top:8px;font-size:11px;color:#6B7280;font-family:monospace;background:#EEF2FF;border-radius:6px;padding:8px;max-height:80px;overflow-y:auto"></div>
+      <div id="iv-progress-detail" style="font-size:12px;color:#4B5563;line-height:1.8;margin-bottom:8px"></div>
+      <!-- 实时入库 Feed -->
+      <div style="font-size:11px;color:#6B6860;margin-bottom:4px;font-weight:600">📡 实时入库（最新30条）</div>
+      <div id="iv-items-feed" style="font-size:11px;font-family:monospace;background:#EEF2FF;border-radius:6px;padding:8px;max-height:120px;overflow-y:auto;line-height:1.7"></div>
+      <!-- 日志 -->
+      <div id="iv-progress-log" style="margin-top:8px;font-size:10px;color:#9CA3AF;font-family:monospace;background:#F3F4F6;border-radius:6px;padding:6px;max-height:60px;overflow-y:auto"></div>
     </div>
-    <div id="iv-msg" class="msg" style="margin-bottom:8px"></div>
+
+    <!-- 行业关键词配置 -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:10px">📋 行业关键词配置</div>
+      <div id="iv-industry-config-list" style="margin-bottom:10px"><div style="color:#9CA3AF;font-size:13px">加载中...</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="iv-new-ind" placeholder="新行业名称" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:8px;font-size:13px;outline:none;width:160px" />
+        <button onclick="ivAddIndustry()" class="btn-primary" style="padding:8px 16px;font-size:13px">+ 添加行业</button>
+      </div>
+    </div>
+
+    <div id="iv-msg" class="msg" style="margin-bottom:10px"></div>
+
+    <!-- 内容列表（行业 Tab） -->
+    <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:10px">📝 内容管理</div>
+    <div id="iv-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-size:13px;color:#9CA3AF">加载行业标签...</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <button onclick="loadIndustryVideos(ivIndustry,1)" style="font-size:12px;padding:6px 12px;border:2px solid #E8EDFF;border-radius:8px;background:#fff;cursor:pointer">刷新列表</button>
+      <span id="iv-total" style="font-size:12px;color:#9CA3AF"></span>
+    </div>
     <div style="overflow-x:auto">
       <table class="code-table">
         <thead><tr>
-          <th>行业</th><th>作者</th><th>文案（前120字）</th><th>点赞</th><th>状态</th><th>操作</th>
+          <th>作者</th><th>文案</th><th>点赞</th><th>采集时间</th><th>状态</th><th>操作</th>
         </tr></thead>
-        <tbody id="iv-tbody"><tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">点击"刷新"加载数据</td></tr></tbody>
+        <tbody id="iv-tbody"><tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">请先选择上方行业标签</td></tr></tbody>
       </table>
     </div>
-    <div style="margin-top:12px;font-size:12px;color:#9CA3AF">
-      每天凌晨 3:00 自动采集。自动过滤无口播视频（文案少于15字）。超过15条自动降级隐藏。
-    </div>
+    <div id="iv-pagination" style="margin-top:10px;display:flex;gap:6px;justify-content:center"></div>
   </div>
 
   <div class="section">
@@ -672,148 +700,302 @@ async function deleteIndustry(id) {
 })();
 
 // ==================== 行业精选视频管理 ====================
-let ivPage = 1, ivIndustry = '';
+let ivPage = 1, ivIndustry = '', ivConfigData = null, ivProgressTimer = null;
 
+// ---- 采集控制 ----
+async function ivTrigger() {
+  const btn = document.getElementById('iv-trigger-btn');
+  btn.disabled = true; btn.textContent = '采集中...';
+  const r = await req('/industry-videos/admin/trigger', { method: 'POST' });
+  showMsg('iv-msg', r?.msg || '已触发', 'success');
+  ivStartProgressPoll();
+}
+
+async function ivPause() {
+  const r = await req('/industry-videos/admin/pause', { method: 'POST' });
+  if (r?.code === 200) {
+    const btn = document.getElementById('iv-pause-btn');
+    if (btn) { btn.textContent = r.paused ? '继续' : '暂停'; }
+    showMsg('iv-msg', r.paused ? '⏸ 采集已暂停' : '▶ 采集继续中', 'success');
+  }
+}
+
+async function ivStop() {
+  if (!confirm('确认停止当前采集任务？本地服务处理完当前视频后会停止。')) return;
+  const r = await req('/industry-videos/admin/stop', { method: 'POST' });
+  showMsg('iv-msg', r?.msg || '停止指令已发出', r?.code === 200 ? 'success' : 'error');
+}
+
+async function ivSaveSchedule() {
+  const el = document.getElementById('iv-schedule-time');
+  const schedule = el?.value || '';
+  const r = await req('/industry-videos/admin/schedule', { method: 'POST', body: JSON.stringify({ schedule }) });
+  showMsg('iv-msg', r?.msg || '保存失败', r?.code === 200 ? 'success' : 'error');
+  ivLoadConfig();
+}
+
+// ---- 行业配置 ----
+async function ivLoadConfig() {
+  const r = await req('/industry-videos/admin/collect-config');
+  if (!r || r.code !== 200) return;
+  ivConfigData = r.data;
+
+  // 更新定时输入
+  const schedEl = document.getElementById('iv-schedule-time');
+  if (schedEl) schedEl.value = r.data.schedule || '';
+
+  // 更新状态文字
+  const statusEl = document.getElementById('iv-collect-status');
+  if (statusEl) {
+    const lastArr = (r.data.industries || []).map(i => i.last_collected).filter(Boolean).sort();
+    const last = lastArr[lastArr.length - 1];
+    const parts = [];
+    if (r.data.schedule) parts.push(`定时：每日 ${r.data.schedule}`);
+    else parts.push('未设置定时');
+    if (last) parts.push(`上次采集：${new Date(last).toLocaleString('zh-CN')}`);
+    if (r.data.running) parts.push('🟢 采集中');
+    else if (r.data.paused) parts.push('⏸ 已暂停');
+    statusEl.textContent = parts.join('　｜　');
+  }
+
+  ivRenderConfig(r.data.industries || []);
+  ivRenderTabs(r.data.industries || []);
+}
+
+function ivRenderConfig(industries) {
+  const list = document.getElementById('iv-industry-config-list');
+  if (!list) return;
+  if (!industries.length) {
+    list.innerHTML = '<div style="color:#9CA3AF;font-size:13px">暂无行业，请在下方添加</div>';
+    return;
+  }
+  list.innerHTML = industries.map(ind => `
+    <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;padding:10px 12px;background:#F9F9FF;border-radius:8px;border:1px solid #E8EDFF">
+      <div style="flex:0 0 70px;font-weight:600;font-size:13px;padding-top:6px;color:#1E1B4B">${ind.name}</div>
+      <textarea id="kw-${ind.id}" rows="2"
+        style="flex:1;padding:6px 10px;border:1.5px solid #E8EDFF;border-radius:6px;font-size:12px;resize:vertical;font-family:inherit"
+        placeholder="采集关键词，逗号分隔（如：${ind.name}推荐,${ind.name}教程）">${ind.collect_keywords || ''}</textarea>
+      <div style="flex:0 0 72px;font-size:11px;color:#9CA3AF;text-align:center;padding-top:4px;line-height:1.8">
+        📹 ${ind.video_count || 0} 条<br>${ind.last_collected ? new Date(ind.last_collected).toLocaleDateString('zh-CN') : '未采集'}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button onclick="ivSaveKeywords(${ind.id},'${ind.name}')"
+          style="font-size:12px;padding:4px 10px;border:1.5px solid #6366F1;color:#6366F1;background:#fff;border-radius:6px;cursor:pointer;white-space:nowrap">保存</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function ivSaveKeywords(id, name) {
+  const el = document.getElementById(`kw-${id}`);
+  if (!el) return;
+  const r = await req(`/industry-videos/admin/industry-keywords/${id}`, {
+    method: 'PATCH', body: JSON.stringify({ keywords: el.value.trim() })
+  });
+  showMsg('iv-msg', r?.code === 200 ? `✓ ${name} 关键词已保存` : (r?.msg || '保存失败'), r?.code === 200 ? 'success' : 'error');
+}
+
+async function ivAddIndustry() {
+  const el = document.getElementById('iv-new-ind');
+  const name = el?.value?.trim();
+  if (!name) { showMsg('iv-msg', '请输入行业名称', 'error'); return; }
+  const r = await req('/config/industries', { method: 'POST', body: JSON.stringify({ name }) });
+  if (r?.code === 200) { el.value = ''; ivLoadConfig(); showMsg('iv-msg', `行业 "${name}" 已添加，请配置采集关键词`, 'success'); }
+  else showMsg('iv-msg', r?.msg || '添加失败', 'error');
+}
+
+// ---- 行业 Tab ----
+function ivRenderTabs(industries) {
+  const tabs = document.getElementById('iv-tabs');
+  if (!tabs) return;
+  if (!industries.length) { tabs.innerHTML = '<span style="font-size:13px;color:#9CA3AF">暂无行业</span>'; return; }
+  tabs.innerHTML = industries.map(ind => `
+    <button onclick="ivSelectTab('${ind.name}')"
+      style="padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;white-space:nowrap;transition:all 0.1s;
+             border:2px solid ${ivIndustry===ind.name?'#6366F1':'#E8EDFF'};
+             background:${ivIndustry===ind.name?'#6366F1':'#fff'};
+             color:${ivIndustry===ind.name?'#fff':'#374151'}"
+    >${ind.name} <span style="opacity:0.7;font-size:11px">(${ind.video_count||0})</span></button>
+  `).join('');
+}
+
+function ivSelectTab(ind) {
+  ivIndustry = ind;
+  if (ivConfigData) ivRenderTabs(ivConfigData.industries || []);
+  loadIndustryVideos(ind, 1);
+}
+
+// ---- 内容列表 ----
 async function loadIndustryVideos(industry, page) {
-  ivIndustry = industry || ivIndustry;
-  ivPage = page || 1;
-  const url = `/industry-videos/admin?industry=${encodeURIComponent(ivIndustry)}&page=${ivPage}&pageSize=20`;
-  const r = await req(url);
+  if (industry !== undefined) ivIndustry = industry;
+  if (page !== undefined) ivPage = page;
   const tbody = document.getElementById('iv-tbody');
   const msg   = document.getElementById('iv-msg');
-  if (!r || r.code !== 200) { msg.textContent = '加载失败'; return; }
-  msg.textContent = '';
+  if (!ivIndustry) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">请先选择上方行业标签</td></tr>';
+    return;
+  }
+  const url = `/industry-videos/admin?industry=${encodeURIComponent(ivIndustry)}&page=${ivPage}&pageSize=20`;
+  const r = await req(url);
+  if (!r || r.code !== 200) { if(msg) msg.textContent = '加载失败'; return; }
+  if(msg) msg.textContent = '';
   document.getElementById('iv-total').textContent = `共 ${r.total} 条`;
-  if (!r.data.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">暂无数据，请先触发采集</td></tr>'; return; }
+  if (!r.data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">该行业暂无数据，请先触发采集</td></tr>';
+    ivRenderPagination(0, ivPage);
+    return;
+  }
   tbody.innerHTML = r.data.map(v => `
     <tr id="iv-row-${v.id}">
-      <td style="color:#6B7280;font-size:12px">${v.industry}</td>
-      <td style="font-size:12px">${v.author || '-'}</td>
-      <td style="max-width:320px;font-size:12px;line-height:1.5;color:${v.transcript?'#1E1B4B':'#EF4444'}">${v.transcript ? v.transcript.substring(0,120)+'…' : '⚠️ 无文案'}</td>
-      <td style="font-size:12px;color:#6B7280">${(v.likes||0).toLocaleString()}</td>
+      <td style="font-size:12px;max-width:80px">${v.author || '-'}</td>
+      <td style="max-width:340px;font-size:12px;line-height:1.5">
+        <div id="iv-text-${v.id}" style="color:${v.transcript?'#1E1B4B':'#EF4444'};white-space:pre-wrap;word-break:break-all">${v.transcript ? v.transcript.substring(0,150)+(v.transcript.length>150?'…':'') : '⚠️ 无文案'}</div>
+        <div id="iv-edit-${v.id}" style="display:none;margin-top:4px">
+          <textarea rows="4" id="iv-ta-${v.id}" style="width:100%;font-size:12px;padding:6px;border:1.5px solid #6366F1;border-radius:6px;resize:vertical">${v.transcript||''}</textarea>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <button onclick="ivSaveTranscript(${v.id})" style="font-size:11px;padding:3px 8px;background:#6366F1;color:#fff;border:none;border-radius:5px;cursor:pointer">保存</button>
+            <button onclick="ivCancelEdit(${v.id})" style="font-size:11px;padding:3px 8px;border:1px solid #D1D5DB;border-radius:5px;cursor:pointer;background:#fff">取消</button>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;color:#6B7280;white-space:nowrap">${(v.likes||0).toLocaleString()}</td>
+      <td style="font-size:11px;color:#9CA3AF;white-space:nowrap">${v.collected_at ? new Date(v.collected_at).toLocaleDateString('zh-CN') : '-'}</td>
       <td><span style="display:inline-block;padding:2px 8px;border-radius:50px;font-size:11px;background:${v.status==='ok'?'#D1FAE5':'#FEE2E2'};color:${v.status==='ok'?'#065F46':'#991B1B'}">${v.status}</span></td>
-      <td>
-        <button onclick="ivDelete(${v.id})" style="font-size:12px;color:#EF4444;background:none;border:1px solid #FCA5A5;border-radius:6px;padding:3px 10px;cursor:pointer">删除</button>
+      <td style="white-space:nowrap">
+        <button onclick="ivEdit(${v.id})" style="font-size:12px;color:#6366F1;background:none;border:1px solid #C7D2FE;border-radius:6px;padding:3px 8px;cursor:pointer;margin-right:4px">编辑</button>
+        <button onclick="ivDelete(${v.id})" style="font-size:12px;color:#EF4444;background:none;border:1px solid #FCA5A5;border-radius:6px;padding:3px 8px;cursor:pointer">删除</button>
       </td>
     </tr>`).join('');
+  ivRenderPagination(r.total, ivPage);
+}
+
+function ivRenderPagination(total, current) {
+  const pageSize = 20;
+  const totalPages = Math.ceil(total / pageSize);
+  const pg = document.getElementById('iv-pagination');
+  if (!pg || totalPages <= 1) { if(pg) pg.innerHTML = ''; return; }
+  let html = '';
+  if (current > 1) html += `<button onclick="loadIndustryVideos(ivIndustry,${current-1})" style="padding:4px 10px;border:1.5px solid #E8EDFF;border-radius:6px;cursor:pointer;font-size:12px;background:#fff">上一页</button>`;
+  html += `<span style="font-size:12px;color:#6B7280;padding:0 8px">第 ${current} / ${totalPages} 页</span>`;
+  if (current < totalPages) html += `<button onclick="loadIndustryVideos(ivIndustry,${current+1})" style="padding:4px 10px;border:1.5px solid #E8EDFF;border-radius:6px;cursor:pointer;font-size:12px;background:#fff">下一页</button>`;
+  pg.innerHTML = html;
+}
+
+function ivEdit(id) {
+  document.getElementById(`iv-text-${id}`).style.display = 'none';
+  document.getElementById(`iv-edit-${id}`).style.display = 'block';
+}
+function ivCancelEdit(id) {
+  document.getElementById(`iv-text-${id}`).style.display = 'block';
+  document.getElementById(`iv-edit-${id}`).style.display = 'none';
+}
+async function ivSaveTranscript(id) {
+  const ta = document.getElementById(`iv-ta-${id}`);
+  const r = await req(`/industry-videos/admin/${id}/transcript`, { method: 'PUT', body: JSON.stringify({ transcript: ta?.value }) });
+  if (r?.code === 200) {
+    document.getElementById(`iv-text-${id}`).textContent = (ta?.value || '').substring(0, 150) + (ta?.value?.length > 150 ? '…' : '');
+    ivCancelEdit(id);
+    showMsg('iv-msg', '文案已保存', 'success');
+  } else showMsg('iv-msg', r?.msg || '保存失败', 'error');
 }
 
 async function ivDelete(id) {
   if (!confirm('确认删除这条视频文案？')) return;
-  const r = await req(`/industry-videos/admin/${id}`, {method:'DELETE'});
-  if (r?.code === 200) { document.getElementById(`iv-row-${id}`).remove(); }
+  const r = await req(`/industry-videos/admin/${id}`, { method: 'DELETE' });
+  if (r?.code === 200) { document.getElementById(`iv-row-${id}`)?.remove(); }
 }
 
-let ivProgressTimer = null;
-
-async function ivTrigger() {
-  const btn = document.getElementById('iv-trigger-btn');
-  btn.disabled = true; btn.textContent = '采集中...';
-  const r = await req('/industry-videos/admin/trigger', {method:'POST'});
-  document.getElementById('iv-msg').textContent = r?.msg || '已触发';
-  // 立即开始轮询进度
-  ivStartProgressPoll();
-}
-
+// ---- 进度轮询 ----
 function ivStartProgressPoll() {
   if (ivProgressTimer) return;
-  ivPollProgress(); // 立即查一次
+  ivPollProgress();
   ivProgressTimer = setInterval(ivPollProgress, 3000);
 }
 
 async function ivPollProgress() {
   let p;
-  try {
-    const r = await req('/industry-videos/admin/progress');
-    p = r?.data;
-  } catch(e) { return; }
+  try { const r = await req('/industry-videos/admin/progress'); p = r?.data; } catch { return; }
   if (!p) return;
 
-  const box = document.getElementById('iv-progress-box');
-  const btn = document.getElementById('iv-trigger-btn');
-  const title = document.getElementById('iv-progress-title');
-  const detail = document.getElementById('iv-progress-detail');
-  const logDiv = document.getElementById('iv-progress-log');
+  const box     = document.getElementById('iv-progress-box');
+  const btn     = document.getElementById('iv-trigger-btn');
+  const pauseBtn = document.getElementById('iv-pause-btn');
+  const title   = document.getElementById('iv-progress-title');
+  const detail  = document.getElementById('iv-progress-detail');
+  const logDiv  = document.getElementById('iv-progress-log');
   const spinner = document.getElementById('iv-progress-spinner');
+  const feedDiv = document.getElementById('iv-items-feed');
 
-  if (!p.running && !p.startedAt) {
-    // 从未运行过
-    box.style.display = 'none';
-    return;
-  }
-
+  if (!p.running && !p.startedAt) { box.style.display = 'none'; return; }
   box.style.display = 'block';
+
+  // 实时 Feed
+  if (feedDiv && p.items && p.items.length) {
+    feedDiv.innerHTML = p.items.map(item =>
+      `<div style="color:${item.action==='saved'?'#059669':'#6B7280'}">
+        ${item.action==='saved'?'✓':'–'} [${item.industry}] ${item.author} · ${(item.preview||'').slice(0,40)}${item.preview?.length>40?'...':''}
+      </div>`
+    ).join('');
+    feedDiv.scrollTop = 0;
+  } else if (feedDiv && (!p.items || !p.items.length)) {
+    feedDiv.innerHTML = '<div style="color:#9CA3AF">等待采集数据...</div>';
+  }
 
   if (p.running) {
     spinner.style.display = 'inline-block';
-    title.textContent = '采集进行中...';
+    if (p.paused) {
+      title.textContent = '⏸ 采集已暂停';
+      title.style.color = '#B45309';
+    } else {
+      title.textContent = '采集进行中...';
+      title.style.color = '#3730A3';
+    }
     btn.disabled = true; btn.textContent = '采集中...';
+    if (pauseBtn) pauseBtn.textContent = p.paused ? '继续' : '暂停';
 
     const elapsed = p.startedAt ? Math.round((Date.now() - new Date(p.startedAt).getTime()) / 1000) : 0;
     const elapsedStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed/60)}分${elapsed%60}秒`;
-
-    const isWaiting = p.industry && p.industry.includes('等待');
-    const industryLine = isWaiting
-      ? `<b>状态:</b> 本地服务采集中，每完成一个关键词就入库（每约15分钟更新一次）`
-      : (p.industry ? `<b>当前行业:</b> ${p.industry} (${p.industryIdx}/${p.industryTotal})` : '');
-
+    const isWaiting = p.industry?.includes('等待') || p.industry?.includes('定时');
     detail.innerHTML = [
-      industryLine,
-      !isWaiting && p.keyword  ? `<b>当前关键词:</b> ${p.keyword} (${p.keywordIdx}/${p.keywordTotal})` : '',
-      `<b>已入库:</b> ${p.saved} 条　<b>已跳过:</b> ${p.skipped} 条`,
-      `<b>已用时:</b> ${elapsedStr}`,
-      `<span style="color:#6366F1;font-size:12px">💡 视频列表已实时更新，可滚动下方查看已入库的内容</span>`,
+      isWaiting ? `<b>状态:</b> 等待本地服务拉取任务（约30秒内开始）` : (p.industry ? `<b>当前行业:</b> ${p.industry}` : ''),
+      !isWaiting && p.keyword ? `<b>当前关键词:</b> ${p.keyword} (${p.keywordIdx}/${p.keywordTotal})` : '',
+      `<b>已入库:</b> <span style="color:#059669;font-weight:700">${p.saved}</span> 条　<b>已跳过:</b> ${p.skipped} 条　<b>已用时:</b> ${elapsedStr}`,
     ].filter(Boolean).join('<br>');
 
-    // 采集中每10秒刷新一次视频列表（实时看到新入库内容）
     if (!window._ivAutoRefreshTimer) {
-      window._ivAutoRefreshTimer = setInterval(() => loadIndustryVideos(ivIndustry, 1), 10000);
+      window._ivAutoRefreshTimer = setInterval(() => { if (ivIndustry) loadIndustryVideos(ivIndustry, 1); }, 8000);
     }
   } else {
-    // 已完成或出错
     spinner.style.display = 'none';
     btn.disabled = false; btn.textContent = '立即采集';
-
     if (ivProgressTimer) { clearInterval(ivProgressTimer); ivProgressTimer = null; }
-
-    if (p.error) {
-      title.textContent = '❌ 采集出错';
-      title.style.color = '#DC2626';
-    } else {
-      title.textContent = `✅ 采集完成！共入库 ${p.saved} 条，跳过 ${p.skipped} 条`;
-      title.style.color = '#059669';
-    }
-
-    const finishTime = p.finishedAt ? new Date(p.finishedAt).toLocaleTimeString('zh-CN') : '';
-    const startTime  = p.startedAt  ? new Date(p.startedAt).toLocaleTimeString('zh-CN') : '';
-    const elapsed = p.startedAt && p.finishedAt
-      ? Math.round((new Date(p.finishedAt) - new Date(p.startedAt)) / 1000) : 0;
-    const elapsedStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed/60)}分${elapsed%60}秒`;
-
-    detail.innerHTML = [
-      `开始: ${startTime}　结束: ${finishTime}　耗时: ${elapsedStr}`,
-      p.error ? `<span style="color:#DC2626">错误: ${p.error}</span>` : '',
+    if (p.error) { title.textContent = '❌ 采集出错'; title.style.color = '#DC2626'; }
+    else { title.textContent = `✅ 完成！入库 ${p.saved} 条，跳过 ${p.skipped} 条`; title.style.color = '#059669'; }
+    const start = p.startedAt ? new Date(p.startedAt).toLocaleTimeString('zh-CN') : '';
+    const end   = p.finishedAt ? new Date(p.finishedAt).toLocaleTimeString('zh-CN') : '';
+    const elapsed = p.startedAt && p.finishedAt ? Math.round((new Date(p.finishedAt) - new Date(p.startedAt)) / 1000) : 0;
+    detail.innerHTML = [`开始: ${start}　结束: ${end}　耗时: ${elapsed < 60 ? elapsed+'秒' : Math.floor(elapsed/60)+'分'+elapsed%60+'秒'}`,
+      p.error ? `<span style="color:#DC2626">错误: ${p.error}</span>` : ''
     ].filter(Boolean).join('<br>');
-
-    // 停止自动刷新，最终刷一次
     if (window._ivAutoRefreshTimer) { clearInterval(window._ivAutoRefreshTimer); window._ivAutoRefreshTimer = null; }
-    loadIndustryVideos(ivIndustry, ivPage);
+    if (ivIndustry) loadIndustryVideos(ivIndustry, ivPage);
+    ivLoadConfig(); // 刷新行业采集时间
   }
 
-  // 显示日志
-  if (p.log && p.log.length) {
+  if (p.log?.length) {
     logDiv.innerHTML = p.log.map(l => `<div>${l}</div>`).join('');
     logDiv.scrollTop = logDiv.scrollHeight;
   }
 }
 
-// 页面加载时检查是否有进行中的采集
+// 页面加载时初始化
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(async () => {
+    await ivLoadConfig();
     const r = await req('/industry-videos/admin/progress').catch(() => null);
     if (r?.data?.running) ivStartProgressPoll();
-    else if (r?.data?.startedAt) ivPollProgress(); // 显示上次结果
-  }, 1000);
+    else if (r?.data?.startedAt) ivPollProgress();
+  }, 800);
 });
 </script>
 

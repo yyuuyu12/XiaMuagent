@@ -651,6 +651,7 @@ async def _run_industry_collect(job: dict):
     total_saved = 0
     total_skipped = 0
     error_msg = None
+    stopped = False
 
     async def _heartbeat(industry="", keyword="", ki=0, kt=0, saved=0, skipped=0):
         """向 Zeabur 推送进度心跳（忽略失败）"""
@@ -664,12 +665,55 @@ async def _run_industry_collect(job: dict):
         except Exception:
             pass
 
+    async def _report_item(industry="", aweme_id="", author="", likes=0, action="saved", transcript=""):
+        """向 Zeabur 上报单条采集结果（忽略失败）"""
+        try:
+            async with httpx.AsyncClient(timeout=5) as hc:
+                await hc.post(f"{ZEABUR_API}/api/industry-videos/collect-item", json={
+                    "industry": industry, "aweme_id": aweme_id,
+                    "author": author, "likes": likes,
+                    "action": action, "transcript": transcript,
+                })
+        except Exception:
+            pass
+
+    async def _check_status():
+        """检查 Zeabur 暂停/停止标志，暂停时轮询等待，返回 True 表示应当停止"""
+        try:
+            async with httpx.AsyncClient(timeout=5) as hc:
+                r = await hc.get(f"{ZEABUR_API}/api/industry-videos/collect-status")
+            if r.status_code != 200:
+                return False
+            data = r.json().get("data", {})
+            if data.get("stop"):
+                print("[IndustryCollect] 收到停止信号，终止采集")
+                return True
+            while data.get("paused"):
+                print("[IndustryCollect] 已暂停，等待5秒后继续...")
+                await asyncio.sleep(5)
+                async with httpx.AsyncClient(timeout=5) as hc2:
+                    r2 = await hc2.get(f"{ZEABUR_API}/api/industry-videos/collect-status")
+                if r2.status_code != 200:
+                    break
+                data = r2.json().get("data", {})
+                if data.get("stop"):
+                    print("[IndustryCollect] 暂停期间收到停止信号，终止采集")
+                    return True
+        except Exception:
+            pass
+        return False
+
     print("[IndustryCollect] 本地采集开始")
     try:
         seen = set()
         for ind_idx, (industry, keywords) in enumerate(industries.items()):
             print(f"[IndustryCollect] 行业: {industry}")
             for ki, keyword in enumerate(keywords):
+                # 每个关键词开始前检查暂停/停止
+                if await _check_status():
+                    stopped = True
+                    break
+
                 print(f"[IndustryCollect]   关键词 [{ki+1}/{len(keywords)}]: {keyword}")
                 # 发送心跳：开始这个关键词
                 await _heartbeat(industry=industry, keyword=keyword,
@@ -694,9 +738,17 @@ async def _run_industry_collect(job: dict):
                         print(f"[IndustryCollect]   结果: ({len(text)}字)")
                         if len(text) >= min_chars:
                             kw_results.append({**v, "transcript": text})
+                            # 每条保存立即上报
+                            await _report_item(industry=industry, aweme_id=v["aweme_id"],
+                                               author=v.get("author", ""), likes=v.get("likes", 0),
+                                               action="saved", transcript=text)
+                            total_saved += 1
                         else:
                             print(f"[IndustryCollect]   跳过无口播({len(text)}字)")
                             total_skipped += 1
+                            await _report_item(industry=industry, aweme_id=v["aweme_id"],
+                                               author=v.get("author", ""), likes=v.get("likes", 0),
+                                               action="skipped")
                     except Exception as e:
                         err_safe = str(e).encode('utf-8', errors='replace').decode('ascii', errors='replace')
                         print(f"[IndustryCollect]   转录失败: {err_safe}")
@@ -712,7 +764,6 @@ async def _run_industry_collect(job: dict):
                                 json={"industry": industry, "videos": kw_results},
                             )
                         print(f"[IndustryCollect]   submit: {r.status_code} {r.text[:120]}")
-                        total_saved += len(kw_results)
                     except Exception as e:
                         print(f"[IndustryCollect]   submit 失败: {e}")
                     # 提交后发心跳更新入库数
@@ -721,6 +772,9 @@ async def _run_industry_collect(job: dict):
                                       saved=total_saved, skipped=total_skipped)
                 else:
                     print(f"[IndustryCollect]   {keyword} 无有效口播视频，跳过提交")
+
+            if stopped:
+                break
     except Exception as e:
         error_msg = str(e)
         print(f"[IndustryCollect] 采集异常: {e}")

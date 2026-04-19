@@ -229,6 +229,17 @@ async function initDb() {
     ) CHARACTER SET utf8mb4
   `);
 
+  // industries 表新增 collect_keywords 字段（采集关键词，逗号分隔）
+  try {
+    await db.query('ALTER TABLE industries ADD COLUMN collect_keywords TEXT DEFAULT NULL');
+  } catch (e) {
+    if (!String(e.message || e).includes('Duplicate column name')) console.warn('[initDb] collect_keywords:', e.message || e);
+  }
+
+  // 定时采集 & 暂停标志
+  await db.query(`INSERT IGNORE INTO system_config (config_key, value) VALUES ('collect_schedule', '')`);
+  await db.query(`INSERT IGNORE INTO system_config (config_key, value) VALUES ('collect_paused', '0')`);
+
   // task_sessions 表（克隆任务跨会话状态：语音/数字人/后期/封面的中间产物与步骤进度）
   // LONGTEXT 最大 4GB，够存 base64 音视频；clone_step 冗余出来便于列表页直接用
   await db.query(`
