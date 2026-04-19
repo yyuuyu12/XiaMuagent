@@ -146,9 +146,9 @@ async function getTikhubKey() {
 
 async function getAsrUrl() {
   const { rows } = await db.query(
-    `SELECT value FROM system_config WHERE config_key IN ('asr_url','video_url') ORDER BY config_key DESC`
+    `SELECT value FROM system_config WHERE config_key = 'asr_url'`
   );
-  return rows[0]?.value || null;
+  return rows[0]?.value?.trim() || null;
 }
 
 // 搜索抖音高赞视频
