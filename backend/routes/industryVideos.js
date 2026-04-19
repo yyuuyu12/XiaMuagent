@@ -206,11 +206,16 @@ router.post('/admin/pause', requireAdmin, (req, res) => {
 
 // POST /api/industry-videos/admin/stop — 停止采集
 router.post('/admin/stop', requireAdmin, async (req, res) => {
-  collectState.stop = true;
-  collectState.paused = false;
+  const wasRunning = collectState.running;
+  collectState.stop    = true;
+  collectState.paused  = false;
+  collectState.running = false;   // 立即重置，不等 ASR 调 collect-done
+  collectState.finishedAt = new Date().toISOString();
   await db.query(`INSERT INTO system_config (config_key, value) VALUES ('collect_pending','0') ON DUPLICATE KEY UPDATE value='0'`);
-  csLog('⛔ 停止指令已发出');
-  res.json({ code: 200, msg: '停止指令已发出，本地服务将在当前视频处理完成后停止' });
+  csLog('⛔ 采集已停止');
+  // 短暂后清 stop 标志，以免影响下次触发
+  setTimeout(() => { collectState.stop = false; }, 10000);
+  res.json({ code: 200, msg: wasRunning ? '采集已停止' : '任务已取消' });
 });
 
 // POST /api/industry-videos/admin/trigger — 触发采集

@@ -721,9 +721,20 @@ async function ivPause() {
 }
 
 async function ivStop() {
-  if (!confirm('确认停止当前采集任务？本地服务处理完当前视频后会停止。')) return;
+  if (!confirm('确认停止当前采集任务？')) return;
   const r = await req('/industry-videos/admin/stop', { method: 'POST' });
-  showMsg('iv-msg', r?.msg || '停止指令已发出', r?.code === 200 ? 'success' : 'error');
+  if (r?.code === 200) {
+    if (ivProgressTimer) { clearInterval(ivProgressTimer); ivProgressTimer = null; }
+    document.getElementById('iv-progress-box').style.display = 'none';
+    const btn = document.getElementById('iv-trigger-btn');
+    if (btn) { btn.disabled = false; btn.textContent = '立即采集'; }
+    const pauseBtn = document.getElementById('iv-pause-btn');
+    if (pauseBtn) pauseBtn.textContent = '暂停';
+    showMsg('iv-msg', r.msg || '已停止', 'success');
+    await ivLoadConfig();
+  } else {
+    showMsg('iv-msg', r?.msg || '停止失败', 'error');
+  }
 }
 
 async function ivSaveSchedule() {
