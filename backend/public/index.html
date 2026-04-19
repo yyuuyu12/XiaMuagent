@@ -394,14 +394,14 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .feat-card { background: #fff; border: 2px solid #F3F4F6; border-radius: 14px; padding: 13px 11px 10px; cursor: pointer; transition: border-color 0.15s,background 0.15s; display: flex; flex-direction: column; }
 .feat-card:active { border-color: #FF6B35; background: #FFF6F3; }
 .feat-card-text { font-size: 13px; color: #3D3A35; line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; word-break: break-all; flex: 1; }
-.feat-card-likes { font-size: 12px; color: #A8A49C; margin-top: auto; }
+.feat-card-likes { font-size: 12px; color: #A8A49C; margin-top: auto; display: flex; align-items: center; gap: 3px; }
 /* 行业精选 - 文案详情弹窗 */
 .feat-modal-overlay { position: fixed; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: rgba(0,0,0,0.45); z-index: 200; display: flex; align-items: flex-end; }
 .feat-modal { background: #fff; border-radius: 20px 20px 0 0; padding: 8px 20px 40px; max-height: 78vh; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
 .feat-modal-handle { width: 36px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 10px auto 16px; flex-shrink: 0; }
 .feat-modal-body { flex: 1; overflow-y: auto; margin-bottom: 14px; }
 .feat-modal-text { font-size: 14px; color: #3D3A35; line-height: 1.75; word-break: break-all; white-space: pre-wrap; }
-.feat-modal-likes { font-size: 12px; color: #A8A49C; margin-top: 12px; }
+.feat-modal-likes { font-size: 13px; color: #A8A49C; margin-top: 12px; display: flex; align-items: center; gap: 4px; }
 .feat-modal-btns { display: flex; gap: 10px; flex-shrink: 0; }
 .feat-btn-sec { flex: 1; padding: 14px; background: #F5F4F2; color: #6B6860; border: none; border-radius: 50px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .feat-btn-pri { flex: 1.4; padding: 14px; background: #FF6B35; color: #fff; border: none; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; }
@@ -2190,7 +2190,7 @@ function tFeaturedContent() {
     grid = S.featuredVideos.map((v, i) => `
       <div class="feat-card" onclick="setState({featuredDetailIdx:${i}});render()">
         <div class="feat-card-text">${esc(v.transcript)}</div>
-        <div class="feat-card-likes">🔥 ${fmtLikes(v.likes)}</div>
+        <div class="feat-card-likes"><svg width="12" height="12" viewBox="0 0 24 24" fill="#F97316" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${fmtLikes(v.likes)}</div>
       </div>`).join('');
   }
   // 详情弹窗
@@ -2202,7 +2202,7 @@ function tFeaturedContent() {
         <div class="feat-modal-handle"></div>
         <div class="feat-modal-body">
           <div class="feat-modal-text">${esc(dv.transcript)}</div>
-          <div class="feat-modal-likes">🔥 ${fmtLikes(dv.likes)} 点赞</div>
+          <div class="feat-modal-likes"><svg width="14" height="14" viewBox="0 0 24 24" fill="#F97316" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${fmtLikes(dv.likes)} 点赞</div>
         </div>
         <div class="feat-modal-btns">
           <button class="feat-btn-sec" onclick="featuredCopySelected()">复制文案</button>
