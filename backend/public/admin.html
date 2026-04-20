@@ -116,6 +116,7 @@
           <option value="qwen">通义千问（OpenAI 兼容地址）</option>
           <option value="claude">Anthropic Claude</option>
           <option value="zhipu">智谱 GLM（bigmodel.cn）</option>
+          <option value="deepseek">DeepSeek</option>
         </select>
         <div class="hint">保存时会写入数据库，请勿随意切换未配置 Key 的提供商</div>
       </div>
@@ -142,6 +143,16 @@
         <div class="form-row">
           <label>智谱模型</label>
           <input id="zhipu_model" placeholder="glm-4-flash" />
+        </div>
+      </div>
+      <div class="grid-2" style="padding-top:12px;border-top:1px solid #E8EDFF;margin-top:8px">
+        <div class="form-row">
+          <label>DeepSeek API Key</label>
+          <input id="deepseek_api_key" type="password" placeholder="sk-..." />
+        </div>
+        <div class="form-row">
+          <label>DeepSeek 模型</label>
+          <input id="deepseek_model" placeholder="deepseek-chat" />
         </div>
       </div>
       <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
@@ -446,6 +457,8 @@ async function loadKeys() {
   document.getElementById('openai_model').value = d.openai_model || '';
   document.getElementById('zhipu_api_key').value = d.zhipu_api_key || '';
   document.getElementById('zhipu_model').value = d.zhipu_model || '';
+  document.getElementById('deepseek_api_key').value = d.deepseek_api_key || '';
+  document.getElementById('deepseek_model').value = d.deepseek_model || '';
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
   document.getElementById('asr_url').value = d.asr_url || '';
   document.getElementById('video_url').value = d.video_url || '';
@@ -460,6 +473,8 @@ async function saveKeys() {
     openai_model: document.getElementById('openai_model').value,
     zhipu_api_key: document.getElementById('zhipu_api_key').value,
     zhipu_model: document.getElementById('zhipu_model').value,
+    deepseek_api_key: document.getElementById('deepseek_api_key').value,
+    deepseek_model: document.getElementById('deepseek_model').value,
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
     asr_url: document.getElementById('asr_url').value,
     video_url: document.getElementById('video_url').value,
