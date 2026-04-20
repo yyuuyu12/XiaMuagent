@@ -20,13 +20,13 @@ Log "=== startup begin ==="
 if (IsPortInUse 7861) {
     Log "[HeyGem] already running, skip"
 } else {
-    Log "[HeyGem] starting..."
+    Log "[HeyGem] starting V2 (hdModule)..."
     Start-Process `
-        -FilePath "C:\ChaojiIP\aigc-human\python-modules\humanModule\venv\python.exe" `
-        -ArgumentList "C:\AIClaudecode\desktop_client\heygem_server.py" `
+        -FilePath "C:\ChaojiIP\aigc-human\python-modules\hdModule\venv\python.exe" `
+        -ArgumentList "C:\AIClaudecode\desktop_client\heygem_server_v2.py" `
         -WorkingDirectory "C:\AIClaudecode\desktop_client" `
         -WindowStyle Hidden
-    Log "[HeyGem] process started (model init ~60s)"
+    Log "[HeyGem] V2 process started (model init ~60-90s)"
 }
 
 # 2. ASR (8765)
