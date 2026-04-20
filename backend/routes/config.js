@@ -40,6 +40,17 @@ router.post('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
   res.json({ code: 200, msg: '配置已保存' });
 });
 
+// ==================== 调试接口（临时） ====================
+router.get('/debug-ai', requireAuth, requireAdmin, async (req, res) => {
+  const keys = ['ai_provider','deepseek_api_key','deepseek_model','openai_api_key'];
+  const result = {};
+  for (const k of keys) {
+    const { rows } = await db.query('SELECT value FROM system_config WHERE config_key = $1', [k]);
+    result[k] = rows[0]?.value ?? '(not found in DB)';
+  }
+  res.json({ code: 200, data: result });
+});
+
 // ==================== 提示词模板 ====================
 router.get('/prompts', requireAuth, async (req, res) => {
   const { type } = req.query;
