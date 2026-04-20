@@ -11,7 +11,8 @@ function requireAdmin(req, res, next) {
 // ==================== AI Key 配置 ====================
 router.get('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
   const keys = ['ai_provider','openai_api_key','openai_base_url','openai_model',
-    'claude_api_key','claude_model','qwen_api_key','qwen_model','zhipu_api_key','zhipu_model','tikhub_api_key','asr_url','video_url','fish_audio_api_key'];
+    'claude_api_key','claude_model','qwen_api_key','qwen_model','zhipu_api_key','zhipu_model',
+    'deepseek_api_key','deepseek_model','tikhub_api_key','asr_url','video_url','fish_audio_api_key'];
   const result = {};
   for (const k of keys) {
     const { rows } = await db.query('SELECT value FROM system_config WHERE config_key = $1', [k]);
@@ -24,7 +25,8 @@ router.get('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
 
 router.post('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
   const allowedKeys = ['ai_provider','openai_api_key','openai_base_url','openai_model',
-    'claude_api_key','claude_model','qwen_api_key','qwen_model','zhipu_api_key','zhipu_model','tikhub_api_key','asr_url','video_url','fish_audio_api_key'];
+    'claude_api_key','claude_model','qwen_api_key','qwen_model','zhipu_api_key','zhipu_model',
+    'deepseek_api_key','deepseek_model','tikhub_api_key','asr_url','video_url','fish_audio_api_key'];
   for (const [k, v] of Object.entries(req.body)) {
     if (allowedKeys.includes(k) && v !== undefined) {
       if (typeof v === 'string' && v.includes('****')) continue;
