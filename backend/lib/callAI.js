@@ -4,7 +4,7 @@ async function getAIConfig() {
   const keys = [
     'ai_provider', 'openai_api_key', 'openai_base_url', 'openai_model',
     'claude_api_key', 'claude_model', 'qwen_api_key', 'qwen_model',
-    'zhipu_api_key', 'zhipu_model',
+    'zhipu_api_key', 'zhipu_model', 'deepseek_api_key', 'deepseek_model',
   ];
   const cfg = {};
   for (const k of keys) {
@@ -68,6 +68,22 @@ async function callAI(prompt, opts = {}) {
     const zc = data.choices?.[0]?.message?.content;
     if (!zc) throw new Error(`智谱返回内容异常`);
     return zc;
+  }
+
+  if (provider === 'deepseek') {
+    const apiKey = cfg.deepseek_api_key;
+    const model = cfg.deepseek_model || 'deepseek-chat';
+    if (!apiKey) throw new Error('DeepSeek Key 未配置，请在后台填写 deepseek_api_key');
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: opts.temperature || 0.8, max_tokens: maxTokens }),
+    });
+    if (!response.ok) throw new Error(`DeepSeek 接口错误: ${await response.text()}`);
+    const data = await response.json();
+    const dc = data.choices?.[0]?.message?.content;
+    if (!dc) throw new Error(`DeepSeek 返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
+    return dc;
   }
 
   throw new Error(`不支持的 AI 提供商: ${provider}，请在后台选择并配置 Key`);
