@@ -361,9 +361,11 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 /* 5. Bottom tab -> blur */
 .bottom-tab { background: rgba(255,255,255,0.92) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-top: 1px solid rgba(0,0,0,0.06) !important; box-shadow: none !important; }
 
-/* 6. Back button -> circular */
-.back-btn { width: 36px !important; height: 36px !important; background: rgba(0,0,0,0.06) !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 0 !important; font-size: 18px !important; transition: transform 0.15s, background 0.15s !important; margin-right: 4px !important; }
+/* 6. Back button -> strictly circular (36×36) */
+.back-btn { width: 36px !important; height: 36px !important; min-width: 36px !important; max-width: 36px !important; background: rgba(0,0,0,0.06) !important; border-radius: 50% !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; padding: 0 !important; font-size: 18px !important; transition: transform 0.15s, background 0.15s !important; margin: 0 !important; flex-shrink: 0 !important; overflow: hidden !important; }
+.back-btn > span { display: none !important; }
 .back-btn:active { transform: scale(0.88) !important; background: rgba(0,0,0,0.1) !important; }
+.back-btn svg { display: block !important; }
 
 /* 7. Primary button -> gradient + shadow */
 .btn-primary { background: linear-gradient(135deg, #FF8040, #F5602A) !important; border-radius: 16px !important; height: 52px !important; line-height: 52px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 6px 20px rgba(245,96,42,0.35) !important; transition: transform 0.15s, box-shadow 0.15s !important; }
@@ -410,15 +412,47 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .profile-section-title { padding: 14px 18px 4px !important; display: block !important; }
 .logout-btn { border-radius: 16px !important; border: 1.5px solid #F0EDE8 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important; margin-top: 8px !important; }
 
+/* 13b. 编辑资料页：section 需要内边距，表单元素才有呼吸 */
+.profile-edit-page { padding: 16px 16px 120px !important; }
+.profile-edit-page .profile-section { padding: 18px 18px 16px !important; }
+.profile-edit-page .profile-section-title { padding: 0 0 10px !important; font-size: 12px !important; color: #9E9890 !important; font-weight: 500 !important; letter-spacing: 0.2px !important; }
+.profile-edit-page .profile-field-label { display: block !important; font-size: 13px !important; color: #1A1614 !important; font-weight: 600 !important; margin-bottom: 10px !important; }
+.profile-edit-page .field-input { height: 46px !important; border-radius: 12px !important; border: 1.5px solid #F0EDE8 !important; background: #FAF8F4 !important; font-size: 14px !important; padding: 0 14px !important; transition: border-color 0.2s, box-shadow 0.2s !important; }
+.profile-edit-page .field-input:focus { border-color: #F5762A !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(245,96,42,0.1) !important; outline: none !important; }
+.profile-edit-page .profile-phone-muted { background: #F3F2EE !important; border-color: #EAE7DF !important; }
+.profile-edit-page .profile-field-hint { font-size: 12px !important; color: #9E9890 !important; margin-top: 8px !important; line-height: 1.55 !important; }
+.profile-edit-page .avatar-options { padding: 4px 0 2px !important; gap: 12px !important; }
+.profile-edit-page .btn-primary { margin: 8px 0 0 !important; width: 100% !important; }
+.profile-edit-page .btn-secondary { margin-right: 0 !important; flex: none !important; }
+
 /* 14. Other components */
 .auth-sheet { border-radius: 24px 24px 0 0 !important; }
 .pay-modal { border-radius: 20px !important; }
-.form-card { border-radius: 18px !important; }
-.plan-card { border-radius: 14px !important; }
-.vip-upgrade-card { border-radius: 20px !important; box-shadow: 0 6px 20px rgba(245,96,42,0.3) !important; }
+.form-card { border-radius: 18px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; }
+.plan-card { border-radius: 14px !important; box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; }
+.vip-upgrade-card { border-radius: 20px !important; box-shadow: 0 8px 28px rgba(245,96,42,0.32) !important; }
 .vip-hero { border-radius: 20px !important; }
-.avatar-picker { border-radius: 16px !important; }
+.avatar-picker { border-radius: 16px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; }
 .industry-item { font-weight: 500; border-radius: 50px !important; }
+
+/* 15. 精致阴影统一化：所有白底卡片贴近设计稿软阴影 */
+.recent-item { border-radius: 16px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; }
+.stats-wrap .stats { border-radius: 20px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; }
+.profile-menu-list { border-radius: 20px !important; border: 1px solid rgba(0,0,0,0.04) !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; }
+.profile-menu-item { padding: 16px 18px !important; }
+.profile-menu-item:not(:last-child)::after { left: 62px !important; background: #F7F5F1 !important; }
+.profile-menu-title { font-size: 15px !important; font-weight: 600 !important; }
+.profile-menu-sub { font-size: 12px !important; color: #9E9890 !important; }
+.profile-menu-icon { border-radius: 12px !important; width: 36px !important; height: 36px !important; }
+.profile-history-entry { border-radius: 16px !important; border: 1px solid rgba(0,0,0,0.04) !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; padding: 14px 16px !important; }
+
+/* 15b. Top-bar 子页面：统一 padding / 居中 */
+.top-bar-sub { padding: 14px 22px 10px !important; gap: 10px !important; }
+.sub-page-title { font-size: 17px !important; font-weight: 700 !important; color: #1A1614 !important; }
+
+/* 15c. 语音/视频管理等二级页也恢复清爽 */
+.voices-page .profile-section, .tab-page.voices-page .profile-section { padding: 16px !important; }
+.voices-page .profile-section-title { padding: 0 0 10px !important; font-size: 13px !important; }
 
 /* === TOAST === */
 .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 200; pointer-events: none; white-space: nowrap; max-width: 480px; }
@@ -1162,16 +1196,16 @@ function tTopBar() {
   const t = S.currentTab;
   if (t === 'profile' && S.profileView === 'edit') {
     return `<div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="goProfileEditBack()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
+      <button type="button" class="back-btn" onclick="goProfileEditBack()" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <span class="sub-page-title">编辑资料</span>
-      <div style="width:56px;flex-shrink:0"></div>
+      <div style="width:36px;flex-shrink:0"></div>
     </div>`;
   }
   if (t === 'profile' && S.profileView === 'voices') {
     return `<div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="setState({profileView:'main'});render()"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="margin-left:4px">返回</span></button>
+      <button type="button" class="back-btn" onclick="setState({profileView:'main'});render()" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <span class="sub-page-title">声音管理</span>
-      <div style="width:56px;flex-shrink:0"></div>
+      <div style="width:36px;flex-shrink:0"></div>
     </div>`;
   }
   if (t === 'home' || t === 'profile') {
@@ -1226,11 +1260,11 @@ function tTopBar() {
   }
 
   const isDeepSub = !!(S.inspireMode || (t === 'history' && S.tasksView === 'detail'));
-  const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:56px;flex-shrink:0"></div>';
+  const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:36px;flex-shrink:0"></div>';
   return `<div class="top-bar top-bar-sub">
-    <button type="button" class="back-btn" onclick="${backAction}"><svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="display:block;flex-shrink:0"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button type="button" class="back-btn" onclick="${backAction}" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <span class="sub-page-title">${esc(title)}</span>
-    ${isDeepSub ? '<div style="width:56px;flex-shrink:0"></div>' : loginHint}
+    ${isDeepSub ? '<div style="width:36px;flex-shrink:0"></div>' : loginHint}
   </div>`;
 }
 
