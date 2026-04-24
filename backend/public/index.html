@@ -295,25 +295,130 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .footer-tip { text-align: center; padding: 20px 16px 40px; }
 .footer-text { font-size: 11px; color: #C4C0B8; }
 
-/* === 精致风格升级：圆角 + 阴影 === */
-.feature-card, .input-card, .result-card, .section-card, .inspire-card,
-.profile-section, .avatar-picker, .history-card { border-radius: 16px !important; }
-.feature-card { box-shadow: 0 2px 12px rgba(0,0,0,.06) !important; }
-.result-card, .section-card, .inspire-card { box-shadow: 0 2px 10px rgba(0,0,0,.05) !important; }
-.welcome-banner, .vip-upgrade-card { border-radius: 20px !important; }
-.profile-hero { border-radius: 20px !important; }
-.vip-hero { border-radius: 20px !important; }
-.plan-card { border-radius: 14px !important; }
-.form-card { border-radius: 18px !important; }
-.bottom-tab { box-shadow: 0 -2px 16px rgba(0,0,0,.06); border-top: none !important; }
+/* === 设计稿精准对标 v2 === */
+
+/* 1. Hero Banner */
+.welcome-banner {
+  margin-bottom: 0 !important;
+  border-radius: 24px !important;
+  padding: 22px 24px !important;
+  background: linear-gradient(135deg, #FF8040 0%, #F5602A 55%, #E84D1C 100%) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 32px rgba(245,96,42,0.38) !important;
+}
+.welcome-banner::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -20px;
+  width: 160px; height: 160px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.welcome-banner::after {
+  content: '';
+  position: absolute;
+  bottom: -40px; right: 40px;
+  width: 120px; height: 120px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.welcome-greet { display: block; font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 2px; font-weight: 400; }
+.welcome-name { display: block; font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.5px; margin-bottom: 2px; }
+.welcome-hi { font-size: 13px !important; color: rgba(255,255,255,0.75) !important; font-weight: 400 !important; display: block !important; margin-bottom: 16px !important; }
+.welcome-sub { display: none !important; }
+.usage-bar { background: rgba(255,255,255,0.18) !important; border: 1px solid rgba(255,255,255,0.25) !important; border-radius: 20px !important; padding: 5px 12px !important; backdrop-filter: blur(8px) !important; display: inline-flex !important; }
+.usage-progress-wrap { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); border-radius: 20px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 8px; }
+.usage-progress-bar { background: rgba(255,255,255,0.3) !important; height: 4px !important; border-radius: 50px !important; width: 80px !important; }
+.usage-progress-fill { background: #fff !important; }
+.usage-progress-text { font-size: 12px; color: #fff; white-space: nowrap; }
+
+/* 2. Home section headers */
+.home-section-title { font-size: 17px !important; font-weight: 700 !important; color: #1A1614 !important; letter-spacing: -0.3px !important; }
+.home-section-more { font-size: 13px !important; color: #F5762A !important; font-weight: 500 !important; }
+.home-section-header { padding: 20px 0 12px !important; margin-bottom: 0 !important; }
+
+/* 3. App name */
+.notif-bell-btn { width: 38px; height: 38px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.15s; flex-shrink: 0; }
+.notif-bell-btn:active { transform: scale(0.9); }
+.app-name { font-size: 22px !important; font-weight: 700 !important; letter-spacing: -0.5px !important; }
+
+/* 4. Feature cards -> 2x2 grid, vertical cards */
+.feature-cards { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; margin-bottom: 4px !important; }
+.feature-card-main { height: auto !important; flex-direction: column !important; align-items: flex-start !important; padding: 18px 16px !important; border-radius: 20px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; position: relative !important; margin-bottom: 0 !important; transition: transform 0.18s, box-shadow 0.18s !important; overflow: hidden !important; }
+.feature-card-main:active { transform: scale(0.96) !important; box-shadow: 0 1px 6px rgba(0,0,0,0.06) !important; }
+.feature-icon-wrap { width: 44px !important; height: 44px !important; border-radius: 14px !important; margin-bottom: 12px !important; margin-right: 0 !important; flex-shrink: 0 !important; }
+.feature-info { display: flex; flex-direction: column; }
+.feature-title { font-size: 15px !important; font-weight: 600 !important; color: #1A1814 !important; margin-bottom: 4px !important; }
+.feature-desc { font-size: 12px !important; color: #9E9890 !important; line-height: 1.5 !important; }
+.feature-arrow-orange { position: absolute !important; top: 14px !important; right: 14px !important; font-size: 16px !important; color: #D0CCC6 !important; }
+.feat-coming { opacity: 0.7; cursor: default !important; }
+.feat-coming:active { transform: none !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; }
+.feat-soon-badge { position: absolute; top: 10px; right: 10px; font-size: 9px; color: #F5762A; background: #FFF0E6; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
+
+/* 5. Bottom tab -> blur */
+.bottom-tab { background: rgba(255,255,255,0.92) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-top: 1px solid rgba(0,0,0,0.06) !important; box-shadow: none !important; }
+
+/* 6. Back button -> circular */
+.back-btn { width: 36px !important; height: 36px !important; background: rgba(0,0,0,0.06) !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 0 !important; font-size: 18px !important; transition: transform 0.15s, background 0.15s !important; margin-right: 4px !important; }
+.back-btn:active { transform: scale(0.88) !important; background: rgba(0,0,0,0.1) !important; }
+
+/* 7. Primary button -> gradient + shadow */
+.btn-primary { background: linear-gradient(135deg, #FF8040, #F5602A) !important; border-radius: 16px !important; height: 52px !important; line-height: 52px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 6px 20px rgba(245,96,42,0.35) !important; transition: transform 0.15s, box-shadow 0.15s !important; }
+.btn-primary:active { transform: scale(0.97) !important; box-shadow: 0 3px 10px rgba(245,96,42,0.25) !important; }
+.btn-disabled { background: #E8E4DF !important; box-shadow: none !important; color: #B0AA9F !important; transform: none !important; }
+.btn-secondary { border-radius: 16px !important; height: 52px !important; line-height: 52px !important; border-color: #F0EDE8 !important; }
+
+/* 8. Tip/hint card */
+.tip-card { background: #FFF8F3 !important; border: 1px solid #FFE5D0 !important; border-left: 3px solid #F5762A !important; border-radius: 16px !important; padding: 16px !important; }
+.tip-title { color: #E06420 !important; font-size: 13px !important; }
+.tip-line { color: #7A6F65 !important; font-size: 13px !important; line-height: 1.8 !important; }
+
+/* 9. Sub-page header blur */
+.top-bar-sub { background: rgba(247,245,241,0.92) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; }
+
+/* 10. Input areas - focus glow */
+.url-textarea { border-radius: 12px !important; }
+.url-textarea:focus { border-color: #F5762A !important; box-shadow: 0 0 0 3px rgba(245,96,42,0.1) !important; outline: none !important; }
+.field-input { border-radius: 12px !important; }
+.field-input:focus { border-color: #F5762A !important; box-shadow: 0 0 0 3px rgba(245,96,42,0.1) !important; }
+.editable-script-textarea { border-radius: 12px !important; }
+.editable-script-textarea:focus { border-color: #F5762A !important; box-shadow: 0 0 0 3px rgba(245,96,42,0.1) !important; }
+.input-card { border-radius: 20px !important; padding: 18px !important; }
+.result-card { border-radius: 16px !important; box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important; }
+.section-card { border-radius: 16px !important; }
+.inspire-card { border-radius: 16px !important; box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important; }
+.history-card { border-radius: 14px !important; }
+
+/* 11. Step bar card */
+.csb-card { border-radius: 20px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; }
+.csb-node-active { box-shadow: 0 4px 12px rgba(245,96,42,0.4) !important; background: #F5762A !important; }
+
+/* 12. Profile hero -> purple-blue from mockup */
+.profile-hero { background: linear-gradient(135deg, #7C82E8, #5B5FD9) !important; border-radius: 24px !important; box-shadow: 0 8px 28px rgba(91,95,217,0.35) !important; margin-bottom: 16px !important; }
+.profile-edit-entry { background: rgba(255,255,255,0.2) !important; border: 1px solid rgba(255,255,255,0.3) !important; color: #fff !important; border-radius: 20px !important; padding: 6px 14px !important; backdrop-filter: blur(8px) !important; }
+.usage-stats { background: rgba(255,255,255,0.15) !important; border-radius: 12px !important; }
+
+/* 13. Profile sections -> menu group style */
+.profile-section { border-radius: 20px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; overflow: hidden !important; padding: 0 !important; margin-bottom: 16px !important; }
+.profile-row { padding: 16px 18px !important; border-bottom: 1px solid #F7F5F1 !important; transition: background 0.15s !important; }
+.profile-row:active { background: #F9F7F4 !important; }
+.profile-row:last-child { border-bottom: none !important; }
+.profile-key { font-size: 15px !important; font-weight: 600 !important; }
+.profile-section-title { padding: 14px 18px 4px !important; display: block !important; }
+.logout-btn { border-radius: 16px !important; border: 1.5px solid #F0EDE8 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important; margin-top: 8px !important; }
+
+/* 14. Other components */
 .auth-sheet { border-radius: 24px 24px 0 0 !important; }
 .pay-modal { border-radius: 20px !important; }
-.field-input { border-radius: 10px !important; }
-.url-textarea { border-radius: 10px !important; }
-.industry-item { font-weight: 500; }
-.tip-card { background: rgba(245,118,42,.06) !important; border-radius: 12px !important; }
-.tip-title { color: #E06A1A !important; }
-.tip-line { color: #9A6A40 !important; }
+.form-card { border-radius: 18px !important; }
+.plan-card { border-radius: 14px !important; }
+.vip-upgrade-card { border-radius: 20px !important; box-shadow: 0 6px 20px rgba(245,96,42,0.3) !important; }
+.vip-hero { border-radius: 20px !important; }
+.avatar-picker { border-radius: 16px !important; }
+.industry-item { font-weight: 500; border-radius: 50px !important; }
 
 /* === TOAST === */
 .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 14px; z-index: 200; pointer-events: none; white-space: nowrap; max-width: 480px; }
@@ -1308,7 +1413,9 @@ function tHome() {
   const u = S.userInfo;
   // 欢迎语：有昵称显示昵称，无昵称显示「你好，老板」
   const hasNickname = !!(u?.nickname && u.nickname.trim());
-  const greetText = hasNickname ? `你好，${esc(u.nickname)}` : '你好，老板';
+  const hour = new Date().getHours();
+  const timeGreet = hour < 12 ? '早上好 👋' : hour < 18 ? '下午好 ☀️' : '晚上好 🌙';
+  const greetText = hasNickname ? esc(u.nickname) : '朋友';
 
   // 用次进度条：已登录但数据未加载时显示空进度条
   let usageSection;
@@ -1335,26 +1442,46 @@ function tHome() {
 
   return `<div class="tab-page">
     <div class="welcome-banner">
-      <span class="welcome-hi">${greetText}</span>
-      <span class="welcome-sub">今天想创作什么爆款内容？</span>
+      <span class="welcome-greet">${timeGreet}</span>
+      <span class="welcome-name">${greetText}</span>
+      <span class="welcome-hi">今天想创作什么爆款内容？</span>
       ${usageSection}
+    </div>
+    <div class="home-section-header" style="margin-top:8px">
+      <span class="home-section-title">核心功能</span>
     </div>
     <div class="feature-cards">
       <div class="feature-card-main" onclick="switchTab('extract')">
-        <div class="feature-icon-wrap feature-icon-blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div>
+        <span class="feature-arrow-orange">›</span>
+        <div class="feature-icon-wrap feature-icon-blue"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div>
         <div class="feature-info">
-          <span class="feature-title">爆款文案克隆</span>
+          <span class="feature-title">爆款克隆</span>
           <span class="feature-desc">粘贴视频链接，提取文案并AI改写</span>
         </div>
-        <span class="feature-arrow-orange">›</span>
       </div>
       <div class="feature-card-main" onclick="switchTab('inspire')">
-        <div class="feature-icon-wrap feature-icon-orange"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <span class="feature-arrow-orange">›</span>
+        <div class="feature-icon-wrap feature-icon-orange"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
         <div class="feature-info">
           <span class="feature-title">灵感发现</span>
           <span class="feature-desc">选择行业赛道，生成爆款文案创意</span>
         </div>
-        <span class="feature-arrow-orange">›</span>
+      </div>
+      <div class="feature-card-main feat-coming">
+        <span class="feat-soon-badge">即将上线</span>
+        <div class="feature-icon-wrap" style="background:rgba(245,118,42,0.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 19.07a10 10 0 010-14.14"/><path d="M15.54 8.46a5 5 0 010 7.07M8.46 15.54a5 5 0 010-7.07"/></svg></div>
+        <div class="feature-info">
+          <span class="feature-title">声音克隆</span>
+          <span class="feature-desc">上传声音，一键克隆专属音色</span>
+        </div>
+      </div>
+      <div class="feature-card-main feat-coming">
+        <span class="feat-soon-badge">即将上线</span>
+        <div class="feature-icon-wrap" style="background:rgba(20,184,166,0.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <div class="feature-info">
+          <span class="feature-title">数字人</span>
+          <span class="feature-desc">管理形象，生成专属数字分身</span>
+        </div>
       </div>
     </div>
     ${tHomeTaskSection()}
