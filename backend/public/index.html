@@ -4336,29 +4336,10 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       if (t.status === 'done' && t.video_direct_url) {
         if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
-        setState({ avatarProgressMsg: '视频生成完成，正在下载...' });
-        try {
-          // 通过 Zeabur 后端流式代理下载（避免 HTTPS→HTTP Mixed Content 拦截）
-          const resp = await fetch(`/ai/video/download/${taskId}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
-          if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
-          const arrayBuffer = await resp.arrayBuffer();
-          if (!arrayBuffer.byteLength) throw new Error('视频数据为空');
-          // 强制指定 video/mp4 类型，确保浏览器能正确播放
-          const blob = new Blob([arrayBuffer], { type: 'video/mp4' });
-          const url = URL.createObjectURL(blob);
-          // 分块转 b64，避免大文件展开数组时栈溢出
-          const uint8 = new Uint8Array(arrayBuffer);
-          let binary = '';
-          const chunk = 8192;
-          for (let i = 0; i < uint8.length; i += chunk) {
-            binary += String.fromCharCode(...uint8.subarray(i, i + chunk));
-          }
-          const b64 = btoa(binary);
-          setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: b64, avatarTaskId: null, extractStep: 4 });
-          saveCloneSession(4);
-        } catch (dlErr) {
-          setState({ avatarGenerating: false, avatarErr: `视频下载失败: ${dlErr.message}`, extractStep: 4 });
-        }
+        // 直接用流式 URL 作为 video src，边下边播，不缓冲整个文件（100MB+ 视频缓冲会内存爆）
+        const videoStreamUrl = `/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
+        setState({ avatarGenerating: false, avatarVideoUrl: videoStreamUrl, avatarVideoB64: null, avatarTaskId: null, extractStep: 4 });
+        saveCloneSession(4);
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });

@@ -1,7 +1,9 @@
 const express = require('express');
 const db = require('../db');
+const jwt = require('jsonwebtoken');
 const { requireAuth } = require('./auth');
 const router = express.Router();
+const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 
 // ==================== 获取 AI 配置 ====================
 async function getAIConfig() {
@@ -565,24 +567,35 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
   }
 });
 
-// 视频文件流式下载（解决 HTTPS 前端不能直接 fetch HTTP heygem 的 Mixed Content 问题）
-router.get('/video/download/:taskId', requireAuth, async (req, res) => {
+// 视频流式代理（token 放 URL 参数，解决 video src 无法带 Authorization header 的问题）
+// 同时转发 Range 请求，支持浏览器拖动进度条
+router.get('/video/stream/:taskId', async (req, res) => {
+  const token = req.query.t || '';
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.userId = payload.id;
+  } catch {
+    return res.status(401).json({ code: 401, msg: 'token 无效' });
+  }
   const { taskId } = req.params;
   const videoUrl = await getVideoUrl();
   if (!videoUrl) return res.status(500).json({ code: 500, msg: '未配置数字人服务地址' });
+  const upHeaders = { ...VIDEO_FETCH_HEADERS };
+  if (req.headers.range) upHeaders['Range'] = req.headers.range;
   try {
     const resp = await fetch(`${videoUrl}/video/file/${taskId}`, {
-      headers: VIDEO_FETCH_HEADERS,
-      signal: AbortSignal.timeout(300000), // 5 分钟，视频文件大允许慢传
+      headers: upHeaders,
+      signal: AbortSignal.timeout(600000),
     });
-    if (!resp.ok) return res.status(500).json({ code: 500, msg: `获取视频失败 ${resp.status}` });
-    const buf = Buffer.from(await resp.arrayBuffer());
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Length', buf.length);
-    res.setHeader('Content-Disposition', `attachment; filename="${taskId}.mp4"`);
-    res.send(buf);
+    res.status(resp.status);
+    res.setHeader('Content-Type', resp.headers.get('content-type') || 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (resp.headers.get('content-length')) res.setHeader('Content-Length', resp.headers.get('content-length'));
+    if (resp.headers.get('content-range')) res.setHeader('Content-Range', resp.headers.get('content-range'));
+    const { Readable } = require('stream');
+    Readable.fromWeb(resp.body).pipe(res);
   } catch (e) {
-    if (!res.headersSent) res.status(500).json({ code: 500, msg: `下载失败: ${e.message}` });
+    if (!res.headersSent) res.status(500).json({ code: 500, msg: `流式失败: ${e.message}` });
   }
 });
 
