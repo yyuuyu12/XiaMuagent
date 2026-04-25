@@ -287,7 +287,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 
 /* === AUTH BOTTOM SHEET === */
 .auth-sheet-mask {
-  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 220;
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 420;
   display: flex; align-items: flex-end; justify-content: center;
 }
 .auth-sheet {
@@ -1265,7 +1265,6 @@ function closeAuthSheet() { setState({ showAuthSheet: false, authErr: '', loadin
 function ensureLoggedIn() {
   if (getToken()) return true;
   openAuthSheet();
-  showToast('请先登录');
   return false;
 }
 
@@ -2842,6 +2841,7 @@ async function featuredConfirm() {
 }
 
 function featuredCopySelected() {
+  if (!ensureLoggedIn()) return;
   const v = (S.featuredVideos || [])[S.featuredDetailIdx];
   if (!v) return;
   navigator.clipboard.writeText(v.transcript).then(() => showToast('已复制')).catch(() => {
@@ -2852,6 +2852,7 @@ function featuredCopySelected() {
 }
 
 async function featuredRewrite() {
+  if (!ensureLoggedIn()) return;
   const v = (S.featuredVideos || [])[S.featuredDetailIdx];
   if (!v) return;
   if (v.id) {
@@ -4856,7 +4857,7 @@ function handleLogout() {
 
 // ===== 数字人管理 =====
 async function openAvatarMgmt(mode) {
-  if (!S.userInfo) { showToast('请先登录'); return; }
+  if (!S.userInfo) { openAuthSheet(); return; }
   setState({
     showAvatarMgmt: true,
     avatarMgmtMode: mode || 'manage',
