@@ -252,7 +252,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .plan-duration { display: block; font-size: 11px; color: #A8A49C; margin-bottom: 6px; }
 .plan-price { display: block; color: #FF6B35; margin-top: 2px; }
 .plan-price-unit { font-size: 12px; font-weight: 400; vertical-align: middle; }
-.plan-price-num { font-size: 20px; font-weight: 500; letter-spacing: -0.5px; vertical-align: middle; }
+.plan-price-num { font-size: 20px; font-weight: 500; letter-spacing: 0; vertical-align: middle; }
 .plan-badge { position: absolute; top: -1px; right: 8px; background: #FF6B35; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 0 0 6px 6px; }
 .payment-row { display: flex; flex-direction: row; margin-bottom: 14px; }
 .payment-item { flex: 1; background: #fff; border: 1px solid #E4E2DA; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; align-items: center; margin-right: 8px; cursor: pointer; user-select: none; }
@@ -269,6 +269,10 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .tab-label { font-size: 10px; font-weight: 500; color: #A8A49C; }
 .tab-active { color: #F97316; }
 .tab-active .tab-label { color: #F97316; font-weight: 600; }
+.bottom-tab { min-height: 83px; align-items: flex-start; justify-content: space-around; padding-top: 10px; }
+.tab-item { gap: 4px; padding: 4px 24px; border-radius: 12px; transition: transform 0.18s, color 0.18s; -webkit-tap-highlight-color: transparent; }
+.tab-item:active { transform: scale(0.92); }
+.tab-icon { margin-bottom: 0; }
 
 /* === PAY MODAL === */
 .pay-modal-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
@@ -357,7 +361,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
   pointer-events: none;
 }
 .welcome-greet { display: block; font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 2px; font-weight: 400; }
-.welcome-name { display: block; font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.5px; margin-bottom: 2px; }
+.welcome-name { display: block; font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 0; margin-bottom: 2px; }
 .welcome-hi { font-size: 13px !important; color: rgba(255,255,255,0.75) !important; font-weight: 400 !important; display: block !important; margin-bottom: 16px !important; }
 .welcome-sub { display: none !important; }
 .usage-bar { background: rgba(255,255,255,0.18) !important; border: 1px solid rgba(255,255,255,0.25) !important; border-radius: 20px !important; padding: 5px 12px !important; backdrop-filter: blur(8px) !important; display: inline-flex !important; }
@@ -367,14 +371,14 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .usage-progress-text { font-size: 12px; color: #fff; white-space: nowrap; }
 
 /* 2. Home section headers */
-.home-section-title { font-size: 17px !important; font-weight: 700 !important; color: #1A1614 !important; letter-spacing: -0.3px !important; }
+.home-section-title { font-size: 17px !important; font-weight: 700 !important; color: #1A1614 !important; letter-spacing: 0 !important; }
 .home-section-more { font-size: 13px !important; color: #F5762A !important; font-weight: 500 !important; }
 .home-section-header { padding: 20px 0 12px !important; margin-bottom: 0 !important; }
 
 /* 3. App name */
 .notif-bell-btn { width: 38px; height: 38px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.15s; flex-shrink: 0; }
 .notif-bell-btn:active { transform: scale(0.9); }
-.app-name { font-size: 22px !important; font-weight: 700 !important; letter-spacing: -0.5px !important; }
+.app-name { font-size: 22px !important; font-weight: 700 !important; letter-spacing: 0 !important; }
 
 /* 4. Feature cards -> 2x2 grid, vertical cards */
 .feature-cards { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; margin-bottom: 4px !important; }
@@ -519,6 +523,21 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .home-task-mini-action { display: inline-flex; align-items: center; justify-content: center; height: 26px; padding: 0 11px; border-radius: 50px; font-size: 12px; font-weight: 600; color: #F97316; background: #FFF0E6; white-space: nowrap; }
 .home-task-mini-action-gray { color: #6B6860; background: #F5F4F0; }
 .home-task-mini-action-red { color: #DC2626; background: #FEF2F2; }
+.home-page .home-task-card { border-radius: 20px !important; padding: 16px 18px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important; }
+.home-page .home-task-card:active { transform: scale(0.98); }
+.home-page .htc-step-circle { width: 24px; height: 24px; font-size: 10px; }
+.home-page .htc-step-active { background: #FFF3E8; color: #F5762A; border: 1.5px solid #F5762A; box-shadow: none; }
+.home-page .htc-step-done { background: #F5762A; color: #fff; }
+.home-page .htc-step-inactive { background: #F0EDE8; color: #B0AA9F; }
+.home-page .htc-detail-link { background: #FFF3E8; padding: 5px 12px; border-radius: 20px; color: #F5762A; }
+.home-page .home-task-small-scroll { margin: 0 -22px; padding: 0 22px 6px; gap: 10px; }
+.home-page .home-task-mini-card { flex: 0 0 248px; border-radius: 16px; padding: 13px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.home-page .home-task-mini-top { margin-bottom: 8px; }
+.home-page .home-task-mini-title { font-weight: 500; height: 20px; -webkit-line-clamp: 1; white-space: nowrap; display: block; text-overflow: ellipsis; }
+.home-page .home-task-mini-meta { margin-bottom: 9px; color: #B0AA9F; }
+.home-page .home-task-mini-action { height: 24px; padding: 0 12px; background: #F5762A; color: #fff; font-size: 11px; }
+.home-page .home-task-mini-action-gray { background: #F7F5F1; color: #9E9890; }
+.home-page .home-task-mini-action-red { background: #FFF0F0; color: #E5534B; }
 
 /* 15. 精致阴影统一化：所有白底卡片贴近设计稿软阴影 */
 .recent-item { border-radius: 16px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; }
@@ -718,7 +737,7 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .feat-clone-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); cursor: pointer; user-select: none; margin-bottom: 10px; position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: transform 0.18s, box-shadow 0.18s; }
 .feat-clone-card:active { transform: scale(0.98); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
 .feat-clone-icon { width: 52px; height: 52px; background: #EEF2FF; border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-bottom: 14px; }
-.feat-clone-title { font-size: 17px; font-weight: 600; color: #1A1614; margin-bottom: 6px; letter-spacing: -0.2px; }
+.feat-clone-title { font-size: 17px; font-weight: 600; color: #1A1614; margin-bottom: 6px; letter-spacing: 0; }
 .feat-clone-desc { font-size: 13px; font-weight: 400; color: #9E9890; line-height: 1.5; margin-bottom: 14px; }
 .feat-clone-arrow { position: absolute; top: 20px; right: 20px; color: #D0CCC6; }
 .feat-clone-tags { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -732,6 +751,16 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .feat-sub-title { font-size: 14px; font-weight: 600; color: #1A1614; margin-bottom: 4px; }
 .feat-sub-desc { font-size: 11px; font-weight: 400; color: #9E9890; line-height: 1.45; }
 .feat-sub-arrow { position: absolute; top: 14px; right: 14px; color: #D0CCC6; }
+.home-page { padding: 18px 22px calc(100px + env(safe-area-inset-bottom, 0px)) !important; }
+.home-page .welcome-banner { margin: 0 !important; }
+.home-page .home-section-header { padding: 22px 0 12px !important; }
+.home-tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+.home-tool-card { background: #fff; border-radius: 20px; padding: 18px 16px; min-height: 132px; cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+.home-tool-card:active { transform: scale(0.96); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+.home-tool-icon { width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.home-tool-arrow { position: absolute; top: 16px; right: 16px; color: #D0CCC6; }
+.home-tool-title { font-size: 15px; font-weight: 600; color: #1A1614; margin-bottom: 4px; }
+.home-tool-desc { font-size: 12px; color: #9E9890; line-height: 1.5; }
 .feature-arrow-orange { font-size: 26px; color: #F97316; margin-left: 4px; font-weight: 400; }
 .feature-row-light { display: flex; flex-direction: row; align-items: center; height: 44px; padding: 0 4px; cursor: pointer; user-select: none; margin-bottom: 12px; }
 .feature-row-icon { font-size: 17px; margin-right: 8px; }
@@ -1713,7 +1742,7 @@ function tHome() {
   // 欢迎语：有昵称显示昵称，无昵称显示「你好，老板」
   const hasNickname = !!(u?.nickname && u.nickname.trim());
   const hour = new Date().getHours();
-  const timeGreet = hour < 12 ? '早上好 👋' : hour < 18 ? '下午好 ☀️' : '晚上好 🌙';
+  const timeGreet = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
   const greetText = hasNickname ? esc(u.nickname) : '朋友';
 
   // 用次进度条：已登录但数据未加载时显示空进度条
@@ -1739,7 +1768,7 @@ function tHome() {
     ? S.industries
     : [{name:'美妆'},{name:'母婴'},{name:'数码'},{name:'食品'},{name:'服装'},{name:'宠物'},{name:'家居'}];
 
-  return `<div class="tab-page">
+  return `<div class="tab-page home-page">
     <div class="welcome-banner">
       <span class="welcome-greet">${timeGreet}</span>
       <span class="welcome-name">${greetText}</span>
@@ -1749,29 +1778,24 @@ function tHome() {
     <div class="home-section-header" style="margin-top:8px">
       <span class="home-section-title">核心功能</span>
     </div>
-    <div class="feat-clone-card" onclick="switchTab('extract')">
-      <div class="feat-clone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-      <div class="feat-clone-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
-      <div class="feat-clone-title">爆款克隆</div>
-      <div class="feat-clone-desc">粘贴抖音/快手链接，一键提取文案并 AI 改写成你的风格</div>
-      <div class="feat-clone-tags">
-        <span class="feat-clone-tag">语音提取</span>
-        <span class="feat-clone-tag">AI 改写</span>
-        <span class="feat-clone-tag">一键复制</span>
+    <div class="home-tools-grid">
+      <div class="home-tool-card" onclick="switchTab('extract')">
+        <div class="home-tool-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="home-tool-icon" style="background:#EEF0FF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
+        <div class="home-tool-title">爆款克隆</div>
+        <div class="home-tool-desc">粘贴视频链接，提取文案并 AI 改写</div>
       </div>
-    </div>
-    <div class="feat-sub-grid">
-      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireMode:'analyze',inspireFromHome:true});render()">
-        <div class="feat-sub-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        <div class="feat-sub-icon" style="background:#FFF0E6"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-        <div class="feat-sub-title">对标拆解</div>
-        <div class="feat-sub-desc">分析竞品文案结构与爆点</div>
+      <div class="home-tool-card" onclick="setState({currentTab:'inspire',inspireMode:'analyze',inspireFromHome:true});render()">
+        <div class="home-tool-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="home-tool-icon" style="background:#FFF3E8"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+        <div class="home-tool-title">对标拆解</div>
+        <div class="home-tool-desc">分析竞品文案结构与爆点</div>
       </div>
-      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireFromHome:true});enterFeaturedMode()">
-        <div class="feat-sub-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        <div class="feat-sub-icon" style="background:#EDFAF3"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0D9B5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-        <div class="feat-sub-title">行业精选</div>
-        <div class="feat-sub-desc">按赛道浏览爆款文案合集</div>
+      <div class="home-tool-card" onclick="setState({currentTab:'inspire',inspireFromHome:true});enterFeaturedMode()">
+        <div class="home-tool-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="home-tool-icon" style="background:#F0FDF4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+        <div class="home-tool-title">行业精选</div>
+        <div class="home-tool-desc">按赛道浏览爆款文案合集</div>
       </div>
     </div>
     ${tHomeTaskSection()}
