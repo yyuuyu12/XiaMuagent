@@ -4346,8 +4346,14 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
           // 强制指定 video/mp4 类型，确保浏览器能正确播放
           const blob = new Blob([arrayBuffer], { type: 'video/mp4' });
           const url = URL.createObjectURL(blob);
-          // 转 b64 供后续字幕烧录使用
-          const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          // 分块转 b64，避免大文件展开数组时栈溢出
+          const uint8 = new Uint8Array(arrayBuffer);
+          let binary = '';
+          const chunk = 8192;
+          for (let i = 0; i < uint8.length; i += chunk) {
+            binary += String.fromCharCode(...uint8.subarray(i, i + chunk));
+          }
+          const b64 = btoa(binary);
           setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: b64, avatarTaskId: null, extractStep: 4 });
           saveCloneSession(4);
         } catch (dlErr) {
