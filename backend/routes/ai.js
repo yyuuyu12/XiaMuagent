@@ -565,6 +565,28 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
   }
 });
 
+// 视频文件流式下载（解决 HTTPS 前端不能直接 fetch HTTP heygem 的 Mixed Content 问题）
+router.get('/video/download/:taskId', requireAuth, async (req, res) => {
+  const { taskId } = req.params;
+  const videoUrl = await getVideoUrl();
+  if (!videoUrl) return res.status(500).json({ code: 500, msg: '未配置数字人服务地址' });
+  try {
+    const resp = await fetch(`${videoUrl}/video/file/${taskId}`, {
+      headers: VIDEO_FETCH_HEADERS,
+      signal: AbortSignal.timeout(300000), // 5 分钟，视频文件大允许慢传
+    });
+    if (!resp.ok) return res.status(500).json({ code: 500, msg: `获取视频失败 ${resp.status}` });
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', `attachment; filename="${taskId}.mp4"`);
+    const cl = resp.headers.get('content-length');
+    if (cl) res.setHeader('Content-Length', cl);
+    const { Readable } = require('stream');
+    Readable.fromWeb(resp.body).pipe(res);
+  } catch (e) {
+    if (!res.headersSent) res.status(500).json({ code: 500, msg: `下载失败: ${e.message}` });
+  }
+});
+
 router.post('/video/cancel/:taskId', requireAuth, async (req, res) => {
   const { taskId } = req.params;
   const videoUrl = await getVideoUrl();

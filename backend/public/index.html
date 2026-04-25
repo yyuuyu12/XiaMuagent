@@ -4338,8 +4338,8 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarProgressMsg: '视频生成完成，正在下载...' });
         try {
-          // 直接从 heygem 公网地址下载视频（走下行带宽，绕过 Zeabur 中转，速度快 5-10 倍）
-          const resp = await fetch(t.video_direct_url);
+          // 通过 Zeabur 后端流式代理下载（避免 HTTPS→HTTP Mixed Content 拦截）
+          const resp = await fetch(`/ai/video/download/${taskId}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
           if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
           const blob = await resp.blob();
           const url = URL.createObjectURL(blob);
