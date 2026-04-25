@@ -1929,10 +1929,12 @@ function tExtract() {
 
   // 改写完成，展示结果 — 步骤2
   if (S.extractStep === 2) {
+    const hasRewrite = !!(S.rewrittenScript || '').trim();
+    const hasSource = !!(S.extractedScript || '').trim();
     return `${sb}<div class="tab-page">
       <div class="result-card result-muted">
         <span class="result-label-sm">原始文案</span>
-        <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value">${esc(S.extractedScript)}</textarea>
+        <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value;syncRewriteActions()">${esc(S.extractedScript)}</textarea>
         <div class="result-action-bottom">
           <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制原文'}</div>
         </div>
@@ -1940,14 +1942,15 @@ function tExtract() {
       <div class="result-card result-highlight">
         <div class="result-header-row"><span class="result-label">AI改写结果（可编辑）</span></div>
         <div class="thin-divider"></div>
-        <textarea class="editable-script-textarea" id="f-rewritten-script" oninput="S.rewrittenScript=this.value">${esc(S.rewrittenScript)}</textarea>
+        <textarea class="editable-script-textarea" id="f-rewritten-script" oninput="S.rewrittenScript=this.value;syncRewriteActions()">${esc(S.rewrittenScript)}</textarea>
         <div class="result-action-bottom">
-          <div class="copy-btn copy-btn-strong" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制改写文案'}</div>
+          <div class="copy-btn copy-btn-strong ${!hasRewrite?'btn-disabled':''}" id="copy-rewritten-btn" onclick="copyRewritten()">${S.copiedId==='rewritten'?'✓ 已复制':'复制改写文案'}</div>
         </div>
       </div>
+      ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
       <div class="action-row">
-        <div class="btn-action-sec" onclick="resetExtract()">重新克隆</div>
-        <div class="btn-action-main" onclick="goToCloneStep3()">下一步：语音合成 →</div>
+        <div class="btn-action-sec ${!hasSource?'btn-disabled':''}" id="clone-rerewrite-btn" onclick="handleCloneRewrite()">重新改写</div>
+        <div class="btn-action-main ${!hasRewrite?'btn-disabled':''}" id="clone-step3-btn" onclick="goToCloneStep3()">下一步：语音合成 →</div>
       </div>
     </div>`;
   }
@@ -3563,18 +3566,23 @@ function stopClonePoller() {
 
 async function handleCloneRewrite() {
   // 先从 DOM 读最新内容（oninput 可能未触发）
-  const ta = document.getElementById('f-extracted-script');
+  const ta = document.getElementById('f-extracted-script') || document.getElementById('f-extracted-script-v2');
   if (ta) S.extractedScript = ta.value;
   const text = S.extractedScript.trim();
-  if (!text) return;
+  if (!text) { showToast('请先填写原始文案'); return; }
 
+  const wasRewriteStep = S.extractStep === 2;
   setState({ extractStep: 'rewriting', extractErr: '' });
   saveCloneSession(2);
   try {
     // 直接把用户编辑好的文案传给 AI 改写，不经过 task 队列
     const r = await api.post('/ai/rewrite', { text });
     if (r.code === 200) {
-      const rewritten = r.data.result;
+      const rewritten = (r.data?.result || '').trim();
+      if (!rewritten) {
+        setState({ extractStep: 2, rewrittenScript: '', extractErr: 'AI改写结果为空，请点击重新改写' });
+        return;
+      }
       setState({ extractStep: 2, rewrittenScript: rewritten, extractErr: '' });
       // 把任务状态更新为 done，并保存 session（step=2），首页进度条才能更新
       if (S.cloneTaskId) {
@@ -3583,15 +3591,38 @@ async function handleCloneRewrite() {
         loadTasks(); // 刷新首页任务列表
       }
     } else {
-      setState({ extractStep: 'review', extractErr: r.msg || '改写失败，请重试' });
+      setState({ extractStep: wasRewriteStep ? 2 : 'review', extractErr: r.msg || '改写失败，请重试' });
     }
   } catch (e) {
-    setState({ extractStep: 'review', extractErr: '网络错误，请重试' });
+    setState({ extractStep: wasRewriteStep ? 2 : 'review', extractErr: '网络错误，请重试' });
   }
 }
 
 // ===== 克隆步骤3-6 handlers =====
+function syncRewriteActions() {
+  const source = document.getElementById('f-extracted-script-v2');
+  const rewritten = document.getElementById('f-rewritten-script');
+  if (source) S.extractedScript = source.value;
+  if (rewritten) S.rewrittenScript = rewritten.value;
+  const hasSource = !!(S.extractedScript || '').trim();
+  const hasRewrite = !!(S.rewrittenScript || '').trim();
+  const toggle = (id, enabled) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('btn-disabled', !enabled);
+  };
+  toggle('clone-rerewrite-btn', hasSource);
+  toggle('copy-rewritten-btn', hasRewrite);
+  toggle('clone-step3-btn', hasRewrite);
+}
+
 function goToCloneStep3() {
+  const ta = document.getElementById('f-rewritten-script');
+  if (ta) S.rewrittenScript = ta.value;
+  if (!(S.rewrittenScript || '').trim()) {
+    showToast('请先完成文案改写');
+    setState({ extractStep: 2, extractErr: '请先完成文案改写，再进入语音合成' });
+    return;
+  }
   setState({ extractStep: 3, ttsErr: '' });
 }
 
@@ -4467,7 +4498,12 @@ async function pasteFromClipboard() {
   } catch { showToast('请手动长按粘贴'); }
 }
 function copyExtracted() { copyText(S.extractedScript); setState({ copiedId: 'extracted' }); setTimeout(()=>setState({copiedId:''}),1500); }
-function copyRewritten() { copyText(S.rewrittenScript); setState({ copiedId: 'rewritten' }); setTimeout(()=>setState({copiedId:''}),1500); }
+function copyRewritten() {
+  if (!(S.rewrittenScript || '').trim()) { showToast('改写文案为空'); return; }
+  copyText(S.rewrittenScript);
+  setState({ copiedId: 'rewritten' });
+  setTimeout(()=>setState({copiedId:''}),1500);
+}
 
 // ===== INSPIRE =====
 function selectIndustry(id, name) {
