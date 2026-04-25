@@ -17,8 +17,10 @@ import uuid
 import base64
 import asyncio
 import threading
+import subprocess
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -80,6 +82,19 @@ def get_task(task_id: str):
     return t
 
 
+@app.get("/video/file/{task_id}")
+def video_file(task_id: str):
+    t = tasks.get(task_id)
+    if not t:
+        raise HTTPException(404, "任务不存在")
+    if t.get("status") != "done":
+        raise HTTPException(425, "视频尚未生成完成")
+    path = t.get("result_file")
+    if not path or not os.path.exists(path):
+        raise HTTPException(404, "视频文件不存在")
+    return FileResponse(path, media_type="video/mp4", filename=f"{task_id}.mp4")
+
+
 def _do_work(task_id, audio_path, video_path):
     with _task_lock:
         tasks[task_id].update({"status": "running", "progress": 10, "msg": "GPU推理中..."})
@@ -117,11 +132,23 @@ async def _run_heygem(task_id: str, audio_path: str, video_path: str):
                 tasks[task_id].update({"status": "error", "error": f"未找到输出视频，检查路径: {candidates[0] if candidates else '无'}"})
             return
 
-        video_b64 = base64.b64encode(Path(result_path).read_bytes()).decode()
+        # faststart：把 moov atom 移到文件头，浏览器可立即获取时长
+        faststart_path = str(OUTPUT_DIR / f"{task_id}_fs.mp4")
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", result_path,
+                 "-c", "copy", "-movflags", "+faststart", faststart_path],
+                capture_output=True, timeout=120
+            )
+            if os.path.exists(faststart_path) and os.path.getsize(faststart_path) > 0:
+                result_path = faststart_path
+        except Exception:
+            pass  # faststart 失败时用原文件
+
         with _task_lock:
             tasks[task_id].update({
                 "status": "done", "progress": 100, "msg": "完成",
-                "video_b64": video_b64,
+                "result_file": result_path,
                 "video_size": os.path.getsize(result_path),
             })
     except asyncio.TimeoutError:

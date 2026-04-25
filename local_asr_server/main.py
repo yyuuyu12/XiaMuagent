@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import whisper
@@ -229,6 +229,33 @@ async def video_task_proxy(task_id: str):
         return resp.json()
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="数字人服务连接失败，请确认数字人服务已启动")
+
+@app.get("/video/file/{task_id}")
+async def video_file_proxy(task_id: str, request: Request):
+    """代理 HeyGem 视频文件下载，支持 Range 断点续传"""
+    headers = {}
+    if request.headers.get("range"):
+        headers["Range"] = request.headers.get("range")
+    try:
+        async with httpx.AsyncClient(timeout=600) as client:
+            resp = await client.get(f"{SADTALKER_URL}/video/file/{task_id}", headers=headers)
+        if resp.status_code == 404:
+            raise HTTPException(404, "视频文件不存在")
+        if resp.status_code not in (200, 206):
+            raise HTTPException(resp.status_code, resp.text[:200])
+        from fastapi.responses import Response
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "video/mp4"),
+            headers={
+                k: v for k, v in resp.headers.items()
+                if k.lower() in ("content-length", "content-range", "accept-ranges")
+            },
+        )
+    except httpx.ConnectError:
+        raise HTTPException(503, "数字人服务连接失败")
+
 
 @app.post("/video/cancel/{task_id}")
 async def video_cancel_proxy(task_id: str):
