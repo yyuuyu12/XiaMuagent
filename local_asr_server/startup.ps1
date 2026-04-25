@@ -1,7 +1,9 @@
 # XiamuAgent - Local Services Auto-Start
-# Services: HeyGem(7861) + ASR(8765) + IndexTTS(8766) + ngrok
+# Services: HeyGem(7861) + ASR(8765) + IndexTTS(8766) + frpc(asr.yyagent.top)
 
 $logFile = "$PSScriptRoot\startup.log"
+$frpcExe = "C:\AIClaudecode\local_asr_server\frp\frp_0.61.0_windows_amd64\frp_0.61.0_windows_amd64\frpc.exe"
+$frpcToml = "C:\AIClaudecode\local_asr_server\frp\frp_0.61.0_windows_amd64\frp_0.61.0_windows_amd64\frpc.toml"
 
 function Log($msg) {
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $msg"
@@ -57,29 +59,23 @@ if (IsPortInUse 8766) {
     Log "[IndexTTS] process started (model loading ~30s)"
 }
 
-# wait for models to load
+# 等待模型加载完成
 Log "[wait] waiting 90s for models to load..."
 Start-Sleep -Seconds 90
 
-# 4. ngrok
-$ngrokRunning = Get-Process -Name "ngrok" -ErrorAction SilentlyContinue
-if ($ngrokRunning) {
-    Log "[ngrok] already running, skip"
+# 4. frpc 穿透 (asr.yyagent.top -> 本地8765)
+$frpcRunning = Get-Process -Name "frpc" -ErrorAction SilentlyContinue
+if ($frpcRunning) {
+    Log "[frpc] already running, skip"
 } else {
-    Log "[ngrok] starting tunnel..."
-    $ngrokExe = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe"
-    if (-not (Test-Path $ngrokExe)) {
-        $found = Get-Command ngrok -ErrorAction SilentlyContinue
-        if ($found) { $ngrokExe = $found.Source }
-    }
-    if (Test-Path $ngrokExe) {
+    if (Test-Path $frpcExe) {
         Start-Process `
-            -FilePath $ngrokExe `
-            -ArgumentList "http", "--domain=unburned-dollhouse-armhole.ngrok-free.dev", "8765" `
+            -FilePath $frpcExe `
+            -ArgumentList "-c", $frpcToml `
             -WindowStyle Hidden
-        Log "[ngrok] tunnel started: baculitic-derivable-sherilyn.ngrok-free.dev"
+        Log "[frpc] tunnel started: asr.yyagent.top -> localhost:8765"
     } else {
-        Log "[ngrok] WARNING: ngrok.exe not found, skipped"
+        Log "[frpc] WARNING: frpc.exe not found at $frpcExe"
     }
 }
 

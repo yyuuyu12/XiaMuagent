@@ -4,7 +4,7 @@ title 注册开机自启动（需要管理员权限）
 
 echo ============================================
 echo   爆款文案工坊 — 注册开机自启动服务
-echo   将自动启动：HeyGem + ASR + ngrok
+echo   将自动启动：HeyGem + ASR + IndexTTS + frpc
 echo ============================================
 echo.
 
@@ -41,7 +41,7 @@ echo.
 echo [完成] 开机自启动已注册！
 echo   任务名称：%TASK_NAME%
 echo   触发时机：登录后延迟 60 秒
-echo   启动顺序：HeyGem → ASR → ngrok
+echo   启动顺序：HeyGem → ASR → IndexTTS → frpc穿透
 echo.
 echo 下次开机将自动启动所有服务，无需手动操作。
 echo 如需手动触发：schtasks /run /tn "%TASK_NAME%"
