@@ -4323,6 +4323,7 @@ async function handleAvatarGenerate() {
 function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
   if (_avatarPoller) clearInterval(_avatarPoller);
   let elapsed = 0;
+  let pollFailCount = 0;
   _avatarPoller = setInterval(async () => {
     if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) {
       clearInterval(_avatarPoller); _avatarPoller = null;
@@ -4330,9 +4331,13 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
     }
     elapsed += 5;
     try {
-      const resp = await fetch(`${asrUrl}/video/task/${taskId}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
-      const r = resp.ok ? { code: 200, data: await resp.json() } : { code: 500 };
-      if (r.code !== 200) return;
+      const r = await api.get(`/ai/video/task/${taskId}`);
+      if (r.code !== 200) {
+        pollFailCount += 1;
+        setState({ avatarProgressMsg: pollFailCount >= 3 ? '连接数字人服务不稳定，正在重试...' : '继续等待生成...' });
+        return;
+      }
+      pollFailCount = 0;
       if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
       const t = r.data;
       const pct = Math.min(90, 10 + elapsed * 1.2);
@@ -4355,7 +4360,9 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
         setState({ avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null, extractStep: 4, avatarErr: '已停止生成' });
       }
     } catch (e) {
-      setState({ avatarProgressMsg: '轮询错误: ' + e.message });
+      pollFailCount += 1;
+      const msg = pollFailCount >= 3 ? '连接数字人服务不稳定，正在重试...' : '继续等待生成...';
+      setState({ avatarProgressMsg: msg });
       console.error('[avatar poller]', e);
     }
   }, 5000);
@@ -4363,10 +4370,12 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
 
 function cancelRemoteAvatarTask(taskId, asrUrl) {
   if (!taskId || !asrUrl) return;
-  fetch(`${asrUrl}/video/cancel/${taskId}`, {
-    method: 'POST',
-    headers: { 'ngrok-skip-browser-warning': '1' },
-  }).catch(() => {});
+  api.post(`/ai/video/cancel/${taskId}`, {}).catch(() => {
+    fetch(`${asrUrl}/video/cancel/${taskId}`, {
+      method: 'POST',
+      headers: { 'ngrok-skip-browser-warning': '1' },
+    }).catch(() => {});
+  });
 }
 
 function handleAvatarStop() {

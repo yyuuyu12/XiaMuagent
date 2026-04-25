@@ -495,4 +495,22 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/video/cancel/:taskId', requireAuth, async (req, res) => {
+  const { taskId } = req.params;
+  const videoUrl = await getVideoUrl();
+  if (!videoUrl) return res.json({ code: 500, msg: '未配置数字人服务地址' });
+
+  try {
+    const resp = await fetch(`${videoUrl}/video/cancel/${taskId}`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) return res.json({ code: 500, msg: '取消失败' });
+    const data = await resp.json();
+    return res.json({ code: 200, data });
+  } catch (e) {
+    return res.json({ code: 500, msg: `取消失败: ${e.message}` });
+  }
+});
+
 module.exports = router;
