@@ -95,6 +95,21 @@ def get_task(task_id: str):
     return t
 
 
+@app.post("/video/cancel/{task_id}")
+def cancel_task(task_id: str):
+    with _task_lock:
+        t = tasks.get(task_id)
+        if not t:
+            raise HTTPException(404, "任务不存在")
+        t.update({"status": "cancelled", "progress": 0, "msg": "已停止生成", "error": "已停止生成"})
+    return {"status": "cancelled", "task_id": task_id}
+
+
+def _task_cancelled(task_id: str) -> bool:
+    with _task_lock:
+        return tasks.get(task_id, {}).get("status") == "cancelled"
+
+
 def _run_cmd(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(
@@ -247,6 +262,9 @@ def _do_work_v2(task_id, audio_path, video_path):
         norm_video = _normalize_video(task_id, video_path)
         normalized_paths.extend([norm_audio, norm_video])
 
+        if _task_cancelled(task_id):
+            return None
+
         with _task_lock:
             tasks[task_id].update({"progress": 28, "msg": "V2 GPU高清推理中..."})
 
@@ -275,6 +293,8 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str):
             asyncio.to_thread(_do_work_v2, task_id, audio_path, video_path),
             timeout=600
         )
+        if _task_cancelled(task_id):
+            return
 
         # 查找输出视频：优先用函数返回值，再遍历候选路径
         candidates = []
@@ -298,26 +318,33 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str):
                 result_path = p
                 break
 
+        if _task_cancelled(task_id):
+            return
+
         if not result_path:
             with _task_lock:
-                tasks[task_id].update({"status": "error", "error": f"V2未找到输出视频，候选: {candidates[:3]}"})
+                if tasks.get(task_id, {}).get("status") != "cancelled":
+                    tasks[task_id].update({"status": "error", "error": f"V2未找到输出视频，候选: {candidates[:3]}"})
             return
 
         video_b64 = base64.b64encode(Path(result_path).read_bytes()).decode()
         with _task_lock:
-            tasks[task_id].update({
-                "status": "done", "progress": 100, "msg": "V2高清完成",
-                "video_b64": video_b64,
-                "video_size": os.path.getsize(result_path),
-            })
+            if tasks.get(task_id, {}).get("status") != "cancelled":
+                tasks[task_id].update({
+                    "status": "done", "progress": 100, "msg": "V2高清完成",
+                    "video_b64": video_b64,
+                    "video_size": os.path.getsize(result_path),
+                })
     except asyncio.TimeoutError:
         with _task_lock:
-            tasks[task_id].update({"status": "error", "error": "V2推理超时（超过10分钟）"})
+            if tasks.get(task_id, {}).get("status") != "cancelled":
+                tasks[task_id].update({"status": "error", "error": "V2推理超时（超过10分钟）"})
     except Exception as e:
         import traceback
         traceback.print_exc()
         with _task_lock:
-            tasks[task_id].update({"status": "error", "error": _friendly_error(e)})
+            if tasks.get(task_id, {}).get("status") != "cancelled":
+                tasks[task_id].update({"status": "error", "error": _friendly_error(e)})
     finally:
         for p in [audio_path, video_path]:
             try:

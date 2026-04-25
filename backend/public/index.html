@@ -1007,6 +1007,13 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
   box-shadow: 0 6px 16px rgba(31,25,18,.06);
 }
 .clone-voice-secondary-row .btn-action-sec:last-child { color: #1F1B17; }
+.avatar-stop-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 40px; min-width: 128px; padding: 0 18px; margin-top: 18px;
+  border-radius: 999px; background: #FFF1F0; color: #D63A2F;
+  font-size: 14px; font-weight: 800; cursor: pointer; user-select: none;
+}
+.avatar-stop-btn:active { transform: scale(.98); background: #FFE4E2; }
 /* 声音管理页 */
 .vm-voice-row { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid #F0EEE8; }
 .vm-voice-avatar { width:42px; height:42px; background:#FFE4D0; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -2303,6 +2310,10 @@ function tCloneStep4(sb) {
         <div style="font-size:12px;color:#A8A49C;margin-bottom:16px">GPU 渲染中，通常 1~3 分钟</div>
         <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:${S.avatarProgressPct||20}%"></div></div>
         <div style="font-size:12px;color:#6B6860;margin-top:8px">${S.avatarProgressMsg||'初始化中...'}</div>
+        <div class="avatar-stop-btn" onclick="handleAvatarStop()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          停止生成
+        </div>
       </div>
     </div>`;
   }
@@ -4211,11 +4222,13 @@ async function handleAvatarVideoSelect(event) {
 }
 
 let _avatarPoller = null;
+let _avatarRunSeq = 0;
 
 async function handleAvatarGenerate() {
   if (!S.ttsAudioUrl) { showToast('请先完成步骤3语音合成'); return; }
   if (!S.avatarSrcVideoB64 && !S.avatarLibKey) { showToast('请先上传或选择人脸视频'); return; }
   if (S.avatarGenerating) return;
+  const runSeq = ++_avatarRunSeq;
 
   // 把 Blob URL 转成 base64
   let audioB64 = null;
@@ -4230,7 +4243,8 @@ async function handleAvatarGenerate() {
     }
     audioB64 = btoa(bin);
   } catch (e) {
-    setState({ avatarErr: '音频读取失败: ' + e.message }); return;
+    if (runSeq === _avatarRunSeq) setState({ avatarErr: '音频读取失败: ' + e.message });
+    return;
   }
 
   setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '初始化中...', avatarProgressPct: 20 });
@@ -4239,6 +4253,7 @@ async function handleAvatarGenerate() {
   try {
     // 先拿 ngrok 地址，大文件直接传给本地服务，绕过 Zeabur 代理限制
     const urlR = await api.get('/ai/asr-url');
+    if (runSeq !== _avatarRunSeq) return;
     if (urlR.code !== 200) {
       setState({ avatarGenerating: false, avatarErr: urlR.msg || '获取服务地址失败', extractStep: 4 }); return;
     }
@@ -4257,34 +4272,47 @@ async function handleAvatarGenerate() {
         ...videoPayload,
       }),
     });
+    if (runSeq !== _avatarRunSeq) return;
     if (!resp.ok) {
       const t = await resp.text();
       setState({ avatarGenerating: false, avatarErr: '视频服务出错: ' + t.slice(0, 100), extractStep: 4 }); return;
     }
     const data = await resp.json();
     const taskId = data.task_id;
+    if (runSeq !== _avatarRunSeq) {
+      cancelRemoteAvatarTask(taskId, asrUrl);
+      return;
+    }
     setState({ avatarTaskId: taskId, avatarAsrUrl: asrUrl });
     saveCloneSession(4); // 生成任务已提交，立即保存 taskId 以便跨会话恢复
-    _startAvatarPoller(taskId, asrUrl);
+    _startAvatarPoller(taskId, asrUrl, runSeq);
   } catch (e) {
-    setState({ avatarGenerating: false, avatarErr: '网络错误: ' + e.message, extractStep: 4 });
+    if (runSeq === _avatarRunSeq) {
+      setState({ avatarGenerating: false, avatarErr: '网络错误: ' + e.message, extractStep: 4 });
+    }
   }
 }
 
-function _startAvatarPoller(taskId, asrUrl) {
+function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
   if (_avatarPoller) clearInterval(_avatarPoller);
   let elapsed = 0;
   _avatarPoller = setInterval(async () => {
+    if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) {
+      clearInterval(_avatarPoller); _avatarPoller = null;
+      return;
+    }
     elapsed += 5;
     try {
       const resp = await fetch(`${asrUrl}/video/task/${taskId}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
       const r = resp.ok ? { code: 200, data: await resp.json() } : { code: 500 };
       if (r.code !== 200) return;
+      if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
       const t = r.data;
       const pct = Math.min(90, 10 + elapsed * 1.2);
       setState({ avatarProgressPct: pct, avatarProgressMsg: t.msg || '处理中...' });
 
       if (t.status === 'done' && t.video_b64) {
+        if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
         const raw = atob(t.video_b64);
         const buf = new Uint8Array(raw.length);
@@ -4295,12 +4323,41 @@ function _startAvatarPoller(taskId, asrUrl) {
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });
+      } else if (t.status === 'cancelled') {
+        clearInterval(_avatarPoller); _avatarPoller = null;
+        setState({ avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null, extractStep: 4, avatarErr: '已停止生成' });
       }
     } catch (e) {
       setState({ avatarProgressMsg: '轮询错误: ' + e.message });
       console.error('[avatar poller]', e);
     }
   }, 5000);
+}
+
+function cancelRemoteAvatarTask(taskId, asrUrl) {
+  if (!taskId || !asrUrl) return;
+  fetch(`${asrUrl}/video/cancel/${taskId}`, {
+    method: 'POST',
+    headers: { 'ngrok-skip-browser-warning': '1' },
+  }).catch(() => {});
+}
+
+function handleAvatarStop() {
+  const taskId = S.avatarTaskId;
+  const asrUrl = S.avatarAsrUrl;
+  _avatarRunSeq++;
+  if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
+  cancelRemoteAvatarTask(taskId, asrUrl);
+  setState({
+    avatarGenerating: false,
+    avatarTaskId: null,
+    avatarAsrUrl: null,
+    avatarProgressPct: 0,
+    avatarProgressMsg: '',
+    avatarErr: '已停止生成，可重新开始',
+    extractStep: 4,
+  });
+  saveCloneSession(4);
 }
 
 async function handlePostProcess() {

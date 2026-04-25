@@ -230,6 +230,18 @@ async def video_task_proxy(task_id: str):
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="数字人服务连接失败，请确认数字人服务已启动")
 
+@app.post("/video/cancel/{task_id}")
+async def video_cancel_proxy(task_id: str):
+    """取消数字人任务：停止前端等待，并通知 HeyGem 丢弃后续结果"""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(f"{SADTALKER_URL}/video/cancel/{task_id}")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text[:200])
+        return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="数字人服务连接失败，请确认数字人服务已启动")
+
 
 # ===================== 视频后期制作（字幕烧录）=====================
 
