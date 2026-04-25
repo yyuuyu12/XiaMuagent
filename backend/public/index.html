@@ -185,6 +185,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .avatar-option { display: flex; flex-direction: column; align-items: center; padding: 6px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
 .avatar-option-active { border-color: #F97316; background: #FFF0E6; }
 .avatar-opt-circle { width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 3px 10px rgba(26,22,20,.08); }
+.preset-avatar-svg { width: 100%; height: 100%; display: block; border-radius: 50%; overflow: hidden; }
 .preset-avatar { width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden; background: linear-gradient(135deg,#F97316,#FB923C); }
 .preset-avatar::before { content: ""; position: absolute; left: 10%; top: 8%; width: 80%; height: 48%; border-radius: 50% 50% 42% 42%; background: rgba(26,22,20,.92); z-index: 1; }
 .pa-head { position: absolute; left: 30%; top: 23%; width: 40%; height: 36%; border-radius: 50%; background: #FFE1C7; z-index: 2; box-shadow: inset -3px -3px 0 rgba(214,86,26,.08); }
@@ -530,12 +531,14 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .home-page .htc-step-done { background: #F5762A; color: #fff; }
 .home-page .htc-step-inactive { background: #F0EDE8; color: #B0AA9F; }
 .home-page .htc-detail-link { background: #FFF3E8; padding: 5px 12px; border-radius: 20px; color: #F5762A; }
-.home-page .home-task-small-scroll { margin: 0 -22px; padding: 0 22px 6px; gap: 10px; }
-.home-page .home-task-mini-card { flex: 0 0 248px; border-radius: 16px; padding: 13px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.home-page .home-task-mini-top { margin-bottom: 8px; }
-.home-page .home-task-mini-title { font-weight: 500; height: 20px; -webkit-line-clamp: 1; white-space: nowrap; display: block; text-overflow: ellipsis; }
-.home-page .home-task-mini-meta { margin-bottom: 9px; color: #B0AA9F; }
-.home-page .home-task-mini-action { height: 24px; padding: 0 12px; background: #F5762A; color: #fff; font-size: 11px; }
+.home-page .home-task-small-scroll { display: flex; flex-direction: column; overflow: visible; margin: 0; padding: 0; gap: 8px; }
+.home-page .home-task-mini-card { width: 100%; flex: none; border-radius: 16px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 12px; }
+.home-page .home-task-mini-icon { flex-shrink: 0; }
+.home-page .home-task-mini-body { flex: 1; min-width: 0; }
+.home-page .home-task-mini-top { margin-bottom: 0; }
+.home-page .home-task-mini-title { font-weight: 500; height: auto; line-height: 1.4; -webkit-line-clamp: 1; white-space: nowrap; display: block; text-overflow: ellipsis; margin-bottom: 5px; }
+.home-page .home-task-mini-meta { margin-bottom: 0; color: #B0AA9F; }
+.home-page .home-task-mini-action { height: 28px; min-width: 54px; padding: 0 14px; background: #F5762A; color: #fff; font-size: 12px; flex-shrink: 0; }
 .home-page .home-task-mini-action-gray { background: #F7F5F1; color: #9E9890; }
 .home-page .home-task-mini-action-red { background: #FFF0F0; color: #E5534B; }
 
@@ -754,6 +757,9 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .home-page { padding: 18px 22px calc(100px + env(safe-area-inset-bottom, 0px)) !important; }
 .home-page .welcome-banner { margin: 0 !important; }
 .home-page .home-section-header { padding: 22px 0 12px !important; }
+.home-page .feat-clone-card { margin-bottom: 12px; padding: 22px 20px 18px; }
+.home-page .feat-sub-grid { gap: 12px; margin-bottom: 4px; }
+.home-page .feat-sub-card { min-height: 130px; padding: 18px 16px; }
 .home-tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
 .home-tool-card { background: #fff; border-radius: 20px; padding: 18px 16px; min-height: 132px; cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; }
 .home-tool-card:active { transform: scale(0.96); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
@@ -1541,7 +1547,7 @@ function tBottomTab() {
 }
 
 // ===== HOME TASK SECTION =====
-// 大卡片现改为时间维度（2小时内完成 = 大卡），不再依赖 localStorage，换设备保持一致
+// 大卡片按最近 1 小时展示，最多 3 条；更早或超出的任务收进下方长条卡片
 function updateHomeDoneSeen() {}
 function dismissHomeDoneSeen() {}
 
@@ -1701,21 +1707,25 @@ function tHomeTaskSection() {
           const clickFn = t.status === 'failed' ? `switchTab('inspire')` : openTaskAction(t);
           const meta = `${typeLbl(t.type)} · ${formatDisplayTime(t.created_at)}`;
           return `<div class="home-task-mini-card" onclick="${clickFn}">
-            <div class="home-task-mini-top">
+            <div class="home-task-mini-icon">
               <div class="htc-icon-wrap ${mi.cls}" style="width:34px;height:34px;border-radius:10px">${mi.icon}</div>
-              <div class="home-task-mini-title">${esc(t.title)}</div>
             </div>
-            <div class="home-task-mini-meta">${esc(meta)}</div>
+            <div class="home-task-mini-body">
+              <div class="home-task-mini-title">${esc(t.title)}</div>
+              <div class="home-task-mini-meta">${esc(meta)}</div>
+            </div>
             <span class="home-task-mini-action ${act.cls}">${act.text}</span>
           </div>`;
         }
         if (it._type === 'clone') {
           return `<div class="home-task-mini-card" onclick="openHistoryPage('clone')">
-            <div class="home-task-mini-top">
+            <div class="home-task-mini-icon">
               <div class="htc-icon-wrap htc-icon-clone" style="width:34px;height:34px;border-radius:10px">${iconClone}</div>
-              <div class="home-task-mini-title">${esc(it.text)}</div>
             </div>
-            <div class="home-task-mini-meta">克隆 · ${esc(formatDisplayTime(it.created_at))}</div>
+            <div class="home-task-mini-body">
+              <div class="home-task-mini-title">${esc(it.text)}</div>
+              <div class="home-task-mini-meta">克隆 · ${esc(formatDisplayTime(it.created_at))}</div>
+            </div>
             <span class="home-task-mini-action home-task-mini-action-gray" onclick="event.stopPropagation();cpHomeCloneItem(event,${it.idx})">复制</span>
           </div>`;
         }
@@ -1778,24 +1788,29 @@ function tHome() {
     <div class="home-section-header" style="margin-top:8px">
       <span class="home-section-title">核心功能</span>
     </div>
-    <div class="home-tools-grid">
-      <div class="home-tool-card" onclick="switchTab('extract')">
-        <div class="home-tool-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        <div class="home-tool-icon" style="background:#EEF0FF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
-        <div class="home-tool-title">爆款克隆</div>
-        <div class="home-tool-desc">粘贴视频链接，提取文案并 AI 改写</div>
+    <div class="feat-clone-card" onclick="switchTab('extract')">
+      <div class="feat-clone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+      <div class="feat-clone-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
+      <div class="feat-clone-title">爆款克隆</div>
+      <div class="feat-clone-desc">粘贴抖音 / 快手链接，一键提取文案并 AI 改写成你的风格</div>
+      <div class="feat-clone-tags">
+        <span class="feat-clone-tag">语音提取</span>
+        <span class="feat-clone-tag">AI 改写</span>
+        <span class="feat-clone-tag">一键复制</span>
       </div>
-      <div class="home-tool-card" onclick="setState({currentTab:'inspire',inspireMode:'analyze',inspireFromHome:true});render()">
-        <div class="home-tool-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        <div class="home-tool-icon" style="background:#FFF3E8"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-        <div class="home-tool-title">对标拆解</div>
-        <div class="home-tool-desc">分析竞品文案结构与爆点</div>
+    </div>
+    <div class="feat-sub-grid">
+      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireMode:'analyze',inspireFromHome:true});render()">
+        <div class="feat-sub-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="feat-sub-icon" style="background:#FFF3E8"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M4.9 4.9L7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></div>
+        <div class="feat-sub-title">对标拆解</div>
+        <div class="feat-sub-desc">分析竞品文案结构与爆点</div>
       </div>
-      <div class="home-tool-card" onclick="setState({currentTab:'inspire',inspireFromHome:true});enterFeaturedMode()">
-        <div class="home-tool-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        <div class="home-tool-icon" style="background:#F0FDF4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-        <div class="home-tool-title">行业精选</div>
-        <div class="home-tool-desc">按赛道浏览爆款文案合集</div>
+      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireFromHome:true});enterFeaturedMode()">
+        <div class="feat-sub-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="feat-sub-icon" style="background:#F0FDF4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11"/><path d="M4 12h9"/><path d="M4 17h6"/><path d="M17 10l3 3-3 3"/><path d="M13 13h7"/></svg></div>
+        <div class="feat-sub-title">行业精选</div>
+        <div class="feat-sub-desc">按赛道浏览爆款文案合集</div>
       </div>
     </div>
     ${tHomeTaskSection()}
@@ -2776,12 +2791,56 @@ function featuredRewrite() {
 // ===== PROFILE =====
 function tPresetAvatar(i) {
   const idx = Math.max(0, Math.min(7, parseInt(i, 10) || 0));
-  return `<div class="preset-avatar preset-avatar-${idx}">
-    <span class="pa-neck"></span>
-    <span class="pa-head"></span>
-    <span class="pa-body"></span>
-    <span class="pa-detail"></span>
-  </div>`;
+  const presets = [
+    { bg:'#6B5FF6', glow:'#9EA5FF', hair:'#25113E', skin:'#FFDCC5', neck:'#F2B187', shirt:'#FFF7F0', collar:'#F5762A', eye:'#2F1F1B', blush:'#F49B92', mouth:'#B95750' },
+    { bg:'#FF7A1A', glow:'#FFD2A6', hair:'#80340F', skin:'#FFD7B8', neck:'#F0AA7D', shirt:'#FFF4E6', collar:'#1A1614', eye:'#3A2117', blush:'#F08B7B', mouth:'#AF514A' },
+    { bg:'#2F6DEB', glow:'#95C1FF', hair:'#123A89', skin:'#FFD9BA', neck:'#EEAA81', shirt:'#EAF3FF', collar:'#5B6FEA', eye:'#1B2B46', blush:'#F1A096', mouth:'#A75051' },
+    { bg:'#12B886', glow:'#8CF3CD', hair:'#075D47', skin:'#FFE0C4', neck:'#F2B187', shirt:'#E4FFF3', collar:'#0F766E', eye:'#17352D', blush:'#F2A294', mouth:'#A9514E' },
+    { bg:'#DF2F86', glow:'#FF9EC9', hair:'#71143F', skin:'#FFE0C5', neck:'#F1B086', shirt:'#FFF0F7', collar:'#C0266D', eye:'#331B25', blush:'#F1A1B7', mouth:'#A94D63' },
+    { bg:'#0EA5C6', glow:'#91E5F5', hair:'#16566A', skin:'#FFD8BA', neck:'#EDAA80', shirt:'#E0FAFF', collar:'#0E7490', eye:'#183845', blush:'#EEA098', mouth:'#A5514D' },
+    { bg:'#D97706', glow:'#FFD78A', hair:'#6F3506', skin:'#FFE1BE', neck:'#F0AE7E', shirt:'#FFF1C7', collar:'#B45309', eye:'#342111', blush:'#EFA08A', mouth:'#A14F43' },
+    { bg:'#5D6B7D', glow:'#AEB8C6', hair:'#172033', skin:'#F2CFB3', neck:'#DCA47B', shirt:'#F0F5FA', collar:'#475569', eye:'#1F2937', blush:'#DE988D', mouth:'#8E4B48' },
+  ];
+  const p = presets[idx];
+  const hair = [
+    `<path d="M23 41c0-22 13-33 28-33s26 11 26 33c-8-8-17-12-27-12s-19 4-27 12z" fill="${p.hair}"/><path d="M28 34c8-14 30-16 43-3-11-2-22-1-31 2-5 2-9 3-12 1z" fill="rgba(255,255,255,.12)"/>`,
+    `<path d="M24 39c2-19 13-30 27-30 13 0 24 10 26 29-8-7-17-10-27-10s-18 3-26 11z" fill="${p.hair}"/><path d="M31 31c10-8 24-9 37 0" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>`,
+    `<path d="M20 42c4-21 19-31 34-28 13 3 22 13 25 28-10-6-21-8-33-7-9 1-18 3-26 7z" fill="${p.hair}"/><path d="M31 29c11-5 25-6 39 1" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="3" stroke-linecap="round"/>`,
+    `<path d="M21 42c1-21 15-32 29-32s28 11 29 32c-8-7-18-10-29-10s-21 3-29 10z" fill="${p.hair}"/><path d="M28 42c2-9 10-15 22-15s20 6 22 15" fill="rgba(255,255,255,.1)"/>`,
+    `<path d="M16 48c0-25 18-38 34-38s34 13 34 38c-9-10-21-15-34-15s-25 5-34 15z" fill="${p.hair}"/><path d="M24 41c8-10 16-15 27-15" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>`,
+    `<path d="M24 37c4-17 15-26 27-26s23 9 27 26c-8-5-17-7-27-7s-19 2-27 7z" fill="${p.hair}"/><path d="M27 46h47" stroke="#F8FBFC" stroke-width="4" stroke-linecap="round"/><path d="M31 46h39" stroke="${p.hair}" stroke-width="2" stroke-linecap="round"/>`,
+    `<path d="M18 44c1-22 16-33 33-33s30 11 31 33c-9-7-20-10-32-10s-23 3-32 10z" fill="${p.hair}"/><path d="M26 45h48" stroke="#FFF1CF" stroke-width="5" stroke-linecap="round"/><path d="M33 45h34" stroke="${p.hair}" stroke-width="2" stroke-linecap="round"/>`,
+    `<path d="M20 43c1-22 16-32 30-32s29 10 30 32c-8-7-18-10-30-10s-22 3-30 10z" fill="${p.hair}"/><path d="M30 31c10-6 25-6 38 0" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="3" stroke-linecap="round"/>`
+  ][idx];
+  const accessory = [
+    '<circle cx="68" cy="50" r="3" fill="#F8EFFF" opacity=".75"/>',
+    '<path d="M37 34c4-3 9-4 14-4" stroke="#FFF5EB" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>',
+    '<path d="M35 44h11M54 44h11M46 44h8" stroke="#1D4ED8" stroke-width="1.8" stroke-linecap="round"/><rect x="33" y="39" width="14" height="10" rx="4" fill="none" stroke="#1D4ED8" stroke-width="1.6"/><rect x="53" y="39" width="14" height="10" rx="4" fill="none" stroke="#1D4ED8" stroke-width="1.6"/>',
+    '<circle cx="66" cy="51" r="2.3" fill="#DDFBEF" opacity=".9"/>',
+    '<path d="M66 48c5 1 7 4 8 8" stroke="#FFF0F7" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>',
+    '<path d="M36 34c5-4 17-6 29-2" stroke="#DDF8FF" stroke-width="2.4" stroke-linecap="round" opacity=".78"/>',
+    '<path d="M34 35c8-5 24-6 35 0" stroke="#FFF2C9" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>',
+    '<rect x="34" y="39" width="32" height="11" rx="5.5" fill="none" stroke="#334155" stroke-width="1.7" opacity=".9"/><path d="M47 44h6" stroke="#334155" stroke-width="1.7" stroke-linecap="round"/>'
+  ][idx];
+  return `<svg class="preset-avatar-svg" viewBox="0 0 100 100" aria-hidden="true">
+    <circle cx="50" cy="50" r="50" fill="${p.bg}"/>
+    <circle cx="72" cy="18" r="21" fill="${p.glow}" opacity=".35"/>
+    <circle cx="28" cy="78" r="28" fill="#fff" opacity=".10"/>
+    <path d="M20 100c4-21 17-31 30-31s26 10 30 31H20z" fill="${p.shirt}"/>
+    <path d="M42 72h16l8 28H34l8-28z" fill="${p.collar}" opacity=".18"/>
+    <rect x="42" y="56" width="16" height="20" rx="8" fill="${p.neck}"/>
+    <circle cx="31" cy="46" r="5" fill="${p.skin}" opacity=".96"/>
+    <circle cx="69" cy="46" r="5" fill="${p.skin}" opacity=".96"/>
+    <ellipse cx="50" cy="45" rx="20" ry="21" fill="${p.skin}"/>
+    ${hair}
+    ${accessory}
+    <circle cx="42" cy="47" r="1.8" fill="${p.eye}"/>
+    <circle cx="58" cy="47" r="1.8" fill="${p.eye}"/>
+    <path d="M48 48c-.8 3-1.5 5.1-.2 6.4 1 .9 2.8.9 4.2.1" stroke="${p.eye}" stroke-width="1.5" stroke-linecap="round" opacity=".38"/>
+    <path d="M44 59c3.5 2.7 8.6 2.7 12 0" stroke="${p.mouth}" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <circle cx="38" cy="53" r="3" fill="${p.blush}" opacity=".38"/>
+    <circle cx="62" cy="53" r="3" fill="${p.blush}" opacity=".38"/>
+  </svg>`;
 }
 
 function tProfile() {
