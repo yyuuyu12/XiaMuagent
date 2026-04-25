@@ -479,8 +479,9 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .htc-action-btn { font-size: 12px; font-weight: 600; color: #fff; background: linear-gradient(135deg, #FF8040, #F5602A); border-radius: 8px; padding: 5px 13px; cursor: pointer; user-select: none; border: none; -webkit-tap-highlight-color: transparent; white-space: nowrap; box-shadow: 0 3px 8px rgba(245,96,42,0.3); }
 .htc-retry-btn { background: #F5F4F0 !important; color: #6B6860 !important; box-shadow: none !important; }
 .htc-action-btn:active { opacity: 0.82; }
-.home-task-small-scroll { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 0 4px; overflow: visible; }
-.home-task-mini-card { width: 100%; background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.home-task-small-scroll { display: flex; gap: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; }
+.home-task-small-scroll::-webkit-scrollbar { display: none; }
+.home-task-mini-card { flex: 0 0 188px; background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .home-task-mini-top { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
 .home-task-mini-title { font-size: 13px; font-weight: 600; color: #1A1614; line-height: 1.4; height: 36px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all; }
 .home-task-mini-meta { font-size: 11px; color: #9E9890; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 10px; }
@@ -1504,7 +1505,8 @@ function tHomeTaskSection() {
   const cloneItems = (S.cloneHistory || [])
     .map((it, idx) => ({ _type: 'clone', idx, label: '克隆', text: it.input || '', created_at: it.created_at }));
   const smallItems = [...oldDoneTasks, ...cloneItems]
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 5);
 
   if (!bigCards.length && !smallItems.length) {
     return `<div style="margin-bottom:14px">
