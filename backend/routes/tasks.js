@@ -8,7 +8,7 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT t.id, t.type, t.title, t.status, t.stage, t.progress, t.thinking, t.error_msg, t.created_at, t.updated_at, t.result,
-              COALESCE(ts.clone_step, CASE WHEN t.status = 'done' THEN 2 ELSE 1 END) AS clone_step,
+              COALESCE(ts.clone_step, CASE WHEN t.status = 'done' THEN 3 ELSE 1 END) AS clone_step,
               ts.session_json,
               GREATEST(t.updated_at, COALESCE(ts.updated_at, t.updated_at)) AS activity_at
        FROM tasks t
@@ -31,10 +31,17 @@ router.get('/', requireAuth, async (req, res) => {
         try { session = JSON.parse(task.session_json); } catch {}
       }
       if (task.type === 'clone_video') {
-        if (!(result?.rewritten || session?.rewrittenScript)) task.clone_step = Math.min(Number(task.clone_step) || 1, 2);
-        if (task.clone_step > 3 && !session?.ttsAudioB64) task.clone_step = 3;
-        if (task.clone_step > 4 && !session?.avatarVideoB64) task.clone_step = 4;
-        if (task.clone_step > 5 && !session?.postProcessedB64) task.clone_step = 5;
+        let step = Math.max(1, Number(task.clone_step) || 1);
+        if (result?.rewritten || session?.rewrittenScript) step = Math.max(step, 3);
+        if (session?.ttsAudioB64) step = Math.max(step, 4);
+        if (session?.avatarTaskId || session?.avatarVideoB64) step = Math.max(step, 4);
+        if (session?.avatarVideoB64) step = Math.max(step, 5);
+        if (session?.postProcessedB64 || session?.coverFrameUrl || session?.publishTitle) step = Math.max(step, 6);
+        if (!(result?.rewritten || session?.rewrittenScript)) step = Math.min(step, 2);
+        if (step > 3 && !session?.ttsAudioB64) step = 3;
+        if (step > 4 && !session?.avatarVideoB64 && !session?.avatarTaskId) step = 4;
+        if (step > 5 && !session?.postProcessedB64 && !session?.coverFrameUrl && !session?.publishTitle) step = 5;
+        task.clone_step = step;
       }
       delete task.result;
       delete task.session_json;
@@ -163,13 +170,25 @@ router.post('/:id/session', requireAuth, async (req, res) => {
     const { clone_step, session } = req.body;
     if (clone_step == null) return res.status(400).json({ code: 400, msg: 'clone_step 必填' });
 
-    const sessionJson = JSON.stringify(session || {});
+    const { rows: oldRows } = await db.query(
+      'SELECT clone_step, session_json FROM task_sessions WHERE task_id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    let oldSession = {};
+    try { oldSession = oldRows[0]?.session_json ? JSON.parse(oldRows[0].session_json) : {}; } catch {}
+    const incomingSession = session || {};
+    const mergedSession = { ...oldSession, ...incomingSession };
+    ['ttsAudioB64', 'avatarVideoB64', 'postProcessedB64', 'coverFrameUrl'].forEach(k => {
+      if ((incomingSession[k] == null || incomingSession[k] === '') && oldSession[k]) mergedSession[k] = oldSession[k];
+    });
+    const nextStep = Math.max(Number(oldRows[0]?.clone_step) || 1, Number(clone_step) || 1);
+    const sessionJson = JSON.stringify(mergedSession);
     // MySQL UPSERT：存在则更新，不存在则插入
     await db.query(
       `INSERT INTO task_sessions (task_id, user_id, clone_step, session_json)
        VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE clone_step = VALUES(clone_step), session_json = VALUES(session_json), updated_at = NOW()`,
-      [req.params.id, req.userId, clone_step, sessionJson]
+       ON DUPLICATE KEY UPDATE clone_step = GREATEST(clone_step, VALUES(clone_step)), session_json = VALUES(session_json), updated_at = NOW()`,
+      [req.params.id, req.userId, nextStep, sessionJson]
     );
     await db.query(
       'UPDATE tasks SET updated_at = NOW() WHERE id = $1 AND user_id = $2',

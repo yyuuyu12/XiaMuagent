@@ -1626,10 +1626,11 @@ function tHomeTaskSection() {
   const iconRun = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
 
   const clampPct = n => Math.max(0, Math.min(100, Math.round(n || 0)));
-  const cloneStepOf = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 2 : 1)));
+  const cloneStepOf = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 3 : 1)));
   const clonePhaseOf = t => {
     const stage = t.stage || '';
-    if (t.status === 'failed') return { step: cloneStepOf(t), phase: 'failed' };
+    const savedStep = cloneStepOf(t);
+    if (t.status === 'failed') return { step: savedStep, phase: 'failed' };
     if (t.status === 'pending') {
       if (stage === 'rewrite' || stage === 'extracted') return { step: 2, phase: 'rewrite_pending' };
       return { step: 1, phase: 'pending' };
@@ -1638,12 +1639,12 @@ function tHomeTaskSection() {
       if (stage === 'rewrite') return { step: 2, phase: 'rewriting' };
       return { step: 1, phase: 'extracting' };
     }
-    if (t.status === 'extracted') return { step: 1, phase: 'extracted' };
-    const step = cloneStepOf(t);
+    if (t.status === 'extracted') return savedStep > 1 ? { step: savedStep, phase: 'step_done' } : { step: 1, phase: 'extracted' };
+    const step = savedStep;
     return { step, phase: step >= 6 ? 'published' : 'step_done' };
   };
-  const cloneDoneLabels = ['提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕','制作完成'];
-  const cloneNextActions = ['去改写 ›','去语音 ›','去数字人 ›','去后期 ›','去发布 ›','去发布 ›'];
+  const cloneDoneLabels = ['提取中','提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕'];
+  const cloneNextActions = ['查看进度 ›','去改写 ›','去语音 ›','去数字人 ›','去后期 ›','去发布 ›'];
   const cloneStatusText = t => {
     const info = clonePhaseOf(t);
     if (info.phase === 'failed') return '失败';
@@ -1663,12 +1664,12 @@ function tHomeTaskSection() {
     if (info.phase === 'rewriting') return t.thinking || '正在AI改写文案，请稍候';
     if (info.phase === 'extracted') return '提取完毕，去改写';
     const hints = [
+      '正在提取视频文案，请稍候',
       '提取完毕，去改写',
       '改写完毕，去语音',
       '语音已完成，去数字人',
       '数字人视频已生成，去后期',
-      '后期制作完成，去发布',
-      '视频已制作完成，可以发布'
+      '后期制作完成，去发布'
     ];
     return hints[info.step - 1] || '可继续完成当前步骤';
   };
@@ -2198,7 +2199,7 @@ function tCloneStep4(sb) {
       ${S.avatarErr?`<div class="err-text">${esc(S.avatarErr)}</div>`:''}
       <div class="action-row" style="gap:8px">
         <div class="btn-action-sec" onclick="setState({avatarVideoUrl:null,avatarTaskId:null,extractStep:4})">重新生成</div>
-        <div class="btn-action-main" onclick="setState({extractStep:5})">下一步：后期制作 →</div>
+        <div class="btn-action-main" onclick="goToCloneStep5()">下一步：后期制作 →</div>
       </div>
     </div>`;
   }
@@ -3700,6 +3701,7 @@ function goToCloneStep3() {
     return;
   }
   setState({ extractStep: 3, ttsErr: '' });
+  saveCloneSession(3);
 }
 
 async function handleTTSGenerate() {
@@ -4031,6 +4033,11 @@ function goToCloneStep4() {
   saveCloneSession(4); // 进入步骤4时立刻保存，防止离开后恢复回步骤3
 }
 
+function goToCloneStep5() {
+  setState({ extractStep: 5 });
+  saveCloneSession(5);
+}
+
 async function handleAvatarVideoSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -4271,6 +4278,7 @@ async function generateCover(seekSec, retitleOnly) {
 
 function goToCloneStep6() {
   setState({ extractStep: 6, publishCopied: false });
+  saveCloneSession(6);
   // 自动触发标题生成
   if (!S.publishTitle && !S.publishTitleLoading) handlePublishTitleGen();
   // 自动生成封面（有视频时）
@@ -4314,10 +4322,38 @@ function handlePublishCopy() {
 }
 
 // ===== 任务 Session 持久化 =====
+function currentCloneStepFromState() {
+  if (S.extractStep === 'cloning') return 1;
+  if (S.extractStep === 'review' || S.extractStep === 'rewriting') return 2;
+  if (S.extractStep === 'tts_gen') return 3;
+  if (S.extractStep === 'avatar_gen') return 4;
+  const n = parseInt(S.extractStep);
+  return Number.isFinite(n) ? Math.max(1, Math.min(6, n)) : 1;
+}
+
+function patchLocalCloneTaskStep(taskId, cloneStep) {
+  if (!taskId) return;
+  const nowIso = new Date().toISOString();
+  const pct = Math.max(0, Math.min(100, Math.round((cloneStep / 6) * 100)));
+  S.tasksList = (S.tasksList || []).map(t => {
+    if (String(t.id) !== String(taskId)) return t;
+    const prev = parseInt(t.clone_step) || 1;
+    return {
+      ...t,
+      clone_step: Math.max(prev, cloneStep),
+      progress: Math.max(t.progress || 0, pct),
+      activity_at: nowIso,
+      updated_at: nowIso
+    };
+  });
+}
+
 // 保存当前克隆流程的关键状态到服务器（静默，失败不影响用户）
 async function saveCloneSession(cloneStep) {
   const taskId = S.cloneTaskId;
   if (!taskId) return;
+  cloneStep = Math.max(parseInt(cloneStep) || 1, currentCloneStepFromState());
+  patchLocalCloneTaskStep(taskId, cloneStep);
   // 只保存纯数据（base64），不保存 Blob URL（跨会话无效）
   const session = {
     extractedScript:  S.extractedScript  || '',
@@ -4345,10 +4381,7 @@ async function saveCloneSession(cloneStep) {
   };
   try {
     await api.post(`/tasks/${taskId}/session`, { clone_step: cloneStep, session });
-    const nowIso = new Date().toISOString();
-    S.tasksList = (S.tasksList || []).map(t => String(t.id) === String(taskId)
-      ? { ...t, clone_step: cloneStep, activity_at: nowIso, updated_at: nowIso }
-      : t);
+    patchLocalCloneTaskStep(taskId, cloneStep);
   } catch (e) {
     console.warn('[saveCloneSession] 保存失败', e);
   }
@@ -5337,14 +5370,23 @@ function tTaskDetail() {
 }
 
 // ===== 任务 API 函数 =====
+function mergeActiveCloneTaskStep(list) {
+  if (!S.cloneTaskId || !Array.isArray(list)) return list;
+  const activeStep = currentCloneStepFromState();
+  return list.map(t => String(t.id) === String(S.cloneTaskId)
+    ? { ...t, clone_step: Math.max(parseInt(t.clone_step) || 1, activeStep) }
+    : t);
+}
+
 async function loadTasks() {
   if (!getToken()) return;
   try {
     const r = await api.get('/tasks');
     if (r.code === 200) {
-      setState({ tasksList: r.data, tasksLoaded: true });
+      const tasks = mergeActiveCloneTaskStep(r.data);
+      setState({ tasksList: tasks, tasksLoaded: true });
       updateHomeDoneSeen();
-      const hasRunning = r.data.some(t => t.status === 'pending' || t.status === 'running');
+      const hasRunning = tasks.some(t => t.status === 'pending' || t.status === 'running');
       if (hasRunning) { startTasksPolling(); startTasksTickTimer(); }
       else { stopTasksPolling(); stopTasksTickTimer(); }
     }
@@ -5358,9 +5400,10 @@ function startTasksPolling() {
     try {
       const r = await api.get('/tasks');
       if (r.code === 200) {
-        setState({ tasksList: r.data });
+        const tasks = mergeActiveCloneTaskStep(r.data);
+        setState({ tasksList: tasks });
         updateHomeDoneSeen();
-        const hasRunning = r.data.some(t => t.status === 'pending' || t.status === 'running');
+        const hasRunning = tasks.some(t => t.status === 'pending' || t.status === 'running');
         if (!hasRunning) { stopTasksPolling(); stopTasksTickTimer(); }
       }
     } catch {}
