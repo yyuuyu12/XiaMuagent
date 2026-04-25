@@ -4829,8 +4829,8 @@ function tAvatarMgmt() {
             <div class="avatar-mgmt-card-sub">建议上传 5-30 秒正脸视频，画面稳定会更利于生成。</div>
           </div>
         </div>
-        <input type="text" placeholder="命名（可选）" value="${esc(S.avatarMgmtUploadName)}"
-          oninput="setState({avatarMgmtUploadName:this.value})"
+        <input id="avatarMgmtNameInput" type="text" placeholder="命名（可选）" value="${esc(S.avatarMgmtUploadName)}"
+          oninput="S.avatarMgmtUploadName=this.value"
           class="avatar-mgmt-input"/>
         <input type="file" id="avatarMgmtFileInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none"
           onchange="handleAvatarMgmtFileSelect(event)"/>
