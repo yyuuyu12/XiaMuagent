@@ -1548,24 +1548,42 @@ function tHomeTaskSection() {
   const iconFailed = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   const iconRun = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
 
-  const statusText = t => ({ pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败' }[t.status] || t.status);
+  const cloneStepOf = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'extracted' ? 2 : t.status === 'done' ? 2 : 1)));
+  const cloneStepLabels = ['提取','改写','语音','数字人','后期','发布'];
+  const cloneStepHints = [
+    '正在提取视频文案，请稍候',
+    '文案已提取，可继续改写',
+    '文案已改写，可继续合成语音',
+    '语音已完成，可继续生成数字人视频',
+    '数字人视频已生成，可继续后期制作',
+    '视频已制作完成，可复制信息发布'
+  ];
+  const cloneStepLabel = t => cloneStepLabels[cloneStepOf(t) - 1] || '克隆';
+  const cloneStepHint = t => cloneStepHints[cloneStepOf(t) - 1] || '可继续完成当前步骤';
+  const statusText = t => {
+    if (t.type === 'clone_video' && t.status !== 'failed' && t.status !== 'pending' && t.status !== 'running') return cloneStepLabel(t);
+    return ({ pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败' }[t.status] || t.status);
+  };
   const bigProgress = t => {
-    if (t.status === 'done') return 100;
     if (t.status === 'failed') return Math.max(0, Math.min(100, t.progress || 0));
     if (t.type === 'clone_video') {
-      const step = Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'extracted' ? 2 : 1)));
+      const step = cloneStepOf(t);
+      if (step >= 6) return 100;
       return Math.max(t.progress || 0, Math.round((step - 1) / 6 * 100));
     }
+    if (t.status === 'done') return 100;
     return Math.max(0, Math.min(100, t.progress || (t.status === 'extracted' ? 45 : 0)));
   };
   const openTaskAction = t => t.type === 'clone_video' ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
   const bigActionText = t => {
+    if (t.type === 'clone_video' && t.status !== 'failed' && t.status !== 'pending' && t.status !== 'running') return `${cloneStepLabel(t)} ›`;
     if (t.status === 'extracted') return '改写 ›';
     if (t.status === 'done') return '查看结果 ›';
     if (t.status === 'failed') return '查看详情 ›';
     return '查看详情 ›';
   };
   const miniAction = t => {
+    if (t.type === 'clone_video' && t.status !== 'failed' && t.status !== 'pending' && t.status !== 'running') return { text: cloneStepLabel(t), cls: '' };
     if (t.status === 'extracted') return { text:'改写', cls:'' };
     if (t.status === 'failed') return { text:'失败', cls:'home-task-mini-action-red' };
     if (t.status === 'pending') return { text:'排队中', cls:'home-task-mini-action-gray' };
@@ -1588,11 +1606,13 @@ function tHomeTaskSection() {
     </div>
     ${bigCards.map(t => {
       const isClone = t.type === 'clone_video';
-      const cloneStep = Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'extracted' ? 2 : 1)));
+      const cloneStep = cloneStepOf(t);
       const pct = bigProgress(t);
       const thinking = t.status === 'failed'
         ? friendlyError(t.error_msg)
-        : (t.thinking || (t.status === 'pending' ? '等待处理...' : t.status === 'done' ? '最近生成完成' : t.status === 'extracted' ? '文案已提取，可继续改写' : '处理中...'));
+        : (isClone && t.status !== 'pending' && t.status !== 'running'
+          ? cloneStepHint(t)
+          : (t.thinking || (t.status === 'pending' ? '等待处理...' : t.status === 'done' ? '最近生成完成' : t.status === 'extracted' ? '文案已提取，可继续改写' : '处理中...')));
       const liveDot = (t.status === 'running' || t.status === 'pending') ? '<span class="htc-live-dot"></span>' : '';
       const badgeCls = t.status === 'failed' ? 'htc-badge-failed' : t.status === 'done' ? 'htc-badge-done' : t.status === 'extracted' ? 'htc-badge-extracted' : t.status === 'pending' ? 'htc-badge-pending' : 'htc-badge-running';
       return `<div class="home-task-card" style="cursor:pointer" onclick="${openTaskAction(t)}">
