@@ -846,17 +846,17 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .clone-step-bar::-webkit-scrollbar { display:none; }
 .clone-step-bar-inner {
   display:flex; align-items:flex-start;
-  padding:20px 20px 16px; min-width:max-content; gap:0;
+  padding:18px 14px 14px; min-width:max-content; gap:0;
 }
 .csb-step {
   display:flex; flex-direction:column; align-items:center;
-  gap:8px; min-width:64px; flex-shrink:0; cursor:pointer;
+  gap:7px; min-width:46px; flex-shrink:0; cursor:pointer;
   -webkit-tap-highlight-color:transparent;
 }
 .csb-node {
-  width:44px; height:44px; border-radius:50%;
+  width:36px; height:36px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  font-size:16px; font-weight:700; transition:transform .2s,box-shadow .2s;
+  font-size:14px; font-weight:700; transition:transform .2s,box-shadow .2s;
   position:relative;
 }
 .csb-node-done {
@@ -872,13 +872,13 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
   background:#F5F4F0; color:#C4C0B8;
   border:2px solid #E4E2DA;
 }
-.csb-lbl { font-size:12px; white-space:nowrap; line-height:1; }
+.csb-lbl { font-size:11px; white-space:nowrap; line-height:1; }
 .csb-lbl-done { color:#FF6B35; }
 .csb-lbl-active { color:#FF6B35; font-weight:700; }
 .csb-lbl-idle { color:#C4C0B8; }
 .csb-line {
-  width:28px; height:2px; flex-shrink:0; border-radius:1px;
-  margin-top:22px; /* (44-2)/2 = 21, +1 for label gap visual center */
+  width:16px; height:2px; flex-shrink:0; border-radius:1px;
+  margin-top:17px;
   align-self:flex-start;
 }
 .csb-line-done { background:#FF6B35; }
@@ -920,6 +920,93 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .voice-item-active { background:#FFF1E8; border-color:#F97316; }
 .voice-item-icon { width:36px; height:36px; border-radius:50%; margin:0 auto 6px; display:flex; align-items:center; justify-content:center; background:#D4D0C8; }
 .voice-item-icon-on { background:#F97316; }
+.clone-voice-page { padding: 8px 22px 116px; }
+.clone-voice-card {
+  background: #fff; border-radius: 20px; padding: 18px 18px 20px; margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(31,25,18,.07);
+}
+.clone-voice-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.clone-voice-title { font-size: 17px; line-height: 1; font-weight: 800; color: #1A1814; letter-spacing: 0; }
+.clone-voice-manage { font-size: 13px; font-weight: 700; color: #FF6B35; cursor: pointer; white-space: nowrap; }
+.voice-scroll-row.voice-scroll-design { gap: 18px; padding: 0 2px 2px; }
+.voice-item.voice-item-design {
+  width: 58px; padding: 0; background: transparent; border: none; border-radius: 0; overflow: visible;
+}
+.voice-item-design .voice-item-icon {
+  width: 54px; height: 54px; margin: 0 auto 8px; border-radius: 15px;
+  background: #F1EFEA; color: #B8B2AA; box-shadow: none; position: relative;
+}
+.voice-item-design.voice-item-active .voice-item-icon {
+  background: linear-gradient(135deg,#FF7E3F 0%,#FF5A20 100%);
+  color: #fff; box-shadow: 0 10px 18px rgba(255,101,40,.28);
+}
+.voice-selected-mark {
+  position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px;
+  border-radius: 50%; background: #FF6B35; border: 3px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 8px rgba(255,107,53,.28);
+}
+.voice-item-name {
+  display: block; width: 68px; margin-left: -5px; text-align: center;
+  font-size: 12px; font-weight: 800; color: #312C27; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.voice-item-active .voice-item-name { color: #FF6B35; }
+.voice-item-tag { display: block; margin-top: 4px; text-align: center; font-size: 10px; color: #AAA49C; line-height: 1; }
+.voice-item-selected-tag {
+  display: inline-flex; justify-content: center; align-items: center; margin-top: 4px;
+  min-width: 32px; height: 17px; padding: 0 5px; border-radius: 5px;
+  background: #FFF0E6; color: #FF6B35; font-size: 10px; font-weight: 700;
+}
+.voice-speed-card { padding-bottom: 18px; }
+.voice-speed-value { font-size: 17px; font-weight: 800; color: #FF6B35; line-height: 1; }
+.speed-slider.voice-speed-slider { height: 4px; border-radius: 4px; margin: 5px 0 0; }
+.speed-slider.voice-speed-slider::-webkit-slider-thumb {
+  width: 22px; height: 22px; background: #fff; border: 2px solid #FF6B35;
+  box-shadow: 0 5px 14px rgba(255,107,53,.22);
+}
+.voice-speed-meta { display: flex; justify-content: space-between; margin-top: 13px; color: #B8B2AA; font-size: 12px; }
+.voice-speed-presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 13px; }
+.voice-speed-pill {
+  height: 30px; border-radius: 8px; background: #F2F0EC; color: #A39D94;
+  font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; user-select: none;
+}
+.voice-speed-pill-active { background: #FFF0E8; color: #FF6B35; border: 1px solid #FFB996; }
+.voice-preview-card {
+  display: flex; align-items: center; gap: 14px; min-height: 74px; padding: 16px 18px;
+}
+.audio-play-btn.voice-preview-play {
+  width: 48px; height: 48px; background: linear-gradient(135deg,#FF7E3F,#FF5A20);
+  box-shadow: 0 10px 20px rgba(255,101,40,.24);
+}
+.voice-preview-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.voice-preview-title { font-size: 15px; font-weight: 800; color: #1A1814; line-height: 1; }
+.voice-wave { height: 20px; display: flex; align-items: center; gap: 3px; overflow: hidden; }
+.voice-wave span {
+  width: 3px; height: 9px; border-radius: 999px; background: #FF6B35;
+  animation: voiceWave 1.05s ease-in-out infinite;
+}
+.voice-wave-muted span { background: #DAD5CE; animation: none; height: 4px; }
+.voice-wave span:nth-child(2n) { height: 15px; animation-delay: .08s; }
+.voice-wave span:nth-child(3n) { height: 11px; animation-delay: .16s; }
+.voice-wave span:nth-child(4n) { height: 18px; animation-delay: .24s; }
+@keyframes voiceWave { 0%,100% { transform: scaleY(.55); opacity: .78; } 50% { transform: scaleY(1.18); opacity: 1; } }
+.voice-done-badge {
+  flex-shrink: 0; background: #EFFFF5; color: #20B86C; border-radius: 999px;
+  padding: 8px 12px; font-size: 12px; font-weight: 800;
+}
+.clone-voice-main-btn {
+  height: 56px; border-radius: 15px; line-height: 56px; font-size: 18px; font-weight: 800;
+  background: linear-gradient(135deg,#FF8140,#FF5A20); box-shadow: 0 10px 22px rgba(255,101,40,.22);
+}
+.clone-voice-secondary-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.clone-voice-secondary-row .btn-action-sec {
+  margin: 0; height: 48px; line-height: 48px; border-radius: 14px;
+  background: #fff; color: #A29B93; font-size: 15px; font-weight: 800;
+  box-shadow: 0 6px 16px rgba(31,25,18,.06);
+}
+.clone-voice-secondary-row .btn-action-sec:last-child { color: #1F1B17; }
 /* 声音管理页 */
 .vm-voice-row { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid #F0EEE8; }
 .vm-voice-avatar { width:42px; height:42px; background:#FFE4D0; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -2108,14 +2195,11 @@ function tCloneStep3(sb) {
 
   const voiceScrollHtml = allVoices.map(v => {
     const on = S.ttsVoice === v.id;
-    const iconBg = on ? '#F97316' : (v.isCustom ? '#FF6B35' : '#D4D0C8');
-    const iconSvg = v.isCustom
-      ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
-      : `<svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/></svg>`;
-    return `<div class="voice-item ${on?'voice-item-active':''}" onclick="selectVoice('${v.id}')">
-      <div class="voice-item-icon ${on?'voice-item-icon-on':''}" style="background:${iconBg}">${iconSvg}</div>
-      <div style="font-size:12px;font-weight:600;color:${on?'#9A3412':'#1A1814'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.name)}</div>
-      <div style="font-size:10px;color:${on?'#F97316':'#A8A49C'};margin-top:2px">${on?'已选':''+v.tag}</div>
+    const iconSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`;
+    return `<div class="voice-item voice-item-design ${on?'voice-item-active':''}" onclick="selectVoice('${v.id}')">
+      <div class="voice-item-icon">${iconSvg}${on?`<span class="voice-selected-mark"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>`:''}</div>
+      <span class="voice-item-name">${esc(v.name)}</span>
+      ${on?`<span class="voice-item-selected-tag">已选</span>`:`<span class="voice-item-tag">${esc(v.tag)}</span>`}
     </div>`;
   }).join('');
 
@@ -2152,54 +2236,58 @@ function tCloneStep3(sb) {
 
   const speedPct = Math.round((S.ttsSpeed - 0.5) / 1.5 * 100);
   const speedBg = `linear-gradient(to right,#FF6B35 ${speedPct}%,#E8E4DC ${speedPct}%)`;
+  const speedPresets = [0.75, 1, 1.25, 1.5, 2];
+  const speedPresetHtml = speedPresets.map(v => {
+    const on = Math.abs(S.ttsSpeed - v) < 0.01;
+    return `<div class="voice-speed-pill ${on?'voice-speed-pill-active':''}" onclick="setTTSSpeedPreset(${v})">${v === 1 ? '1x' : v + 'x'}</div>`;
+  }).join('');
+  const wave = Array.from({length: 28}, (_, i) => `<span style="animation-delay:${(i % 7) * 0.07}s"></span>`).join('');
 
   const audioSection = S.ttsAudioUrl ? `
-    <div class="audio-player-row">
-      <div class="audio-play-btn" onclick="playTTSAudio()">
+    <div class="clone-voice-card voice-preview-card">
+      <div class="audio-play-btn voice-preview-play" onclick="playTTSAudio()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       </div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:3px">语音预览</div>
-        <div style="font-size:11px;color:#A8A49C">点击播放试听</div>
+      <div class="voice-preview-main">
+        <div class="voice-preview-title">语音预览</div>
+        <div class="voice-wave">${wave}</div>
       </div>
-      <span style="font-size:11px;color:#059669;background:#ECFDF5;padding:4px 10px;border-radius:50px">✓ 合成完成</span>
+      <span class="voice-done-badge">✓ 合成完成</span>
     </div>` : '';
 
-  return `${sb}<div class="tab-page">
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="section-label" style="margin-bottom:0">声音选择</div>
-        <span style="font-size:12px;color:#F97316;cursor:pointer" onclick="gotoVoiceManager()">管理声音 →</span>
+  return `${sb}<div class="tab-page clone-voice-page">
+    <div class="clone-voice-card">
+      <div class="clone-voice-head">
+        <div class="clone-voice-title">声音选择</div>
+        <span class="clone-voice-manage" onclick="gotoVoiceManager()">管理声音 ›</span>
       </div>
-      <div class="voice-scroll-row">${voiceScrollHtml}</div>
+      <div class="voice-scroll-row voice-scroll-design">${voiceScrollHtml}</div>
     </div>
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="section-label" style="margin-bottom:0">语速</div>
-        <span id="speedLabel" style="font-size:14px;color:#F97316;font-weight:600">${S.ttsSpeed.toFixed(1)}x</span>
+    <div class="clone-voice-card voice-speed-card">
+      <div class="clone-voice-head">
+        <div class="clone-voice-title">语速调节</div>
+        <span id="speedLabel" class="voice-speed-value">${S.ttsSpeed.toFixed(1)}x</span>
       </div>
-      <input class="speed-slider" type="range" min="50" max="200" step="10" value="${Math.round(S.ttsSpeed*100)}"
+      <input class="speed-slider voice-speed-slider" type="range" min="50" max="200" step="10" value="${Math.round(S.ttsSpeed*100)}"
         id="speedSlider" oninput="onSpeedInput(this.value)"
         style="background:${speedBg}" />
-      <div style="display:flex;justify-content:space-between;margin-top:6px">
-        <span style="font-size:11px;color:#A8A49C">0.5x 慢</span>
-        <span style="font-size:11px;color:#A8A49C">快 2.0x</span>
-      </div>
+      <div class="voice-speed-meta"><span>0.5x 慢</span><span>快 2.0x</span></div>
+      <div class="voice-speed-presets">${speedPresetHtml}</div>
     </div>
     ${emotionSection}
     ${audioSection}
     ${S.ttsErr?`<span class="err-text">${esc(S.ttsErr)}</span>`:''}
     ${S.ttsAudioUrl ? `
     <div style="margin-top:4px">
-      <div class="btn-action-main" onclick="goToCloneStep4()">下一步：选择数字人 →</div>
-      <div class="action-row" style="gap:8px;margin-top:8px">
+      <div class="btn-action-main clone-voice-main-btn" onclick="goToCloneStep4()">下一步：选择数字人 →</div>
+      <div class="clone-voice-secondary-row">
         <div class="btn-action-sec" onclick="setState({extractStep:2})">上一步</div>
         <div class="btn-action-sec" onclick="handleTTSGenerate()">重新合成</div>
       </div>
     </div>` : `
     <div class="action-row" style="gap:8px">
       <div class="btn-action-sec" onclick="setState({extractStep:2})">上一步</div>
-      <div class="btn-action-main ${S.ttsGenerating?'btn-disabled':''}" onclick="handleTTSGenerate()">合成语音试听</div>
+      <div class="btn-action-main clone-voice-main-btn ${S.ttsGenerating?'btn-disabled':''}" onclick="handleTTSGenerate()">合成语音试听</div>
     </div>`}
   </div>`;
 }
@@ -4087,6 +4175,10 @@ function onSpeedInput(val) {
     const pct = Math.round((S.ttsSpeed - 0.5) / 1.5 * 100);
     slider.style.background = `linear-gradient(to right,#FF6B35 ${pct}%,#E8E4DC ${pct}%)`;
   }
+}
+
+function setTTSSpeedPreset(v) {
+  setState({ ttsSpeed: v });
 }
 
 function goToCloneStep4() {
