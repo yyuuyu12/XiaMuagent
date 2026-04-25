@@ -682,6 +682,23 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .feat-btn-sec { flex: 1; padding: 14px; background: #F5F4F2; color: #6B6860; border: none; border-radius: 50px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .feat-btn-pri { flex: 1.4; padding: 14px; background: #FF6B35; color: #fff; border: none; border-radius: 50px; font-size: 14px; font-weight: 700; cursor: pointer; }
 
+/* === GLOBAL LOADER === */
+.app-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 54px 0; color: #A8A49C; font-size: 13px; }
+.app-loader-mark { position: relative; width: 56px; height: 40px; }
+.app-loader-dot { position: absolute; bottom: 0; width: 12px; height: 12px; border-radius: 50%; background: #FF6B35; box-shadow: 0 6px 16px rgba(245,96,42,.22); animation: app-loader-bounce 0.9s cubic-bezier(.28,.84,.42,1) infinite; }
+.app-loader-dot:nth-child(1) { left: 7px; animation-delay: 0s; opacity: .78; }
+.app-loader-dot:nth-child(2) { left: 22px; animation-delay: .12s; opacity: .95; }
+.app-loader-dot:nth-child(3) { left: 37px; animation-delay: .24s; opacity: .72; }
+.app-loader-spark { position: absolute; left: 24px; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: #FFD7C2; transform: rotate(45deg); animation: app-loader-spark 1.4s ease-in-out infinite; }
+@keyframes app-loader-bounce {
+  0%, 80%, 100% { transform: translateY(0) scale(.86); }
+  38% { transform: translateY(-18px) scale(1.05); }
+}
+@keyframes app-loader-spark {
+  0%, 100% { opacity: .15; transform: translateY(8px) rotate(45deg) scale(.55); }
+  45% { opacity: 1; transform: translateY(0) rotate(45deg) scale(1); }
+}
+
 /* === PATH A · 对标拆解 === */
 .video-list-item { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
 .video-list-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #E4E2DA; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; }
@@ -1058,7 +1075,7 @@ const S = {
   inspireFromHome: false,     // 从首页进入时置 true，返回直接回首页
   // 行业精选
   featuredPage: 'select',      // 'select' | 'content'
-  featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredErr: '',
+  featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredIndustriesLoading: false, featuredErr: '',
   featuredIndustriesList: [], featuredSelectedIdx: null, featuredDetailIdx: null,
   // 路径A
   pathAText: '', pathALoading: false, pathAErr: '',
@@ -1186,6 +1203,17 @@ function showToast(msg) {
   t.className = 'toast'; t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2000);
+}
+function tAppLoader(text = '加载中...') {
+  return `<div class="app-loader">
+    <div class="app-loader-mark">
+      <span class="app-loader-dot"></span>
+      <span class="app-loader-dot"></span>
+      <span class="app-loader-dot"></span>
+      <span class="app-loader-spark"></span>
+    </div>
+    <div>${esc(text)}</div>
+  </div>`;
 }
 function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
@@ -2685,7 +2713,7 @@ function tInspireIndustry() {
 let _featuredRefreshTimer = null;
 
 async function enterFeaturedMode() {
-  setState({ inspireMode: 'featured', featuredPage: 'select', featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredErr: '', featuredSelectedIdx: null });
+  setState({ inspireMode: 'featured', featuredPage: 'select', featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredIndustriesLoading: true, featuredErr: '', featuredSelectedIdx: null });
   render();
   await loadFeaturedIndustries();
   if (_featuredRefreshTimer) clearInterval(_featuredRefreshTimer);
@@ -2703,13 +2731,17 @@ async function enterFeaturedMode() {
 }
 
 async function loadFeaturedIndustries() {
+  if (!S.featuredIndustriesList || S.featuredIndustriesList.length === 0) S.featuredIndustriesLoading = true;
   try {
     const r = await fetch('/api/industry-videos/industries').then(x => x.json());
     if (r.code === 200 && Array.isArray(r.data)) {
-      setState({ featuredIndustriesList: r.data });
+      setState({ featuredIndustriesList: r.data, featuredIndustriesLoading: false });
       render();
+    } else {
+      setState({ featuredIndustriesLoading: false });
     }
   } catch(e) {
+    setState({ featuredIndustriesLoading: false });
     console.error('[loadFeaturedIndustries]', e);
   }
 }
@@ -2722,6 +2754,9 @@ function tInspireFeatured() {
 
 function tFeaturedSelect() {
   const list = S.featuredIndustriesList || [];
+  if (S.featuredIndustriesLoading && list.length === 0) {
+    return `<div class="tab-page">${tAppLoader('正在整理行业热门文案')}</div>`;
+  }
   if (list.length === 0) {
     return `<div class="tab-page"><div style="text-align:center;color:#9CA3AF;margin-top:60px;font-size:14px">暂无行业数据，请联系管理员</div></div>`;
   }
@@ -2744,7 +2779,7 @@ function tFeaturedContent() {
   const di = S.featuredDetailIdx;
   let grid = '';
   if (S.featuredLoading) {
-    grid = `<div style="grid-column:1/-1;text-align:center;padding:40px 0"><div class="loading-spinner"></div></div>`;
+    grid = `<div style="grid-column:1/-1">${tAppLoader('正在加载热门文案')}</div>`;
   } else if (S.featuredErr) {
     grid = `<div style="grid-column:1/-1;text-align:center;color:#EF4444;font-size:13px">${esc(S.featuredErr)}</div>`;
   } else if (!S.featuredVideos || S.featuredVideos.length === 0) {
