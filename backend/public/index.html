@@ -4341,13 +4341,13 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
           // 通过 Zeabur 后端流式代理下载（避免 HTTPS→HTTP Mixed Content 拦截）
           const resp = await fetch(`/ai/video/download/${taskId}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
           if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
-          const blob = await resp.blob();
+          const arrayBuffer = await resp.arrayBuffer();
+          if (!arrayBuffer.byteLength) throw new Error('视频数据为空');
+          // 强制指定 video/mp4 类型，确保浏览器能正确播放
+          const blob = new Blob([arrayBuffer], { type: 'video/mp4' });
           const url = URL.createObjectURL(blob);
-          const b64 = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1]);
-            reader.readAsDataURL(blob);
-          });
+          // 转 b64 供后续字幕烧录使用
+          const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
           setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: b64, avatarTaskId: null, extractStep: 4 });
           saveCloneSession(4);
         } catch (dlErr) {

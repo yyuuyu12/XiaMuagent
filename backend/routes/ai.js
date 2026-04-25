@@ -576,12 +576,11 @@ router.get('/video/download/:taskId', requireAuth, async (req, res) => {
       signal: AbortSignal.timeout(300000), // 5 分钟，视频文件大允许慢传
     });
     if (!resp.ok) return res.status(500).json({ code: 500, msg: `获取视频失败 ${resp.status}` });
+    const buf = Buffer.from(await resp.arrayBuffer());
     res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Length', buf.length);
     res.setHeader('Content-Disposition', `attachment; filename="${taskId}.mp4"`);
-    const cl = resp.headers.get('content-length');
-    if (cl) res.setHeader('Content-Length', cl);
-    const { Readable } = require('stream');
-    Readable.fromWeb(resp.body).pipe(res);
+    res.send(buf);
   } catch (e) {
     if (!res.headersSent) res.status(500).json({ code: 500, msg: `下载失败: ${e.message}` });
   }
