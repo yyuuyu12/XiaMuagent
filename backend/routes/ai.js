@@ -451,11 +451,11 @@ async function getVideoUrl() {
 
 // ==================== 数字人视频生成 ====================
 router.post('/video/generate', requireAuth, async (req, res) => {
-  const { audio_b64, video_b64, audio_fmt, video_fmt, enhancer } = req.body;
+  const { audio_b64, video_b64, avatar_key, audio_fmt, video_fmt, enhancer } = req.body;
   if (!audio_b64) return res.json({ code: 400, msg: '请先完成语音合成' });
-  if (!video_b64) return res.json({ code: 400, msg: '请上传静默人脸视频' });
+  if (!video_b64 && !avatar_key) return res.json({ code: 400, msg: '请上传或选择数字人视频' });
   if (audio_b64.length > 6 * 1024 * 1024) return res.json({ code: 400, msg: '音频过大（>4.5MB），请缩短语音' });
-  if (video_b64.length > 50 * 1024 * 1024) return res.json({ code: 400, msg: '视频过大（>37MB），请压缩后上传' });
+  if (video_b64 && video_b64.length > 70 * 1024 * 1024) return res.json({ code: 400, msg: '视频过大（>50MB），请压缩后上传' });
 
   const videoUrl = await getVideoUrl();
   if (!videoUrl) return res.json({ code: 500, msg: '请在后台配置数字人服务地址（video_url）' });
@@ -463,8 +463,13 @@ router.post('/video/generate', requireAuth, async (req, res) => {
   try {
     const resp = await fetch(`${videoUrl}/video/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audio_b64, video_b64, audio_fmt: audio_fmt || 'wav', video_fmt: video_fmt || 'mp4', enhancer: !!enhancer }),
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+      body: JSON.stringify({
+        audio_b64,
+        audio_fmt: audio_fmt || 'wav',
+        enhancer: !!enhancer,
+        ...(avatar_key ? { avatar_key } : { video_b64, video_fmt: video_fmt || 'mp4' }),
+      }),
       signal: AbortSignal.timeout(120000),
     });
     if (!resp.ok) {

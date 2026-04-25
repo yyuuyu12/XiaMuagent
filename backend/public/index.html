@@ -4274,48 +4274,35 @@ async function handleAvatarGenerate() {
     return;
   }
 
-  setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '初始化中...', avatarProgressPct: 20 });
+  setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '正在提交生成任务...', avatarProgressPct: 20 });
   touchCloneTaskActivity();
 
   try {
-    // 先拿 ngrok 地址，大文件直接传给本地服务，绕过 Zeabur 代理限制
-    const urlR = await api.get('/ai/asr-url');
-    if (runSeq !== _avatarRunSeq) return;
-    if (urlR.code !== 200) {
-      setState({ avatarGenerating: false, avatarErr: urlR.msg || '获取服务地址失败', extractStep: 4 }); return;
-    }
-    const asrUrl = urlR.data.url.replace(/\/$/, '');
-
     const videoPayload = S.avatarLibKey
       ? { avatar_key: S.avatarLibKey }
       : { video_b64: S.avatarSrcVideoB64, video_fmt: S.avatarSrcVideoFmt || 'mp4' };
-    const resp = await fetch(`${asrUrl}/video/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
-      body: JSON.stringify({
-        audio_b64: audioB64,
-        audio_fmt: 'wav',
-        enhancer: S.avatarBeauty,
-        ...videoPayload,
-      }),
+    const r = await api.post('/ai/video/generate', {
+      audio_b64: audioB64,
+      audio_fmt: 'wav',
+      enhancer: S.avatarBeauty,
+      ...videoPayload,
     });
     if (runSeq !== _avatarRunSeq) return;
-    if (!resp.ok) {
-      const t = await resp.text();
-      setState({ avatarGenerating: false, avatarErr: '视频服务出错: ' + t.slice(0, 100), extractStep: 4 }); return;
-    }
-    const data = await resp.json();
-    const taskId = data.task_id;
-    if (runSeq !== _avatarRunSeq) {
-      cancelRemoteAvatarTask(taskId, asrUrl);
+    if (r.code !== 200 || !r.data?.task_id) {
+      setState({ avatarGenerating: false, avatarErr: r.msg || '数字人生成任务提交失败', extractStep: 4 });
       return;
     }
-    setState({ avatarTaskId: taskId, avatarAsrUrl: asrUrl });
+    const taskId = r.data.task_id;
+    if (runSeq !== _avatarRunSeq) {
+      cancelRemoteAvatarTask(taskId);
+      return;
+    }
+    setState({ avatarTaskId: taskId, avatarAsrUrl: null, avatarProgressMsg: '任务已提交，正在生成...' });
     saveCloneSession(4); // 生成任务已提交，立即保存 taskId 以便跨会话恢复
-    _startAvatarPoller(taskId, asrUrl, runSeq);
+    _startAvatarPoller(taskId, null, runSeq);
   } catch (e) {
     if (runSeq === _avatarRunSeq) {
-      setState({ avatarGenerating: false, avatarErr: '网络错误: ' + e.message, extractStep: 4 });
+      setState({ avatarGenerating: false, avatarErr: '数字人生成任务提交失败，请重试', extractStep: 4 });
     }
   }
 }
@@ -4369,8 +4356,9 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
 }
 
 function cancelRemoteAvatarTask(taskId, asrUrl) {
-  if (!taskId || !asrUrl) return;
+  if (!taskId) return;
   api.post(`/ai/video/cancel/${taskId}`, {}).catch(() => {
+    if (!asrUrl) return;
     fetch(`${asrUrl}/video/cancel/${taskId}`, {
       method: 'POST',
       headers: { 'ngrok-skip-browser-warning': '1' },
