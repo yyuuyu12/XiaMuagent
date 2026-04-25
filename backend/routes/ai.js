@@ -446,38 +446,55 @@ function normalizeServiceUrl(url) {
 }
 
 const VIDEO_FETCH_HEADERS = {
-  'ngrok-skip-browser-warning': '1',
   'User-Agent': 'XiaMuagent-Zeabur/1.0',
   'Accept': 'application/json',
 };
 
 // 获取视频服务 URL 的内部工具函数：优先使用真正返回 /health JSON 的地址，避免 video_url 配成网页域名。
+// 探活结果缓存 60 秒，避免每次轮询都做跨境探活（Zeabur → 阿里云 延迟较高，频繁探活会引发"连接不稳定"）
+let _videoUrlCache = { url: '', expires: 0 };
+const VIDEO_URL_CACHE_TTL = 60 * 1000; // 60 秒
+
 async function getVideoUrl() {
+  const now = Date.now();
+  if (_videoUrlCache.url && _videoUrlCache.expires > now) {
+    return _videoUrlCache.url;
+  }
+
   const { rows } = await db.query("SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','video_url')");
   const cfg = {};
   rows.forEach(r => { cfg[r.config_key] = normalizeServiceUrl(r.value); });
   const candidates = [...new Set([cfg.video_url, cfg.asr_url].filter(Boolean))];
   if (!candidates.length) return '';
 
+  let picked = '';
   for (const url of candidates) {
     try {
       const resp = await fetch(`${url}/health`, {
         headers: VIDEO_FETCH_HEADERS,
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(10000),
       });
       const ct = resp.headers.get('content-type') || '';
       if (!resp.ok || !ct.includes('application/json')) continue;
       const data = await resp.json();
-      if (data && data.status === 'ok') return url;
+      if (data && data.status === 'ok') { picked = url; break; }
     } catch {}
   }
 
-  return candidates[0];
+  if (!picked) picked = candidates[0];
+  _videoUrlCache = { url: picked, expires: now + VIDEO_URL_CACHE_TTL };
+  return picked;
 }
+
+// 暴露给后台配置改动后立即失效缓存（admin 改 video_url/asr_url 时可调用）
+function invalidateVideoUrlCache() {
+  _videoUrlCache = { url: '', expires: 0 };
+}
+router.invalidateVideoUrlCache = invalidateVideoUrlCache;
 
 function htmlServiceError(url, text) {
   const hint = text && text.includes('<!DOCTYPE')
-    ? '当前数字人地址返回的是网页，不是本地视频接口。请检查后台 video_url/asr_url，必须指向本地 ASR ngrok 地址，并能打开 /health 返回 JSON。'
+    ? '当前数字人地址返回的是网页，不是本地视频接口。请检查后台 video_url/asr_url，必须指向 frp/heygem 穿透地址（如 http://heygem.yyagent.top），并能打开 /health 返回 JSON。'
     : '数字人接口返回内容异常，请检查后台 video_url/asr_url 配置。';
   return `${hint} 当前地址：${url}`;
 }

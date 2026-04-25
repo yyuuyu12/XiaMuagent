@@ -168,12 +168,12 @@ async function initDb() {
     await db.query('INSERT IGNORE INTO system_config (config_key, value) VALUES (?, ?)', [k, v]);
   }
 
-  // asr_url：若不存在则插入，若已存在但缺少协议头则修正
+  // asr_url：若不存在则插入，若已存在但缺少协议头则修正（默认指向 frp 穿透域名）
   await db.query(
-    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('asr_url', 'https://baculitic-derivable-sherilyn.ngrok-free.dev')`
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('asr_url', 'http://asr.yyagent.top')`
   );
   await db.query(
-    `UPDATE system_config SET value = 'https://baculitic-derivable-sherilyn.ngrok-free.dev'
+    `UPDATE system_config SET value = 'http://asr.yyagent.top'
      WHERE config_key = 'asr_url' AND value NOT LIKE 'http%'`
   );
 
