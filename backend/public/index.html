@@ -4311,12 +4311,15 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
   if (_avatarPoller) clearInterval(_avatarPoller);
   let elapsed = 0;
   let pollFailCount = 0;
+  let inFlight = false; // ★ 防并发锁：上一次轮询还没返回就不再发新请求，避免 done 时多次拉取 50MB video_b64 把上行打满
   _avatarPoller = setInterval(async () => {
     if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) {
       clearInterval(_avatarPoller); _avatarPoller = null;
       return;
     }
-    elapsed += 5;
+    if (inFlight) return; // 上一轮没回来，跳过本次 tick
+    inFlight = true;
+    elapsed += 10;
     try {
       const r = await api.get(`/ai/video/task/${taskId}`);
       if (r.code !== 200) {
@@ -4327,7 +4330,7 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       pollFailCount = 0;
       if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
       const t = r.data;
-      const pct = Math.min(90, 10 + elapsed * 1.2);
+      const pct = Math.min(90, 10 + elapsed * 0.6);
       setState({ avatarProgressPct: pct, avatarProgressMsg: t.msg || '处理中...' });
 
       if (t.status === 'done' && t.video_b64) {
@@ -4351,8 +4354,10 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       const msg = pollFailCount >= 3 ? '连接数字人服务不稳定，正在重试...' : '继续等待生成...';
       setState({ avatarProgressMsg: msg });
       console.error('[avatar poller]', e);
+    } finally {
+      inFlight = false;
     }
-  }, 5000);
+  }, 10000);
 }
 
 function cancelRemoteAvatarTask(taskId, asrUrl) {
