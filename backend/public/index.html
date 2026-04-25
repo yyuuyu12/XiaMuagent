@@ -675,16 +675,14 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .feature-card-main { background: #fff; border-radius: 12px; padding: 0 16px; height: 72px; display: flex; flex-direction: row; align-items: center; box-shadow: 0 1px 8px rgba(0,0,0,.06); cursor: pointer; user-select: none; margin-bottom: 10px; }
 
 /* Home big clone card */
-.feat-clone-card { background: #fff; border-radius: 20px; padding: 18px 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); cursor: pointer; user-select: none; margin-bottom: 10px; position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: transform 0.18s, box-shadow 0.18s; }
+.feat-clone-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); cursor: pointer; user-select: none; margin-bottom: 10px; position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: transform 0.18s, box-shadow 0.18s; }
 .feat-clone-card:active { transform: scale(0.98); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
-.feat-clone-card-top { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
-.feat-clone-icon { width: 48px; height: 48px; background: #EEF2FF; border-radius: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.feat-clone-info { flex: 1; min-width: 0; }
-.feat-clone-title { font-size: 17px; font-weight: 700; color: #1A1614; margin-bottom: 4px; letter-spacing: -0.3px; }
-.feat-clone-desc { font-size: 13px; color: #9E9890; line-height: 1.5; }
-.feat-clone-arrow { position: absolute; top: 16px; right: 16px; color: #D0CCC6; }
+.feat-clone-icon { width: 52px; height: 52px; background: #EEF2FF; border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-bottom: 16px; }
+.feat-clone-title { font-size: 20px; font-weight: 700; color: #1A1614; margin-bottom: 6px; letter-spacing: -0.3px; }
+.feat-clone-desc { font-size: 13px; color: #9E9890; line-height: 1.5; margin-bottom: 14px; }
+.feat-clone-arrow { position: absolute; top: 20px; right: 20px; color: #D0CCC6; }
 .feat-clone-tags { display: flex; gap: 8px; flex-wrap: wrap; }
-.feat-clone-tag { font-size: 11px; font-weight: 600; color: #6B6FE0; background: #EEF2FF; border-radius: 6px; padding: 4px 10px; }
+.feat-clone-tag { font-size: 12px; font-weight: 600; color: #6B6FE0; background: #EEF2FF; border-radius: 8px; padding: 5px 12px; }
 
 /* Home 2-col sub cards */
 .feat-sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -905,6 +903,7 @@ const S = {
   profileView: 'main',
   // ===== 灵感发现 · 新流程 =====
   inspireMode: null,          // null | 'analyze' | 'industry' | 'featured'
+  inspireFromHome: false,     // 从首页进入时置 true，返回直接回首页
   // 行业精选
   featuredPage: 'select',      // 'select' | 'content'
   featuredIndustry: null, featuredVideos: [], featuredLoading: false, featuredErr: '',
@@ -1293,9 +1292,13 @@ function tTopBar() {
       if (S.pathAState === 'videos') {
         backAction = "setState({pathAState:'input',pathAErr:''});render()";
       } else if (S.pathAState === 'started') {
-        backAction = "stopPathAPolling();setState({inspireMode:null,pathAState:'input',pathATaskData:null});render()";
+        backAction = S.inspireFromHome
+          ? "stopPathAPolling();setState({currentTab:'home',inspireMode:null,inspireFromHome:false,pathAState:'input',pathATaskData:null});loadTasks();render()"
+          : "stopPathAPolling();setState({inspireMode:null,pathAState:'input',pathATaskData:null});render()";
       } else {
-        backAction = "setState({inspireMode:null});render()";
+        backAction = S.inspireFromHome
+          ? "setState({currentTab:'home',inspireMode:null,inspireFromHome:false});loadTasks();render()"
+          : "setState({inspireMode:null});render()";
       }
     } else if (S.inspireMode === 'industry') {
       title = '行业生成';
@@ -1305,7 +1308,9 @@ function tTopBar() {
       if (S.featuredPage === 'content') {
         backAction = "setState({featuredPage:'select',featuredSelectedIdx:null,featuredDetailIdx:null});render()";
       } else {
-        backAction = "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}setState({inspireMode:null,featuredPage:'select',featuredDetailIdx:null});render()";
+        backAction = S.inspireFromHome
+          ? "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}setState({currentTab:'home',inspireMode:null,inspireFromHome:false,featuredPage:'select',featuredDetailIdx:null});loadTasks();render()"
+          : "if(_featuredRefreshTimer){clearInterval(_featuredRefreshTimer);_featuredRefreshTimer=null;}setState({inspireMode:null,featuredPage:'select',featuredDetailIdx:null});render()";
       }
     } else {
       title = '灵感发现';
@@ -1611,13 +1616,9 @@ function tHome() {
     </div>
     <div class="feat-clone-card" onclick="switchTab('extract')">
       <div class="feat-clone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-      <div class="feat-clone-card-top">
-        <div class="feat-clone-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
-        <div class="feat-clone-info">
-          <div class="feat-clone-title">爆款克隆</div>
-          <div class="feat-clone-desc">粘贴抖音/快手链接，一键提取文案并 AI 改写成你的风格</div>
-        </div>
-      </div>
+      <div class="feat-clone-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
+      <div class="feat-clone-title">爆款克隆</div>
+      <div class="feat-clone-desc">粘贴抖音/快手链接，一键提取文案并 AI 改写成你的风格</div>
       <div class="feat-clone-tags">
         <span class="feat-clone-tag">语音提取</span>
         <span class="feat-clone-tag">AI 改写</span>
@@ -1625,13 +1626,13 @@ function tHome() {
       </div>
     </div>
     <div class="feat-sub-grid">
-      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireMode:'analyze'});render()">
+      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireMode:'analyze',inspireFromHome:true});render()">
         <div class="feat-sub-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
         <div class="feat-sub-icon" style="background:#FFF0E6"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
         <div class="feat-sub-title">对标拆解</div>
         <div class="feat-sub-desc">分析竞品文案结构与爆点</div>
       </div>
-      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireMode:'featured',featuredPage:'select'});render()">
+      <div class="feat-sub-card" onclick="setState({currentTab:'inspire',inspireMode:'featured',featuredPage:'select',inspireFromHome:true});render()">
         <div class="feat-sub-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
         <div class="feat-sub-icon" style="background:#EDFAF3"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0D9B5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
         <div class="feat-sub-title">行业精选</div>
