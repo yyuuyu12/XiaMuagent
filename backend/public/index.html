@@ -156,11 +156,15 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .profile-hero-top { display: flex; flex-direction: row; align-items: center; width: 100%; margin-bottom: 14px; }
 .profile-hero-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 0 10px 0 12px; }
 .profile-phone-inline { display: block; font-size: 12px; color: rgba(255,255,255,.72); margin-top: 4px; }
-.avatar-lg { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 0; position: relative; overflow: hidden; flex-shrink: 0; }
-.avatar-type-0 { background: rgba(124,58,237,.55); }
-.avatar-type-1 { background: rgba(249,115,22,.55); }
-.avatar-type-2 { background: rgba(59,130,246,.55); }
-.avatar-type-3 { background: rgba(16,185,129,.55); }
+.avatar-lg { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 0; position: relative; overflow: hidden; flex-shrink: 0; background: rgba(255,255,255,.18); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+.avatar-type-0 { background: linear-gradient(135deg,#8B5CF6,#5B21B6); }
+.avatar-type-1 { background: linear-gradient(135deg,#F97316,#FB923C); }
+.avatar-type-2 { background: linear-gradient(135deg,#3B82F6,#1D4ED8); }
+.avatar-type-3 { background: linear-gradient(135deg,#10B981,#047857); }
+.avatar-type-4 { background: linear-gradient(135deg,#EC4899,#BE185D); }
+.avatar-type-5 { background: linear-gradient(135deg,#06B6D4,#0E7490); }
+.avatar-type-6 { background: linear-gradient(135deg,#F59E0B,#B45309); }
+.avatar-type-7 { background: linear-gradient(135deg,#64748B,#334155); }
 .avatar-lg-text { font-size: 28px; line-height: 1; }
 .avatar-lg-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .profile-name { display: block; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 0; user-select: none; line-height: 1.25; word-break: break-all; }
@@ -177,15 +181,42 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .stat-empty { color: #FFD4C5; }
 .stat-divider { width: 1px; height: 30px; background: rgba(255,255,255,.3); }
 .avatar-picker { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
-.avatar-options { display: flex; flex-direction: row; justify-content: space-around; margin-top: 8px; }
-.avatar-option { display: flex; flex-direction: column; align-items: center; padding: 4px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; user-select: none; }
-.avatar-option-active { border-color: #F5762A; background: rgba(245,118,42,.06); }
-.avatar-opt-circle { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-.avatar-opt-0 { background: #7C3AED; }
-.avatar-opt-1 { background: #F97316; }
-.avatar-opt-2 { background: #3B82F6; }
-.avatar-opt-3 { background: #10B981; }
-.avatar-opt-circle { display: flex; align-items: center; justify-content: center; }
+.avatar-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 10px; }
+.avatar-option { display: flex; flex-direction: column; align-items: center; padding: 6px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+.avatar-option-active { border-color: #F97316; background: #FFF0E6; }
+.avatar-opt-circle { width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 3px 10px rgba(26,22,20,.08); }
+.preset-avatar { width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden; background: linear-gradient(135deg,#F97316,#FB923C); }
+.preset-avatar::before { content: ""; position: absolute; left: 10%; top: 8%; width: 80%; height: 48%; border-radius: 50% 50% 42% 42%; background: rgba(26,22,20,.92); z-index: 1; }
+.pa-head { position: absolute; left: 30%; top: 23%; width: 40%; height: 36%; border-radius: 50%; background: #FFE1C7; z-index: 2; box-shadow: inset -3px -3px 0 rgba(214,86,26,.08); }
+.pa-body { position: absolute; left: 20%; bottom: 0; width: 60%; height: 34%; border-radius: 42% 42% 0 0; background: rgba(255,255,255,.92); z-index: 2; }
+.pa-neck { position: absolute; left: 42%; top: 52%; width: 16%; height: 16%; border-radius: 8px; background: #FFD2B2; z-index: 1; }
+.pa-detail { position: absolute; z-index: 3; }
+.preset-avatar-0 { background: linear-gradient(135deg,#8B5CF6,#5B21B6); }
+.preset-avatar-0 .pa-body { background: #F6F0FF; }
+.preset-avatar-1 { background: linear-gradient(135deg,#F97316,#FDBA74); }
+.preset-avatar-1::before { left: 18%; top: 9%; width: 64%; height: 38%; border-radius: 54% 54% 40% 40%; background: #7C2D12; }
+.preset-avatar-1 .pa-body { background: #FFF7ED; }
+.preset-avatar-2 { background: linear-gradient(135deg,#3B82F6,#1D4ED8); }
+.preset-avatar-2::before { top: 13%; height: 28%; border-radius: 50% 50% 20% 20%; background: #1E3A8A; }
+.preset-avatar-2 .pa-body { background: #DBEAFE; }
+.preset-avatar-3 { background: linear-gradient(135deg,#10B981,#047857); }
+.preset-avatar-3::before { left: 16%; top: 5%; width: 68%; height: 42%; border-radius: 48% 48% 35% 35%; background: #064E3B; }
+.preset-avatar-3 .pa-body { background: #D1FAE5; }
+.preset-avatar-4 { background: linear-gradient(135deg,#EC4899,#BE185D); }
+.preset-avatar-4::before { left: 7%; top: 9%; width: 86%; height: 54%; border-radius: 52% 52% 45% 45%; background: #831843; }
+.preset-avatar-4 .pa-body { background: #FCE7F3; }
+.preset-avatar-5 { background: linear-gradient(135deg,#06B6D4,#0E7490); }
+.preset-avatar-5::before { left: 20%; top: 8%; width: 60%; height: 34%; border-radius: 16px 16px 12px 12px; background: #164E63; }
+.preset-avatar-5 .pa-body { background: #CFFAFE; }
+.preset-avatar-5 .pa-detail { left: 28%; top: 38%; width: 44%; height: 11%; border-top: 2px solid rgba(14,116,144,.9); border-radius: 50%; }
+.preset-avatar-6 { background: linear-gradient(135deg,#F59E0B,#B45309); }
+.preset-avatar-6::before { left: 12%; top: 10%; width: 76%; height: 34%; border-radius: 50% 50% 18% 18%; background: #78350F; }
+.preset-avatar-6 .pa-body { background: #FEF3C7; }
+.preset-avatar-6 .pa-detail { left: 28%; top: 35%; width: 44%; height: 14%; border: 2px solid rgba(120,53,15,.75); border-left: none; border-right: none; border-radius: 999px; }
+.preset-avatar-7 { background: linear-gradient(135deg,#64748B,#334155); }
+.preset-avatar-7::before { left: 15%; top: 8%; width: 70%; height: 40%; border-radius: 46% 46% 28% 28%; background: #111827; }
+.preset-avatar-7 .pa-head { background: #F3D2B8; }
+.preset-avatar-7 .pa-body { background: #E2E8F0; }
 .profile-section { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
 .profile-section-title { display: block; font-size: 12px; color: #A8A49C; font-weight: 500; margin-bottom: 10px; }
 .profile-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F0EEE8; }
@@ -2719,12 +2750,21 @@ function featuredRewrite() {
 }
 
 // ===== PROFILE =====
+function tPresetAvatar(i) {
+  const idx = Math.max(0, Math.min(7, parseInt(i, 10) || 0));
+  return `<div class="preset-avatar preset-avatar-${idx}">
+    <span class="pa-neck"></span>
+    <span class="pa-head"></span>
+    <span class="pa-body"></span>
+    <span class="pa-detail"></span>
+  </div>`;
+}
+
 function tProfile() {
   if (S.profileView === 'edit') return tProfileEdit();
   if (S.profileView === 'voices') return tVoiceManager();
   const u = S.userInfo;
   const loggedIn = !!getToken();
-  const emoji = '<svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg>';
   const hasImg = u && u.avatar_image;
   const showPhone = S.appH5 && S.appH5.showProfilePhone;
   const showAcc = S.appH5 && S.appH5.showAccountType;
@@ -2735,7 +2775,7 @@ function tProfile() {
       <div class="profile-hero">
         <div class="profile-hero-top">
           <div class="avatar-lg avatar-type-0" onclick="openAuthSheet()">
-            <span class="avatar-lg-text"><svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg></span>
+            ${tPresetAvatar(0)}
           </div>
           <div class="profile-hero-mid">
             <span class="profile-name" style="cursor:default">未登录</span>
@@ -2758,7 +2798,7 @@ function tProfile() {
     <div class="profile-hero">
       <div class="profile-hero-top">
         <div class="avatar-lg avatar-type-${S.userAvatar}">
-          ${hasImg ? `<img class="avatar-lg-img" src="${esc(u.avatar_image)}" alt=""/>` : `<span class="avatar-lg-text">${emoji}</span>`}
+          ${hasImg ? `<img class="avatar-lg-img" src="${esc(u.avatar_image)}" alt=""/>` : tPresetAvatar(S.userAvatar)}
         </div>
         <div class="profile-hero-mid">
           <span class="profile-name">${esc(S.userName)}</span>
@@ -2932,23 +2972,22 @@ function tVoiceManager() {
 
 function tProfileEdit() {
   const u = S.userInfo;
-  const emoji = '<svg width="26" height="26" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg>';
   const hasImg = u && u.avatar_image;
   return `<div class="tab-page profile-edit-page">
     <div class="profile-section">
       <span class="profile-section-title">头像</span>
       <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:8px">
         <div class="avatar-lg avatar-type-${S.userAvatar}" style="width:72px;height:72px">
-          ${hasImg ? `<img class="avatar-lg-img" src="${esc(u.avatar_image)}" alt=""/>` : `<span class="avatar-lg-text">${emoji}</span>`}
+          ${hasImg ? `<img class="avatar-lg-img" src="${esc(u.avatar_image)}" alt=""/>` : tPresetAvatar(S.userAvatar)}
         </div>
         <input type="file" id="f-avatar-file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="onAvatarFile(event)"/>
         <div class="btn-secondary" style="margin-top:10px;padding:0 16px;border-radius:999px;font-size:13px;text-align:center;display:inline-flex;align-items:center;justify-content:center;height:34px;line-height:34px;min-width:128px" onclick="document.getElementById('f-avatar-file').click()">上传本地图片</div>
       </div>
       <span class="profile-section-title" style="margin-top:4px">预设头像</span>
-      <div class="avatar-options" style="justify-content:flex-start;flex-wrap:wrap;gap:10px">
-        ${[0,1,2,3].map(i=>`
+      <div class="avatar-options">
+        ${[0,1,2,3,4,5,6,7].map(i=>`
           <div class="avatar-option ${S.userAvatar===i && !hasImg ? 'avatar-option-active' : ''}" onclick="selectAvatar(${i})">
-            <div class="avatar-opt-circle avatar-opt-${i}"><svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><path d="M12 12a5 5 0 100-10 5 5 0 000 10z"/><path d="M4 20c0-2.67 5.33-4 8-4s8 1.33 8 4v1H4v-1z"/></svg></div>
+            <div class="avatar-opt-circle avatar-type-${i}">${tPresetAvatar(i)}</div>
           </div>`).join('')}
       </div>
     </div>
@@ -4327,10 +4366,11 @@ function cpHistory(e, hi, si) {
 // ===== PROFILE =====
 function toggleAvatarPicker() { openProfileEdit(); }
 async function selectAvatar(i) {
-  setState({ userAvatar: i, showAvatarPicker: false });
+  const nextInfo = S.userInfo ? { ...S.userInfo, avatar: i, avatar_image: null } : S.userInfo;
+  setState({ userAvatar: i, showAvatarPicker: false, userInfo: nextInfo });
   try {
     await api.post('/auth/update-avatar', { avatar: i });
-    const user = getUser()||{}; setUser({...user, avatar:i});
+    const user = getUser()||{}; setUser({...user, avatar:i, avatar_image:null});
     if (S.userInfo) { S.userInfo = {...S.userInfo, avatar:i, avatar_image:null}; }
     fetchMe();
   } catch {}
