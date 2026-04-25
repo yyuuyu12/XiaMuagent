@@ -86,6 +86,12 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .result-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; }
 .result-muted { opacity: .7; }
 .result-highlight { border: 1px solid #FF6B35; }
+.rewrite-source-compact { background: #FBFAF7; border: 1px solid #EEE9E2; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.rewrite-source-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rewrite-source-title { font-size: 12px; color: #9E9890; font-weight: 600; }
+.rewrite-source-toggle { flex-shrink: 0; font-size: 12px; color: #F5762A; background: #FFF3EA; border-radius: 999px; padding: 5px 10px; cursor: pointer; }
+.rewrite-source-preview { margin-top: 8px; color: #8A857D; font-size: 13px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rewrite-source-compact .editable-script-textarea { margin-top: 10px; min-height: 112px; max-height: 26vh; background: #FFFDF9; }
 .result-header-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .result-label { font-size: 14px; font-weight: 600; color: #1A1814; }
 .result-label-sm { display: block; font-size: 11px; color: #A8A49C; margin-bottom: 6px; }
@@ -1053,7 +1059,7 @@ const S = {
   pwdNew: '', pwdNew2: '', pwdErr: '', pwdLoading: false,
   showAuthCodeInput: false, showAuthCodeSheet: false, showSetPwdSheet: false,
   userName: '创作者', userPhone: '', userInfo: null, userAvatar: 0,
-  videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '',
+  videoUrl: '', extractStep: 0, extractedScript: '', rewrittenScript: '', rewriteSourceExpanded: false,
   extractLoading: false, extractErr: '', extractRawErr: '', copiedId: '',
   cloneTaskId: null, cloneTaskData: null, extractFromHistory: false,
   industries: [], selectedIndustryId: null, selectedIndustryName: '', customTrack: '',
@@ -1924,13 +1930,6 @@ function tCloneStepBar() {
   const cur = cloneCurrentStep();
   if (cur === 0) return '';
   const steps = ['提取','改写','语音','数字人','后期','发布'];
-  const targets = ['review', 2, 3, 4, 5, 6];
-  const maxReachable = 1
-    + ((S.extractedScript || '').trim() ? 1 : 0)
-    + ((S.rewrittenScript || '').trim() ? 1 : 0)
-    + (S.ttsAudioUrl ? 1 : 0)
-    + (S.avatarVideoUrl ? 1 : 0)
-    + ((S.postProcessedVideoUrl || S.avatarVideoUrl) ? 1 : 0);
   const CHECK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
   let parts = [];
   steps.forEach((label, i) => {
@@ -1939,9 +1938,7 @@ function tCloneStepBar() {
     const nc = done ? 'csb-node csb-node-done' : (active ? 'csb-node csb-node-active' : 'csb-node csb-node-idle');
     const lc = done ? 'csb-lbl csb-lbl-done' : (active ? 'csb-lbl csb-lbl-active' : 'csb-lbl csb-lbl-idle');
     const inner = done ? CHECK : n;
-    const target = JSON.stringify(targets[i]);
-    const click = n <= maxReachable ? ` onclick="setState({extractStep:${target}})"` : '';
-    parts.push(`<div class="csb-step"${click}><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
+    parts.push(`<div class="csb-step"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
     if (n < 6) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
   });
   return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
@@ -2012,13 +2009,19 @@ function tExtract() {
   if (S.extractStep === 2) {
     const hasRewrite = !!(S.rewrittenScript || '').trim();
     const hasSource = !!(S.extractedScript || '').trim();
+    const sourceExpanded = !!S.rewriteSourceExpanded;
     return `${sb}<div class="tab-page">
-      <div class="result-card result-muted">
-        <span class="result-label-sm">原始文案</span>
-        <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value;syncRewriteActions()">${esc(S.extractedScript)}</textarea>
-        <div class="result-action-bottom">
-          <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制原文'}</div>
+      <div class="rewrite-source-compact">
+        <div class="rewrite-source-head">
+          <span class="rewrite-source-title">原文参考</span>
+          <span class="rewrite-source-toggle" onclick="setState({rewriteSourceExpanded:${sourceExpanded ? 'false' : 'true'}});render()">${sourceExpanded ? '收起' : '查看/修改'}</span>
         </div>
+        ${sourceExpanded ? `
+          <textarea class="editable-script-textarea" id="f-extracted-script-v2" oninput="S.extractedScript=this.value;syncRewriteActions()">${esc(S.extractedScript)}</textarea>
+          <div class="result-action-bottom">
+            <div class="copy-btn" onclick="copyExtracted()">${S.copiedId==='extracted'?'✓ 已复制':'复制原文'}</div>
+          </div>
+        ` : `<div class="rewrite-source-preview">${esc(S.extractedScript || '暂无原文')}</div>`}
       </div>
       <div class="result-card result-highlight">
         <div class="result-header-row"><span class="result-label">AI改写结果（可编辑）</span></div>
@@ -2846,6 +2849,7 @@ async function startCloneFromFeatured(videoId, transcript) {
     extractStep: 'review',
     extractedScript: transcript || '',
     rewrittenScript: '',
+    rewriteSourceExpanded: false,
     extractErr: '',
     extractRawErr: '',
     videoUrl: '',
@@ -3660,7 +3664,7 @@ function startClonePoller(taskId) {
       } else if (task.status === 'done') {
         stopClonePoller();
         const rewritten = task.result?.rewritten || task.result?.scripts?.[0]?.content || '';
-        setState({ extractStep: 2, rewrittenScript: rewritten, extractedScript: task.result?.transcript || S.extractedScript });
+        setState({ extractStep: 2, rewrittenScript: rewritten, rewriteSourceExpanded: false, extractedScript: task.result?.transcript || S.extractedScript });
         loadTasks();
       } else if (task.status === 'pending' || task.status === 'running') {
         const nextStep = (task.stage === 'rewrite' || task.stage === 'extracted') ? 'rewriting' : 'cloning';
@@ -3686,7 +3690,7 @@ async function handleCloneRewrite() {
   if (!text) { showToast('请先填写原始文案'); return; }
 
   const wasRewriteStep = S.extractStep === 2;
-  setState({ extractStep: 'rewriting', extractErr: '' });
+  setState({ extractStep: 'rewriting', rewriteSourceExpanded: false, extractErr: '' });
   saveCloneSession(2);
   if (S.cloneTaskId) {
     try {
@@ -3714,10 +3718,10 @@ async function handleCloneRewrite() {
     if (r.code === 200) {
       const rewritten = (r.data?.result || '').trim();
       if (!rewritten) {
-        setState({ extractStep: 2, rewrittenScript: '', extractErr: 'AI改写结果为空，请点击重新改写' });
+        setState({ extractStep: 2, rewrittenScript: '', rewriteSourceExpanded: false, extractErr: 'AI改写结果为空，请点击重新改写' });
         return;
       }
-      setState({ extractStep: 2, rewrittenScript: rewritten, extractErr: '' });
+      setState({ extractStep: 2, rewrittenScript: rewritten, rewriteSourceExpanded: false, extractErr: '' });
       // 把任务状态更新为 done，并保存 session（step=2），首页进度条才能更新
       if (S.cloneTaskId) {
         api.post(`/tasks/${S.cloneTaskId}/set-rewritten`, { rewrittenScript: rewritten }).catch(() => {});
@@ -4551,7 +4555,7 @@ async function openExtractWithTask(taskId, fromHistory) {
     avatarProgressPct: 0, avatarProgressMsg: '',
     ttsAudioUrl: null, ttsAudioB64: null, ttsGenerating: false, ttsErr: '',
     postProcessedVideoUrl: null, postProcessedB64: null, postProcessing: false,
-    coverFrameUrl: null, rewrittenScript: '', extractedScript: '',
+    coverFrameUrl: null, rewrittenScript: '', extractedScript: '', rewriteSourceExpanded: false,
   });
   try {
     const r = await api.get(`/tasks/${taskId}`);
@@ -4648,7 +4652,7 @@ function resetExtract() {
     S.extractTranscribeController = null;
   }
   stopClonePoller();
-  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false, cloneTaskId: null, cloneTaskData: null, extractFromHistory: false,
+  setState({ extractStep: 0, videoUrl: '', extractedScript: '', rewrittenScript: '', rewriteSourceExpanded: false, extractErr: '', rewriteStyle: '', rewriteGenerating: false, extractLoading: false, cloneTaskId: null, cloneTaskData: null, extractFromHistory: false,
     ttsVoice: 'xiaoxiao', ttsSpeed: 1.0, ttsGenerating: false, ttsAudioUrl: null, ttsErr: '',
     ttsCloning: false, ttsCloneErr: '',
     ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral', ttsEmoIntensity: 5,
