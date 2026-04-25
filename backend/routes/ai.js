@@ -555,6 +555,10 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
     } catch {
       return res.json({ code: 500, msg: htmlServiceError(videoUrl, text) });
     }
+    // 生成完成时，把直连下载 URL 注入给前端（浏览器直接从 heygem 公网地址下载，走下行带宽，不走 Zeabur 中转）
+    if (data && data.status === 'done') {
+      data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
+    }
     return res.json({ code: 200, data });
   } catch (e) {
     return res.json({ code: 500, msg: `轮询失败: ${e.message}` });

@@ -4333,15 +4333,26 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       const pct = Math.min(90, 10 + elapsed * 0.6);
       setState({ avatarProgressPct: pct, avatarProgressMsg: t.msg || '处理中...' });
 
-      if (t.status === 'done' && t.video_b64) {
+      if (t.status === 'done' && t.video_direct_url) {
         if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
-        const raw = atob(t.video_b64);
-        const buf = new Uint8Array(raw.length);
-        for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
-        const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
-        setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: t.video_b64, avatarTaskId: null, extractStep: 4 });
-        saveCloneSession(4); // ★ 步骤4：数字人生成完成，保存 session（avatarTaskId已清空）
+        setState({ avatarProgressMsg: '视频生成完成，正在下载...' });
+        try {
+          // 直接从 heygem 公网地址下载视频（走下行带宽，绕过 Zeabur 中转，速度快 5-10 倍）
+          const resp = await fetch(t.video_direct_url);
+          if (!resp.ok) throw new Error(`下载失败 ${resp.status}`);
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const b64 = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.readAsDataURL(blob);
+          });
+          setState({ avatarGenerating: false, avatarVideoUrl: url, avatarVideoB64: b64, avatarTaskId: null, extractStep: 4 });
+          saveCloneSession(4);
+        } catch (dlErr) {
+          setState({ avatarGenerating: false, avatarErr: `视频下载失败: ${dlErr.message}`, extractStep: 4 });
+        }
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });

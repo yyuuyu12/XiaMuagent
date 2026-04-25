@@ -92,7 +92,22 @@ def get_task(task_id: str):
     t = tasks.get(task_id)
     if not t:
         raise HTTPException(404, "任务不存在")
-    return t
+    # 不返回 video_b64（可能 50MB+），前端通过 /video/file/{task_id} 直接下载
+    return {k: v for k, v in t.items() if k != "video_b64"}
+
+
+@app.get("/video/file/{task_id}")
+def get_video_file(task_id: str):
+    from fastapi.responses import FileResponse
+    t = tasks.get(task_id)
+    if not t:
+        raise HTTPException(404, "任务不存在")
+    if t.get("status") != "done":
+        raise HTTPException(425, "视频尚未生成完成")
+    result_path = t.get("result_path")
+    if not result_path or not Path(result_path).exists():
+        raise HTTPException(404, "视频文件不存在")
+    return FileResponse(result_path, media_type="video/mp4", filename=f"{task_id}.mp4")
 
 
 @app.post("/video/cancel/{task_id}")
@@ -327,12 +342,11 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str):
                     tasks[task_id].update({"status": "error", "error": f"V2未找到输出视频，候选: {candidates[:3]}"})
             return
 
-        video_b64 = base64.b64encode(Path(result_path).read_bytes()).decode()
         with _task_lock:
             if tasks.get(task_id, {}).get("status") != "cancelled":
                 tasks[task_id].update({
                     "status": "done", "progress": 100, "msg": "V2高清完成",
-                    "video_b64": video_b64,
+                    "result_path": result_path,
                     "video_size": os.path.getsize(result_path),
                 })
     except asyncio.TimeoutError:
