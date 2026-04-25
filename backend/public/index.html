@@ -543,6 +543,9 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .home-page .home-task-mini-action { height: 28px; min-width: 54px; padding: 0 14px; background: #F5762A; color: #fff; font-size: 12px; flex-shrink: 0; }
 .home-page .home-task-mini-action-gray { background: #F7F5F1; color: #9E9890; }
 .home-page .home-task-mini-action-red { background: #FFF0F0; color: #E5534B; }
+.home-page .home-task-mini-action-clone { background: #FFF3E8; color: #F5762A; }
+.home-page .home-task-mini-action-benchmark { background: #EEF2FF; color: #6366F1; }
+.home-page .home-task-mini-action-industry { background: #ECFDF5; color: #059669; }
 
 /* 15. 精致阴影统一化：所有白底卡片贴近设计稿软阴影 */
 .recent-item { border-radius: 16px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.05) !important; border: 1px solid rgba(0,0,0,0.04) !important; }
@@ -1555,10 +1558,16 @@ function dismissHomeDoneSeen() {}
 
 function tHomeTaskSection() {
   if (!S.tasksLoaded && !S.cloneHistoryLoaded) return '';
-  const typeLbl = t => ({ profile_analyze:'对标拆解', single_video_analyze:'视频分析', industry_gen:'行业生成', clone_video:'克隆' }[t]||t);
+  const taskKind = t => {
+    if (!t) return '克隆';
+    if (t.task_kind === 'industry' || t.type === 'industry_gen') return '行业';
+    if (t.type === 'profile_analyze' || t.type === 'single_video_analyze') return '对标';
+    return '克隆';
+  };
+  const taskKindCls = t => ({ '克隆':'home-task-mini-action-clone', '对标':'home-task-mini-action-benchmark', '行业':'home-task-mini-action-industry' }[taskKind(t)] || '');
   const DONE_BIG_WINDOW = 1 * 60 * 60 * 1000;
   const taskTime = t => {
-    const raw = t && (t.updated_at || t.created_at);
+    const raw = t && (t.activity_at || t.updated_at || t.created_at);
     const n = raw ? new Date(raw).getTime() : 0;
     return Number.isNaN(n) ? 0 : n;
   };
@@ -1569,7 +1578,7 @@ function tHomeTaskSection() {
   const bigIds = new Set(bigCards.map(t => String(t.id)));
   const oldDoneTasks = sortedTasks
     .filter(t => !bigIds.has(String(t.id)))
-    .map(t => ({ _type: 'task', _task: t, label: typeLbl(t.type), text: t.title, created_at: t.updated_at || t.created_at }));
+    .map(t => ({ _type: 'task', _task: t, label: taskKind(t), text: t.title, created_at: t.activity_at || t.updated_at || t.created_at }));
   const cloneItems = (S.cloneHistory || [])
     .map((it, idx) => ({ _type: 'clone', idx, label: '克隆', text: it.input || '', created_at: it.created_at }));
   const smallItems = [...oldDoneTasks, ...cloneItems]
@@ -1651,12 +1660,7 @@ function tHomeTaskSection() {
     return '查看详情 ›';
   };
   const miniAction = t => {
-    if (t.type === 'clone_video' && t.status !== 'failed' && t.status !== 'pending' && t.status !== 'running') return { text: cloneStepLabel(t), cls: '' };
-    if (t.status === 'extracted') return { text:'改写', cls:'' };
-    if (t.status === 'failed') return { text:'失败', cls:'home-task-mini-action-red' };
-    if (t.status === 'pending') return { text:'排队中', cls:'home-task-mini-action-gray' };
-    if (t.status === 'running') return { text:'进行中', cls:'' };
-    return { text:'查看', cls:'home-task-mini-action-gray' };
+    return { text: taskKind(t), cls: taskKindCls(t) };
   };
   const miniIcon = t => {
     if (t.status === 'failed') return { icon: iconFailed, cls: 'htc-icon-failed' };
@@ -1707,7 +1711,7 @@ function tHomeTaskSection() {
           const mi = miniIcon(t);
           const act = miniAction(t);
           const clickFn = t.status === 'failed' ? `switchTab('inspire')` : openTaskAction(t);
-          const meta = `${typeLbl(t.type)} · ${formatDisplayTime(t.created_at)}`;
+          const meta = formatDisplayTime(t.activity_at || t.updated_at || t.created_at);
           return `<div class="home-task-mini-card" onclick="${clickFn}">
             <div class="home-task-mini-icon">
               <div class="htc-icon-wrap ${mi.cls}" style="width:34px;height:34px;border-radius:10px">${mi.icon}</div>
@@ -1728,7 +1732,7 @@ function tHomeTaskSection() {
               <div class="home-task-mini-title">${esc(it.text)}</div>
               <div class="home-task-mini-meta">克隆 · ${esc(formatDisplayTime(it.created_at))}</div>
             </div>
-            <span class="home-task-mini-action home-task-mini-action-gray" onclick="event.stopPropagation();cpHomeCloneItem(event,${it.idx})">复制</span>
+            <span class="home-task-mini-action home-task-mini-action-clone">克隆</span>
           </div>`;
         }
         return '';
@@ -2724,10 +2728,11 @@ async function featuredSelectIndustry(ind) {
 
 async function startCloneFromFeatured(videoId) {
   try {
-    const r = await api.post(`/api/industry-videos/start-clone/${videoId}`, {});
+    const r = await api.post(`/industry-videos/start-clone/${videoId}`, {});
     if (r.code === 200 && r.data && r.data.task_id) {
       if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
       await openExtractWithTask(r.data.task_id);
+      loadTasks();
     } else {
       showToast(r.msg || '操作失败，请重试');
     }
@@ -2769,22 +2774,15 @@ function featuredCopySelected() {
   });
 }
 
-function featuredRewrite() {
+async function featuredRewrite() {
   const v = (S.featuredVideos || [])[S.featuredDetailIdx];
   if (!v) return;
-  // 跳到克隆流程第1步，预填行业精选文案到原始文案输入框
+  if (v.id) {
+    await startCloneFromFeatured(v.id);
+    return;
+  }
   if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
-  setState({
-    inspireMode: null,
-    featuredDetailIdx: null,
-    extractedScript: v.transcript,
-    extractStep: 'review',
-    extractErr: '',
-    extractRawErr: '',
-    videoUrl: '',
-    cloneTaskData: null,
-    taskId: null,
-  });
+  setState({ inspireMode: null, featuredDetailIdx: null, extractedScript: v.transcript, extractStep: 'review', extractErr: '', extractRawErr: '', videoUrl: '', cloneTaskData: null, taskId: null });
   switchTab('extract');
   render();
   showToast('已填入爆款文案，点击开始AI改写');
@@ -3551,6 +3549,7 @@ async function handleCloneRewrite() {
   if (!text) return;
 
   setState({ extractStep: 'rewriting', extractErr: '' });
+  saveCloneSession(2);
   try {
     // 直接把用户编辑好的文案传给 AI 改写，不经过 task 队列
     const r = await api.post('/ai/rewrite', { text });
@@ -3581,6 +3580,7 @@ async function handleTTSGenerate() {
   const text = (S.rewrittenScript || S.extractedScript || '').trim();
   if (!text) { showToast('请先完成文案改写'); return; }
   setState({ ttsGenerating: true, ttsErr: '', extractStep: 'tts_gen' });
+  saveCloneSession(3);
   try {
     // 处理我的声音（my_xxx格式）
     let voiceId = S.ttsVoice;
@@ -3947,6 +3947,7 @@ async function handleAvatarGenerate() {
   }
 
   setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '初始化中...', avatarProgressPct: 20 });
+  saveCloneSession(4);
 
   try {
     // 先拿 ngrok 地址，大文件直接传给本地服务，绕过 Zeabur 代理限制
@@ -4021,6 +4022,7 @@ async function handlePostProcess() {
   if (!S.ttsAudioB64)    { showToast('未找到语音数据，请返回步骤3重新合成'); return; }
 
   setState({ postProcessing: true, postProcessErr: '' });
+  saveCloneSession(5);
   try {
     const asrUrl = S.asrUrl || (await (async () => {
       const r = await api.get('/ai/asr-url');
@@ -4115,6 +4117,7 @@ async function generateCover(seekSec, retitleOnly) {
   if (!S.avatarVideoUrl) { showToast('请先生成数字人视频'); return; }
   const t = isNaN(seekSec) ? 1.0 : Math.max(0.5, seekSec);
   setState({ coverGenerating: true });
+  saveCloneSession(6);
   try {
     // 获取封面短标题
     let title = S.coverTitle;
@@ -4215,6 +4218,10 @@ async function saveCloneSession(cloneStep) {
   };
   try {
     await api.post(`/tasks/${taskId}/session`, { clone_step: cloneStep, session });
+    const nowIso = new Date().toISOString();
+    S.tasksList = (S.tasksList || []).map(t => String(t.id) === String(taskId)
+      ? { ...t, clone_step: cloneStep, activity_at: nowIso, updated_at: nowIso }
+      : t);
   } catch (e) {
     console.warn('[saveCloneSession] 保存失败', e);
   }

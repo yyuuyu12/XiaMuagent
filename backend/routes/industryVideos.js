@@ -139,7 +139,7 @@ router.post('/start-clone/:id', requireAuth, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ code: 404, msg: '视频不存在' });
     const v = rows[0];
     const taskId = crypto.randomUUID();
-    const title = `精选·${v.industry}·${(v.transcript || '').slice(0, 15)}`;
+    const title = `精选${v.industry} · ${(v.transcript || '').slice(0, 18)}`;
     const result = JSON.stringify({
       transcript: v.transcript,
       source: 'featured',

@@ -7,15 +7,27 @@ const router = express.Router();
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT t.id, t.type, t.title, t.status, t.stage, t.progress, t.thinking, t.error_msg, t.created_at, t.updated_at,
-              COALESCE(ts.clone_step, CASE WHEN t.status = 'done' THEN 2 ELSE 1 END) AS clone_step
+      `SELECT t.id, t.type, t.title, t.status, t.stage, t.progress, t.thinking, t.error_msg, t.created_at, t.updated_at, t.result,
+              COALESCE(ts.clone_step, CASE WHEN t.status = 'done' THEN 2 ELSE 1 END) AS clone_step,
+              GREATEST(t.updated_at, COALESCE(ts.updated_at, t.updated_at)) AS activity_at
        FROM tasks t
        LEFT JOIN task_sessions ts ON ts.task_id = t.id AND ts.user_id = t.user_id
        WHERE t.user_id = $1
-       ORDER BY t.created_at DESC LIMIT 30`,
+       ORDER BY activity_at DESC LIMIT 30`,
       [req.userId]
     );
-    res.json({ code: 200, data: rows });
+    const data = rows.map(row => {
+      const task = { ...row };
+      if (task.type === 'clone_video' && task.result) {
+        try {
+          const result = typeof task.result === 'string' ? JSON.parse(task.result) : task.result;
+          if (result && result.source === 'featured') task.task_kind = 'industry';
+        } catch {}
+      }
+      delete task.result;
+      return task;
+    });
+    res.json({ code: 200, data });
   } catch (err) {
     res.status(500).json({ code: 500, msg: err.message });
   }
@@ -145,6 +157,10 @@ router.post('/:id/session', requireAuth, async (req, res) => {
        VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE clone_step = VALUES(clone_step), session_json = VALUES(session_json), updated_at = NOW()`,
       [req.params.id, req.userId, clone_step, sessionJson]
+    );
+    await db.query(
+      'UPDATE tasks SET updated_at = NOW() WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
     );
     res.json({ code: 200, msg: 'ok' });
   } catch (err) {
