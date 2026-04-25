@@ -855,13 +855,26 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 }
 .avatar-mgmt-input:focus { border-color: #F97316; }
 .avatar-mgmt-input::placeholder { color: #BBBBBB; }
+.avatar-mgmt-file-row {
+  display: flex; align-items: center; gap: 10px; min-height: 50px;
+  background: #F5F4F1; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px;
+}
+.avatar-mgmt-file-icon { width: 32px; height: 32px; border-radius: 10px; background: #FFF0E6; color: #F97316; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.avatar-mgmt-file-info { flex: 1; min-width: 0; }
+.avatar-mgmt-file-name { font-size: 14px; font-weight: 500; color: #1A1A1A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.avatar-mgmt-file-meta { font-size: 12px; color: #AAAAAA; margin-top: 2px; }
+.avatar-mgmt-change-btn { font-size: 14px; color: #F97316; font-weight: 500; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .avatar-mgmt-upload {
   height: 52px; border-radius: 26px; display: flex; align-items: center; justify-content: center; gap: 8px;
   background: #F97316; color: #fff; font-size: 16px; font-weight: 700;
   cursor: pointer; user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+.avatar-mgmt-pick {
+  background: #FFF0E6; color: #F97316; box-shadow: none; border: 1px solid #F97316;
+}
 .avatar-mgmt-upload:active { background: #D9650F; }
+.avatar-mgmt-pick:active { background: #FFE2CC; }
 .avatar-mgmt-upload-disabled { background: #DDDDDD; color: #FFFFFF; cursor: default; }
 .avatar-mgmt-error { font-size: 12px; color: #E24B4A; border-radius: 8px; padding: 8px 0 0; line-height: 1.45; }
 .avatar-mgmt-empty { padding: 26px 12px 18px; display: flex; flex-direction: column; align-items: center; text-align: center; }
@@ -1011,6 +1024,7 @@ const S = {
   avatarTaskId: null, avatarTaskStatus: '', avatarVideoB64: null, avatarVideoUrl: null, avatarGenerating: false, avatarProgressMsg: '初始化中...', avatarProgressPct: 20,
   showAvatarMgmt: false, avatarMgmtList: [], avatarMgmtLoading: false,
   avatarMgmtUploading: false, avatarMgmtUploadName: '', avatarMgmtErr: '', avatarMgmtMode: 'manage',
+  avatarMgmtPendingFile: null, avatarMgmtPendingFileName: '', avatarMgmtPendingFileSize: 0,
   ttsAudioB64: null,
   subColor: '#FFFFFF', subOutlineColor: '#000000', subFontsize: 44, subOutlineWidth: 2.5, subTemplate: 'classic',
   postProcessing: false, postProcessedVideoUrl: null, postProcessedB64: null, postProcessErr: '',
@@ -4436,7 +4450,15 @@ function handleLogout() {
 // ===== 数字人管理 =====
 async function openAvatarMgmt(mode) {
   if (!S.userInfo) { showToast('请先登录'); return; }
-  setState({ showAvatarMgmt: true, avatarMgmtMode: mode || 'manage', avatarMgmtErr: '', avatarMgmtUploadName: '' });
+  setState({
+    showAvatarMgmt: true,
+    avatarMgmtMode: mode || 'manage',
+    avatarMgmtErr: '',
+    avatarMgmtUploadName: '',
+    avatarMgmtPendingFile: null,
+    avatarMgmtPendingFileName: '',
+    avatarMgmtPendingFileSize: 0,
+  });
   await loadAvatarList();
 }
 
@@ -4456,9 +4478,36 @@ async function loadAvatarList() {
   }
 }
 
-async function uploadAvatarFile(file) {
+function formatAvatarFileSize(size) {
+  if (!size) return '';
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} B`;
+}
+
+function handleAvatarMgmtFileSelect(ev) {
+  const file = ev && ev.target && ev.target.files && ev.target.files[0];
+  if (!file) return;
+  if (file.size > 300 * 1024 * 1024) {
+    setState({ avatarMgmtErr: '视频过大，请压缩到 300MB 以内后再上传' });
+    return;
+  }
+  const fallbackName = file.name.replace(/\.[^.]+$/, '');
+  setState({
+    avatarMgmtPendingFile: file,
+    avatarMgmtPendingFileName: file.name,
+    avatarMgmtPendingFileSize: file.size || 0,
+    avatarMgmtUploadName: S.avatarMgmtUploadName.trim() || fallbackName,
+    avatarMgmtErr: '',
+  });
+}
+
+async function submitAvatarUpload() {
   const u = S.userInfo;
+  const file = S.avatarMgmtPendingFile;
   if (!u) return;
+  if (!file) { setState({ avatarMgmtErr: '请先选择要上传的视频' }); return; }
+  if (S.avatarMgmtUploading) return;
   setState({ avatarMgmtUploading: true, avatarMgmtErr: '' });
   try {
     const urlR = await api.get('/ai/asr-url');
@@ -4470,7 +4519,13 @@ async function uploadAvatarFile(file) {
     fd.append('video', file);
     const r = await fetch(`${asrUrl}/avatar/upload`, { method: 'POST', body: fd, headers: { 'ngrok-skip-browser-warning': '1' } });
     if (!r.ok) { const t = await r.json(); throw new Error(t.detail || r.statusText); }
-    setState({ avatarMgmtUploading: false, avatarMgmtUploadName: '' });
+    setState({
+      avatarMgmtUploading: false,
+      avatarMgmtUploadName: '',
+      avatarMgmtPendingFile: null,
+      avatarMgmtPendingFileName: '',
+      avatarMgmtPendingFileSize: 0,
+    });
     showToast('上传成功 ✓');
     await loadAvatarList();
   } catch(e) {
@@ -4510,6 +4565,10 @@ function tAvatarMgmt() {
   const uploadIcon = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
   const avatarIcon = '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
   const trashIcon = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+  const videoIcon = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 9l4-2v10l-4-2"/></svg>';
+  const pendingFile = S.avatarMgmtPendingFile;
+  const pendingName = S.avatarMgmtPendingFileName || (pendingFile && pendingFile.name) || '';
+  const pendingMeta = formatAvatarFileSize(S.avatarMgmtPendingFileSize || (pendingFile && pendingFile.size) || 0);
 
   const listHtml = S.avatarMgmtLoading
     ? `<div class="avatar-mgmt-loading">加载中...</div>`
@@ -4555,12 +4614,20 @@ function tAvatarMgmt() {
           oninput="setState({avatarMgmtUploadName:this.value})"
           class="avatar-mgmt-input"/>
         <input type="file" id="avatarMgmtFileInput" accept="video/mp4,video/quicktime,video/mov,video/*" style="display:none"
-          onchange="if(this.files[0])uploadAvatarFile(this.files[0])"/>
-        <div onclick="${S.avatarMgmtUploading?'':'document.getElementById(\'avatarMgmtFileInput\').click()'}"
-          class="avatar-mgmt-upload ${S.avatarMgmtUploading?'avatar-mgmt-upload-disabled':''}">
-          ${S.avatarMgmtUploading
-            ? `${uploadIcon} 上传中...`
-            : `${uploadIcon} 选择视频上传`}
+          onchange="handleAvatarMgmtFileSelect(event)"/>
+        ${pendingFile ? `
+          <div class="avatar-mgmt-file-row">
+            <div class="avatar-mgmt-file-icon">${videoIcon}</div>
+            <div class="avatar-mgmt-file-info">
+              <div class="avatar-mgmt-file-name">${esc(pendingName)}</div>
+              <div class="avatar-mgmt-file-meta">${esc(pendingMeta || '已选择视频')}</div>
+            </div>
+            <div class="avatar-mgmt-change-btn" onclick="${S.avatarMgmtUploading?'':"document.getElementById('avatarMgmtFileInput').click()"}">更换</div>
+          </div>
+        ` : ''}
+        <div onclick="${S.avatarMgmtUploading?'':(pendingFile?'submitAvatarUpload()':"document.getElementById('avatarMgmtFileInput').click()")}"
+          class="avatar-mgmt-upload ${S.avatarMgmtUploading?'avatar-mgmt-upload-disabled':(pendingFile?'':'avatar-mgmt-pick')}">
+          ${S.avatarMgmtUploading ? `${uploadIcon} 上传中...` : (pendingFile ? `${uploadIcon} 提交上传` : `${uploadIcon} 选择视频`)}
         </div>
         ${S.avatarMgmtErr ? `<div class="avatar-mgmt-error">${esc(S.avatarMgmtErr)}</div>` : ''}
       </div>
