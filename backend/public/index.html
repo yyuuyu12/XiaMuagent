@@ -1625,35 +1625,88 @@ function tHomeTaskSection() {
   const iconFailed = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   const iconRun = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
 
-  const cloneStepOf = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'extracted' ? 2 : t.status === 'done' ? 2 : 1)));
-  const cloneStepLabels = ['提取','改写','语音','数字人','后期','发布'];
-  const cloneStepHints = [
-    '正在提取视频文案，请稍候',
-    '文案已提取，可继续改写',
-    '文案已改写，可继续合成语音',
-    '语音已完成，可继续生成数字人视频',
-    '数字人视频已生成，可继续后期制作',
-    '视频已制作完成，可复制信息发布'
-  ];
-  const cloneStepLabel = t => cloneStepLabels[cloneStepOf(t) - 1] || '克隆';
-  const cloneStepHint = t => cloneStepHints[cloneStepOf(t) - 1] || '可继续完成当前步骤';
+  const clampPct = n => Math.max(0, Math.min(100, Math.round(n || 0)));
+  const cloneStepOf = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 2 : 1)));
+  const clonePhaseOf = t => {
+    const stage = t.stage || '';
+    if (t.status === 'failed') return { step: cloneStepOf(t), phase: 'failed' };
+    if (t.status === 'pending') {
+      if (stage === 'rewrite' || stage === 'extracted') return { step: 2, phase: 'rewrite_pending' };
+      return { step: 1, phase: 'pending' };
+    }
+    if (t.status === 'running') {
+      if (stage === 'rewrite') return { step: 2, phase: 'rewriting' };
+      return { step: 1, phase: 'extracting' };
+    }
+    if (t.status === 'extracted') return { step: 1, phase: 'extracted' };
+    const step = cloneStepOf(t);
+    return { step, phase: step >= 6 ? 'published' : 'step_done' };
+  };
+  const cloneDoneLabels = ['提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕','制作完成'];
+  const cloneNextActions = ['去改写 ›','去语音 ›','去数字人 ›','去后期 ›','去发布 ›','去发布 ›'];
+  const cloneStatusText = t => {
+    const info = clonePhaseOf(t);
+    if (info.phase === 'failed') return '失败';
+    if (info.phase === 'pending') return '排队中';
+    if (info.phase === 'rewrite_pending') return '等待改写';
+    if (info.phase === 'extracting') return '提取中';
+    if (info.phase === 'rewriting') return '改写中';
+    if (info.phase === 'extracted') return '提取完毕';
+    return cloneDoneLabels[info.step - 1] || '已完成';
+  };
+  const cloneHintText = t => {
+    const info = clonePhaseOf(t);
+    if (info.phase === 'failed') return friendlyError(t.error_msg);
+    if (info.phase === 'pending') return '等待开始提取视频文案';
+    if (info.phase === 'rewrite_pending') return '改写任务排队中，请稍候';
+    if (info.phase === 'extracting') return t.thinking || '正在提取视频文案，请稍候';
+    if (info.phase === 'rewriting') return t.thinking || '正在AI改写文案，请稍候';
+    if (info.phase === 'extracted') return '提取完毕，去改写';
+    const hints = [
+      '提取完毕，去改写',
+      '改写完毕，去语音',
+      '语音已完成，去数字人',
+      '数字人视频已生成，去后期',
+      '后期制作完成，去发布',
+      '视频已制作完成，可以发布'
+    ];
+    return hints[info.step - 1] || '可继续完成当前步骤';
+  };
   const statusText = t => {
-    if (t.type === 'clone_video' && t.status !== 'failed' && t.status !== 'pending' && t.status !== 'running') return cloneStepLabel(t);
+    if (t.type === 'clone_video') return cloneStatusText(t);
     return ({ pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败' }[t.status] || t.status);
   };
   const bigProgress = t => {
     if (t.status === 'failed') return Math.max(0, Math.min(100, t.progress || 0));
     if (t.type === 'clone_video') {
-      const step = cloneStepOf(t);
-      if (step >= 6) return 100;
-      return Math.max(t.progress || 0, Math.round((step - 1) / 6 * 100));
+      const info = clonePhaseOf(t);
+      if (info.phase === 'pending') return 0;
+      if (info.phase === 'extracting') return clampPct(Math.min(16, Math.max(5, (t.progress || 10) * 0.45)));
+      if (info.phase === 'extracted') return 17;
+      if (info.phase === 'rewrite_pending') return 18;
+      if (info.phase === 'rewriting') return 25;
+      return clampPct(info.step / 6 * 100);
     }
     if (t.status === 'done') return 100;
     return Math.max(0, Math.min(100, t.progress || (t.status === 'extracted' ? 45 : 0)));
   };
+  const cloneBadgeCls = t => {
+    const info = clonePhaseOf(t);
+    if (info.phase === 'failed') return 'htc-badge-failed';
+    if (info.phase === 'pending') return 'htc-badge-pending';
+    if (info.phase === 'extracting' || info.phase === 'rewrite_pending' || info.phase === 'rewriting' || info.phase === 'extracted') return 'htc-badge-extracted';
+    return 'htc-badge-done';
+  };
   const openTaskAction = t => t.type === 'clone_video' ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
   const bigActionText = t => {
-    if (t.type === 'clone_video' && t.status !== 'failed' && t.status !== 'pending' && t.status !== 'running') return `${cloneStepLabel(t)} ›`;
+    if (t.type === 'clone_video') {
+      const info = clonePhaseOf(t);
+      if (info.phase === 'failed') return '查看详情 ›';
+      if (info.phase === 'pending' || info.phase === 'extracting') return '查看进度 ›';
+      if (info.phase === 'rewrite_pending' || info.phase === 'rewriting') return '改写中 ›';
+      if (info.phase === 'extracted') return '去改写 ›';
+      return cloneNextActions[info.step - 1] || '继续 ›';
+    }
     if (t.status === 'extracted') return '改写 ›';
     if (t.status === 'done') return '查看结果 ›';
     if (t.status === 'failed') return '查看详情 ›';
@@ -1678,15 +1731,15 @@ function tHomeTaskSection() {
     </div>
     ${bigCards.map(t => {
       const isClone = t.type === 'clone_video';
-      const cloneStep = cloneStepOf(t);
+      const cloneStep = isClone ? clonePhaseOf(t).step : cloneStepOf(t);
       const pct = bigProgress(t);
-      const thinking = t.status === 'failed'
-        ? friendlyError(t.error_msg)
-        : (isClone && t.status !== 'pending' && t.status !== 'running'
-          ? cloneStepHint(t)
+      const thinking = isClone
+        ? cloneHintText(t)
+        : (t.status === 'failed'
+          ? friendlyError(t.error_msg)
           : (t.thinking || (t.status === 'pending' ? '等待处理...' : t.status === 'done' ? '最近生成完成' : t.status === 'extracted' ? '文案已提取，可继续改写' : '处理中...')));
       const liveDot = (t.status === 'running' || t.status === 'pending') ? '<span class="htc-live-dot"></span>' : '';
-      const badgeCls = t.status === 'failed' ? 'htc-badge-failed' : t.status === 'done' ? 'htc-badge-done' : t.status === 'extracted' ? 'htc-badge-extracted' : t.status === 'pending' ? 'htc-badge-pending' : 'htc-badge-running';
+      const badgeCls = isClone ? cloneBadgeCls(t) : (t.status === 'failed' ? 'htc-badge-failed' : t.status === 'done' ? 'htc-badge-done' : t.status === 'extracted' ? 'htc-badge-extracted' : t.status === 'pending' ? 'htc-badge-pending' : 'htc-badge-running');
       return `<div class="home-task-card" style="cursor:pointer" onclick="${openTaskAction(t)}">
         <div class="htc-top-row">
           <div class="htc-title">${esc(t.title)}</div>
@@ -3551,6 +3604,9 @@ function startClonePoller(taskId) {
         const rewritten = task.result?.rewritten || task.result?.scripts?.[0]?.content || '';
         setState({ extractStep: 2, rewrittenScript: rewritten, extractedScript: task.result?.transcript || S.extractedScript });
         loadTasks();
+      } else if (task.status === 'pending' || task.status === 'running') {
+        const nextStep = (task.stage === 'rewrite' || task.stage === 'extracted') ? 'rewriting' : 'cloning';
+        if (S.extractStep !== nextStep) setState({ extractStep: nextStep });
       } else if (task.status === 'failed') {
         stopClonePoller();
         setState({ extractStep: 0, extractErr: friendlyError(task.error_msg), extractRawErr: task.error_msg || '', cloneTaskId: null, cloneTaskData: null });
@@ -3574,6 +3630,26 @@ async function handleCloneRewrite() {
   const wasRewriteStep = S.extractStep === 2;
   setState({ extractStep: 'rewriting', extractErr: '' });
   saveCloneSession(2);
+  if (S.cloneTaskId) {
+    try {
+      const r = await api.post(`/tasks/${S.cloneTaskId}/start-rewrite`, { editedTranscript: text });
+      if (apiUnauthorized(r)) return;
+      if (r.code !== 200) {
+        setState({ extractStep: wasRewriteStep ? 2 : 'review', extractErr: r.msg || '改写失败，请重试' });
+        return;
+      }
+      const nowIso = new Date().toISOString();
+      S.tasksList = (S.tasksList || []).map(t => String(t.id) === String(S.cloneTaskId)
+        ? { ...t, status: 'pending', stage: 'extracted', progress: 50, clone_step: 2, activity_at: nowIso, updated_at: nowIso }
+        : t);
+      startClonePoller(S.cloneTaskId);
+      loadTasks();
+      return;
+    } catch (e) {
+      setState({ extractStep: wasRewriteStep ? 2 : 'review', extractErr: '网络错误，请重试' });
+      return;
+    }
+  }
   try {
     // 直接把用户编辑好的文案传给 AI 改写，不经过 task 队列
     const r = await api.post('/ai/rewrite', { text });
@@ -4403,7 +4479,7 @@ async function openExtractWithTask(taskId, fromHistory) {
         setState({ extractedScript: task.result?.transcript || '' });
       }
     } else if (task.status === 'pending' || task.status === 'running') {
-      setState({ extractStep: 'cloning' });
+      setState({ extractStep: (task.stage === 'rewrite' || task.stage === 'extracted') ? 'rewriting' : 'cloning' });
       startClonePoller(taskId);
     } else if (task.status === 'done') {
       const rewritten = task.result?.rewritten || task.result?.scripts?.[0]?.content || '';
@@ -5076,7 +5152,16 @@ function tHistory() {
       <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有克隆记录</div>
       <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('extract')">去克隆</div>
     </div></div>`;
-  const statusLbl = { pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败' };
+  const statusLbl = { pending:'排队中', running:'进行中', extracted:'提取完毕', done:'已完成', failed:'失败' };
+  const cloneStatusLbl = t => {
+    const step = Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 2 : 1)));
+    const doneLabels = ['提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕','制作完成'];
+    if (t.status === 'pending') return (t.stage === 'extracted' || t.stage === 'rewrite') ? '等待改写' : '排队中';
+    if (t.status === 'running') return t.stage === 'rewrite' ? '改写中' : '提取中';
+    if (t.status === 'extracted') return '提取完毕';
+    if (t.status === 'done') return doneLabels[step - 1] || '已完成';
+    return statusLbl[t.status] || t.status;
+  };
   return `<div class="tab-page">${tabs}
     ${cloneTasks.map(t => {
       const canClick = t.status === 'done' || t.status === 'extracted';
@@ -5084,7 +5169,7 @@ function tHistory() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <span class="history-page-hook" style="-webkit-line-clamp:1;flex:1">${esc(t.title)}</span>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
-            <span style="font-size:11px;color:${t.status==='done'?'#10B981':t.status==='failed'?'#DC2626':'#E8650A'}">${statusLbl[t.status]||t.status}</span>
+            <span style="font-size:11px;color:${t.status==='done'?'#10B981':t.status==='failed'?'#DC2626':'#E8650A'}">${cloneStatusLbl(t)}</span>
             ${(t.status==='done'||t.status==='failed')?`<span style="display:flex;align-items:center;cursor:pointer" onclick="deleteTask(event,'${t.id}')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C8C4BB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span>`:''}
           </div>
         </div>
