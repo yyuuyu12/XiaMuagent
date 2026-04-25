@@ -184,8 +184,8 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .avatar-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 10px; }
 .avatar-option { display: flex; flex-direction: column; align-items: center; padding: 6px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
 .avatar-option-active { border-color: #F97316; background: #FFF0E6; }
-.avatar-opt-circle { width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 3px 10px rgba(26,22,20,.08); }
-.preset-avatar-svg { width: 100%; height: 100%; display: block; border-radius: 50%; overflow: hidden; }
+.avatar-opt-circle { width: 58px; height: 58px; border-radius: 16px; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 3px 10px rgba(26,22,20,.08); }
+.preset-avatar-svg { width: 100%; height: 100%; display: block; overflow: hidden; }
 .preset-avatar { width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden; background: linear-gradient(135deg,#F97316,#FB923C); }
 .preset-avatar::before { content: ""; position: absolute; left: 10%; top: 8%; width: 80%; height: 48%; border-radius: 50% 50% 42% 42%; background: rgba(26,22,20,.92); z-index: 1; }
 .pa-head { position: absolute; left: 30%; top: 23%; width: 40%; height: 36%; border-radius: 50%; background: #FFE1C7; z-index: 2; box-shadow: inset -3px -3px 0 rgba(214,86,26,.08); }
@@ -2791,56 +2791,121 @@ function featuredRewrite() {
 // ===== PROFILE =====
 function tPresetAvatar(i) {
   const idx = Math.max(0, Math.min(7, parseInt(i, 10) || 0));
-  const presets = [
-    { bg:'#6B5FF6', glow:'#9EA5FF', hair:'#25113E', skin:'#FFDCC5', neck:'#F2B187', shirt:'#FFF7F0', collar:'#F5762A', eye:'#2F1F1B', blush:'#F49B92', mouth:'#B95750' },
-    { bg:'#FF7A1A', glow:'#FFD2A6', hair:'#80340F', skin:'#FFD7B8', neck:'#F0AA7D', shirt:'#FFF4E6', collar:'#1A1614', eye:'#3A2117', blush:'#F08B7B', mouth:'#AF514A' },
-    { bg:'#2F6DEB', glow:'#95C1FF', hair:'#123A89', skin:'#FFD9BA', neck:'#EEAA81', shirt:'#EAF3FF', collar:'#5B6FEA', eye:'#1B2B46', blush:'#F1A096', mouth:'#A75051' },
-    { bg:'#12B886', glow:'#8CF3CD', hair:'#075D47', skin:'#FFE0C4', neck:'#F2B187', shirt:'#E4FFF3', collar:'#0F766E', eye:'#17352D', blush:'#F2A294', mouth:'#A9514E' },
-    { bg:'#DF2F86', glow:'#FF9EC9', hair:'#71143F', skin:'#FFE0C5', neck:'#F1B086', shirt:'#FFF0F7', collar:'#C0266D', eye:'#331B25', blush:'#F1A1B7', mouth:'#A94D63' },
-    { bg:'#0EA5C6', glow:'#91E5F5', hair:'#16566A', skin:'#FFD8BA', neck:'#EDAA80', shirt:'#E0FAFF', collar:'#0E7490', eye:'#183845', blush:'#EEA098', mouth:'#A5514D' },
-    { bg:'#D97706', glow:'#FFD78A', hair:'#6F3506', skin:'#FFE1BE', neck:'#F0AE7E', shirt:'#FFF1C7', collar:'#B45309', eye:'#342111', blush:'#EFA08A', mouth:'#A14F43' },
-    { bg:'#5D6B7D', glow:'#AEB8C6', hair:'#172033', skin:'#F2CFB3', neck:'#DCA47B', shirt:'#F0F5FA', collar:'#475569', eye:'#1F2937', blush:'#DE988D', mouth:'#8E4B48' },
+  const avatars = [
+    `<rect width="100" height="100" fill="#DDE2F6"/>
+      <circle cx="27" cy="56" r="13" fill="#8B98F6" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="73" cy="56" r="13" fill="#8B98F6" stroke="#050505" stroke-width="3.5"/>
+      <path d="M23 104c4-21 17-31 27-31s23 10 27 31H23z" fill="#4A164F" stroke="#050505" stroke-width="3.5"/>
+      <rect x="40" y="61" width="20" height="18" rx="7" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="25" cy="44" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="75" cy="44" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <ellipse cx="50" cy="42" rx="25" ry="27" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M18 39c0-24 14-36 32-36s32 12 32 36v7c-15-1-29-7-34-17-8 8-19 13-30 14z" fill="#8B98F6" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <ellipse cx="40" cy="44" rx="4.2" ry="6.2" fill="#050505"/><ellipse cx="60" cy="44" rx="4.2" ry="6.2" fill="#050505"/>
+      <circle cx="38.6" cy="41.7" r="1.4" fill="#fff"/><circle cx="58.6" cy="41.7" r="1.4" fill="#fff"/>
+      <path d="M35 33l12 2M55 35l12-3" stroke="#050505" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="50" cy="49" r="1.8" fill="#050505"/>
+      <path d="M50 58c3-.4 5-2 6-4" stroke="#8A1F2D" stroke-width="2.7" stroke-linecap="round" fill="none"/>`,
+    `<rect width="100" height="100" fill="#CFE8F8"/>
+      <path d="M26 42c0-22 11-34 24-34s24 12 24 34v7c0 19-11 31-24 31S26 68 26 49z" fill="#E79A4B" stroke="#050505" stroke-width="3.5"/>
+      <path d="M23 104c4-21 17-33 27-33s23 12 27 33H23z" fill="#FFFFFF" stroke="#050505" stroke-width="3.5"/>
+      <path d="M34 59h32v29H34z" fill="#4B4B4B" stroke="#050505" stroke-width="3.5"/>
+      <path d="M40 65l10 6 10-6" fill="none" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M64 72v13M36 72v13" stroke="#3D94C8" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="25" cy="42" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="75" cy="42" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M26 39c0-20 10-28 24-28s24 8 24 28v5H26z" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M24 28c0-17 10-27 26-27s26 10 26 27v11H24z" fill="#4F90C3" stroke="#050505" stroke-width="3.5"/>
+      <path d="M43 24h14c3 0 5 2 5 5H38c0-3 2-5 5-5z" fill="#FFD3D8" stroke="#050505" stroke-width="3.2"/>
+      <ellipse cx="41" cy="42" rx="4" ry="6" fill="#050505"/><ellipse cx="59" cy="42" rx="4" ry="6" fill="#050505"/>
+      <circle cx="39.6" cy="39.8" r="1.3" fill="#fff"/><circle cx="57.6" cy="39.8" r="1.3" fill="#fff"/>
+      <path d="M34 32l11 2M55 34l11-2" stroke="#050505" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M50 45v6" stroke="#050505" stroke-width="2.5" stroke-linecap="round"/>`,
+    `<rect width="100" height="100" fill="#F1CEF0"/>
+      <path d="M20 41c0-25 14-39 31-39s30 14 30 39v50H20z" fill="#A044A8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M22 100c4-20 17-30 28-30s24 10 28 30H22z" fill="#72B8E6" stroke="#050505" stroke-width="3.5"/>
+      <rect x="40" y="60" width="20" height="17" rx="7" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="24" cy="43" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="76" cy="43" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <ellipse cx="50" cy="43" rx="25" ry="27" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M21 36c7 0 25-5 39-22 1 10 8 18 20 22v-3C80 14 67 2 51 2S21 14 21 33z" fill="#A044A8" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <rect x="24" y="40" width="10" height="31" rx="5" fill="#A044A8" stroke="#050505" stroke-width="3.5"/>
+      <rect x="66" y="40" width="10" height="31" rx="5" fill="#A044A8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="39" cy="43" r="9" fill="rgba(255,255,255,.45)" stroke="#fff" stroke-width="3"/>
+      <circle cx="61" cy="43" r="9" fill="rgba(255,255,255,.45)" stroke="#fff" stroke-width="3"/>
+      <path d="M48 43h4" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="39" cy="43" rx="3.7" ry="5.4" fill="#888"/><ellipse cx="61" cy="43" rx="3.7" ry="5.4" fill="#888"/>
+      <path d="M44 56c3 4 9 4 12 0" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>`,
+    `<rect width="100" height="100" fill="#F9EFCF"/>
+      <path d="M67 24c11 1 19 7 23 16-10 4-21 3-29-4zM67 40c12-1 22 3 29 11-9 7-23 9-35 5z" fill="#FFE08A" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M22 104c4-23 17-34 28-34s24 11 28 34H22z" fill="#0899B7" stroke="#050505" stroke-width="3.5"/>
+      <rect x="39" y="61" width="22" height="23" rx="4" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="24" cy="43" r="9" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="76" cy="43" r="9" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <ellipse cx="50" cy="43" rx="26" ry="28" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M24 31c0-19 12-29 26-29s26 10 26 29v10H24z" fill="#F2676B" stroke="#050505" stroke-width="3.5"/>
+      <path d="M23 43c4 17 15 27 27 27s23-10 27-27" fill="none" stroke="#006A78" stroke-width="4" stroke-linecap="round"/>
+      <path d="M36 36c4-3 8-3 11 0M54 36c4-3 8-3 11 0" stroke="#050505" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="40" cy="48" r="4" fill="#fff"/><circle cx="60" cy="48" r="4" fill="#fff"/>
+      <path d="M39 53c-2 4-2 7-1 9M61 53c2 4 2 7 1 9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M45 61c2-4 8-4 10 0" stroke="#8A1F2D" stroke-width="2.8" stroke-linecap="round" fill="none"/>`,
+    `<rect width="100" height="100" fill="#F7D7B5"/>
+      <path d="M18 104c5-24 19-35 32-35s27 11 32 35H18z" fill="#E8DFFF" stroke="#050505" stroke-width="3.5"/>
+      <rect x="36" y="58" width="28" height="35" rx="6" fill="#5EA1C6" stroke="#050505" stroke-width="3.5"/>
+      <path d="M40 78v18M60 78v18" stroke="#050505" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M23 42c0-22 12-35 27-35s27 13 27 35v15c0 13-11 22-27 22S23 70 23 57z" fill="#E9994E" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="26" cy="47" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="74" cy="47" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <ellipse cx="50" cy="46" rx="25" ry="27" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M24 41c13-8 19-18 26-23 8 9 17 20 27 23V23C77 11 67 5 50 5S23 12 23 25z" fill="#E9994E" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <ellipse cx="39" cy="47" rx="4.1" ry="5.8" fill="#050505"/><ellipse cx="61" cy="47" rx="4.1" ry="5.8" fill="#050505"/>
+      <circle cx="37.8" cy="44.7" r="1.4" fill="#fff"/><circle cx="59.8" cy="44.7" r="1.4" fill="#fff"/>
+      <path d="M34 38l10 2M56 40l10-2" stroke="#050505" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M46 59c2 3 6 3 8 0" stroke="#8A5650" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+      <path d="M50 49v7" stroke="#050505" stroke-width="2.8" stroke-linecap="round"/>`,
+    `<rect width="100" height="100" fill="#DCEBFA"/>
+      <path d="M22 104c5-22 18-33 28-33s23 11 28 33H22z" fill="#168AA3" stroke="#050505" stroke-width="3.5"/>
+      <rect x="39" y="60" width="22" height="18" rx="5" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="25" cy="46" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="75" cy="46" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <ellipse cx="50" cy="47" rx="25" ry="27" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M20 43c0-24 12-37 30-37s30 13 30 37v8H64l-5-21-6 22-7-22-4 21H20z" fill="#9CC4EF" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M22 52c3 13 8 24 18 31M78 52c-3 13-8 24-18 31" fill="none" stroke="#9CC4EF" stroke-width="7" stroke-linecap="round"/>
+      <ellipse cx="39" cy="49" rx="4.2" ry="6" fill="#050505"/><ellipse cx="61" cy="49" rx="4.2" ry="6" fill="#050505"/>
+      <circle cx="37.8" cy="46.8" r="1.4" fill="#fff"/><circle cx="59.8" cy="46.8" r="1.4" fill="#fff"/>
+      <path d="M34 40l11 2M55 42l11-2" stroke="#050505" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M45 62c3 4 8 4 11 0" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <path d="M36 74h28M43 77v19M50 77v19M57 77v19" stroke="#BDE8FF" stroke-width="2.3" stroke-linecap="round"/>`,
+    `<rect width="100" height="100" fill="#FAD4E3"/>
+      <path d="M19 104c5-23 18-34 31-34s26 11 31 34H19z" fill="#E63B74" stroke="#050505" stroke-width="3.5"/>
+      <rect x="36" y="67" width="28" height="30" rx="5" fill="#B76EA4" stroke="#050505" stroke-width="3.5"/>
+      <path d="M23 42c0-23 12-37 27-37s27 14 27 37v48H23z" fill="#8D0B3B" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="25" cy="48" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="75" cy="48" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <ellipse cx="50" cy="47" rx="25" ry="27" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M23 38c12 0 22-7 27-20 7 12 17 18 27 20V24C77 12 67 5 50 5S23 12 23 24z" fill="#8D0B3B" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <circle cx="40" cy="50" r="4.2" fill="#050505"/>
+      <path d="M59 44l-5 6 5 6" stroke="#050505" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path d="M35 40c4-2 8-2 12 0M54 40c4-2 8-2 12 0" stroke="#050505" stroke-width="2.8" stroke-linecap="round"/>
+      <circle cx="50" cy="56" r="2.3" fill="#050505"/>
+      <path d="M48 64c4 0 7-2 9-6" stroke="#8A1F2D" stroke-width="3.1" stroke-linecap="round" fill="none"/>
+      <path d="M38 82v14M62 82v14" stroke="#050505" stroke-width="3.2" stroke-linecap="round"/>`,
+    `<rect width="100" height="100" fill="#F7D5B2"/>
+      <path d="M18 104c5-24 19-35 32-35s27 11 32 35H18z" fill="#E8DFFF" stroke="#050505" stroke-width="3.5"/>
+      <rect x="36" y="58" width="28" height="35" rx="6" fill="#5EA1C6" stroke="#050505" stroke-width="3.5"/>
+      <path d="M40 78v18M60 78v18" stroke="#050505" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M23 42c0-22 12-35 27-35s27 13 27 35v15c0 13-11 22-27 22S23 70 23 57z" fill="#E9994E" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="26" cy="47" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <circle cx="74" cy="47" r="8" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <ellipse cx="50" cy="46" rx="25" ry="27" fill="#FFD3D8" stroke="#050505" stroke-width="3.5"/>
+      <path d="M24 41c13-8 19-18 26-23 8 9 17 20 27 23V23C77 11 67 5 50 5S23 12 23 25z" fill="#E9994E" stroke="#050505" stroke-width="3.5" stroke-linejoin="round"/>
+      <ellipse cx="39" cy="47" rx="4.1" ry="5.8" fill="#050505"/><ellipse cx="61" cy="47" rx="4.1" ry="5.8" fill="#050505"/>
+      <circle cx="37.8" cy="44.7" r="1.4" fill="#fff"/><circle cx="59.8" cy="44.7" r="1.4" fill="#fff"/>
+      <path d="M34 38l10 2M56 40l10-2" stroke="#050505" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M46 59c2 3 6 3 8 0" stroke="#8A5650" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+      <path d="M50 49v7" stroke="#050505" stroke-width="2.8" stroke-linecap="round"/>`
   ];
-  const p = presets[idx];
-  const hair = [
-    `<path d="M23 41c0-22 13-33 28-33s26 11 26 33c-8-8-17-12-27-12s-19 4-27 12z" fill="${p.hair}"/><path d="M28 34c8-14 30-16 43-3-11-2-22-1-31 2-5 2-9 3-12 1z" fill="rgba(255,255,255,.12)"/>`,
-    `<path d="M24 39c2-19 13-30 27-30 13 0 24 10 26 29-8-7-17-10-27-10s-18 3-26 11z" fill="${p.hair}"/><path d="M31 31c10-8 24-9 37 0" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>`,
-    `<path d="M20 42c4-21 19-31 34-28 13 3 22 13 25 28-10-6-21-8-33-7-9 1-18 3-26 7z" fill="${p.hair}"/><path d="M31 29c11-5 25-6 39 1" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="3" stroke-linecap="round"/>`,
-    `<path d="M21 42c1-21 15-32 29-32s28 11 29 32c-8-7-18-10-29-10s-21 3-29 10z" fill="${p.hair}"/><path d="M28 42c2-9 10-15 22-15s20 6 22 15" fill="rgba(255,255,255,.1)"/>`,
-    `<path d="M16 48c0-25 18-38 34-38s34 13 34 38c-9-10-21-15-34-15s-25 5-34 15z" fill="${p.hair}"/><path d="M24 41c8-10 16-15 27-15" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3" stroke-linecap="round"/>`,
-    `<path d="M24 37c4-17 15-26 27-26s23 9 27 26c-8-5-17-7-27-7s-19 2-27 7z" fill="${p.hair}"/><path d="M27 46h47" stroke="#F8FBFC" stroke-width="4" stroke-linecap="round"/><path d="M31 46h39" stroke="${p.hair}" stroke-width="2" stroke-linecap="round"/>`,
-    `<path d="M18 44c1-22 16-33 33-33s30 11 31 33c-9-7-20-10-32-10s-23 3-32 10z" fill="${p.hair}"/><path d="M26 45h48" stroke="#FFF1CF" stroke-width="5" stroke-linecap="round"/><path d="M33 45h34" stroke="${p.hair}" stroke-width="2" stroke-linecap="round"/>`,
-    `<path d="M20 43c1-22 16-32 30-32s29 10 30 32c-8-7-18-10-30-10s-22 3-30 10z" fill="${p.hair}"/><path d="M30 31c10-6 25-6 38 0" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="3" stroke-linecap="round"/>`
-  ][idx];
-  const accessory = [
-    '<circle cx="68" cy="50" r="3" fill="#F8EFFF" opacity=".75"/>',
-    '<path d="M37 34c4-3 9-4 14-4" stroke="#FFF5EB" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>',
-    '<path d="M35 44h11M54 44h11M46 44h8" stroke="#1D4ED8" stroke-width="1.8" stroke-linecap="round"/><rect x="33" y="39" width="14" height="10" rx="4" fill="none" stroke="#1D4ED8" stroke-width="1.6"/><rect x="53" y="39" width="14" height="10" rx="4" fill="none" stroke="#1D4ED8" stroke-width="1.6"/>',
-    '<circle cx="66" cy="51" r="2.3" fill="#DDFBEF" opacity=".9"/>',
-    '<path d="M66 48c5 1 7 4 8 8" stroke="#FFF0F7" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>',
-    '<path d="M36 34c5-4 17-6 29-2" stroke="#DDF8FF" stroke-width="2.4" stroke-linecap="round" opacity=".78"/>',
-    '<path d="M34 35c8-5 24-6 35 0" stroke="#FFF2C9" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>',
-    '<rect x="34" y="39" width="32" height="11" rx="5.5" fill="none" stroke="#334155" stroke-width="1.7" opacity=".9"/><path d="M47 44h6" stroke="#334155" stroke-width="1.7" stroke-linecap="round"/>'
-  ][idx];
-  return `<svg class="preset-avatar-svg" viewBox="0 0 100 100" aria-hidden="true">
-    <circle cx="50" cy="50" r="50" fill="${p.bg}"/>
-    <circle cx="72" cy="18" r="21" fill="${p.glow}" opacity=".35"/>
-    <circle cx="28" cy="78" r="28" fill="#fff" opacity=".10"/>
-    <path d="M20 100c4-21 17-31 30-31s26 10 30 31H20z" fill="${p.shirt}"/>
-    <path d="M42 72h16l8 28H34l8-28z" fill="${p.collar}" opacity=".18"/>
-    <rect x="42" y="56" width="16" height="20" rx="8" fill="${p.neck}"/>
-    <circle cx="31" cy="46" r="5" fill="${p.skin}" opacity=".96"/>
-    <circle cx="69" cy="46" r="5" fill="${p.skin}" opacity=".96"/>
-    <ellipse cx="50" cy="45" rx="20" ry="21" fill="${p.skin}"/>
-    ${hair}
-    ${accessory}
-    <circle cx="42" cy="47" r="1.8" fill="${p.eye}"/>
-    <circle cx="58" cy="47" r="1.8" fill="${p.eye}"/>
-    <path d="M48 48c-.8 3-1.5 5.1-.2 6.4 1 .9 2.8.9 4.2.1" stroke="${p.eye}" stroke-width="1.5" stroke-linecap="round" opacity=".38"/>
-    <path d="M44 59c3.5 2.7 8.6 2.7 12 0" stroke="${p.mouth}" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-    <circle cx="38" cy="53" r="3" fill="${p.blush}" opacity=".38"/>
-    <circle cx="62" cy="53" r="3" fill="${p.blush}" opacity=".38"/>
-  </svg>`;
+  return `<svg class="preset-avatar-svg" viewBox="0 0 100 100" aria-hidden="true">${avatars[idx]}</svg>`;
 }
 
 function tProfile() {
