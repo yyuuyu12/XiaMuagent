@@ -1143,6 +1143,23 @@ function maskPhone(phone) {
 }
 
 // ===== RENDER ENGINE =====
+let _lastRenderedViewKey = '';
+
+function getViewKey() {
+  const historyKey = S.currentTab === 'history'
+    ? `${S.historyTab || ''}:${S.tasksView || ''}:${S.viewingTask?.id || ''}`
+    : '';
+  const profileKey = S.currentTab === 'profile' ? (S.profileView || '') : '';
+  const extractKey = S.currentTab === 'extract'
+    ? `${S.extractStep || ''}:${S.cloneTaskId || S.taskId || ''}`
+    : '';
+  const inspireKey = S.currentTab === 'inspire'
+    ? `${S.inspireMode || ''}:${S.pathAState || ''}:${S.featuredPage || ''}`
+    : '';
+  const modalKey = S.showAvatarMgmt ? 'avatar-mgmt' : '';
+  return [S.currentTab, historyKey, profileKey, extractKey, inspireKey, modalKey].join('|');
+}
+
 function setState(updates) {
   const focusId = document.activeElement && document.activeElement.id;
   const focusSel = [document.activeElement && document.activeElement.selectionStart,
@@ -1155,7 +1172,19 @@ function setState(updates) {
   }
 }
 function render() {
+  const oldScroller = document.querySelector('.page-content');
+  const oldScrollTop = oldScroller ? oldScroller.scrollTop : 0;
+  const oldViewKey = _lastRenderedViewKey;
+  const newViewKey = getViewKey();
   document.getElementById('app').innerHTML = tMain();
+  _lastRenderedViewKey = newViewKey;
+  if (oldViewKey && oldViewKey === newViewKey) {
+    const newScroller = document.querySelector('.page-content');
+    if (newScroller) {
+      const maxTop = Math.max(0, newScroller.scrollHeight - newScroller.clientHeight);
+      newScroller.scrollTop = Math.min(oldScrollTop, maxTop);
+    }
+  }
 }
 
 function openAuthSheet() { setState({ showAuthSheet: true, authErr: '' }); }
