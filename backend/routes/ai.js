@@ -546,7 +546,7 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
   if (!videoUrl) return res.json({ code: 500, msg: '未配置数字人服务地址' });
 
   try {
-    const resp = await fetch(`${videoUrl}/video/task/${taskId}`, { headers: VIDEO_FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+    const resp = await fetch(`${videoUrl}/video/task/${taskId}`, { headers: VIDEO_FETCH_HEADERS, signal: AbortSignal.timeout(45000) });
     const text = await resp.text();
     if (!resp.ok) return res.json({ code: 500, msg: text.includes('<!DOCTYPE') ? htmlServiceError(videoUrl, text) : '查询失败' });
     let data;
@@ -570,7 +570,7 @@ router.post('/video/cancel/:taskId', requireAuth, async (req, res) => {
     const resp = await fetch(`${videoUrl}/video/cancel/${taskId}`, {
       method: 'POST',
       headers: VIDEO_FETCH_HEADERS,
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(30000),
     });
     const text = await resp.text();
     if (!resp.ok) return res.json({ code: 500, msg: text.includes('<!DOCTYPE') ? htmlServiceError(videoUrl, text) : '取消失败' });
