@@ -145,9 +145,11 @@ router.post('/start-clone/:id', requireAuth, async (req, res) => {
       source: 'featured',
       industry: v.industry,
     });
+    const displayTitle = `精选${v.industry} · ${(v.transcript || '').slice(0, 18)}`;
     await db.query(
-      `INSERT INTO tasks (id, user_id, type, title, status, result) VALUES (?, ?, 'clone_video', ?, 'extracted', ?)`,
-      [taskId, req.userId, title, result]
+      `INSERT INTO tasks (id, user_id, type, title, status, stage, progress, thinking, result)
+       VALUES (?, ?, 'clone_video', ?, 'extracted', 'extracted', 17, '提取完毕，去改写', ?)`,
+      [taskId, req.userId, displayTitle, result]
     );
     res.json({ code: 200, data: { task_id: taskId } });
   } catch (e) {

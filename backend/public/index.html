@@ -2802,12 +2802,33 @@ async function featuredSelectIndustry(ind) {
   render();
 }
 
-async function startCloneFromFeatured(videoId) {
+async function startCloneFromFeatured(videoId, transcript) {
+  if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
+  setState({
+    currentTab: 'extract',
+    inspireMode: null,
+    featuredDetailIdx: null,
+    extractStep: 'review',
+    extractedScript: transcript || '',
+    rewrittenScript: '',
+    extractErr: '',
+    extractRawErr: '',
+    videoUrl: '',
+    cloneTaskId: null,
+    cloneTaskData: null,
+    taskId: null,
+    ttsAudioUrl: null,
+    ttsAudioB64: null,
+    avatarVideoUrl: null,
+    avatarVideoB64: null,
+    postProcessedVideoUrl: null,
+    postProcessedB64: null,
+  });
   try {
     const r = await api.post(`/industry-videos/start-clone/${videoId}`, {});
     if (r.code === 200 && r.data && r.data.task_id) {
-      if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
-      await openExtractWithTask(r.data.task_id);
+      setState({ cloneTaskId: r.data.task_id });
+      saveCloneSession(2);
       loadTasks();
     } else {
       showToast(r.msg || '操作失败，请重试');
@@ -2856,11 +2877,11 @@ async function featuredRewrite() {
   const v = (S.featuredVideos || [])[S.featuredDetailIdx];
   if (!v) return;
   if (v.id) {
-    await startCloneFromFeatured(v.id);
+    await startCloneFromFeatured(v.id, v.transcript);
     return;
   }
   if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
-  setState({ inspireMode: null, featuredDetailIdx: null, extractedScript: v.transcript, extractStep: 'review', extractErr: '', extractRawErr: '', videoUrl: '', cloneTaskData: null, taskId: null });
+  setState({ inspireMode: null, featuredDetailIdx: null, extractedScript: v.transcript, rewrittenScript: '', extractStep: 'review', extractErr: '', extractRawErr: '', videoUrl: '', cloneTaskId: null, cloneTaskData: null, taskId: null });
   switchTab('extract');
   render();
   showToast('已填入爆款文案，点击开始AI改写');
