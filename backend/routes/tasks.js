@@ -9,6 +9,7 @@ router.get('/', requireAuth, async (req, res) => {
     const { rows } = await db.query(
       `SELECT t.id, t.type, t.title, t.status, t.stage, t.progress, t.thinking, t.error_msg, t.created_at, t.updated_at, t.result,
               COALESCE(ts.clone_step, CASE WHEN t.status = 'done' THEN 2 ELSE 1 END) AS clone_step,
+              ts.session_json,
               GREATEST(t.updated_at, COALESCE(ts.updated_at, t.updated_at)) AS activity_at
        FROM tasks t
        LEFT JOIN task_sessions ts ON ts.task_id = t.id AND ts.user_id = t.user_id
@@ -18,13 +19,25 @@ router.get('/', requireAuth, async (req, res) => {
     );
     const data = rows.map(row => {
       const task = { ...row };
+      let result = null;
+      let session = null;
       if (task.type === 'clone_video' && task.result) {
         try {
-          const result = typeof task.result === 'string' ? JSON.parse(task.result) : task.result;
+          result = typeof task.result === 'string' ? JSON.parse(task.result) : task.result;
           if (result && result.source === 'featured') task.task_kind = 'industry';
         } catch {}
       }
+      if (task.type === 'clone_video' && task.session_json) {
+        try { session = JSON.parse(task.session_json); } catch {}
+      }
+      if (task.type === 'clone_video') {
+        if (!(result?.rewritten || session?.rewrittenScript)) task.clone_step = Math.min(Number(task.clone_step) || 1, 2);
+        if (task.clone_step > 3 && !session?.ttsAudioB64) task.clone_step = 3;
+        if (task.clone_step > 4 && !session?.avatarVideoB64) task.clone_step = 4;
+        if (task.clone_step > 5 && !session?.postProcessedB64) task.clone_step = 5;
+      }
       delete task.result;
+      delete task.session_json;
       return task;
     });
     res.json({ code: 200, data });
@@ -158,6 +171,24 @@ router.post('/:id/session', requireAuth, async (req, res) => {
        ON DUPLICATE KEY UPDATE clone_step = VALUES(clone_step), session_json = VALUES(session_json), updated_at = NOW()`,
       [req.params.id, req.userId, clone_step, sessionJson]
     );
+    await db.query(
+      'UPDATE tasks SET updated_at = NOW() WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    res.json({ code: 200, msg: 'ok' });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/tasks/:id/touch - 刷新任务活动时间，不改变流程步骤
+router.post('/:id/touch', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id FROM tasks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
     await db.query(
       'UPDATE tasks SET updated_at = NOW() WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]

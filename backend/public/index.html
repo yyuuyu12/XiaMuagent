@@ -1828,6 +1828,10 @@ function cloneCurrentStep() {
   const s = S.extractStep;
   if (s === 0 || s === 'cloning' || s === 'review') return 1;
   if (s === 'rewriting' || s === 2) return 2;
+  if ((s === 3 || s === 'tts_gen') && !(S.rewrittenScript || '').trim()) return 2;
+  if ((s === 4 || s === 'avatar_gen') && !S.ttsAudioUrl) return 3;
+  if (s === 5 && !S.avatarVideoUrl) return 4;
+  if (s === 6 && !S.postProcessedVideoUrl && !S.avatarVideoUrl) return 5;
   if (s === 3 || s === 'tts_gen') return 3;
   if (s === 4 || s === 'avatar_gen') return 4;
   if (s === 5) return 5;
@@ -1840,6 +1844,12 @@ function tCloneStepBar() {
   if (cur === 0) return '';
   const steps = ['提取','改写','语音','数字人','后期','发布'];
   const targets = ['review', 2, 3, 4, 5, 6];
+  const maxReachable = 1
+    + ((S.extractedScript || '').trim() ? 1 : 0)
+    + ((S.rewrittenScript || '').trim() ? 1 : 0)
+    + (S.ttsAudioUrl ? 1 : 0)
+    + (S.avatarVideoUrl ? 1 : 0)
+    + ((S.postProcessedVideoUrl || S.avatarVideoUrl) ? 1 : 0);
   const CHECK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
   let parts = [];
   steps.forEach((label, i) => {
@@ -1849,7 +1859,8 @@ function tCloneStepBar() {
     const lc = done ? 'csb-lbl csb-lbl-done' : (active ? 'csb-lbl csb-lbl-active' : 'csb-lbl csb-lbl-idle');
     const inner = done ? CHECK : n;
     const target = JSON.stringify(targets[i]);
-    parts.push(`<div class="csb-step" onclick="setState({extractStep:${target}})"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
+    const click = n <= maxReachable ? ` onclick="setState({extractStep:${target}})"` : '';
+    parts.push(`<div class="csb-step"${click}><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
     if (n < 6) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
   });
   return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
@@ -1971,6 +1982,15 @@ function tExtract() {
 
 // ===== 步骤3：语音合成 =====
 function tCloneStep3(sb) {
+  if (!(S.rewrittenScript || '').trim()) {
+    return `${sb}<div class="tab-page">
+      <div class="input-card" style="text-align:center;padding:26px 18px;margin-top:4px">
+        <div style="font-size:15px;font-weight:700;color:#1A1814;margin-bottom:8px">请先完成文案改写</div>
+        <div style="font-size:12px;color:#A8A49C;line-height:1.7;margin-bottom:16px">语音合成必须使用改写后的文案，避免直接拿提取原文进入后续流程。</div>
+        <div class="btn-primary" onclick="setState({extractStep:2})">回到改写步骤</div>
+      </div>
+    </div>`;
+  }
   // 合成中状态
   if (S.extractStep === 'tts_gen') {
     return `${sb}<div class="tab-page">
@@ -3577,10 +3597,10 @@ function goToCloneStep3() {
 
 async function handleTTSGenerate() {
   if (!ensureLoggedIn()) return;
-  const text = (S.rewrittenScript || S.extractedScript || '').trim();
-  if (!text) { showToast('请先完成文案改写'); return; }
+  const text = (S.rewrittenScript || '').trim();
+  if (!text) { showToast('请先完成文案改写'); setState({ extractStep: 2 }); return; }
   setState({ ttsGenerating: true, ttsErr: '', extractStep: 'tts_gen' });
-  saveCloneSession(3);
+  touchCloneTaskActivity();
   try {
     // 处理我的声音（my_xxx格式）
     let voiceId = S.ttsVoice;
@@ -3947,7 +3967,7 @@ async function handleAvatarGenerate() {
   }
 
   setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '初始化中...', avatarProgressPct: 20 });
-  saveCloneSession(4);
+  touchCloneTaskActivity();
 
   try {
     // 先拿 ngrok 地址，大文件直接传给本地服务，绕过 Zeabur 代理限制
@@ -4022,7 +4042,7 @@ async function handlePostProcess() {
   if (!S.ttsAudioB64)    { showToast('未找到语音数据，请返回步骤3重新合成'); return; }
 
   setState({ postProcessing: true, postProcessErr: '' });
-  saveCloneSession(5);
+  touchCloneTaskActivity();
   try {
     const asrUrl = S.asrUrl || (await (async () => {
       const r = await api.get('/ai/asr-url');
@@ -4117,7 +4137,7 @@ async function generateCover(seekSec, retitleOnly) {
   if (!S.avatarVideoUrl) { showToast('请先生成数字人视频'); return; }
   const t = isNaN(seekSec) ? 1.0 : Math.max(0.5, seekSec);
   setState({ coverGenerating: true });
-  saveCloneSession(6);
+  touchCloneTaskActivity();
   try {
     // 获取封面短标题
     let title = S.coverTitle;
@@ -4224,6 +4244,20 @@ async function saveCloneSession(cloneStep) {
       : t);
   } catch (e) {
     console.warn('[saveCloneSession] 保存失败', e);
+  }
+}
+
+async function touchCloneTaskActivity() {
+  const taskId = S.cloneTaskId;
+  if (!taskId) return;
+  try {
+    await api.post(`/tasks/${taskId}/touch`, {});
+    const nowIso = new Date().toISOString();
+    S.tasksList = (S.tasksList || []).map(t => String(t.id) === String(taskId)
+      ? { ...t, activity_at: nowIso, updated_at: nowIso }
+      : t);
+  } catch (e) {
+    console.warn('[touchCloneTaskActivity] 刷新失败', e);
   }
 }
 
