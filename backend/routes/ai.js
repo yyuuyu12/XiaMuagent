@@ -441,12 +441,45 @@ router.get('/asr-url', requireAuth, async (req, res) => {
   return res.json({ code: 200, data: { url } });
 });
 
-// 获取视频服务 URL 的内部工具函数
+function normalizeServiceUrl(url) {
+  return (url || '').trim().replace(/\/+$/, '');
+}
+
+const VIDEO_FETCH_HEADERS = {
+  'ngrok-skip-browser-warning': '1',
+  'User-Agent': 'XiaMuagent-Zeabur/1.0',
+  'Accept': 'application/json',
+};
+
+// 获取视频服务 URL 的内部工具函数：优先使用真正返回 /health JSON 的地址，避免 video_url 配成网页域名。
 async function getVideoUrl() {
   const { rows } = await db.query("SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','video_url')");
   const cfg = {};
-  rows.forEach(r => { cfg[r.config_key] = (r.value || '').trim(); });
-  return cfg.video_url || cfg.asr_url || '';
+  rows.forEach(r => { cfg[r.config_key] = normalizeServiceUrl(r.value); });
+  const candidates = [...new Set([cfg.video_url, cfg.asr_url].filter(Boolean))];
+  if (!candidates.length) return '';
+
+  for (const url of candidates) {
+    try {
+      const resp = await fetch(`${url}/health`, {
+        headers: VIDEO_FETCH_HEADERS,
+        signal: AbortSignal.timeout(5000),
+      });
+      const ct = resp.headers.get('content-type') || '';
+      if (!resp.ok || !ct.includes('application/json')) continue;
+      const data = await resp.json();
+      if (data && data.status === 'ok') return url;
+    } catch {}
+  }
+
+  return candidates[0];
+}
+
+function htmlServiceError(url, text) {
+  const hint = text && text.includes('<!DOCTYPE')
+    ? '当前数字人地址返回的是网页，不是本地视频接口。请检查后台 video_url/asr_url，必须指向本地 ASR ngrok 地址，并能打开 /health 返回 JSON。'
+    : '数字人接口返回内容异常，请检查后台 video_url/asr_url 配置。';
+  return `${hint} 当前地址：${url}`;
 }
 
 // ==================== 数字人视频生成 ====================
@@ -463,7 +496,7 @@ router.post('/video/generate', requireAuth, async (req, res) => {
   try {
     const resp = await fetch(`${videoUrl}/video/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+      headers: { ...VIDEO_FETCH_HEADERS, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         audio_b64,
         audio_fmt: audio_fmt || 'wav',
@@ -472,11 +505,16 @@ router.post('/video/generate', requireAuth, async (req, res) => {
       }),
       signal: AbortSignal.timeout(120000),
     });
+    const text = await resp.text();
     if (!resp.ok) {
-      const t = await resp.text();
-      return res.json({ code: 500, msg: `视频服务出错: ${t.slice(0, 200)}` });
+      return res.json({ code: 500, msg: text.includes('<!DOCTYPE') ? htmlServiceError(videoUrl, text) : `视频服务出错: ${text.slice(0, 200)}` });
     }
-    const data = await resp.json();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return res.json({ code: 500, msg: htmlServiceError(videoUrl, text) });
+    }
     return res.json({ code: 200, data });
   } catch (e) {
     const msg = e.message || '';
@@ -491,9 +529,15 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
   if (!videoUrl) return res.json({ code: 500, msg: '未配置数字人服务地址' });
 
   try {
-    const resp = await fetch(`${videoUrl}/video/task/${taskId}`, { signal: AbortSignal.timeout(10000) });
-    if (!resp.ok) return res.json({ code: 500, msg: '查询失败' });
-    const data = await resp.json();
+    const resp = await fetch(`${videoUrl}/video/task/${taskId}`, { headers: VIDEO_FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+    const text = await resp.text();
+    if (!resp.ok) return res.json({ code: 500, msg: text.includes('<!DOCTYPE') ? htmlServiceError(videoUrl, text) : '查询失败' });
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return res.json({ code: 500, msg: htmlServiceError(videoUrl, text) });
+    }
     return res.json({ code: 200, data });
   } catch (e) {
     return res.json({ code: 500, msg: `轮询失败: ${e.message}` });
@@ -508,10 +552,17 @@ router.post('/video/cancel/:taskId', requireAuth, async (req, res) => {
   try {
     const resp = await fetch(`${videoUrl}/video/cancel/${taskId}`, {
       method: 'POST',
+      headers: VIDEO_FETCH_HEADERS,
       signal: AbortSignal.timeout(10000),
     });
-    if (!resp.ok) return res.json({ code: 500, msg: '取消失败' });
-    const data = await resp.json();
+    const text = await resp.text();
+    if (!resp.ok) return res.json({ code: 500, msg: text.includes('<!DOCTYPE') ? htmlServiceError(videoUrl, text) : '取消失败' });
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return res.json({ code: 500, msg: htmlServiceError(videoUrl, text) });
+    }
     return res.json({ code: 200, data });
   } catch (e) {
     return res.json({ code: 500, msg: `取消失败: ${e.message}` });
