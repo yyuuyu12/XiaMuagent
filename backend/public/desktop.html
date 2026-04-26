@@ -1282,11 +1282,21 @@ function _dStartAvatarPoller(taskId, runSeq) {
         dS.avatarProgressMsg = '生成完成，正在加载视频...'; dS.avatarProgressPct = 95;
         _dUpdateAvatarProgress();
         try {
-          const streamUrl = `/ai/video/stream/${taskId}?t=${encodeURIComponent(dGetToken())}`;
-          const resp = await fetch(streamUrl);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          // 桌面 PC 可直接访问 frp 穿透地址，绕过 Zeabur 代理（避免大视频被截断）
+          const directUrl = t.video_direct_url;
+          const fallbackUrl = `/ai/video/stream/${taskId}?t=${encodeURIComponent(dGetToken())}`;
+          let resp;
+          try {
+            resp = await fetch(directUrl);
+            if (!resp.ok) throw new Error(`direct ${resp.status}`);
+          } catch (_) {
+            resp = await fetch(fallbackUrl);
+            if (!resp.ok) throw new Error(`proxy ${resp.status}`);
+          }
           const blob = await resp.blob();
-          const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type:'video/mp4' });
+          if (blob.size < 1000) throw new Error('视频文件异常（过小）');
+          const mp4Blob = blob.type.includes('video') ? blob : new Blob([blob], { type:'video/mp4' });
+          if (dS.avatarVideoUrl?.startsWith('blob:')) { try { URL.revokeObjectURL(dS.avatarVideoUrl); } catch {} }
           dS.avatarVideoUrl = URL.createObjectURL(mp4Blob);
         } catch (e) {
           dS.avatarErr = `视频加载失败: ${e.message}`;
