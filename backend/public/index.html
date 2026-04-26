@@ -1385,8 +1385,17 @@ function render() {
   const oldScrollTop = oldScroller ? oldScroller.scrollTop : 0;
   const oldViewKey = _lastRenderedViewKey;
   const newViewKey = getViewKey();
+  // 保存 blob video 节点，渲染后复用，避免视频闪烁
+  const oldVideo = document.querySelector('#app video[src^="blob:"]');
+  const oldVideoSrc = oldVideo ? oldVideo.src : null;
   document.getElementById('app').innerHTML = tMain();
   _lastRenderedViewKey = newViewKey;
+  if (oldVideoSrc) {
+    const newVideo = document.querySelector('#app video');
+    if (newVideo && newVideo.src === oldVideoSrc) {
+      newVideo.parentNode.replaceChild(oldVideo, newVideo);
+    }
+  }
   if (oldViewKey && oldViewKey === newViewKey) {
     const newScroller = document.querySelector('.page-content');
     if (newScroller) {
