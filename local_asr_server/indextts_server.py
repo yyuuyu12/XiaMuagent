@@ -237,7 +237,7 @@ def _run_inference(spk_path, text, output_path, speed, emo_path, emo_alpha):
         text=text,
         output_path=output_path,
         verbose=False,
-        max_text_tokens_per_segment=120,
+        max_text_tokens_per_segment=300,
         emo_audio_prompt=emo_path,      # v2 真实情感控制
         emo_alpha=emo_alpha,
         use_random=False,
