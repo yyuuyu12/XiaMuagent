@@ -147,21 +147,10 @@ async def tts_synthesize(payload: dict):
         tmp_path = f.name
 
     try:
-        if style:
-            # SSML 方式：指定风格，声音更平和自然
-            ssml = _build_ssml(voice, style, rate_str, text)
-            communicate = edge_tts.Communicate(ssml, voice)
-        else:
-            communicate = edge_tts.Communicate(text, voice, rate=rate_str)
+        communicate = edge_tts.Communicate(text, voice, rate=rate_str)
         await communicate.save(tmp_path)
         with open(tmp_path, "rb") as f:
             audio_bytes = f.read()
-        if not audio_bytes:
-            # SSML 失败时降级为普通模式
-            communicate = edge_tts.Communicate(text, voice, rate=rate_str)
-            await communicate.save(tmp_path)
-            with open(tmp_path, "rb") as f:
-                audio_bytes = f.read()
         return {"audio": base64.b64encode(audio_bytes).decode(), "format": "mp3"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"edge-tts 合成失败: {str(e)[:300]}")
