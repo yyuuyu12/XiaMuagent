@@ -4399,7 +4399,7 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
           if (S.avatarVideoUrl && S.avatarVideoUrl.startsWith && S.avatarVideoUrl.startsWith('blob:')) {
             try { URL.revokeObjectURL(S.avatarVideoUrl); } catch {}
           }
-          setState({ avatarGenerating: false, avatarVideoUrl: blobUrl, avatarVideoB64: null, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
+          setState({ avatarGenerating: false, avatarVideoUrl: blobUrl, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
           saveCloneSession(4);
         } catch (e) {
           console.error('[avatar download]', e);
@@ -4453,7 +4453,7 @@ function handleAvatarStop() {
 
 async function handlePostProcess() {
   if (S.postProcessing) return;
-  if (!S.avatarVideoB64) { showToast('请先生成数字人视频'); return; }
+  if (!S.avatarVideoUrl) { showToast('请先生成数字人视频'); return; }
   if (!S.ttsAudioB64)    { showToast('未找到语音数据，请返回步骤3重新合成'); return; }
 
   setState({ postProcessing: true, postProcessErr: '' });
@@ -4470,7 +4470,8 @@ async function handlePostProcess() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        video_b64:     S.avatarVideoB64,
+        video_task_id: S.avatarDoneTaskId || null,
+        video_b64:     S.avatarVideoB64 || null,
         audio_b64:     S.ttsAudioB64,
         audio_fmt:     'mp3',
         sub_color:     S.subColor,

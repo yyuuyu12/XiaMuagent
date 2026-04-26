@@ -424,7 +424,8 @@ async def video_postprocess(payload: dict):
              sub_color(#RRGGBB), outline_color(#RRGGBB|none),
              outline_width(0~4), fontsize(24~60)
     """
-    video_b64   = payload.get("video_b64", "")
+    video_b64      = payload.get("video_b64", "")
+    video_task_id  = payload.get("video_task_id", "")
     audio_b64   = payload.get("audio_b64", "")
     audio_fmt   = payload.get("audio_fmt", "mp3")
     sub_color   = payload.get("sub_color", "#FFFFFF")
@@ -432,8 +433,19 @@ async def video_postprocess(payload: dict):
     outline_w   = float(payload.get("outline_width", 2.0))
     fontsize    = int(payload.get("fontsize", 44))
 
+    # 优先用 video_task_id 从 HeyGem 直接取文件，避免传输大 base64
+    if not video_b64 and video_task_id:
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                vresp = await client.get(f"{SADTALKER_URL}/video/file/{video_task_id}")
+            if vresp.status_code != 200:
+                raise HTTPException(400, f"获取数字人视频失败: HTTP {vresp.status_code}")
+            video_b64 = base64.b64encode(vresp.content).decode()
+        except httpx.ConnectError:
+            raise HTTPException(503, "数字人服务连接失败，请确认 HeyGem 已启动")
+
     if not video_b64 or not audio_b64:
-        raise HTTPException(400, "video_b64 和 audio_b64 不能为空")
+        raise HTTPException(400, "video_b64/video_task_id 和 audio_b64 不能为空")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         video_in  = os.path.join(tmpdir, "input.mp4")
