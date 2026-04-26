@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>爆款文案工坊 · 桌面版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   CSS · 公共 reset
+   ============================================================ */
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  height:100%; min-height:100vh;
+  font-family:'Noto Sans SC',-apple-system,'PingFang SC',sans-serif;
+  background:#F0EDE8; color:#1A1614; font-size:14px;
+}
+
+/* ============================================================
+   CSS · 桌面端布局
+   ============================================================ */
+.d-shell { display:flex; height:100vh; overflow:hidden; }
+
+/* 侧边栏 */
+.d-sidebar {
+  width:200px; flex-shrink:0;
+  background:#fff; border-right:1px solid rgba(0,0,0,0.06);
+  display:flex; flex-direction:column;
+}
+.d-logo {
+  height:54px; padding:0 20px;
+  display:flex; align-items:center; gap:9px;
+  border-bottom:1px solid rgba(0,0,0,0.05); flex-shrink:0;
+}
+.d-logo-icon {
+  width:28px; height:28px; border-radius:8px;
+  background:linear-gradient(135deg,#FF8040,#F5602A);
+  display:flex; align-items:center; justify-content:center;
+}
+.d-logo-text { font-size:14px; font-weight:700; color:#1A1614; letter-spacing:-0.3px; }
+
+.d-nav-section { padding:14px 10px 4px; }
+.d-nav-label {
+  font-size:10px; color:#B0AA9F; font-weight:600;
+  letter-spacing:0.5px; padding:0 8px; margin-bottom:6px;
+}
+.d-nav-item {
+  display:flex; align-items:center; gap:9px;
+  padding:9px 10px; border-radius:10px;
+  font-size:13px; font-weight:500; color:#6E6860;
+  cursor:pointer; transition:all 0.15s; margin-bottom:2px;
+  user-select:none;
+}
+.d-nav-item:hover { background:#F7F5F1; color:#1A1614; }
+.d-nav-item.active { background:#FFF3E8; color:#F5762A; font-weight:600; }
+
+.d-sidebar-bottom {
+  margin-top:auto; padding:0 10px 16px;
+  border-top:1px solid rgba(0,0,0,0.05); padding-top:12px;
+}
+.d-user-chip {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 8px; border-radius:12px;
+  background:#F7F5F1; cursor:pointer; transition:background 0.15s;
+}
+.d-user-chip:hover { background:#EDE9E3; }
+.d-avatar-circle {
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,#FF8040,#E84D1C);
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; color:#fff;
+}
+
+/* 主内容区 */
+.d-main { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#F7F5F1; }
+.d-content { flex:1; overflow-y:auto; overflow-x:hidden; padding:20px 24px 32px; }
+.d-content::-webkit-scrollbar { width:6px; }
+.d-content::-webkit-scrollbar-track { background:transparent; }
+.d-content::-webkit-scrollbar-thumb { background:#E0DCD6; border-radius:4px; }
+
+/* ============================================================
+   CSS · 通用卡片 & 组件
+   ============================================================ */
+.d-card {
+  background:#fff; border-radius:16px;
+  border:1px solid rgba(0,0,0,0.04);
+  box-shadow:0 2px 12px rgba(0,0,0,0.05);
+}
+.d-card.active-card {
+  border-color:rgba(245,118,42,0.25);
+  box-shadow:0 2px 20px rgba(245,96,42,0.1);
+}
+.d-card-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:13px 18px; border-bottom:1px solid #F7F5F1;
+}
+.d-card-header.active-header {
+  background:linear-gradient(135deg,rgba(255,128,64,0.04),rgba(245,96,42,0.06));
+  border-radius:16px 16px 0 0;
+}
+.d-card-title-row { display:flex; align-items:center; gap:8px; }
+.d-step-num {
+  width:22px; height:22px; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; flex-shrink:0;
+}
+.d-step-num.done { background:#F5762A; color:#fff; }
+.d-step-num.active { background:linear-gradient(135deg,#FF8040,#F5602A); color:#fff; box-shadow:0 3px 10px rgba(245,96,42,0.4); }
+.d-step-num.idle { background:#F0EDE8; color:#B0AA9F; }
+.d-card-title { font-size:14px; font-weight:700; color:#1A1614; }
+.d-step-badge {
+  font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px;
+}
+.d-step-badge.done { background:#F0FDF4; color:#22C55E; }
+.d-step-badge.active { background:#FFF3E8; color:#F5762A; }
+.d-step-badge.idle { background:#F7F5F1; color:#B0AA9F; }
+.d-card-body { padding:16px 18px; }
+
+/* 步骤进度条 */
+.d-step-bar {
+  background:#fff; border-radius:16px; padding:14px 24px;
+  border:1px solid rgba(0,0,0,0.04);
+  box-shadow:0 2px 12px rgba(0,0,0,0.05);
+  margin-bottom:16px;
+  display:flex; align-items:center;
+}
+.d-step-item { display:flex; flex-direction:column; align-items:center; gap:5px; }
+.d-step-circle {
+  width:32px; height:32px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; transition:all 0.3s;
+}
+.d-step-circle.done { background:#F5762A; color:#fff; }
+.d-step-circle.active { background:linear-gradient(135deg,#FF8040,#F5602A); color:#fff; box-shadow:0 4px 14px rgba(245,96,42,0.4); }
+.d-step-circle.idle { background:#F0EDE8; color:#B0AA9F; }
+.d-step-label { font-size:11px; color:#9E9890; font-weight:500; }
+.d-step-label.active { color:#F5762A; font-weight:700; }
+.d-step-line { flex:1; height:2px; background:#F0EDE8; margin:0 6px; margin-bottom:16px; }
+.d-step-line.done { background:#F5762A; }
+
+/* 输入控件 */
+.d-label { font-size:12px; color:#9E9890; font-weight:500; margin-bottom:5px; }
+.d-input {
+  background:#F7F5F1; border:1.5px solid #EDE9E3;
+  border-radius:10px; padding:9px 12px;
+  font-size:13px; color:#1A1614; font-family:inherit;
+  width:100%; outline:none; transition:all 0.2s;
+}
+.d-input:focus { border-color:#F5762A; background:#fff; box-shadow:0 0 0 3px rgba(245,96,42,0.1); }
+.d-textarea {
+  background:#F7F5F1; border:1.5px solid #EDE9E3;
+  border-radius:10px; padding:10px 12px;
+  font-size:12px; color:#1A1614; font-family:inherit;
+  width:100%; outline:none; resize:none; line-height:1.65;
+  transition:all 0.2s;
+}
+.d-textarea:focus { border-color:#F5762A; background:#fff; box-shadow:0 0 0 3px rgba(245,96,42,0.1); }
+.d-select {
+  background:#F7F5F1; border:1.5px solid #EDE9E3;
+  border-radius:10px; padding:8px 32px 8px 12px;
+  font-size:13px; color:#1A1614; font-family:inherit;
+  width:100%; outline:none; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9L12 15L18 9' stroke='%23B0AA9F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center;
+  cursor:pointer; transition:border-color 0.2s;
+}
+.d-select:focus { border-color:#F5762A; }
+
+/* 按钮 */
+.d-btn {
+  padding:8px 16px; border-radius:9px; border:none;
+  font-size:13px; font-weight:600; font-family:inherit;
+  cursor:pointer; transition:all 0.15s;
+  display:inline-flex; align-items:center; justify-content:center; gap:5px;
+}
+.d-btn:active { transform:scale(0.97); }
+.d-btn-ghost { background:#F7F5F1; color:#6E6860; border:1px solid #EDE9E3; }
+.d-btn-ghost:hover { background:#EDE9E3; }
+.d-btn-primary {
+  background:linear-gradient(135deg,#FF8040,#F5602A); color:#fff;
+  box-shadow:0 3px 10px rgba(245,96,42,0.35);
+}
+.d-btn-primary:hover { box-shadow:0 5px 16px rgba(245,96,42,0.45); transform:translateY(-1px); }
+.d-btn-primary:disabled { background:#E8E4DF; color:#B0AA9F; box-shadow:none; transform:none; cursor:not-allowed; }
+.d-btn-lg {
+  width:100%; padding:11px; border-radius:12px; border:none;
+  background:linear-gradient(135deg,#FF8040,#F5602A); color:#fff;
+  font-size:13px; font-weight:700; font-family:inherit;
+  cursor:pointer; box-shadow:0 4px 16px rgba(245,96,42,0.4);
+  transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.d-btn-lg:hover { box-shadow:0 6px 22px rgba(245,96,42,0.5); transform:translateY(-1px); }
+.d-btn-lg:disabled { background:#E8E4DF; color:#B0AA9F; box-shadow:none; transform:none; cursor:not-allowed; }
+.d-btn-danger { background:#FFF0EF; color:#E5534B; border:1px solid #F5C0BA; }
+.d-btn-danger:hover { background:#FFE4E2; }
+
+/* 滑块 */
+.d-slider-wrap { position:relative; height:18px; display:flex; align-items:center; }
+.d-slider-track { position:absolute; left:0; right:0; height:3px; background:#F0EDE8; border-radius:3px; }
+.d-slider-fill { position:absolute; left:0; height:3px; background:linear-gradient(90deg,#FF8040,#F5602A); border-radius:3px; }
+.d-slider-thumb { position:absolute; width:16px; height:16px; border-radius:50%; background:#fff; border:2px solid #F5762A; box-shadow:0 2px 8px rgba(245,96,42,0.35); transform:translateX(-50%); pointer-events:none; }
+.d-slider-input { position:absolute; width:100%; opacity:0; cursor:pointer; height:18px; margin:0; }
+
+/* Toast */
+.d-toast {
+  position:fixed; top:24px; left:50%; transform:translateX(-50%);
+  background:rgba(26,22,20,0.92); color:#fff;
+  padding:10px 20px; border-radius:24px; font-size:13px; font-weight:500;
+  z-index:9999; pointer-events:none;
+  opacity:0; transition:opacity 0.25s;
+  white-space:nowrap;
+}
+.d-toast.show { opacity:1; }
+
+/* 错误提示 */
+.d-err { font-size:12px; color:#E5534B; padding:8px 12px; background:#FFF0EF; border-radius:8px; }
+
+/* 任务表格 */
+.d-table { width:100%; border-collapse:collapse; }
+.d-table th {
+  font-size:12px; font-weight:600; color:#9E9890;
+  text-align:left; padding:10px 16px;
+  border-bottom:1px solid #F0EDE8;
+}
+.d-table td { padding:13px 16px; border-bottom:1px solid #F7F5F1; vertical-align:middle; }
+.d-table tr:last-child td { border-bottom:none; }
+.d-table tr:hover td { background:#FDFCFB; }
+
+/* 步骤点（任务列表用） */
+.d-dots { display:flex; align-items:center; gap:2px; }
+.d-dot {
+  width:22px; height:22px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:8px; font-weight:700; flex-shrink:0;
+}
+.d-dot.done { background:#F5762A; color:#fff; }
+.d-dot.active { background:#FFF3E8; color:#F5762A; border:1.5px solid #F5762A; }
+.d-dot.idle { background:#F0EDE8; color:#C8C3BC; }
+.d-dot-line { width:8px; height:1.5px; background:#F0EDE8; }
+.d-dot-line.done { background:#F5762A; }
+
+/* 进度条（数字人生成） */
+.d-progress-bar { height:6px; background:#F0EDE8; border-radius:4px; overflow:hidden; }
+.d-progress-fill { height:100%; background:linear-gradient(90deg,#FF8040,#F5602A); border-radius:4px; transition:width 0.4s; }
+
+/* ============================================================
+   CSS · 登录弹窗
+   ============================================================ */
+.d-modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.45);
+  display:flex; align-items:center; justify-content:center;
+  z-index:1000; backdrop-filter:blur(4px);
+}
+.d-modal {
+  background:#fff; border-radius:20px;
+  padding:32px 36px; width:400px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);
+}
+.d-modal-title { font-size:20px; font-weight:700; color:#1A1614; margin-bottom:6px; }
+.d-modal-sub { font-size:13px; color:#9E9890; margin-bottom:24px; }
+.d-auth-tabs { display:flex; gap:4px; background:#F7F5F1; border-radius:10px; padding:3px; margin-bottom:20px; }
+.d-auth-tab {
+  flex:1; padding:8px; border-radius:8px; text-align:center;
+  font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s;
+  color:#9E9890;
+}
+.d-auth-tab.active { background:#fff; color:#F5762A; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+.d-field { margin-bottom:14px; }
+.d-sms-row { display:flex; gap:8px; }
+.d-sms-row .d-input { flex:1; }
+
+/* ============================================================
+   CSS · 平台标签
+   ============================================================ */
+.d-platform-tab {
+  padding:5px 14px; border-radius:8px;
+  font-size:12px; font-weight:600; cursor:pointer;
+  transition:all 0.15s; border:1.5px solid transparent;
+}
+.d-platform-tab.active { background:#FFF3E8; color:#F5762A; border-color:#FFD4B8; }
+.d-platform-tab.inactive { background:#F7F5F1; color:#9E9890; }
+
+/* 情绪标签 */
+.d-emotion {
+  padding:4px 10px; border-radius:6px;
+  font-size:11px; font-weight:500; cursor:pointer; transition:all 0.15s;
+  border:1px solid transparent;
+}
+.d-emotion.active { background:#F5762A; color:#fff; }
+.d-emotion.inactive { background:#F7F5F1; color:#9E9890; }
+.d-emotion.inactive:hover { background:#EDE9E3; }
+
+/* 开关 */
+.d-toggle {
+  width:34px; height:18px; border-radius:9px; position:relative;
+  cursor:pointer; transition:background 0.2s; flex-shrink:0;
+}
+.d-toggle.on { background:#F5762A; }
+.d-toggle.off { background:#E8E4DF; }
+.d-toggle-ball {
+  position:absolute; top:2px; width:14px; height:14px;
+  border-radius:50%; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.2);
+  transition:left 0.2s;
+}
+.d-toggle.on .d-toggle-ball { left:18px; }
+.d-toggle.off .d-toggle-ball { left:2px; }
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="d-toast" id="dToast"></div>
+
+<!-- Login Modal -->
+<div class="d-modal-overlay" id="dLoginModal" style="display:none">
+  <div class="d-modal">
+    <div class="d-modal-title">欢迎使用</div>
+    <div class="d-modal-sub">爆款文案工坊 · 桌面版</div>
+    <div class="d-auth-tabs">
+      <div class="d-auth-tab active" id="dTabSms" onclick="dSwitchAuth('sms')">验证码登录</div>
+      <div class="d-auth-tab" id="dTabPwd" onclick="dSwitchAuth('pwd')">密码登录</div>
+    </div>
+    <!-- SMS -->
+    <div id="dAuthSms">
+      <div class="d-field">
+        <div class="d-label">手机号</div>
+        <input class="d-input" id="dPhone" placeholder="请输入手机号" maxlength="11" oninput="dS.phone=this.value">
+      </div>
+      <div class="d-field">
+        <div class="d-label">验证码</div>
+        <div class="d-sms-row">
+          <input class="d-input" id="dSmsCode" placeholder="6 位验证码" maxlength="6" oninput="dS.smsCode=this.value">
+          <button class="d-btn d-btn-ghost" id="dSendSmsBtn" onclick="dSendSms()" style="flex-shrink:0;white-space:nowrap">获取验证码</button>
+        </div>
+      </div>
+      <div id="dAuthErr" style="display:none" class="d-err"></div>
+      <button class="d-btn-lg" onclick="dLoginSms()" style="margin-top:8px">登录 / 注册</button>
+    </div>
+    <!-- PWD -->
+    <div id="dAuthPwd" style="display:none">
+      <div class="d-field">
+        <div class="d-label">手机号</div>
+        <input class="d-input" id="dPwdPhone" placeholder="请输入手机号" maxlength="11" oninput="dS.phone=this.value">
+      </div>
+      <div class="d-field">
+        <div class="d-label">密码</div>
+        <input class="d-input" type="password" id="dPwdInput" placeholder="请输入密码" oninput="dS.password=this.value">
+      </div>
+      <div id="dPwdErr" style="display:none" class="d-err"></div>
+      <button class="d-btn-lg" onclick="dLoginPwd()" style="margin-top:8px">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main App Shell -->
+<div class="d-shell" id="dApp" style="display:none">
+  <!-- 侧边栏 -->
+  <div class="d-sidebar">
+    <div class="d-logo">
+      <div class="d-logo-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5H22L16.5 14L18.5 21L12 17L5.5 21L7.5 14L2 9.5H9.5L12 2Z" fill="white"/></svg>
+      </div>
+      <span class="d-logo-text">爆款文案工坊</span>
+    </div>
+    <div class="d-nav-section">
+      <div class="d-nav-label">主要功能</div>
+      <div class="d-nav-item active" id="dNavHome" onclick="dGoPage('home')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z" fill="#F5762A" stroke="#F5762A" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span>克隆流程</span>
+      </div>
+      <div class="d-nav-item" id="dNavTasks" onclick="dGoPage('tasks')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2.5" stroke="#9E9890" stroke-width="1.8"/><path d="M9 8H15M9 12H15M9 16H12" stroke="#9E9890" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>我的任务</span>
+      </div>
+    </div>
+    <div class="d-sidebar-bottom">
+      <div class="d-nav-label" style="padding:0 0 6px">账号</div>
+      <div class="d-user-chip" onclick="dGoPage('profile')">
+        <div class="d-avatar-circle" id="dSideAvatar">我</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="dSideName">创作者</div>
+          <div style="font-size:10px;color:#B0AA9F;margin-top:1px">个人资料</div>
+        </div>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="#C8C3BC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <div class="d-main">
+    <div class="d-content" id="dMainContent">
+      <!-- 由 JS 动态渲染 -->
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   JS · 公共工具
+   ============================================================ */
+const API_BASE = '';
+function dGetToken() { return localStorage.getItem('wf_token') || ''; }
+function dSetToken(t) { localStorage.setItem('wf_token', t); }
+function dClearAuth() { localStorage.removeItem('wf_token'); localStorage.removeItem('wf_user'); }
+function dGetUser() { try { return JSON.parse(localStorage.getItem('wf_user') || 'null'); } catch { return null; } }
+function dSetUser(u) { localStorage.setItem('wf_user', JSON.stringify(u)); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function dApi(method, path, data) {
+  const token = dGetToken();
+  const opts = {
+    method,
+    headers: { 'Content-Type':'application/json', ...(token ? {'Authorization':`Bearer ${token}`} : {}) }
+  };
+  if (data) opts.body = JSON.stringify(data);
+  try {
+    const res = await fetch(API_BASE + path, opts);
+    const raw = await res.text();
+    if (!raw.trim()) return { code: res.status || 500, msg: '服务器无响应' };
+    return JSON.parse(raw);
+  } catch (e) {
+    return { code: 500, msg: e.message };
+  }
+}
+const dHttp = {
+  get: (p) => dApi('GET', p),
+  post: (p, d) => dApi('POST', p, d),
+  put: (p, d) => dApi('PUT', p, d),
+};
+
+let _dToastTimer = null;
+function dToast(msg, dur=2500) {
+  const el = document.getElementById('dToast');
+  el.textContent = msg; el.classList.add('show');
+  if (_dToastTimer) clearTimeout(_dToastTimer);
+  _dToastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+/* ============================================================
+   JS · 全局桌面端状态 (dS)
+   ============================================================ */
+const dS = {
+  page: 'home',
+  userInfo: null,
+  // auth
+  phone: '', password: '', smsCode: '', smsSent: false, smsCountdown: 0,
+  authMode: 'sms',
+  // 克隆流程
+  extractStep: 0,       // 0=未开始 1=提取完 2=改写完 3=TTS完 4=数字人完 5=后期完
+  videoUrl: '',
+  extractedScript: '',
+  rewrittenScript: '', rewriteStyle: '',
+  // TTS
+  ttsAudioUrl: null, ttsAudioB64: null, ttsVoiceId: '', ttsEmotion: 'neutral',
+  ttsSpeed: 1.0, ttsVolume: 1.0,
+  myVoices: JSON.parse(localStorage.getItem('myVoices') || '[]'),
+  systemVoices: [],
+  // 数字人
+  avatarImageB64: null, avatarImageName: '', avatarImageFmt: 'jpg',
+  avatarTaskId: null, avatarGenerating: false,
+  avatarProgressMsg: '初始化中...', avatarProgressPct: 0,
+  avatarVideoUrl: null, avatarErr: '',
+  avatarBeauty: true,
+  // 任务列表
+  tasks: [], tasksLoaded: false,
+  // 个人资料
+  profileLoaded: false,
+};
+
+/* ============================================================
+   JS · 渲染入口
+   ============================================================ */
+function dRender() {
+  const el = document.getElementById('dMainContent');
+  if (!el) return;
+  switch (dS.page) {
+    case 'home':    el.innerHTML = dRenderHome(); dBindHome(); break;
+    case 'tasks':   el.innerHTML = dRenderTasks(); dBindTasks(); break;
+    case 'profile': el.innerHTML = dRenderProfile(); dBindProfile(); break;
+    default:        el.innerHTML = dRenderHome(); dBindHome();
+  }
+}
+
+function dGoPage(page) {
+  dS.page = page;
+  document.querySelectorAll('.d-nav-item').forEach(el => el.classList.remove('active'));
+  const navMap = { home:'dNavHome', tasks:'dNavTasks', profile:'' };
+  if (navMap[page]) document.getElementById(navMap[page])?.classList.add('active');
+  dRender();
+}
+
+/* ============================================================
+   JS · 登录 / Auth
+   ============================================================ */
+function dSwitchAuth(mode) {
+  dS.authMode = mode;
+  document.getElementById('dAuthSms').style.display = mode==='sms' ? '' : 'none';
+  document.getElementById('dAuthPwd').style.display = mode==='pwd' ? '' : 'none';
+  document.getElementById('dTabSms').className = 'd-auth-tab' + (mode==='sms' ? ' active' : '');
+  document.getElementById('dTabPwd').className = 'd-auth-tab' + (mode==='pwd' ? ' active' : '');
+}
+
+let _smsTimer = null;
+async function dSendSms() {
+  const phone = document.getElementById('dPhone')?.value?.trim() || dS.phone;
+  if (!/^1\d{10}$/.test(phone)) { dToast('请输入正确的手机号'); return; }
+  dS.phone = phone;
+  const btn = document.getElementById('dSendSmsBtn');
+  btn.disabled = true;
+  const r = await dHttp.post('/auth/send-sms', { phone });
+  if (r.code !== 200) { dToast(r.msg || '发送失败'); btn.disabled = false; return; }
+  dToast('验证码已发送');
+  dS.smsCountdown = 60;
+  _smsTimer = setInterval(() => {
+    dS.smsCountdown--;
+    btn.textContent = dS.smsCountdown > 0 ? `${dS.smsCountdown}s` : '重新发送';
+    if (dS.smsCountdown <= 0) { clearInterval(_smsTimer); btn.disabled = false; }
+  }, 1000);
+}
+
+async function dLoginSms() {
+  const phone = document.getElementById('dPhone')?.value?.trim() || dS.phone;
+  const code  = document.getElementById('dSmsCode')?.value?.trim() || dS.smsCode;
+  if (!phone || !code) { dShowAuthErr('请填写手机号和验证码'); return; }
+  const r = await dHttp.post('/auth/sms-login', { phone, code });
+  if (r.code !== 200) { dShowAuthErr(r.msg || '登录失败'); return; }
+  dSetToken(r.data.token); dSetUser(r.data.user);
+  dS.userInfo = r.data.user;
+  dInitApp();
+}
+
+async function dLoginPwd() {
+  const phone = document.getElementById('dPwdPhone')?.value?.trim() || dS.phone;
+  const password = document.getElementById('dPwdInput')?.value || dS.password;
+  if (!phone || !password) { dShowPwdErr('请填写手机号和密码'); return; }
+  const r = await dHttp.post('/auth/login', { phone, password });
+  if (r.code !== 200) { dShowPwdErr(r.msg || '登录失败'); return; }
+  dSetToken(r.data.token); dSetUser(r.data.user);
+  dS.userInfo = r.data.user;
+  dInitApp();
+}
+
+function dShowAuthErr(msg) {
+  const el = document.getElementById('dAuthErr');
+  if (el) { el.textContent = msg; el.style.display = ''; }
+}
+function dShowPwdErr(msg) {
+  const el = document.getElementById('dPwdErr');
+  if (el) { el.textContent = msg; el.style.display = ''; }
+}
+
+/* ============================================================
+   JS · 初始化
+   ============================================================ */
+async function dInitApp() {
+  document.getElementById('dLoginModal').style.display = 'none';
+  document.getElementById('dApp').style.display = 'flex';
+  // 拉取用户信息
+  const r = await dHttp.get('/auth/me');
+  if (r.code === 200) {
+    dS.userInfo = r.data;
+    dSetUser(r.data);
+  } else if (r.code === 401) {
+    dClearAuth(); dShowLogin(); return;
+  }
+  // 拉取 TTS 声音列表
+  const sv = await dHttp.get('/ai/voices');
+  if (sv.code === 200) dS.systemVoices = sv.data || [];
+  // 更新侧边栏用户信息
+  dUpdateSideUser();
+  dRender();
+}
+
+function dUpdateSideUser() {
+  const u = dS.userInfo;
+  if (!u) return;
+  const name = u.nickname || u.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') || '创作者';
+  const el = document.getElementById('dSideName');
+  const av = document.getElementById('dSideAvatar');
+  if (el) el.textContent = name;
+  if (av) av.textContent = name.charAt(0);
+}
+
+function dShowLogin() {
+  document.getElementById('dLoginModal').style.display = 'flex';
+  document.getElementById('dApp').style.display = 'none';
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (dGetToken()) {
+    document.getElementById('dApp').style.display = 'flex';
+    document.getElementById('dLoginModal').style.display = 'none';
+    dInitApp();
+  } else {
+    dShowLogin();
+  }
+});
+
+/* ============================================================
+   JS · 桌面端 · 克隆流程页 (dRenderHome)
+   ============================================================ */
+function dStepCircle(step, current) {
+  const cls = step < current ? 'done' : step === current ? 'active' : 'idle';
+  const icon = step < current
+    ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    : step + 1;
+  return `<div class="d-step-circle ${cls}">${icon}</div>`;
+}
+
+function dRenderHome() {
+  const cur = dCurrentStep();
+  const steps = ['提取','改写','语音','数字人','后期'];
+  const stepBar = `
+  <div class="d-step-bar">
+    ${steps.map((s,i) => `
+      <div class="d-step-item">
+        ${dStepCircle(i, cur)}
+        <div class="d-step-label ${i===cur?'active':''}">${s}</div>
+      </div>
+      ${i < steps.length-1 ? `<div class="d-step-line ${i < cur ? 'done' : ''}"></div>` : ''}
+    `).join('')}
+  </div>`;
+
+  return `
+  <div>
+    <!-- 顶部信息栏 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:18px;font-weight:700;color:#1A1614">克隆流程</div>
+      <button class="d-btn d-btn-ghost" onclick="dResetFlow()" style="font-size:12px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M3 12C3 7.03 7.03 3 12 3C15.4 3 18.35 4.85 20 7.6M21 12C21 16.97 16.97 21 12 21C8.6 21 5.65 19.15 4 16.4" stroke="#6E6860" stroke-width="2" stroke-linecap="round"/><path d="M20 3V8H15" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 21V16H9" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        清空流程
+      </button>
+    </div>
+
+    ${stepBar}
+
+    <!-- 第一行：提取 + 改写 + 语音（3列） -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;margin-bottom:14px">
+      ${dCardExtract()}
+      ${dCardRewrite()}
+      ${dCardTTS()}
+    </div>
+
+    <!-- 第二行：数字人 + 后期（2列） -->
+    <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px">
+      ${dCardAvatar()}
+      ${dCardPostProcess()}
+    </div>
+  </div>`;
+}
+
+function dCurrentStep() {
+  if (dS.extractStep === 0) return 0;
+  if (dS.extractStep === 1) return 1;
+  if (dS.extractStep === 2) return 2;
+  if (dS.extractStep === 3 || dS.extractStep === 'tts_gen') return 3;
+  if (dS.extractStep === 4 || dS.extractStep === 'avatar_gen') return 4;
+  if (dS.extractStep === 5) return 4;
+  return 0;
+}
+
+function dStepState(stepIdx) {
+  const cur = dCurrentStep();
+  if (stepIdx < cur) return 'done';
+  if (stepIdx === cur) return 'active';
+  return 'idle';
+}
+
+/* ① 提取卡片 */
+function dCardExtract() {
+  const st = dStepState(0);
+  return `
+  <div class="d-card ${st==='active'?'active-card':''}">
+    <div class="d-card-header ${st==='active'?'active-header':''}">
+      <div class="d-card-title-row">
+        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'1'}</div>
+        <span class="d-card-title">① 提取文案</span>
+      </div>
+      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+    </div>
+    <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
+      <div>
+        <div class="d-label">视频链接（抖音）</div>
+        <input class="d-input" id="dVideoUrl" placeholder="粘贴抖音视频链接" value="${esc(dS.videoUrl)}" oninput="dS.videoUrl=this.value">
+      </div>
+      ${dS.extractedScript ? `
+        <div>
+          <div class="d-label">提取的文案</div>
+          <textarea class="d-textarea" id="dExtractedScript" style="height:90px" oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>
+        </div>
+      ` : ''}
+      <button class="d-btn-lg" id="dExtractBtn" onclick="dHandleExtract()" ${dS.extractLoading?'disabled':''} style="padding:10px;font-size:13px">
+        ${dS.extractLoading ? '提取中...' : dS.extractedScript ? '重新提取' : '提取文案'}
+      </button>
+      ${dS.extractErr ? `<div class="d-err">${esc(dS.extractErr)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ② 改写卡片 */
+function dCardRewrite() {
+  const st = dStepState(1);
+  const locked = dS.extractStep < 1;
+  return `
+  <div class="d-card ${st==='active'?'active-card':''}">
+    <div class="d-card-header ${st==='active'?'active-header':''}">
+      <div class="d-card-title-row">
+        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'2'}</div>
+        <span class="d-card-title">② AI 改写</span>
+      </div>
+      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+    </div>
+    <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
+      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤①提取文案</div>' : `
+      <div>
+        <div class="d-label">改写风格</div>
+        <select class="d-select" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
+          <option value="">智能匹配</option>
+          <option value="hook">强钩子开头</option>
+          <option value="emotion">情感共鸣</option>
+          <option value="problem">问题解决</option>
+          <option value="list">干货列表</option>
+        </select>
+      </div>
+      ${dS.rewrittenScript ? `
+        <div>
+          <div class="d-label">改写结果</div>
+          <textarea class="d-textarea" id="dRewrittenScript" style="height:90px" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
+          <div style="font-size:11px;color:#22C55E;margin-top:4px">✓ 共 ${dS.rewrittenScript.length} 字</div>
+        </div>
+      ` : ''}
+      <button class="d-btn-lg" id="dRewriteBtn" onclick="dHandleRewrite()" style="padding:10px;font-size:13px">
+        ${dS.rewriteLoading ? '改写中...' : dS.rewrittenScript ? '重新改写' : 'AI 改写'}
+      </button>
+      ${dS.rewriteErr ? `<div class="d-err">${esc(dS.rewriteErr)}</div>` : ''}
+      `}
+    </div>
+  </div>`;
+}
+
+/* ③ 语音合成卡片 */
+function dCardTTS() {
+  const st = dStepState(2);
+  const locked = dS.extractStep < 2;
+  const allVoices = [
+    ...dS.systemVoices,
+    ...dS.myVoices.map(v => ({ id: v.id || v.name, name: `🎙 ${v.name}` }))
+  ];
+  const emotions = [
+    { id:'neutral', label:'自然' }, { id:'happy', label:'愉悦' },
+    { id:'sad', label:'悲伤' }, { id:'serious', label:'严肃' },
+  ];
+  const speedPct = ((dS.ttsSpeed - 0.5) / 1.5) * 100;
+  const volPct = dS.ttsVolume * 100;
+  return `
+  <div class="d-card ${st==='active'?'active-card':''}">
+    <div class="d-card-header ${st==='active'?'active-header':''}">
+      <div class="d-card-title-row">
+        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'3'}</div>
+        <span class="d-card-title">③ 语音合成</span>
+      </div>
+      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+    </div>
+    <div class="d-card-body" style="display:flex;flex-direction:column;gap:11px">
+      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤②改写文案</div>' : `
+      <div>
+        <div class="d-label">选择声音</div>
+        <select class="d-select" id="dTtsVoice" onchange="dS.ttsVoiceId=this.value">
+          <option value="">— 选择声音 —</option>
+          ${allVoices.map(v => `<option value="${esc(v.id)}" ${dS.ttsVoiceId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div class="d-label">情绪</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap" id="dEmotionGroup">
+          ${emotions.map(e => `
+            <div class="d-emotion ${dS.ttsEmotion===e.id?'active':'inactive'}" onclick="dSetEmotion('${e.id}')">${e.label}</div>
+          `).join('')}
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <div class="d-label" style="margin:0">语速</div>
+          <div style="font-size:12px;font-weight:700;color:#F5762A" id="dSpeedVal">${dS.ttsSpeed.toFixed(1)}x</div>
+        </div>
+        <div class="d-slider-wrap">
+          <div class="d-slider-track"><div class="d-slider-fill" id="dSpeedFill" style="width:${speedPct}%"></div></div>
+          <div class="d-slider-thumb" id="dSpeedThumb" style="left:${speedPct}%"></div>
+          <input type="range" class="d-slider-input" min="50" max="200" value="${dS.ttsSpeed*100}" oninput="dOnSpeed(this.value)">
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <div class="d-label" style="margin:0">音量</div>
+          <div style="font-size:12px;font-weight:700;color:#F5762A" id="dVolVal">${Math.round(dS.ttsVolume*100)}%</div>
+        </div>
+        <div class="d-slider-wrap">
+          <div class="d-slider-track"><div class="d-slider-fill" id="dVolFill" style="width:${volPct}%"></div></div>
+          <div class="d-slider-thumb" id="dVolThumb" style="left:${volPct}%"></div>
+          <input type="range" class="d-slider-input" min="0" max="100" value="${dS.ttsVolume*100}" oninput="dOnVolume(this.value)">
+        </div>
+      </div>
+      ${dS.ttsAudioUrl ? `
+        <div style="background:#F7F5F1;border-radius:12px;padding:10px 14px;border:1px solid #EDE9E3">
+          <audio controls src="${dS.ttsAudioUrl}" style="width:100%;height:32px"></audio>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="d-btn d-btn-ghost" onclick="dHandleTTS()" style="flex:1">重新合成</button>
+          <button class="d-btn d-btn-primary" onclick="dGoStep(3)" style="flex:1">下一步 →</button>
+        </div>
+      ` : `
+        <button class="d-btn-lg" id="dTtsBtn" onclick="dHandleTTS()" style="padding:10px;font-size:13px">
+          ${dS.ttsLoading ? '合成中...' : '开始语音合成'}
+        </button>
+      `}
+      ${dS.ttsErr ? `<div class="d-err">${esc(dS.ttsErr)}</div>` : ''}
+      `}
+    </div>
+  </div>`;
+}
+
+/* ④ 数字人卡片 */
+function dCardAvatar() {
+  const st = dStepState(3);
+  const locked = dS.extractStep < 3;
+  const generating = dS.extractStep === 'avatar_gen' || dS.avatarGenerating;
+  return `
+  <div class="d-card ${st==='active'?'active-card':''}">
+    <div class="d-card-header ${st==='active'?'active-header':''}">
+      <div class="d-card-title-row">
+        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'4'}</div>
+        <span class="d-card-title">④ 数字人生成</span>
+      </div>
+      <span class="d-step-badge ${st}">${st==='done'?'已完成':generating?'● 生成中':st==='active'?'● 进行中':'待处理'}</span>
+    </div>
+    <div class="d-card-body">
+      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤③语音合成</div>' :
+      generating ? `
+        <div style="text-align:center;padding:16px 0">
+          <div style="font-size:13px;font-weight:600;color:#1A1614;margin-bottom:8px">${esc(dS.avatarProgressMsg)}</div>
+          <div class="d-progress-bar" style="margin-bottom:8px"><div class="d-progress-fill" style="width:${dS.avatarProgressPct}%"></div></div>
+          <div style="font-size:12px;color:#B0AA9F">GPU 渲染中，通常 1~3 分钟</div>
+        </div>
+      ` : dS.avatarVideoUrl ? `
+        <div>
+          <video src="${dS.avatarVideoUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:240px;margin-bottom:10px"></video>
+          <div style="display:flex;gap:8px">
+            <button class="d-btn d-btn-ghost" onclick="dResetAvatar()" style="flex:1">重新生成</button>
+            <button class="d-btn d-btn-primary" onclick="dGoStep(4)" style="flex:1">下一步 →</button>
+          </div>
+        </div>
+      ` : `
+        <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:12px">
+          <div>
+            <div class="d-label">上传人脸图片</div>
+            <div style="width:100%;aspect-ratio:1;border:2px dashed #D4D0C8;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:all 0.15s;margin-bottom:8px;background:${dS.avatarImageB64?'transparent':'#F9F8F6'}"
+              onclick="document.getElementById('dAvatarImgInput').click()"
+              onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
+              ${dS.avatarImageB64
+                ? `<img src="data:image/${dS.avatarImageFmt};base64,${dS.avatarImageB64}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`
+                : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#C4C0B8" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="#C4C0B8" stroke-width="2"/></svg>
+                   <div style="font-size:11px;color:#B0AA9F">${dS.avatarImageName || '选择图片'}</div>`
+              }
+            </div>
+            <input type="file" id="dAvatarImgInput" accept="image/jpeg,image/png" style="display:none" onchange="dHandleAvatarImg(event)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;color:#6E6860">面部增强</span>
+              <div class="d-toggle ${dS.avatarBeauty?'on':'off'}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"><div class="d-toggle-ball"></div></div>
+            </div>
+          </div>
+          <div>
+            <div class="d-label">数字人预览区</div>
+            <div style="background:#2A2620;border-radius:10px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
+              <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center">生成后在此预览</div>
+            </div>
+          </div>
+        </div>
+        <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" style="margin-top:12px;font-size:13px;padding:10px"
+          ${(!dS.avatarImageB64 || !dS.ttsAudioUrl) ? 'disabled' : ''}>
+          开始生成数字人视频
+        </button>
+        ${!dS.ttsAudioUrl ? '<div style="font-size:11px;color:#EF4444;text-align:center;margin-top:6px">需要先完成语音合成</div>' : ''}
+        ${!dS.avatarImageB64 ? '<div style="font-size:11px;color:#EF4444;text-align:center;margin-top:4px">需要先上传人脸图片</div>' : ''}
+        ${dS.avatarErr ? `<div class="d-err" style="margin-top:8px">${esc(dS.avatarErr)}</div>` : ''}
+      `}
+    </div>
+  </div>`;
+}
+
+/* ⑤ 后期卡片 */
+function dCardPostProcess() {
+  const st = dStepState(4);
+  const locked = dS.extractStep < 4;
+  return `
+  <div class="d-card ${st==='active'?'active-card':''}">
+    <div class="d-card-header ${st==='active'?'active-header':''}">
+      <div class="d-card-title-row">
+        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'5'}</div>
+        <span class="d-card-title">⑤ 后期制作</span>
+      </div>
+      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+    </div>
+    <div class="d-card-body">
+      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤④数字人生成</div>' : `
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px">
+        <div>
+          ${dS.avatarVideoUrl ? `<video src="${dS.avatarVideoUrl}" style="width:100%;border-radius:10px;max-height:120px;margin-bottom:10px" controls></video>` : ''}
+          <div class="d-label">字幕颜色</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            ${['#FFFFFF','#FF6B35','#FFD700','#7EF09F'].map((c,i) => `
+              <div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${i===0?'#F5762A':'#E8E4DF'};cursor:pointer"
+                onclick="dS.subColor='${c}';dRender()"></div>
+            `).join('')}
+          </div>
+          <div class="d-label">字体大小</div>
+          <div class="d-slider-wrap">
+            <div class="d-slider-track"><div class="d-slider-fill" style="width:50%"></div></div>
+            <div class="d-slider-thumb" style="left:50%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="d-label">描边颜色</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            ${['#1A1614','#F5762A','#fff'].map((c,i) => `
+              <div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${i===0?'#F5762A':'#E8E4DF'};cursor:pointer"></div>
+            `).join('')}
+          </div>
+          <div class="d-label">边框样式</div>
+          <div style="display:flex;gap:5px;margin-bottom:10px">
+            ${['无','圆角','矩形'].map((v,i) => `
+              <div style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:${i===0?'#F5762A':'#F7F5F1'};color:${i===0?'#fff':'#9E9890'};cursor:pointer">${v}</div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <button class="d-btn-lg" onclick="dToast('后期制作功能即将完善')" style="margin-top:12px;font-size:13px;padding:10px">
+        开始后期合成
+      </button>
+      `}
+    </div>
+  </div>`;
+}
+
+function dBindHome() {
+  // 滑块绑定由 oninput 行内处理
+}
+
+function dOnSpeed(val) {
+  dS.ttsSpeed = val / 100;
+  const pct = ((dS.ttsSpeed - 0.5) / 1.5) * 100;
+  const fill = document.getElementById('dSpeedFill');
+  const thumb = document.getElementById('dSpeedThumb');
+  const label = document.getElementById('dSpeedVal');
+  if (fill) fill.style.width = pct + '%';
+  if (thumb) thumb.style.left = pct + '%';
+  if (label) label.textContent = dS.ttsSpeed.toFixed(1) + 'x';
+}
+
+function dOnVolume(val) {
+  dS.ttsVolume = val / 100;
+  const pct = dS.ttsVolume * 100;
+  const fill = document.getElementById('dVolFill');
+  const thumb = document.getElementById('dVolThumb');
+  const label = document.getElementById('dVolVal');
+  if (fill) fill.style.width = pct + '%';
+  if (thumb) thumb.style.left = pct + '%';
+  if (label) label.textContent = Math.round(dS.ttsVolume * 100) + '%';
+}
+
+function dSetEmotion(id) {
+  dS.ttsEmotion = id;
+  document.querySelectorAll('#dEmotionGroup .d-emotion').forEach(el => {
+    el.className = 'd-emotion ' + (el.onclick?.toString().includes(id) ? 'active' : 'inactive');
+  });
+  // 重新渲染情绪组
+  const g = document.getElementById('dEmotionGroup');
+  if (!g) return;
+  const emotions = [
+    { id:'neutral', label:'自然' }, { id:'happy', label:'愉悦' },
+    { id:'sad', label:'悲伤' }, { id:'serious', label:'严肃' },
+  ];
+  g.innerHTML = emotions.map(e => `
+    <div class="d-emotion ${dS.ttsEmotion===e.id?'active':'inactive'}" onclick="dSetEmotion('${e.id}')">${e.label}</div>
+  `).join('');
+}
+
+function dGoStep(step) {
+  dS.extractStep = step;
+  dRender();
+}
+
+function dResetFlow() {
+  if (!confirm('确认清空当前克隆流程？')) return;
+  dS.extractStep = 0;
+  dS.videoUrl = ''; dS.extractedScript = ''; dS.rewrittenScript = '';
+  dS.ttsAudioUrl = null; dS.ttsAudioB64 = null;
+  dS.avatarImageB64 = null; dS.avatarTaskId = null;
+  dS.avatarVideoUrl = null; dS.avatarErr = ''; dS.avatarGenerating = false;
+  dRender();
+}
+
+function dResetAvatar() {
+  dS.avatarVideoUrl = null; dS.avatarTaskId = null;
+  dS.extractStep = 3; dS.avatarErr = '';
+  dRender();
+}
+
+/* ============================================================
+   JS · 克隆流程 · API 调用
+   ============================================================ */
+
+/* ① 提取 */
+async function dHandleExtract() {
+  const url = document.getElementById('dVideoUrl')?.value?.trim() || dS.videoUrl;
+  if (!url) { dToast('请输入视频链接'); return; }
+  dS.videoUrl = url;
+  dS.extractLoading = true; dS.extractErr = '';
+  dRender();
+  const r = await dHttp.post('/ai/extract', { url });
+  dS.extractLoading = false;
+  if (r.code !== 200) {
+    dS.extractErr = r.msg || '提取失败'; dRender(); return;
+  }
+  dS.extractedScript = r.data?.script || r.data?.text || '';
+  dS.cloneTaskId = r.data?.taskId || null;
+  dS.extractStep = 1;
+  dRender();
+}
+
+/* ② 改写 */
+async function dHandleRewrite() {
+  const script = document.getElementById('dExtractedScript')?.value || dS.extractedScript;
+  if (!script) { dToast('没有文案可改写'); return; }
+  dS.extractedScript = script;
+  dS.rewriteLoading = true; dS.rewriteErr = '';
+  dRender();
+  const style = document.getElementById('dRewriteStyle')?.value || dS.rewriteStyle;
+  const r = await dHttp.post('/ai/rewrite', {
+    script, style,
+    ...(dS.cloneTaskId ? { taskId: dS.cloneTaskId } : {})
+  });
+  dS.rewriteLoading = false;
+  if (r.code !== 200) {
+    dS.rewriteErr = r.msg || '改写失败'; dRender(); return;
+  }
+  dS.rewrittenScript = r.data?.rewritten || r.data?.script || '';
+  dS.extractStep = 2;
+  dRender();
+}
+
+/* ③ TTS */
+async function dHandleTTS() {
+  const voiceId = document.getElementById('dTtsVoice')?.value || dS.ttsVoiceId;
+  if (!voiceId) { dToast('请选择声音'); return; }
+  const text = dS.rewrittenScript || dS.extractedScript;
+  if (!text) { dToast('没有文案'); return; }
+  dS.ttsLoading = true; dS.ttsErr = ''; dS.ttsVoiceId = voiceId;
+  dRender();
+  const r = await dHttp.post('/ai/tts', {
+    text, voice_id: voiceId,
+    speed: dS.ttsSpeed, volume: dS.ttsVolume,
+    emotion: dS.ttsEmotion,
+  });
+  dS.ttsLoading = false;
+  if (r.code !== 200) {
+    dS.ttsErr = r.msg || '语音合成失败'; dRender(); return;
+  }
+  // 后端返回 audio_b64 或 audio_url
+  if (r.data?.audio_b64) {
+    const b64 = r.data.audio_b64;
+    dS.ttsAudioB64 = b64;
+    const raw = atob(b64); const buf = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+    dS.ttsAudioUrl = URL.createObjectURL(new Blob([buf], { type:'audio/mp3' }));
+  } else if (r.data?.audio_url) {
+    dS.ttsAudioUrl = r.data.audio_url;
+  }
+  dS.extractStep = 3;
+  dRender();
+}
+
+/* ④ 数字人 · 上传图片 */
+function dHandleAvatarImg(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  dS.avatarImageName = file.name;
+  dS.avatarImageFmt = file.type === 'image/png' ? 'png' : 'jpg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const result = e.target.result;
+    dS.avatarImageB64 = result.split(',')[1];
+    dRender();
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ④ 数字人 · 提交生成 */
+let _dAvatarPoller = null;
+let _dAvatarRunSeq = 0;
+
+async function dHandleAvatarGenerate() {
+  if (!dS.avatarImageB64) { dToast('请先上传人脸图片'); return; }
+  if (!dS.ttsAudioB64 && !dS.ttsAudioUrl) { dToast('请先完成语音合成'); return; }
+  dS.avatarGenerating = true; dS.avatarErr = '';
+  dS.avatarProgressMsg = '正在提交任务...'; dS.avatarProgressPct = 10;
+  dS.extractStep = 'avatar_gen';
+  dRender();
+
+  const body = {
+    image_b64: dS.avatarImageB64,
+    image_fmt: dS.avatarImageFmt,
+    beauty: dS.avatarBeauty,
+    ...(dS.ttsAudioB64 ? { audio_b64: dS.ttsAudioB64 } : {}),
+  };
+
+  const r = await dHttp.post('/ai/video/submit', body);
+  if (r.code !== 200) {
+    dS.avatarGenerating = false; dS.avatarErr = r.msg || '提交失败';
+    dS.extractStep = 3; dRender(); return;
+  }
+  const taskId = r.data?.task_id;
+  dS.avatarTaskId = taskId;
+  dS.avatarProgressMsg = '任务已提交，等待 GPU 渲染...';
+  dS.avatarProgressPct = 20;
+  dRender();
+  _dAvatarRunSeq++;
+  _dStartAvatarPoller(taskId, _dAvatarRunSeq);
+}
+
+function _dStartAvatarPoller(taskId, runSeq) {
+  if (_dAvatarPoller) clearInterval(_dAvatarPoller);
+  let elapsed = 0;
+  let inFlight = false;
+  _dAvatarPoller = setInterval(async () => {
+    if (runSeq !== _dAvatarRunSeq) { clearInterval(_dAvatarPoller); return; }
+    if (inFlight) return;
+    inFlight = true; elapsed += 10;
+    try {
+      const r = await dHttp.get(`/ai/video/task/${taskId}`);
+      if (r.code !== 200) { inFlight = false; return; }
+      const t = r.data;
+      const pct = Math.min(90, 20 + elapsed * 0.5);
+      dS.avatarProgressPct = pct;
+      dS.avatarProgressMsg = t.msg || '处理中...';
+      _dUpdateAvatarProgress();
+      if (t.status === 'done' && t.video_direct_url) {
+        clearInterval(_dAvatarPoller); _dAvatarPoller = null;
+        dS.avatarProgressMsg = '生成完成，正在加载视频...'; dS.avatarProgressPct = 95;
+        _dUpdateAvatarProgress();
+        try {
+          const streamUrl = `/ai/video/stream/${taskId}?t=${encodeURIComponent(dGetToken())}`;
+          const resp = await fetch(streamUrl);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const blob = await resp.blob();
+          const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type:'video/mp4' });
+          dS.avatarVideoUrl = URL.createObjectURL(mp4Blob);
+        } catch (e) {
+          dS.avatarErr = `视频加载失败: ${e.message}`;
+        }
+        dS.avatarGenerating = false; dS.extractStep = 4;
+        dRender();
+      } else if (t.status === 'error') {
+        clearInterval(_dAvatarPoller);
+        dS.avatarGenerating = false; dS.avatarErr = t.error || '生成失败';
+        dS.extractStep = 3; dRender();
+      }
+    } catch(e) {
+      console.error('[d-avatar]', e);
+    } finally { inFlight = false; }
+  }, 10000);
+}
+
+function _dUpdateAvatarProgress() {
+  const msgEl = document.querySelector('#dMainContent .d-progress-fill');
+  const txtEl = document.querySelector('#dMainContent .d-card-body div[style*="text-align:center"] div:first-child');
+  if (msgEl) msgEl.style.width = dS.avatarProgressPct + '%';
+  if (txtEl) txtEl.textContent = dS.avatarProgressMsg;
+}
+
+/* ============================================================
+   JS · 任务列表页 (dRenderTasks)
+   ============================================================ */
+const STEP_LABELS = ['提取','改写','语音','数字人','后期','发布'];
+
+function dRenderTasks() {
+  const tasks = dS.tasks;
+  const rows = tasks.length === 0
+    ? `<tr><td colspan="4" style="text-align:center;padding:40px;color:#B0AA9F;font-size:13px">
+        ${dS.tasksLoaded ? '暂无任务，去克隆第一条视频吧 🎬' : '加载中...'}
+       </td></tr>`
+    : tasks.map(t => {
+        const steps = dTaskSteps(t);
+        const cur = steps.findIndex(s => s !== 'done');
+        const nextLabel = cur >= 0 ? `去${STEP_LABELS[cur]}` : '已完成';
+        const nextColor = cur >= 0 ? '#F5762A' : '#22C55E';
+        return `
+        <tr onclick="dOpenTask('${t.id}')" style="cursor:pointer">
+          <td><div style="font-size:13px;font-weight:500;color:#1A1614;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title || t.videoTitle || '无标题')}</div></td>
+          <td><div style="font-size:12px;color:#B0AA9F;white-space:nowrap">${dFmtTime(t.createdAt || t.created_at)}</div></td>
+          <td>
+            <div class="d-dots">
+              ${steps.map((s,i) => `
+                <div class="d-dot ${s}">${s==='done'?'<svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':`<span style="font-size:8px">${i+1}</span>`}</div>
+                ${i < steps.length-1 ? `<div class="d-dot-line ${s==='done'?'done':''}"></div>` : ''}
+              `).join('')}
+            </div>
+          </td>
+          <td style="text-align:right;padding-right:20px">
+            <span style="font-size:12px;font-weight:600;color:${nextColor}">${nextLabel} ${cur>=0?'›':''}</span>
+          </td>
+        </tr>`;
+      }).join('');
+  return `
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:18px;font-weight:700;color:#1A1614">我的任务</div>
+      <button class="d-btn d-btn-primary" onclick="dGoPage('home')" style="gap:5px;padding:8px 18px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+        新建克隆
+      </button>
+    </div>
+    <div class="d-card">
+      <table class="d-table">
+        <thead>
+          <tr>
+            <th style="width:42%">任务标题</th>
+            <th style="width:16%">创建时间</th>
+            <th style="width:30%">进度</th>
+            <th style="width:12%;text-align:right;padding-right:20px">操作</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function dTaskSteps(t) {
+  // 根据任务数据推断各步骤状态
+  const has = field => t[field] != null && t[field] !== '';
+  return [
+    has('videoTitle') || has('script') ? 'done' : 'idle',
+    has('rewritten') ? 'done' : 'idle',
+    has('audioUrl') || has('ttsAudio') ? 'done' : 'idle',
+    has('videoUrl') || has('avatarVideo') ? 'done' : 'idle',
+    has('finalVideo') ? 'done' : 'idle',
+    'idle',
+  ];
+}
+
+function dFmtTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function dOpenTask(id) {
+  dToast('正在恢复任务...');
+  // TODO: 恢复任务状态后跳转克隆流程
+}
+
+async function dBindTasks() {
+  if (!dS.tasksLoaded) {
+    const r = await dHttp.get('/history/clone');
+    if (r.code === 200) {
+      dS.tasks = r.data || [];
+      dS.tasksLoaded = true;
+      dRender(); // 重新渲染带数据的版本
+    }
+  }
+}
+
+/* ============================================================
+   JS · 个人资料页 (dRenderProfile)
+   ============================================================ */
+function dRenderProfile() {
+  const u = dS.userInfo || {};
+  const name = u.nickname || u.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') || '创作者';
+  const phone = u.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') || '未绑定';
+  const expire = u.memberExpire || u.member_expire || '—';
+  const usedToday = u.usedToday ?? u.used_today ?? 0;
+  const dailyLimit = u.dailyLimit || u.daily_limit || '无限制';
+  return `
+  <div>
+    <div style="font-size:18px;font-weight:700;color:#1A1614;margin-bottom:20px">个人资料</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+      <!-- 左列 -->
+      <div>
+        <!-- 用户卡 -->
+        <div style="background:linear-gradient(135deg,#FF8040,#F5602A,#E84D1C);border-radius:20px;padding:22px 26px;margin-bottom:14px;box-shadow:0 6px 24px rgba(245,96,42,0.3);position:relative;overflow:hidden">
+          <div style="position:absolute;top:-30px;right:60px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.07)"></div>
+          <div style="display:flex;align-items:center;gap:14px;position:relative">
+            <div style="width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0">${name.charAt(0)}</div>
+            <div style="flex:1">
+              <div style="font-size:17px;font-weight:700;color:#fff">${esc(name)}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px">${esc(phone)}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:24px;margin-top:18px;position:relative">
+            ${[{val: usedToday, lab:'今日已用'},{val: dailyLimit, lab:'每日上限'},{val: expire, lab:'会员到期'}].map(s => `
+              <div>
+                <div style="font-size:15px;font-weight:700;color:#fff">${esc(String(s.val))}</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:2px">${s.lab}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 账号安全 -->
+        <div class="d-card">
+          <div style="padding:12px 18px 0;font-size:12px;font-weight:700;color:#9E9890;letter-spacing:0.5px">账号安全</div>
+          <div style="padding:14px 18px;display:flex;align-items:center;border-bottom:1px solid #F7F5F1">
+            <div style="font-size:13px;font-weight:500;color:#1A1614;width:80px;flex-shrink:0">手机号</div>
+            <div style="flex:1;font-size:13px;color:#6E6860">${esc(phone)}</div>
+          </div>
+          <div style="padding:14px 18px;display:flex;align-items:center">
+            <div style="font-size:13px;font-weight:500;color:#1A1614;width:80px;flex-shrink:0">登录密码</div>
+            <div style="flex:1;font-size:13px;color:#6E6860">已设置</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右列 -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <!-- 授权码 -->
+        <div class="d-card">
+          <div style="padding:12px 18px 0;font-size:12px;font-weight:700;color:#9E9890;letter-spacing:0.5px">授权管理</div>
+          <div style="padding:14px 18px;display:flex;align-items:center;gap:10px">
+            <input class="d-input" id="dAuthCodeInput" placeholder="输入授权码..." style="flex:1">
+            <button class="d-btn d-btn-ghost" onclick="dSubmitAuthCode()" style="flex-shrink:0;white-space:nowrap">确认</button>
+          </div>
+          <div id="dAuthCodeMsg" style="display:none;padding:0 18px 12px;font-size:12px;color:#22C55E"></div>
+        </div>
+
+        <!-- 退出 -->
+        <button class="d-btn d-btn-danger" onclick="dLogout()" style="width:100%;padding:12px;font-size:14px;border-radius:14px">
+          退出登录
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function dBindProfile() {}
+
+async function dSubmitAuthCode() {
+  const code = document.getElementById('dAuthCodeInput')?.value?.trim();
+  if (!code) { dToast('请输入授权码'); return; }
+  const r = await dHttp.post('/auth/auth-code', { code });
+  const msgEl = document.getElementById('dAuthCodeMsg');
+  if (r.code === 200) {
+    if (msgEl) { msgEl.textContent = '授权成功！'; msgEl.style.display = ''; msgEl.style.color = '#22C55E'; }
+    dToast('授权成功');
+    // 刷新用户信息
+    const mr = await dHttp.get('/auth/me');
+    if (mr.code === 200) { dS.userInfo = mr.data; dRender(); }
+  } else {
+    if (msgEl) { msgEl.textContent = r.msg || '授权失败'; msgEl.style.display = ''; msgEl.style.color = '#E5534B'; }
+  }
+}
+
+function dLogout() {
+  if (!confirm('确认退出登录？')) return;
+  dClearAuth();
+  dS.userInfo = null;
+  dShowLogin();
+}
+</script>
+</body>
+</html>
