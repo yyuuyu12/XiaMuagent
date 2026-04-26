@@ -4653,7 +4653,8 @@ async function saveCloneSession(cloneStep) {
     ttsSpeed:         S.ttsSpeed,
     ttsAudioB64:      S.ttsAudioB64      || null,   // 步骤3完成后有值
     ttsIndexEmotion:  S.ttsIndexEmotion  || 'neutral',
-    avatarVideoB64:   S.avatarVideoB64   || null,   // 步骤4完成后有值
+    avatarVideoB64:   S.avatarVideoB64   || null,   // 步骤4完成后有值（旧流程）
+    avatarDoneTaskId: S.avatarDoneTaskId || null,   // 步骤4完成后有值（新流程，用于恢复视频）
     avatarTaskId:     S.avatarTaskId     || null,   // 数字人生成任务ID（生成中时有值）
     avatarAsrUrl:     S.avatarAsrUrl     || null,   // 数字人服务地址（用于恢复poller）
     avatarLibKey:     S.avatarLibKey     || null,
@@ -4741,10 +4742,24 @@ async function restoreCloneSession(taskId) {
       patch.ttsAudioB64 = s.ttsAudioB64;
       patch.ttsAudioUrl = _b64ToBlobUrl(s.ttsAudioB64, 'audio/mp3');
     }
-    // 数字人视频 base64 → Blob URL 恢复
+    // 数字人视频恢复：优先用 base64，其次用 doneTaskId 重新拉取
     if (s.avatarVideoB64) {
       patch.avatarVideoB64 = s.avatarVideoB64;
       patch.avatarVideoUrl = _b64ToBlobUrl(s.avatarVideoB64, 'video/mp4');
+    } else if (s.avatarDoneTaskId) {
+      patch.avatarDoneTaskId = s.avatarDoneTaskId;
+      // 异步拉取视频，不阻塞 setState
+      setTimeout(async () => {
+        try {
+          const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
+          const resp = await fetch(streamUrl);
+          if (!resp.ok) return;
+          const blob = await resp.blob();
+          if (!blob.size) return;
+          const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
+          setState({ avatarVideoUrl: URL.createObjectURL(mp4Blob) });
+        } catch {}
+      }, 300);
     } else if (s.avatarTaskId && s.avatarAsrUrl) {
       // 视频未完成但有任务ID → 恢复"生成中"状态并重启poller
       patch.avatarTaskId    = s.avatarTaskId;
