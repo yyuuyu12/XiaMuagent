@@ -399,7 +399,7 @@ html, body {
 /* ============================================================
    JS · 公共工具
    ============================================================ */
-const API_BASE = '';
+const API_BASE = `${location.origin}/api`;
 function dGetToken() { return localStorage.getItem('wf_token') || ''; }
 function dSetToken(t) { localStorage.setItem('wf_token', t); }
 function dClearAuth() { localStorage.removeItem('wf_token'); localStorage.removeItem('wf_user'); }
