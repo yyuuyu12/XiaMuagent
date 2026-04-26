@@ -374,6 +374,17 @@ html, body {
         <span>我的任务</span>
       </div>
     </div>
+    <div class="d-nav-section">
+      <div class="d-nav-label">资源管理</div>
+      <div class="d-nav-item" id="dNavVoices" onclick="dGoPage('voices')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3C10.34 3 9 4.34 9 6V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V6C15 4.34 13.66 3 12 3Z" stroke="#9E9890" stroke-width="1.8"/><path d="M5 11C5 14.87 8.13 18 12 18C15.87 18 19 14.87 19 11" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/><path d="M12 18V21M9 21H15" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>声音管理</span>
+      </div>
+      <div class="d-nav-item" id="dNavAvatars" onclick="dGoPage('avatars')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#9E9890" stroke-width="1.8"/><path d="M4 20C4 16.69 7.58 14 12 14C16.42 14 20 16.69 20 20" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>数字人管理</span>
+      </div>
+    </div>
     <div class="d-sidebar-bottom">
       <div class="d-nav-label" style="padding:0 0 6px">账号</div>
       <div class="d-user-chip" onclick="dGoPage('profile')">
@@ -447,25 +458,34 @@ const dS = {
   phone: '', password: '', smsCode: '', smsSent: false, smsCountdown: 0,
   authMode: 'sms',
   // 克隆流程
-  extractStep: 0,       // 0=未开始 1=提取完 2=改写完 3=TTS完 4=数字人完 5=后期完
+  extractStep: 0,
   videoUrl: '',
-  extractedScript: '',
-  rewrittenScript: '', rewriteStyle: '',
-  // TTS
-  ttsAudioUrl: null, ttsAudioB64: null, ttsVoiceId: '', ttsEmotion: 'neutral',
+  extractedScript: '', extractLoading: false, extractErr: '',
+  rewrittenScript: '', rewriteStyle: '', rewriteLoading: false, rewriteErr: '',
+  // TTS —— 系统声音硬编码，不调 voices 接口
+  ttsAudioUrl: null, ttsAudioB64: null,
+  ttsVoiceId: 'xiaoxiao', ttsEmotion: 'neutral',
   ttsSpeed: 1.0, ttsVolume: 1.0,
+  ttsLoading: false, ttsErr: '',
+  systemVoices: [
+    { id:'xiaoxiao', name:'温柔女声' },
+    { id:'yunjian',  name:'磁性男声' },
+    { id:'xiaoyi',   name:'活泼女声' },
+    { id:'yunxi',    name:'阳光男声' },
+  ],
   myVoices: JSON.parse(localStorage.getItem('myVoices') || '[]'),
-  systemVoices: [],
+  myAvatars: JSON.parse(localStorage.getItem('myAvatars') || '[]'),
+  voiceCloneLoading: false, voiceCloneErr: '', voiceCloneName: '',
+  avatarAddLoading: false, avatarAddName: '',
   // 数字人
   avatarImageB64: null, avatarImageName: '', avatarImageFmt: 'jpg',
   avatarTaskId: null, avatarGenerating: false,
   avatarProgressMsg: '初始化中...', avatarProgressPct: 0,
   avatarVideoUrl: null, avatarErr: '',
   avatarBeauty: true,
+  subColor: '#FFFFFF',
   // 任务列表
   tasks: [], tasksLoaded: false,
-  // 个人资料
-  profileLoaded: false,
 };
 
 /* ============================================================
@@ -477,6 +497,8 @@ function dRender() {
   switch (dS.page) {
     case 'home':    el.innerHTML = dRenderHome(); dBindHome(); break;
     case 'tasks':   el.innerHTML = dRenderTasks(); dBindTasks(); break;
+    case 'voices':  el.innerHTML = dRenderVoices(); break;
+    case 'avatars': el.innerHTML = dRenderAvatars(); break;
     case 'profile': el.innerHTML = dRenderProfile(); dBindProfile(); break;
     default:        el.innerHTML = dRenderHome(); dBindHome();
   }
@@ -485,7 +507,7 @@ function dRender() {
 function dGoPage(page) {
   dS.page = page;
   document.querySelectorAll('.d-nav-item').forEach(el => el.classList.remove('active'));
-  const navMap = { home:'dNavHome', tasks:'dNavTasks', profile:'' };
+  const navMap = { home:'dNavHome', tasks:'dNavTasks', voices:'dNavVoices', avatars:'dNavAvatars', profile:'' };
   if (navMap[page]) document.getElementById(navMap[page])?.classList.add('active');
   dRender();
 }
@@ -564,10 +586,7 @@ async function dInitApp() {
   } else if (r.code === 401) {
     dClearAuth(); dShowLogin(); return;
   }
-  // 拉取 TTS 声音列表
-  const sv = await dHttp.get('/ai/voices');
-  if (sv.code === 200) dS.systemVoices = sv.data || [];
-  // 更新侧边栏用户信息
+  // 更新侧边栏用户信息，然后渲染
   dUpdateSideUser();
   dRender();
 }
@@ -667,6 +686,11 @@ function dStepState(stepIdx) {
   return 'idle';
 }
 
+/* 步骤徽章图标 */
+function dCheckIcon() {
+  return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
 /* ① 提取卡片 */
 function dCardExtract() {
   const st = dStepState(0);
@@ -674,7 +698,7 @@ function dCardExtract() {
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
       <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'1'}</div>
+        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'1'}</div>
         <span class="d-card-title">① 提取文案</span>
       </div>
       <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
@@ -688,12 +712,13 @@ function dCardExtract() {
         <div>
           <div class="d-label">提取的文案</div>
           <textarea class="d-textarea" id="dExtractedScript" style="height:90px" oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>
+          <div style="font-size:11px;color:#22C55E;margin-top:4px">✓ 共 ${dS.extractedScript.length} 字</div>
         </div>
       ` : ''}
-      <button class="d-btn-lg" id="dExtractBtn" onclick="dHandleExtract()" ${dS.extractLoading?'disabled':''} style="padding:10px;font-size:13px">
-        ${dS.extractLoading ? '提取中...' : dS.extractedScript ? '重新提取' : '提取文案'}
+      <button class="d-btn-lg" onclick="dHandleExtract()" ${dS.extractLoading?'disabled':''} style="padding:10px;font-size:13px">
+        ${dS.extractLoading?'提取中...':dS.extractedScript?'重新提取':'提取文案'}
       </button>
-      ${dS.extractErr ? `<div class="d-err">${esc(dS.extractErr)}</div>` : ''}
+      ${dS.extractErr?`<div class="d-err">${esc(dS.extractErr)}</div>`:''}
     </div>
   </div>`;
 }
@@ -701,18 +726,16 @@ function dCardExtract() {
 /* ② 改写卡片 */
 function dCardRewrite() {
   const st = dStepState(1);
-  const locked = dS.extractStep < 1;
   return `
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
       <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'2'}</div>
+        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'2'}</div>
         <span class="d-card-title">② AI 改写</span>
       </div>
       <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
     <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
-      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤①提取文案</div>' : `
       <div>
         <div class="d-label">改写风格</div>
         <select class="d-select" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
@@ -723,18 +746,22 @@ function dCardRewrite() {
           <option value="list">干货列表</option>
         </select>
       </div>
+      <div>
+        <div class="d-label">文案内容${!dS.extractedScript?'（先提取文案）':''}</div>
+        <textarea class="d-textarea" id="dRewriteSource" style="height:70px" placeholder="或直接粘贴文案内容..."
+          oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>
+      </div>
       ${dS.rewrittenScript ? `
         <div>
           <div class="d-label">改写结果</div>
-          <textarea class="d-textarea" id="dRewrittenScript" style="height:90px" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
+          <textarea class="d-textarea" id="dRewrittenScript" style="height:80px" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
           <div style="font-size:11px;color:#22C55E;margin-top:4px">✓ 共 ${dS.rewrittenScript.length} 字</div>
         </div>
       ` : ''}
-      <button class="d-btn-lg" id="dRewriteBtn" onclick="dHandleRewrite()" style="padding:10px;font-size:13px">
-        ${dS.rewriteLoading ? '改写中...' : dS.rewrittenScript ? '重新改写' : 'AI 改写'}
+      <button class="d-btn-lg" onclick="dHandleRewrite()" ${dS.rewriteLoading?'disabled':''} style="padding:10px;font-size:13px">
+        ${dS.rewriteLoading?'改写中...':dS.rewrittenScript?'重新改写':'AI 改写'}
       </button>
-      ${dS.rewriteErr ? `<div class="d-err">${esc(dS.rewriteErr)}</div>` : ''}
-      `}
+      ${dS.rewriteErr?`<div class="d-err">${esc(dS.rewriteErr)}</div>`:''}
     </div>
   </div>`;
 }
@@ -742,10 +769,9 @@ function dCardRewrite() {
 /* ③ 语音合成卡片 */
 function dCardTTS() {
   const st = dStepState(2);
-  const locked = dS.extractStep < 2;
   const allVoices = [
     ...dS.systemVoices,
-    ...dS.myVoices.map(v => ({ id: v.id || v.name, name: `🎙 ${v.name}` }))
+    ...dS.myVoices.map(v => ({ id: v.voiceId || v.id || v.name, name: `🎙 ${v.name}` }))
   ];
   const emotions = [
     { id:'neutral', label:'自然' }, { id:'happy', label:'愉悦' },
@@ -757,26 +783,22 @@ function dCardTTS() {
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
       <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'3'}</div>
+        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'3'}</div>
         <span class="d-card-title">③ 语音合成</span>
       </div>
       <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
     <div class="d-card-body" style="display:flex;flex-direction:column;gap:11px">
-      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤②改写文案</div>' : `
       <div>
         <div class="d-label">选择声音</div>
         <select class="d-select" id="dTtsVoice" onchange="dS.ttsVoiceId=this.value">
-          <option value="">— 选择声音 —</option>
-          ${allVoices.map(v => `<option value="${esc(v.id)}" ${dS.ttsVoiceId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
+          ${allVoices.map(v=>`<option value="${esc(v.id)}" ${dS.ttsVoiceId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
         </select>
       </div>
       <div>
         <div class="d-label">情绪</div>
         <div style="display:flex;gap:5px;flex-wrap:wrap" id="dEmotionGroup">
-          ${emotions.map(e => `
-            <div class="d-emotion ${dS.ttsEmotion===e.id?'active':'inactive'}" onclick="dSetEmotion('${e.id}')">${e.label}</div>
-          `).join('')}
+          ${emotions.map(e=>`<div class="d-emotion ${dS.ttsEmotion===e.id?'active':'inactive'}" onclick="dSetEmotion('${e.id}')">${e.label}</div>`).join('')}
         </div>
       </div>
       <div>
@@ -787,7 +809,7 @@ function dCardTTS() {
         <div class="d-slider-wrap">
           <div class="d-slider-track"><div class="d-slider-fill" id="dSpeedFill" style="width:${speedPct}%"></div></div>
           <div class="d-slider-thumb" id="dSpeedThumb" style="left:${speedPct}%"></div>
-          <input type="range" class="d-slider-input" min="50" max="200" value="${dS.ttsSpeed*100}" oninput="dOnSpeed(this.value)">
+          <input type="range" class="d-slider-input" min="50" max="200" value="${Math.round(dS.ttsSpeed*100)}" oninput="dOnSpeed(this.value)">
         </div>
       </div>
       <div>
@@ -798,24 +820,20 @@ function dCardTTS() {
         <div class="d-slider-wrap">
           <div class="d-slider-track"><div class="d-slider-fill" id="dVolFill" style="width:${volPct}%"></div></div>
           <div class="d-slider-thumb" id="dVolThumb" style="left:${volPct}%"></div>
-          <input type="range" class="d-slider-input" min="0" max="100" value="${dS.ttsVolume*100}" oninput="dOnVolume(this.value)">
+          <input type="range" class="d-slider-input" min="0" max="100" value="${Math.round(dS.ttsVolume*100)}" oninput="dOnVolume(this.value)">
         </div>
       </div>
-      ${dS.ttsAudioUrl ? `
+      ${dS.ttsAudioUrl?`
         <div style="background:#F7F5F1;border-radius:12px;padding:10px 14px;border:1px solid #EDE9E3">
           <audio controls src="${dS.ttsAudioUrl}" style="width:100%;height:32px"></audio>
         </div>
-        <div style="display:flex;gap:8px">
-          <button class="d-btn d-btn-ghost" onclick="dHandleTTS()" style="flex:1">重新合成</button>
-          <button class="d-btn d-btn-primary" onclick="dGoStep(3)" style="flex:1">下一步 →</button>
-        </div>
-      ` : `
-        <button class="d-btn-lg" id="dTtsBtn" onclick="dHandleTTS()" style="padding:10px;font-size:13px">
-          ${dS.ttsLoading ? '合成中...' : '开始语音合成'}
+        <button class="d-btn d-btn-ghost" onclick="dHandleTTS()" style="width:100%;padding:9px">重新合成</button>
+      `:`
+        <button class="d-btn-lg" onclick="dHandleTTS()" ${dS.ttsLoading?'disabled':''} style="padding:10px;font-size:13px">
+          ${dS.ttsLoading?'合成中...':'开始语音合成'}
         </button>
       `}
-      ${dS.ttsErr ? `<div class="d-err">${esc(dS.ttsErr)}</div>` : ''}
-      `}
+      ${dS.ttsErr?`<div class="d-err">${esc(dS.ttsErr)}</div>`:''}
     </div>
   </div>`;
 }
@@ -823,66 +841,60 @@ function dCardTTS() {
 /* ④ 数字人卡片 */
 function dCardAvatar() {
   const st = dStepState(3);
-  const locked = dS.extractStep < 3;
-  const generating = dS.extractStep === 'avatar_gen' || dS.avatarGenerating;
+  const generating = dS.extractStep==='avatar_gen' || dS.avatarGenerating;
   return `
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
       <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'4'}</div>
+        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'4'}</div>
         <span class="d-card-title">④ 数字人生成</span>
       </div>
       <span class="d-step-badge ${st}">${st==='done'?'已完成':generating?'● 生成中':st==='active'?'● 进行中':'待处理'}</span>
     </div>
     <div class="d-card-body">
-      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤③语音合成</div>' :
-      generating ? `
+      ${generating?`
         <div style="text-align:center;padding:16px 0">
           <div style="font-size:13px;font-weight:600;color:#1A1614;margin-bottom:8px">${esc(dS.avatarProgressMsg)}</div>
           <div class="d-progress-bar" style="margin-bottom:8px"><div class="d-progress-fill" style="width:${dS.avatarProgressPct}%"></div></div>
           <div style="font-size:12px;color:#B0AA9F">GPU 渲染中，通常 1~3 分钟</div>
         </div>
-      ` : dS.avatarVideoUrl ? `
-        <div>
-          <video src="${dS.avatarVideoUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:240px;margin-bottom:10px"></video>
-          <div style="display:flex;gap:8px">
-            <button class="d-btn d-btn-ghost" onclick="dResetAvatar()" style="flex:1">重新生成</button>
-            <button class="d-btn d-btn-primary" onclick="dGoStep(4)" style="flex:1">下一步 →</button>
-          </div>
+      `:dS.avatarVideoUrl?`
+        <video src="${dS.avatarVideoUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:220px;margin-bottom:10px"></video>
+        <div style="display:flex;gap:8px">
+          <button class="d-btn d-btn-ghost" onclick="dResetAvatar()" style="flex:1">重新生成</button>
         </div>
-      ` : `
-        <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:12px">
+      `:`
+        <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:12px;margin-bottom:12px">
           <div>
             <div class="d-label">上传人脸图片</div>
-            <div style="width:100%;aspect-ratio:1;border:2px dashed #D4D0C8;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:all 0.15s;margin-bottom:8px;background:${dS.avatarImageB64?'transparent':'#F9F8F6'}"
+            <div style="width:100%;aspect-ratio:1;border:2px dashed #D4D0C8;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:border-color 0.15s;overflow:hidden"
               onclick="document.getElementById('dAvatarImgInput').click()"
               onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
               ${dS.avatarImageB64
-                ? `<img src="data:image/${dS.avatarImageFmt};base64,${dS.avatarImageB64}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`
-                : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#C4C0B8" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="#C4C0B8" stroke-width="2"/></svg>
-                   <div style="font-size:11px;color:#B0AA9F">${dS.avatarImageName || '选择图片'}</div>`
+                ?`<img src="data:image/${dS.avatarImageFmt};base64,${dS.avatarImageB64}" style="width:100%;height:100%;object-fit:cover">`
+                :`<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#C4C0B8" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="#C4C0B8" stroke-width="2"/></svg>
+                  <div style="font-size:11px;color:#B0AA9F">点击选择图片</div>
+                  <div style="font-size:10px;color:#C8C3BC">JPG / PNG</div>`
               }
             </div>
             <input type="file" id="dAvatarImgInput" accept="image/jpeg,image/png" style="display:none" onchange="dHandleAvatarImg(event)">
-            <div style="display:flex;align-items:center;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
               <span style="font-size:11px;color:#6E6860">面部增强</span>
               <div class="d-toggle ${dS.avatarBeauty?'on':'off'}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"><div class="d-toggle-ball"></div></div>
             </div>
           </div>
           <div>
-            <div class="d-label">数字人预览区</div>
-            <div style="background:#2A2620;border-radius:10px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-              <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center">生成后在此预览</div>
+            <div class="d-label">预览区</div>
+            <div style="background:#2A2620;border-radius:10px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center">
+              <div style="font-size:11px;color:rgba(255,255,255,0.25);text-align:center">生成后预览</div>
             </div>
           </div>
         </div>
-        <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" style="margin-top:12px;font-size:13px;padding:10px"
-          ${(!dS.avatarImageB64 || !dS.ttsAudioUrl) ? 'disabled' : ''}>
+        ${!dS.ttsAudioUrl?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px;margin-bottom:8px">⚠ 需要先完成步骤③语音合成</div>':''}
+        <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" ${(!dS.avatarImageB64||!dS.ttsAudioUrl)?'disabled':''} style="padding:10px;font-size:13px">
           开始生成数字人视频
         </button>
-        ${!dS.ttsAudioUrl ? '<div style="font-size:11px;color:#EF4444;text-align:center;margin-top:6px">需要先完成语音合成</div>' : ''}
-        ${!dS.avatarImageB64 ? '<div style="font-size:11px;color:#EF4444;text-align:center;margin-top:4px">需要先上传人脸图片</div>' : ''}
-        ${dS.avatarErr ? `<div class="d-err" style="margin-top:8px">${esc(dS.avatarErr)}</div>` : ''}
+        ${dS.avatarErr?`<div class="d-err" style="margin-top:8px">${esc(dS.avatarErr)}</div>`:''}
       `}
     </div>
   </div>`;
@@ -891,53 +903,58 @@ function dCardAvatar() {
 /* ⑤ 后期卡片 */
 function dCardPostProcess() {
   const st = dStepState(4);
-  const locked = dS.extractStep < 4;
   return `
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
       <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>':'5'}</div>
+        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'5'}</div>
         <span class="d-card-title">⑤ 后期制作</span>
       </div>
       <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
     <div class="d-card-body">
-      ${locked ? '<div style="font-size:13px;color:#B0AA9F;text-align:center;padding:24px 0">请先完成步骤④数字人生成</div>' : `
       <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px">
         <div>
-          ${dS.avatarVideoUrl ? `<video src="${dS.avatarVideoUrl}" style="width:100%;border-radius:10px;max-height:120px;margin-bottom:10px" controls></video>` : ''}
+          ${dS.avatarVideoUrl?`<video src="${dS.avatarVideoUrl}" style="width:100%;border-radius:10px;max-height:110px;margin-bottom:10px" controls></video>`
+            :`<div style="background:#2A2620;border-radius:10px;height:110px;display:flex;align-items:center;justify-content:center;margin-bottom:10px"><div style="font-size:11px;color:rgba(255,255,255,0.25)">完成数字人后显示</div></div>`}
           <div class="d-label">字幕颜色</div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            ${['#FFFFFF','#FF6B35','#FFD700','#7EF09F'].map((c,i) => `
-              <div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${i===0?'#F5762A':'#E8E4DF'};cursor:pointer"
-                onclick="dS.subColor='${c}';dRender()"></div>
+            ${['#FFFFFF','#FF6B35','#FFD700','#7EF09F'].map((c,i)=>`
+              <div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${dS.subColor===c?'#F5762A':'#E8E4DF'};cursor:pointer" onclick="dS.subColor='${c}';dRender()"></div>
             `).join('')}
           </div>
           <div class="d-label">字体大小</div>
           <div class="d-slider-wrap">
             <div class="d-slider-track"><div class="d-slider-fill" style="width:50%"></div></div>
             <div class="d-slider-thumb" style="left:50%"></div>
+            <input type="range" class="d-slider-input" min="20" max="80" value="44">
           </div>
         </div>
         <div>
           <div class="d-label">描边颜色</div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            ${['#1A1614','#F5762A','#fff'].map((c,i) => `
+            ${['#1A1614','#F5762A','#ffffff'].map((c,i)=>`
               <div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${i===0?'#F5762A':'#E8E4DF'};cursor:pointer"></div>
             `).join('')}
           </div>
           <div class="d-label">边框样式</div>
           <div style="display:flex;gap:5px;margin-bottom:10px">
-            ${['无','圆角','矩形'].map((v,i) => `
+            ${['无','圆角','矩形'].map((v,i)=>`
               <div style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:${i===0?'#F5762A':'#F7F5F1'};color:${i===0?'#fff':'#9E9890'};cursor:pointer">${v}</div>
             `).join('')}
           </div>
+          <div class="d-label">描边粗细</div>
+          <div class="d-slider-wrap">
+            <div class="d-slider-track"><div class="d-slider-fill" style="width:40%"></div></div>
+            <div class="d-slider-thumb" style="left:40%"></div>
+            <input type="range" class="d-slider-input" min="0" max="10" value="2">
+          </div>
         </div>
       </div>
-      <button class="d-btn-lg" onclick="dToast('后期制作功能即将完善')" style="margin-top:12px;font-size:13px;padding:10px">
+      ${!dS.avatarVideoUrl?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px;margin:10px 0">⚠ 需要先完成步骤④数字人生成</div>':''}
+      <button class="d-btn-lg" onclick="dToast('后期制作功能即将完善')" ${!dS.avatarVideoUrl?'disabled':''} style="margin-top:10px;padding:10px;font-size:13px">
         开始后期合成
       </button>
-      `}
     </div>
   </div>`;
 }
@@ -1345,6 +1362,279 @@ function dRenderProfile() {
 }
 
 function dBindProfile() {}
+
+/* ============================================================
+   JS · 声音管理页 (dRenderVoices)
+   ============================================================ */
+function dRenderVoices() {
+  const voices = dS.myVoices;
+  const voiceCards = voices.length === 0
+    ? `<div style="text-align:center;padding:60px 20px;color:#B0AA9F">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style="margin-bottom:12px;opacity:0.35"><path d="M12 3C10.34 3 9 4.34 9 6V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V6C15 4.34 13.66 3 12 3Z" stroke="#B0AA9F" stroke-width="1.5"/><path d="M5 11C5 14.87 8.13 18 12 18C15.87 18 19 14.87 19 11" stroke="#B0AA9F" stroke-width="1.5" stroke-linecap="round"/><path d="M12 18V21M9 21H15" stroke="#B0AA9F" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px">还没有克隆声音</div>
+        <div style="font-size:12px">上传音频样本，克隆专属声音</div>
+      </div>`
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+        ${voices.map((v, i) => `
+          <div class="d-card" style="padding:16px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#FF8040,#F5602A);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3C10.34 3 9 4.34 9 6V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V6C15 4.34 13.66 3 12 3Z" fill="white"/><path d="M5 11C5 14.87 8.13 18 12 18C15.87 18 19 14.87 19 11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.name || '未命名声音')}</div>
+                <div style="font-size:11px;color:#B0AA9F;margin-top:2px">${v.createdAt ? dFmtTime(v.createdAt) : '—'}</div>
+              </div>
+            </div>
+            <div style="font-size:11px;background:#F7F5F1;border-radius:8px;padding:6px 10px;color:#9E9890;word-break:break-all">
+              ID: ${esc((v.voiceId || v.id || '').slice(0, 24))}...
+            </div>
+            <div style="display:flex;gap:7px">
+              <button class="d-btn d-btn-ghost" style="flex:1;font-size:11px;padding:6px"
+                onclick="dUseVoiceInClone('${esc(v.voiceId || v.id)}', '${esc(v.name || '')}')">
+                在克隆流程中使用
+              </button>
+              <button class="d-btn d-btn-danger" style="font-size:11px;padding:6px 10px"
+                onclick="dDeleteVoice(${i})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 6H21M8 6V4H16V6M19 6L18.1 19.1C18 20.15 17.1 21 16.05 21H7.95C6.9 21 6 20.15 5.9 19.1L5 6" stroke="#E5534B" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+
+  return `
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#1A1614">声音管理</div>
+        <div style="font-size:12px;color:#B0AA9F;margin-top:3px">共 ${voices.length} 个克隆声音</div>
+      </div>
+    </div>
+
+    <!-- 克隆新声音 -->
+    <div class="d-card" style="margin-bottom:20px;padding:20px">
+      <div style="font-size:14px;font-weight:700;color:#1A1614;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#F5762A" stroke-width="2.5" stroke-linecap="round"/></svg>
+        克隆新声音
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end">
+        <div>
+          <div class="d-label">声音名称</div>
+          <input class="d-input" id="dVoiceCloneName" placeholder="给声音起个名字..." value="${esc(dS.voiceCloneName)}" oninput="dS.voiceCloneName=this.value">
+        </div>
+        <div>
+          <div class="d-label">音频样本（MP3/WAV，建议30秒+）</div>
+          <div style="display:flex;gap:8px">
+            <label style="flex:1;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#F7F5F1;border:1.5px dashed #D4D0C8;border-radius:10px;cursor:pointer;font-size:12px;color:#9E9890;transition:border-color 0.15s"
+              onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#C4C0B8" stroke-width="2" stroke-linecap="round"/></svg>
+              <span id="dVoiceFileLabel">选择音频文件</span>
+              <input type="file" id="dVoiceFileInput" accept="audio/*" style="display:none" onchange="dOnVoiceFileSelect(event)">
+            </label>
+          </div>
+        </div>
+        <button class="d-btn d-btn-primary" onclick="dHandleVoiceClone()" ${dS.voiceCloneLoading?'disabled':''} style="white-space:nowrap;padding:9px 18px">
+          ${dS.voiceCloneLoading?'克隆中...':'开始克隆'}
+        </button>
+      </div>
+      ${dS.voiceCloneErr?`<div class="d-err" style="margin-top:10px">${esc(dS.voiceCloneErr)}</div>`:''}
+      <div style="font-size:11px;color:#B0AA9F;margin-top:10px;line-height:1.7">
+        💡 音频样本越清晰、越长，克隆效果越好。支持 MP3 / WAV / M4A 等格式，最佳时长 30~120 秒。需要管理员配置 Fish Audio API Key。
+      </div>
+    </div>
+
+    <!-- 声音列表 -->
+    ${voiceCards}
+  </div>`;
+}
+
+let _dVoiceFileB64 = null;
+let _dVoiceFileName = '';
+
+function dOnVoiceFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  _dVoiceFileName = file.name;
+  document.getElementById('dVoiceFileLabel').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => { _dVoiceFileB64 = e.target.result.split(',')[1]; };
+  reader.readAsDataURL(file);
+}
+
+async function dHandleVoiceClone() {
+  const name = document.getElementById('dVoiceCloneName')?.value?.trim() || dS.voiceCloneName;
+  if (!name) { dToast('请先输入声音名称'); return; }
+  if (!_dVoiceFileB64) { dToast('请先选择音频文件'); return; }
+  dS.voiceCloneLoading = true; dS.voiceCloneErr = ''; dS.voiceCloneName = name;
+  dRender();
+  const r = await dHttp.post('/ai/tts/clone', { audio: _dVoiceFileB64, audioName: name });
+  dS.voiceCloneLoading = false;
+  if (r.code !== 200) {
+    dS.voiceCloneErr = r.msg || '克隆失败';
+    dRender(); return;
+  }
+  const voiceId = r.data?.voice_id;
+  const newVoice = { id: voiceId, voiceId, name, createdAt: new Date().toISOString() };
+  dS.myVoices = [...dS.myVoices, newVoice];
+  localStorage.setItem('myVoices', JSON.stringify(dS.myVoices));
+  dS.voiceCloneName = ''; _dVoiceFileB64 = null; _dVoiceFileName = '';
+  dToast('声音克隆成功！');
+  dRender();
+}
+
+function dDeleteVoice(idx) {
+  if (!confirm('确认删除这个克隆声音？')) return;
+  dS.myVoices = dS.myVoices.filter((_, i) => i !== idx);
+  localStorage.setItem('myVoices', JSON.stringify(dS.myVoices));
+  dRender();
+}
+
+function dUseVoiceInClone(voiceId, name) {
+  dS.ttsVoiceId = voiceId;
+  dToast(`已选择声音「${name}」，前往克隆流程使用`);
+  dGoPage('home');
+}
+
+/* ============================================================
+   JS · 数字人管理页 (dRenderAvatars)
+   ============================================================ */
+function dRenderAvatars() {
+  const avatars = dS.myAvatars;
+  const avatarCards = avatars.length === 0
+    ? `<div style="text-align:center;padding:60px 20px;color:#B0AA9F">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style="margin-bottom:12px;opacity:0.35"><circle cx="12" cy="8" r="4" stroke="#B0AA9F" stroke-width="1.5"/><path d="M4 20C4 16.69 7.58 14 12 14C16.42 14 20 16.69 20 20" stroke="#B0AA9F" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px">还没有保存数字人形象</div>
+        <div style="font-size:12px">添加常用人脸图片，快速发起生成</div>
+      </div>`
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">
+        ${avatars.map((a, i) => `
+          <div class="d-card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="border-radius:10px;overflow:hidden;aspect-ratio:1;background:#F0EDE8">
+              <img src="data:image/${a.fmt||'jpeg'};base64,${a.imageB64}" style="width:100%;height:100%;object-fit:cover">
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name || '未命名形象')}</div>
+              <div style="font-size:11px;color:#B0AA9F;margin-top:2px">${a.createdAt ? dFmtTime(a.createdAt) : '—'}</div>
+            </div>
+            <div style="display:flex;gap:7px">
+              <button class="d-btn d-btn-ghost" style="flex:1;font-size:11px;padding:6px"
+                onclick="dUseAvatarInClone(${i})">
+                使用此形象
+              </button>
+              <button class="d-btn d-btn-danger" style="font-size:11px;padding:6px 10px"
+                onclick="dDeleteAvatar(${i})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 6H21M8 6V4H16V6M19 6L18.1 19.1C18 20.15 17.1 21 16.05 21H7.95C6.9 21 6 20.15 5.9 19.1L5 6" stroke="#E5534B" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+
+  return `
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#1A1614">数字人管理</div>
+        <div style="font-size:12px;color:#B0AA9F;margin-top:3px">共 ${avatars.length} 个形象</div>
+      </div>
+    </div>
+
+    <!-- 添加新形象 -->
+    <div class="d-card" style="margin-bottom:20px;padding:20px">
+      <div style="font-size:14px;font-weight:700;color:#1A1614;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#F5762A" stroke-width="2.5" stroke-linecap="round"/></svg>
+        添加新形象
+      </div>
+      <div style="display:grid;grid-template-columns:140px 1fr auto;gap:12px;align-items:end">
+        <!-- 图片上传 -->
+        <div>
+          <div class="d-label">人脸图片</div>
+          <div style="width:100%;aspect-ratio:1;border:2px dashed #D4D0C8;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;overflow:hidden;transition:border-color 0.15s"
+            id="dAvatarAddBox"
+            onclick="document.getElementById('dAvatarAddInput').click()"
+            onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor=dS._addImgB64?'#22C55E':'#D4D0C8'">
+            <div id="dAvatarAddPreview" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#C4C0B8" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="#C4C0B8" stroke-width="2"/></svg>
+              <div style="font-size:10px;color:#B0AA9F">点击上传</div>
+            </div>
+          </div>
+          <input type="file" id="dAvatarAddInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="dOnAvatarAddSelect(event)">
+        </div>
+        <!-- 名称 -->
+        <div>
+          <div class="d-label">形象名称</div>
+          <input class="d-input" id="dAvatarAddName" placeholder="给这个形象起个名字..." value="${esc(dS.avatarAddName)}" oninput="dS.avatarAddName=this.value">
+          <div style="font-size:11px;color:#B0AA9F;margin-top:8px;line-height:1.7">
+            💡 建议使用正脸清晰照片，JPG/PNG 格式，图片越清晰生成效果越好。
+          </div>
+        </div>
+        <!-- 按钮 -->
+        <div>
+          <button class="d-btn d-btn-primary" onclick="dHandleAvatarAdd()" style="white-space:nowrap;padding:9px 18px">
+            保存形象
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 形象列表 -->
+    ${avatarCards}
+  </div>`;
+}
+
+let _dAddAvatarB64 = null;
+let _dAddAvatarFmt = 'jpeg';
+
+function dOnAvatarAddSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  _dAddAvatarFmt = file.type === 'image/png' ? 'png' : 'jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    _dAddAvatarB64 = e.target.result.split(',')[1];
+    const preview = document.getElementById('dAvatarAddPreview');
+    const box = document.getElementById('dAvatarAddBox');
+    if (preview) preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+    if (box) box.style.borderColor = '#22C55E';
+  };
+  reader.readAsDataURL(file);
+}
+
+function dHandleAvatarAdd() {
+  const name = document.getElementById('dAvatarAddName')?.value?.trim() || dS.avatarAddName;
+  if (!name) { dToast('请填写形象名称'); return; }
+  if (!_dAddAvatarB64) { dToast('请先上传人脸图片'); return; }
+  const newAvatar = {
+    id: Date.now().toString(),
+    name,
+    imageB64: _dAddAvatarB64,
+    fmt: _dAddAvatarFmt,
+    createdAt: new Date().toISOString(),
+  };
+  dS.myAvatars = [...dS.myAvatars, newAvatar];
+  localStorage.setItem('myAvatars', JSON.stringify(dS.myAvatars));
+  _dAddAvatarB64 = null; dS.avatarAddName = '';
+  dToast('形象已保存！');
+  dRender();
+}
+
+function dDeleteAvatar(idx) {
+  if (!confirm('确认删除这个数字人形象？')) return;
+  dS.myAvatars = dS.myAvatars.filter((_, i) => i !== idx);
+  localStorage.setItem('myAvatars', JSON.stringify(dS.myAvatars));
+  dRender();
+}
+
+function dUseAvatarInClone(idx) {
+  const a = dS.myAvatars[idx];
+  if (!a) return;
+  dS.avatarImageB64 = a.imageB64;
+  dS.avatarImageFmt = a.fmt || 'jpeg';
+  dS.avatarImageName = a.name;
+  dToast(`已选择形象「${a.name}」，前往克隆流程使用`);
+  dGoPage('home');
+}
 
 async function dSubmitAuthCode() {
   const code = document.getElementById('dAuthCodeInput')?.value?.trim();
