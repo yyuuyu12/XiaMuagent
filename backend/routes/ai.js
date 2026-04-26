@@ -275,7 +275,14 @@ router.post('/inspire-expand', requireAuth, async (req, res) => {
 router.post('/tts', requireAuth, async (req, res) => {
   const { text, voice, speed, cloneVoiceId } = req.body;
   if (!text?.trim()) return res.json({ code: 400, msg: '文案内容不能为空' });
-  const trimText = text.trim().slice(0, 4096);
+  // 清理 URL、#话题标签、@用户名，避免 TTS 朗读出乱七八糟的内容
+  const cleanText = text.trim()
+    .replace(/https?:\/\/[^\s，。！？、\n]*/gi, '')
+    .replace(/#[^\s#，。！？、\n]*/g, '')
+    .replace(/@[^\s@，。！？、\n]*/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  const trimText = cleanText.slice(0, 4096);
 
   // ===== 通道1：Fish Audio 克隆音色 =====
   if (cloneVoiceId) {
