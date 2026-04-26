@@ -478,7 +478,7 @@ const dS = {
   voiceCloneLoading: false, voiceCloneErr: '', voiceCloneName: '',
   avatarAddLoading: false, avatarAddName: '',
   // 数字人
-  avatarImageB64: null, avatarImageName: '', avatarImageFmt: 'jpg',
+  avatarSrcVideoB64: null, avatarSrcVideoFmt: 'mp4', avatarSrcVideoName: '',
   avatarTaskId: null, avatarGenerating: false,
   avatarProgressMsg: '初始化中...', avatarProgressPct: 0,
   avatarVideoUrl: null, avatarErr: '',
@@ -864,37 +864,44 @@ function dCardAvatar() {
           <button class="d-btn d-btn-ghost" onclick="dResetAvatar()" style="flex:1">重新生成</button>
         </div>
       `:`
-        <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:12px;margin-bottom:12px">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <!-- 参考视频上传 -->
           <div>
-            <div class="d-label">上传人脸图片</div>
-            <div style="width:100%;aspect-ratio:1;border:2px dashed #D4D0C8;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:border-color 0.15s;overflow:hidden"
-              onclick="document.getElementById('dAvatarImgInput').click()"
-              onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
-              ${dS.avatarImageB64
-                ?`<img src="data:image/${dS.avatarImageFmt};base64,${dS.avatarImageB64}" style="width:100%;height:100%;object-fit:cover">`
-                :`<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#C4C0B8" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="#C4C0B8" stroke-width="2"/></svg>
-                  <div style="font-size:11px;color:#B0AA9F">点击选择图片</div>
-                  <div style="font-size:10px;color:#C8C3BC">JPG / PNG</div>`
+            <div class="d-label">参考视频（真人说话短视频，MP4，建议 5~30 秒）</div>
+            <div style="border:2px dashed #D4D0C8;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color 0.15s;min-height:90px;display:flex;align-items:center;justify-content:center"
+              onclick="document.getElementById('dAvatarVideoInput').click()"
+              onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor=dS.avatarSrcVideoB64?'#22C55E':'#D4D0C8'"
+              style="border-color:${dS.avatarSrcVideoB64?'#22C55E':'#D4D0C8'}">
+              ${dS.avatarSrcVideoB64
+                ? `<div style="width:100%;padding:10px 14px;display:flex;align-items:center;gap:10px">
+                    <div style="width:40px;height:40px;background:linear-gradient(135deg,#22C55E,#16A34A);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>
+                    </div>
+                    <div>
+                      <div style="font-size:12px;font-weight:600;color:#1A1614">${esc(dS.avatarSrcVideoName||'视频已上传')}</div>
+                      <div style="font-size:11px;color:#22C55E;margin-top:2px">✓ 点击可重新选择</div>
+                    </div>
+                  </div>`
+                : `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="#C4C0B8" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="#C4C0B8"/></svg>
+                    <div style="font-size:12px;color:#B0AA9F">点击上传参考视频</div>
+                    <div style="font-size:10px;color:#C8C3BC">MP4 / MOV / AVI · 建议 5~30 秒</div>
+                  </div>`
               }
             </div>
-            <input type="file" id="dAvatarImgInput" accept="image/jpeg,image/png" style="display:none" onchange="dHandleAvatarImg(event)">
-            <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-              <span style="font-size:11px;color:#6E6860">面部增强</span>
-              <div class="d-toggle ${dS.avatarBeauty?'on':'off'}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"><div class="d-toggle-ball"></div></div>
-            </div>
+            <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dHandleAvatarVideo(event)">
           </div>
-          <div>
-            <div class="d-label">预览区</div>
-            <div style="background:#2A2620;border-radius:10px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center">
-              <div style="font-size:11px;color:rgba(255,255,255,0.25);text-align:center">生成后预览</div>
-            </div>
+          <!-- 面部增强开关 -->
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:#6E6860">面部增强</span>
+            <div class="d-toggle ${dS.avatarBeauty?'on':'off'}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"><div class="d-toggle-ball"></div></div>
           </div>
+          ${!dS.ttsAudioUrl?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px">⚠ 需要先完成步骤③语音合成</div>':''}
+          <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcVideoB64||!dS.ttsAudioB64)?'disabled':''} style="padding:10px;font-size:13px">
+            开始生成数字人视频
+          </button>
+          ${dS.avatarErr?`<div class="d-err">${esc(dS.avatarErr)}</div>`:''}
         </div>
-        ${!dS.ttsAudioUrl?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px;margin-bottom:8px">⚠ 需要先完成步骤③语音合成</div>':''}
-        <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" ${(!dS.avatarImageB64||!dS.ttsAudioUrl)?'disabled':''} style="padding:10px;font-size:13px">
-          开始生成数字人视频
-        </button>
-        ${dS.avatarErr?`<div class="d-err" style="margin-top:8px">${esc(dS.avatarErr)}</div>`:''}
       `}
     </div>
   </div>`;
@@ -1012,7 +1019,8 @@ function dResetFlow() {
   dS.extractStep = 0;
   dS.videoUrl = ''; dS.extractedScript = ''; dS.rewrittenScript = '';
   dS.ttsAudioUrl = null; dS.ttsAudioB64 = null;
-  dS.avatarImageB64 = null; dS.avatarTaskId = null;
+  dS.avatarSrcVideoB64 = null; dS.avatarSrcVideoName = '';
+  dS.avatarTaskId = null;
   dS.avatarVideoUrl = null; dS.avatarErr = ''; dS.avatarGenerating = false;
   dRender();
 }
@@ -1020,6 +1028,7 @@ function dResetFlow() {
 function dResetAvatar() {
   dS.avatarVideoUrl = null; dS.avatarTaskId = null;
   dS.extractStep = 3; dS.avatarErr = '';
+  dS.avatarSrcVideoB64 = null; dS.avatarSrcVideoName = '';
   dRender();
 }
 
@@ -1097,16 +1106,15 @@ async function dHandleTTS() {
   dRender();
 }
 
-/* ④ 数字人 · 上传图片 */
-function dHandleAvatarImg(event) {
+/* ④ 数字人 · 上传参考视频 */
+function dHandleAvatarVideo(event) {
   const file = event.target.files[0];
   if (!file) return;
-  dS.avatarImageName = file.name;
-  dS.avatarImageFmt = file.type === 'image/png' ? 'png' : 'jpg';
+  dS.avatarSrcVideoName = file.name;
+  dS.avatarSrcVideoFmt = (file.name.split('.').pop() || 'mp4').toLowerCase();
   const reader = new FileReader();
   reader.onload = e => {
-    const result = e.target.result;
-    dS.avatarImageB64 = result.split(',')[1];
+    dS.avatarSrcVideoB64 = e.target.result.split(',')[1];
     dRender();
   };
   reader.readAsDataURL(file);
@@ -1117,21 +1125,22 @@ let _dAvatarPoller = null;
 let _dAvatarRunSeq = 0;
 
 async function dHandleAvatarGenerate() {
-  if (!dS.avatarImageB64) { dToast('请先上传人脸图片'); return; }
-  if (!dS.ttsAudioB64 && !dS.ttsAudioUrl) { dToast('请先完成语音合成'); return; }
+  if (!dS.avatarSrcVideoB64) { dToast('请先上传参考视频'); return; }
+  if (!dS.ttsAudioB64) { dToast('请先完成语音合成（步骤③）'); return; }
   dS.avatarGenerating = true; dS.avatarErr = '';
   dS.avatarProgressMsg = '正在提交任务...'; dS.avatarProgressPct = 10;
   dS.extractStep = 'avatar_gen';
   dRender();
 
   const body = {
-    image_b64: dS.avatarImageB64,
-    image_fmt: dS.avatarImageFmt,
-    beauty: dS.avatarBeauty,
-    ...(dS.ttsAudioB64 ? { audio_b64: dS.ttsAudioB64 } : {}),
+    video_b64: dS.avatarSrcVideoB64,
+    video_fmt: dS.avatarSrcVideoFmt || 'mp4',
+    audio_b64: dS.ttsAudioB64,
+    audio_fmt: 'mp3',
+    enhancer: dS.avatarBeauty,
   };
 
-  const r = await dHttp.post('/ai/video/submit', body);
+  const r = await dHttp.post('/ai/video/generate', body);
   if (r.code !== 200) {
     dS.avatarGenerating = false; dS.avatarErr = r.msg || '提交失败';
     dS.extractStep = 3; dRender(); return;
@@ -1507,11 +1516,14 @@ function dRenderAvatars() {
         <div style="font-size:14px;font-weight:600;margin-bottom:6px">还没有保存数字人形象</div>
         <div style="font-size:12px">添加常用人脸图片，快速发起生成</div>
       </div>`
-    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
         ${avatars.map((a, i) => `
           <div class="d-card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
-            <div style="border-radius:10px;overflow:hidden;aspect-ratio:1;background:#F0EDE8">
-              <img src="data:image/${a.fmt||'jpeg'};base64,${a.imageB64}" style="width:100%;height:100%;object-fit:cover">
+            <div style="border-radius:10px;overflow:hidden;background:#2A2620;aspect-ratio:9/16;max-height:180px;display:flex;align-items:center;justify-content:center">
+              <div style="text-align:center;padding:12px">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="opacity:0.5"><rect x="2" y="5" width="20" height="14" rx="3" stroke="white" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="white"/></svg>
+                <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:6px">${esc(a.name)}</div>
+              </div>
             </div>
             <div>
               <div style="font-size:13px;font-weight:600;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name || '未命名形象')}</div>
@@ -1544,36 +1556,36 @@ function dRenderAvatars() {
     <div class="d-card" style="margin-bottom:20px;padding:20px">
       <div style="font-size:14px;font-weight:700;color:#1A1614;margin-bottom:14px;display:flex;align-items:center;gap:8px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#F5762A" stroke-width="2.5" stroke-linecap="round"/></svg>
-        添加新形象
+        保存常用形象
       </div>
-      <div style="display:grid;grid-template-columns:140px 1fr auto;gap:12px;align-items:end">
-        <!-- 图片上传 -->
-        <div>
-          <div class="d-label">人脸图片</div>
-          <div style="width:100%;aspect-ratio:1;border:2px dashed #D4D0C8;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;overflow:hidden;transition:border-color 0.15s"
-            id="dAvatarAddBox"
-            onclick="document.getElementById('dAvatarAddInput').click()"
-            onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor=dS._addImgB64?'#22C55E':'#D4D0C8'">
-            <div id="dAvatarAddPreview" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="#C4C0B8" stroke-width="2"/><line x1="5" y1="12" x2="19" y2="12" stroke="#C4C0B8" stroke-width="2"/></svg>
-              <div style="font-size:10px;color:#B0AA9F">点击上传</div>
-            </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+        <!-- 左：文件上传 + 名称 -->
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div class="d-label">形象名称</div>
+            <input class="d-input" id="dAvatarAddName" placeholder="给这个形象起个名字..." value="${esc(dS.avatarAddName)}" oninput="dS.avatarAddName=this.value">
           </div>
-          <input type="file" id="dAvatarAddInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="dOnAvatarAddSelect(event)">
-        </div>
-        <!-- 名称 -->
-        <div>
-          <div class="d-label">形象名称</div>
-          <input class="d-input" id="dAvatarAddName" placeholder="给这个形象起个名字..." value="${esc(dS.avatarAddName)}" oninput="dS.avatarAddName=this.value">
-          <div style="font-size:11px;color:#B0AA9F;margin-top:8px;line-height:1.7">
-            💡 建议使用正脸清晰照片，JPG/PNG 格式，图片越清晰生成效果越好。
+          <div>
+            <div class="d-label">参考视频（说话短视频，MP4，建议 5~30 秒）</div>
+            <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F7F5F1;border:1.5px dashed #D4D0C8;border-radius:10px;cursor:pointer;font-size:12px;color:#9E9890;transition:border-color 0.15s"
+              onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="#C4C0B8" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="#C4C0B8"/></svg>
+              <span id="dAvatarAddVideoLabel">选择参考视频</span>
+              <input type="file" id="dAvatarAddInput" accept="video/*" style="display:none" onchange="dOnAvatarAddSelect(event)">
+            </label>
           </div>
-        </div>
-        <!-- 按钮 -->
-        <div>
-          <button class="d-btn d-btn-primary" onclick="dHandleAvatarAdd()" style="white-space:nowrap;padding:9px 18px">
+          <button class="d-btn d-btn-primary" onclick="dHandleAvatarAdd()" style="width:100%;padding:9px 18px">
             保存形象
           </button>
+        </div>
+        <!-- 右：提示 -->
+        <div style="background:#F7F5F1;border-radius:12px;padding:14px;font-size:11px;color:#9E9890;line-height:1.8">
+          <div style="font-weight:600;color:#6E6860;margin-bottom:6px">💡 参考视频说明</div>
+          <div>• 人物正脸、光线均匀的视频</div>
+          <div>• 5~30 秒真人说话视频效果最佳</div>
+          <div>• 建议分辨率 720p 以上</div>
+          <div>• 视频会保存在本地浏览器中</div>
+          <div style="color:#F5762A;margin-top:6px">⚠ 视频较大时可能占用较多存储空间</div>
         </div>
       </div>
     </div>
@@ -1584,37 +1596,36 @@ function dRenderAvatars() {
 }
 
 let _dAddAvatarB64 = null;
-let _dAddAvatarFmt = 'jpeg';
+let _dAddAvatarFmt = 'mp4';
+let _dAddAvatarName = '';
 
 function dOnAvatarAddSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
-  _dAddAvatarFmt = file.type === 'image/png' ? 'png' : 'jpeg';
+  _dAddAvatarFmt = (file.name.split('.').pop() || 'mp4').toLowerCase();
+  _dAddAvatarName = file.name;
+  const label = document.getElementById('dAvatarAddVideoLabel');
+  if (label) label.textContent = file.name;
   const reader = new FileReader();
-  reader.onload = e => {
-    _dAddAvatarB64 = e.target.result.split(',')[1];
-    const preview = document.getElementById('dAvatarAddPreview');
-    const box = document.getElementById('dAvatarAddBox');
-    if (preview) preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
-    if (box) box.style.borderColor = '#22C55E';
-  };
+  reader.onload = e => { _dAddAvatarB64 = e.target.result.split(',')[1]; };
   reader.readAsDataURL(file);
 }
 
 function dHandleAvatarAdd() {
   const name = document.getElementById('dAvatarAddName')?.value?.trim() || dS.avatarAddName;
   if (!name) { dToast('请填写形象名称'); return; }
-  if (!_dAddAvatarB64) { dToast('请先上传人脸图片'); return; }
+  if (!_dAddAvatarB64) { dToast('请先选择参考视频'); return; }
   const newAvatar = {
     id: Date.now().toString(),
     name,
-    imageB64: _dAddAvatarB64,
+    videoB64: _dAddAvatarB64,
     fmt: _dAddAvatarFmt,
+    fileName: _dAddAvatarName,
     createdAt: new Date().toISOString(),
   };
   dS.myAvatars = [...dS.myAvatars, newAvatar];
   localStorage.setItem('myAvatars', JSON.stringify(dS.myAvatars));
-  _dAddAvatarB64 = null; dS.avatarAddName = '';
+  _dAddAvatarB64 = null; _dAddAvatarName = ''; dS.avatarAddName = '';
   dToast('形象已保存！');
   dRender();
 }
@@ -1629,9 +1640,9 @@ function dDeleteAvatar(idx) {
 function dUseAvatarInClone(idx) {
   const a = dS.myAvatars[idx];
   if (!a) return;
-  dS.avatarImageB64 = a.imageB64;
-  dS.avatarImageFmt = a.fmt || 'jpeg';
-  dS.avatarImageName = a.name;
+  dS.avatarSrcVideoB64 = a.videoB64;
+  dS.avatarSrcVideoFmt = a.fmt || 'mp4';
+  dS.avatarSrcVideoName = a.name;
   dToast(`已选择形象「${a.name}」，前往克隆流程使用`);
   dGoPage('home');
 }
