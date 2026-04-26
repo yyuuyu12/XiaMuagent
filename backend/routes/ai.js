@@ -5,9 +5,8 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 
-const LOCAL_SERVICE_HEADERS = {
+const PUBLIC_TUNNEL_HEADERS = {
   'Content-Type': 'application/json',
-  'ngrok-skip-browser-warning': '1',
   'User-Agent': 'XiaMuagent-Backend/1.0',
 };
 
@@ -26,7 +25,7 @@ async function readServiceError(resp, fallback = '本地服务返回异常') {
     if (Array.isArray(detail)) return detail.map(x => x.msg || JSON.stringify(x)).join('；').slice(0, 300);
     if (detail) return String(detail).slice(0, 300);
   } catch (_) {}
-  if (text.includes('<!DOCTYPE')) return `${fallback}：服务地址返回了网页，请检查 asr_url 是否指向本地 ASR 接口`;
+  if (text.includes('<!DOCTYPE')) return `${fallback}：公网穿透地址返回了网页，请检查 asr_url 是否指向本地 ASR 接口`;
   return text.slice(0, 300);
 }
 
@@ -312,7 +311,7 @@ router.post('/tts', requireAuth, async (req, res) => {
     try {
       const resp = await fetch(`${asrUrl}/tts/indextts`, {
         method: 'POST',
-        headers: LOCAL_SERVICE_HEADERS,
+        headers: PUBLIC_TUNNEL_HEADERS,
         body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }),
         signal: AbortSignal.timeout(240000), // 4分钟，GPU首次推理较慢
       });
@@ -339,7 +338,7 @@ router.post('/tts', requireAuth, async (req, res) => {
       const edgeRate = Math.max(-50, Math.min(100, Math.round(((parseFloat(speed) || 1.0) - 1.0) * 100)));
       const resp = await fetch(`${asrUrl}/tts/synthesize`, {
         method: 'POST',
-        headers: LOCAL_SERVICE_HEADERS,
+        headers: PUBLIC_TUNNEL_HEADERS,
         body: JSON.stringify({ text: trimText, voice: voice || 'xiaoxiao', rate: edgeRate }),
         signal: AbortSignal.timeout(60000),
       });
