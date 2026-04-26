@@ -34,6 +34,9 @@ app.use('/api/industry-videos',  industryVideosRouter);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/health', (req, res) => res.json({ code: 200, msg: 'ok', time: new Date().toISOString() }));
+app.get('/desktop', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'desktop.html'));
+});
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => {
     if (err) res.status(404).json({ code: 404, msg: '接口不存在' });
