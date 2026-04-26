@@ -2354,7 +2354,7 @@ function tCloneStep4(sb) {
   if (S.avatarVideoUrl) {
     return `${sb}<div class="tab-page">
       <div class="section-card" style="text-align:center">
-        <video src="${S.avatarVideoUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:50vh"></video>
+        <video src="${S.avatarVideoUrl}" controls playsinline preload="metadata" style="width:100%;border-radius:10px;max-height:50vh"></video>
         <div style="font-size:13px;color:#059669;margin-top:10px;font-weight:600">✓ 数字人视频生成完成</div>
       </div>
       ${S.avatarErr?`<div class="err-text">${esc(S.avatarErr)}</div>`:''}
@@ -2485,7 +2485,7 @@ function tCloneStep5(sb) {
   return `${sb}<div class="tab-page">
 
     ${videoSrc ? `<div class="section-card" style="padding:10px">
-      <video src="${videoSrc}" controls playsinline style="width:100%;border-radius:10px;max-height:40vh"></video>
+      <video src="${videoSrc}" controls playsinline preload="metadata" style="width:100%;border-radius:10px;max-height:40vh"></video>
       <div style="font-size:12px;color:${hasResult?'#059669':'#A8A49C'};text-align:center;margin-top:6px;font-weight:${hasResult?600:400}">
         ${hasResult ? '✓ 字幕已烧录' : '原始视频（未加字幕）'}
       </div>
