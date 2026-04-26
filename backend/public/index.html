@@ -3923,7 +3923,9 @@ async function handleTTSGenerate() {
     const r = await api.post('/ai/tts', payload);
     if (r.code === 200) {
       // 转成 Blob URL，移动端大 base64 直接用 new Audio() 会静默失败
-      const audioUrl = _b64ToBlobUrl(r.data.audio, 'audio/mp3');
+      const audioFmt = (r.data.format || 'mp3').toLowerCase();
+      const audioMime = audioFmt === 'wav' ? 'audio/wav' : audioFmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
+      const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
       setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
       saveCloneSession(3); // ★ 步骤3：语音合成完成，保存 session
     } else {
