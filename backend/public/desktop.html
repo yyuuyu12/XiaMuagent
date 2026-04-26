@@ -1281,7 +1281,7 @@ function dOpenTask(id) {
 
 async function dBindTasks() {
   if (!dS.tasksLoaded) {
-    const r = await dHttp.get('/history/clone');
+    const r = await dHttp.get('/history');
     if (r.code === 200) {
       dS.tasks = r.data || [];
       dS.tasksLoaded = true;
