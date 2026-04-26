@@ -177,7 +177,7 @@ INDEXTTS_URL = "http://localhost:8766"
 async def tts_indextts_proxy(payload: dict):
     """代理到 IndexTTS 服务（端口 8766），需要先启动 start_indextts.bat"""
     try:
-        async with httpx.AsyncClient(timeout=210) as client:  # 3.5分钟，低于Zeabur的4分钟
+        async with httpx.AsyncClient(timeout=600) as client:  # 10分钟，长文案/首次推理会比较慢
             resp = await client.post(f"{INDEXTTS_URL}/tts/generate", json=payload)
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text[:400])

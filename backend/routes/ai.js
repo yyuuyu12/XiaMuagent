@@ -313,7 +313,7 @@ router.post('/tts', requireAuth, async (req, res) => {
         method: 'POST',
         headers: PUBLIC_TUNNEL_HEADERS,
         body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }),
-        signal: AbortSignal.timeout(240000), // 4分钟，GPU首次推理较慢
+        signal: AbortSignal.timeout(600000), // 10分钟，长文案/首次推理会比较慢
       });
       if (!resp.ok) {
         const errText = await readServiceError(resp, 'IndexTTS 合成失败');
@@ -325,7 +325,7 @@ router.post('/tts', requireAuth, async (req, res) => {
     } catch (e) {
       const isTimeout = e.message && (e.message.includes('timeout') || e.message.includes('aborted'));
       return res.json({ code: 500, msg: isTimeout
-        ? 'IndexTTS 合成超时（超过4分钟）。建议：参考音频控制在10~30秒，文案不要过长，或重试一次'
+        ? 'IndexTTS 合成超时（超过10分钟）。建议缩短文案或参考音频后重试'
         : `IndexTTS 出错: ${e.message}` });
     }
   }
