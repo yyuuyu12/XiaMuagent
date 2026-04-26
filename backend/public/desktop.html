@@ -1016,6 +1016,7 @@ function dGoStep(step) {
 
 function dResetFlow() {
   if (!confirm('确认清空当前克隆流程？')) return;
+  if (_dExtractPoller) { clearInterval(_dExtractPoller); _dExtractPoller = null; }
   dS.extractStep = 0;
   dS.videoUrl = ''; dS.extractedScript = ''; dS.rewrittenScript = '';
   dS.ttsAudioUrl = null; dS.ttsAudioB64 = null;
@@ -1036,43 +1037,102 @@ function dResetAvatar() {
    JS · 克隆流程 · API 调用
    ============================================================ */
 
-/* ① 提取 */
+/* ① 提取 —— 和手机端完全相同：先 clone-start，再轮询 /tasks/:id */
+let _dExtractPoller = null;
+
 async function dHandleExtract() {
   const url = document.getElementById('dVideoUrl')?.value?.trim() || dS.videoUrl;
   if (!url) { dToast('请输入视频链接'); return; }
   dS.videoUrl = url;
   dS.extractLoading = true; dS.extractErr = '';
+  dS.extractedScript = '';
   dRender();
-  const r = await dHttp.post('/ai/extract', { url });
-  dS.extractLoading = false;
+
+  const r = await dHttp.post('/video/clone-start', { url });
   if (r.code !== 200) {
-    dS.extractErr = r.msg || '提取失败'; dRender(); return;
+    dS.extractLoading = false;
+    dS.extractErr = r.msg || '提交失败';
+    dRender(); return;
   }
-  dS.extractedScript = r.data?.script || r.data?.text || '';
   dS.cloneTaskId = r.data?.taskId || null;
-  dS.extractStep = 1;
-  dRender();
+  // 开始轮询
+  _dStartExtractPoller(dS.cloneTaskId);
+}
+
+function _dStartExtractPoller(taskId) {
+  if (_dExtractPoller) clearInterval(_dExtractPoller);
+  _dExtractPoller = setInterval(async () => {
+    try {
+      const r = await dHttp.get(`/tasks/${taskId}`);
+      if (r.code !== 200) return;
+      const task = r.data;
+      if (task.status === 'extracted' || task.status === 'done') {
+        clearInterval(_dExtractPoller); _dExtractPoller = null;
+        dS.extractLoading = false;
+        dS.extractedScript = task.result?.transcript || '';
+        // 如果已经跑完改写也一并拿到
+        if (task.result?.rewritten) dS.rewrittenScript = task.result.rewritten;
+        dS.extractStep = 1;
+        dRender();
+      } else if (task.status === 'failed') {
+        clearInterval(_dExtractPoller); _dExtractPoller = null;
+        dS.extractLoading = false;
+        dS.extractErr = task.error_msg || '提取失败';
+        dRender();
+      }
+      // pending / running 继续等
+    } catch (e) { console.error('[d-extract]', e); }
+  }, 2500);
 }
 
 /* ② 改写 */
 async function dHandleRewrite() {
-  const script = document.getElementById('dExtractedScript')?.value || dS.extractedScript;
+  // 优先从 DOM 读最新内容
+  const scriptEl = document.getElementById('dRewriteSource') || document.getElementById('dExtractedScript');
+  const script = scriptEl?.value?.trim() || dS.extractedScript;
   if (!script) { dToast('没有文案可改写'); return; }
   dS.extractedScript = script;
   dS.rewriteLoading = true; dS.rewriteErr = '';
   dRender();
-  const style = document.getElementById('dRewriteStyle')?.value || dS.rewriteStyle;
-  const r = await dHttp.post('/ai/rewrite', {
-    script, style,
-    ...(dS.cloneTaskId ? { taskId: dS.cloneTaskId } : {})
-  });
-  dS.rewriteLoading = false;
-  if (r.code !== 200) {
-    dS.rewriteErr = r.msg || '改写失败'; dRender(); return;
+
+  // 有 cloneTaskId 时走任务改写接口（与手机端一致）
+  if (dS.cloneTaskId) {
+    const r = await dHttp.post(`/tasks/${dS.cloneTaskId}/start-rewrite`, { editedTranscript: script });
+    dS.rewriteLoading = false;
+    if (r.code !== 200) { dS.rewriteErr = r.msg || '改写失败'; dRender(); return; }
+    // 轮询任务直到改写完成
+    _dWaitRewrite(dS.cloneTaskId);
+  } else {
+    // 没有 taskId 时直接调 /ai/rewrite（手动粘贴文案的情况）
+    const r = await dHttp.post('/ai/rewrite', { text: script });
+    dS.rewriteLoading = false;
+    if (r.code !== 200) { dS.rewriteErr = r.msg || '改写失败'; dRender(); return; }
+    dS.rewrittenScript = r.data?.result || '';
+    dS.extractStep = 2;
+    dRender();
   }
-  dS.rewrittenScript = r.data?.rewritten || r.data?.script || '';
-  dS.extractStep = 2;
-  dRender();
+}
+
+function _dWaitRewrite(taskId) {
+  const poller = setInterval(async () => {
+    try {
+      const r = await dHttp.get(`/tasks/${taskId}`);
+      if (r.code !== 200) return;
+      const task = r.data;
+      if (task.status === 'done') {
+        clearInterval(poller);
+        dS.rewriteLoading = false;
+        dS.rewrittenScript = task.result?.rewritten || task.result?.scripts?.[0]?.content || '';
+        dS.extractStep = 2;
+        dRender();
+      } else if (task.status === 'failed') {
+        clearInterval(poller);
+        dS.rewriteLoading = false;
+        dS.rewriteErr = task.error_msg || '改写失败';
+        dRender();
+      }
+    } catch (e) { console.error('[d-rewrite]', e); }
+  }, 2500);
 }
 
 /* ③ TTS */
