@@ -193,6 +193,28 @@ def health():
     return {"status": "ok"}
 
 
+@app.post("/tts/indextts/submit")
+async def tts_indextts_submit(payload: dict):
+    """异步提交 IndexTTS 任务，立即返回 task_id"""
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(f"{INDEXTTS_URL}/tts/submit", json=payload)
+        return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="IndexTTS 服务未启动，请运行 start_indextts.bat 后重试")
+
+
+@app.get("/tts/indextts/task/{task_id}")
+async def tts_indextts_task(task_id: str):
+    """查询 IndexTTS 任务状态"""
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(f"{INDEXTTS_URL}/tts/task/{task_id}")
+        return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="IndexTTS 服务连接失败")
+
+
 # ===================== 数字人视频代理接口（SadTalker/HeyGem 端口 7861）=====================
 SADTALKER_URL = "http://localhost:7861"
 AVATARS_DIR = Path(__file__).parent / "avatars"

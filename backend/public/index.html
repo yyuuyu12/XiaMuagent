@@ -3921,6 +3921,12 @@ async function handleTTSGenerate() {
       }
     }
     const r = await api.post('/ai/tts', payload);
+    if (r.code === 202 && r.task_id) {
+      // IndexTTS 异步模式：轮询直到完成
+      setState({ ttsGenerating: true, ttsErr: '', extractStep: 'tts_gen' });
+      await _pollIndexTTSTask(r.task_id);
+      return;
+    }
     if (r.code === 200) {
       // 转成 Blob URL，移动端大 base64 直接用 new Audio() 会静默失败
       const audioFmt = (r.data.format || 'mp3').toLowerCase();
@@ -3934,6 +3940,34 @@ async function handleTTSGenerate() {
   } catch {
     setState({ ttsGenerating: false, ttsErr: '网络错误，请重试', extractStep: 3 });
   }
+}
+
+async function _pollIndexTTSTask(taskId) {
+  const maxWait = 20 * 60 * 1000; // 最长等20分钟
+  const interval = 5000;
+  const start = Date.now();
+  while (Date.now() - start < maxWait) {
+    await new Promise(r => setTimeout(r, interval));
+    try {
+      const r = await api.get(`/ai/tts/indextts/task/${taskId}`);
+      if (r.code === 200 && r.data) {
+        const audioFmt = (r.data.format || 'wav').toLowerCase();
+        const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
+        const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
+        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
+        saveCloneSession(3);
+        return;
+      }
+      if (r.code === 500) {
+        setState({ ttsGenerating: false, ttsErr: r.msg || '声音克隆失败', extractStep: 3 });
+        return;
+      }
+      // code 202：还在推理中，继续等
+    } catch {
+      // 网络抖动，继续等
+    }
+  }
+  setState({ ttsGenerating: false, ttsErr: '声音克隆超时，请重试', extractStep: 3 });
 }
 
 function _b64ToBlobUrl(b64, mime) {

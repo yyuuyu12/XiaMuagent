@@ -301,7 +301,7 @@ router.post('/tts', requireAuth, async (req, res) => {
     }
   }
 
-  // ===== 通道2：IndexTTS 本地克隆音色 =====
+  // ===== 通道2：IndexTTS 本地克隆音色（异步任务模式，绕过网关超时）=====
   if (voice === 'indextts') {
     const { rows: asrRows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
     const asrUrl = (asrRows[0]?.value || '').trim();
@@ -309,24 +309,21 @@ router.post('/tts', requireAuth, async (req, res) => {
     const { indexRefAudio, indexEmotion, indexEmoAlpha } = req.body;
     if (!indexRefAudio) return res.json({ code: 400, msg: '请先上传参考音频（你的声音样本）才能使用克隆音色' });
     try {
-      const resp = await fetch(`${asrUrl}/tts/indextts`, {
+      const resp = await fetch(`${asrUrl}/tts/indextts/submit`, {
         method: 'POST',
         headers: PUBLIC_TUNNEL_HEADERS,
         body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }),
-        signal: AbortSignal.timeout(600000), // 10分钟，长文案/首次推理会比较慢
+        signal: AbortSignal.timeout(30000),
       });
       if (!resp.ok) {
-        const errText = await readServiceError(resp, 'IndexTTS 合成失败');
-        return res.json({ code: 500, msg: `IndexTTS 合成失败: ${errText.slice(0, 300)}` });
+        const errText = await readServiceError(resp, 'IndexTTS 提交失败');
+        return res.json({ code: 500, msg: `IndexTTS 提交失败: ${errText.slice(0, 300)}` });
       }
       const data = await resp.json();
-      if (data.audio) return res.json({ code: 200, data: { audio: data.audio, format: data.format || 'wav' } });
-      return res.json({ code: 500, msg: 'IndexTTS 返回数据异常' });
+      if (!data.task_id) return res.json({ code: 500, msg: 'IndexTTS 未返回 task_id' });
+      return res.json({ code: 202, task_id: data.task_id, asr_url: asrUrl });
     } catch (e) {
-      const isTimeout = e.message && (e.message.includes('timeout') || e.message.includes('aborted'));
-      return res.json({ code: 500, msg: isTimeout
-        ? 'IndexTTS 合成超时（超过10分钟）。建议缩短文案或参考音频后重试'
-        : `IndexTTS 出错: ${e.message}` });
+      return res.json({ code: 500, msg: `IndexTTS 提交失败: ${e.message}` });
     }
   }
 
@@ -645,6 +642,30 @@ router.post('/video/cancel/:taskId', requireAuth, async (req, res) => {
     return res.json({ code: 200, data });
   } catch (e) {
     return res.json({ code: 500, msg: `取消失败: ${e.message}` });
+  }
+});
+
+// IndexTTS 异步任务轮询
+router.get('/tts/indextts/task/:taskId', requireAuth, async (req, res) => {
+  const { taskId } = req.params;
+  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+  const asrUrl = (rows[0]?.value || '').trim();
+  if (!asrUrl) return res.json({ code: 500, msg: '未配置 asr_url' });
+  try {
+    const resp = await fetch(`${asrUrl}/tts/indextts/task/${taskId}`, {
+      headers: PUBLIC_TUNNEL_HEADERS,
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await resp.json();
+    if (data.status === 'done') {
+      return res.json({ code: 200, data: { audio: data.audio, format: data.format || 'wav' } });
+    }
+    if (data.status === 'error') {
+      return res.json({ code: 500, msg: `IndexTTS 推理失败: ${data.error || '未知错误'}` });
+    }
+    return res.json({ code: 202, status: data.status });
+  } catch (e) {
+    return res.json({ code: 500, msg: `轮询失败: ${e.message}` });
   }
 });
 

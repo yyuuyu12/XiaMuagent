@@ -42,6 +42,7 @@ sys.path.insert(0, os.path.join(VOICE_MODULE_DIR, "indextts"))
 import asyncio
 import base64
 import tempfile
+import threading
 import traceback
 import uuid
 import warnings
@@ -89,6 +90,8 @@ tts = IndexTTS2(
 print(f"IndexTTS2 v2 加载完成！GPU: {torch.cuda.is_available()}")
 
 inference_lock = asyncio.Lock()
+_tasks: dict = {}
+_tasks_lock = threading.Lock()
 
 app = FastAPI(title="IndexTTS2 Server")
 
@@ -149,6 +152,81 @@ async def generate(payload: dict):
             try:
                 if os.path.exists(p):
                     os.unlink(p)
+            except Exception:
+                pass
+
+
+@app.post("/tts/submit")
+async def tts_submit(payload: dict):
+    """异步提交：立即返回 task_id，推理在后台运行"""
+    task_id = uuid.uuid4().hex
+    with _tasks_lock:
+        _tasks[task_id] = {"status": "pending", "audio": None, "format": "wav", "error": None}
+    asyncio.create_task(_run_tts_task(task_id, payload))
+    return {"task_id": task_id}
+
+
+@app.get("/tts/task/{task_id}")
+def tts_task_status(task_id: str):
+    """查询任务状态"""
+    t = _tasks.get(task_id)
+    if not t:
+        raise HTTPException(404, "任务不存在")
+    # 返回时不包含 audio（可能几十MB），只在 done 时返回
+    if t["status"] == "done":
+        return {"status": "done", "audio": t["audio"], "format": t["format"]}
+    return {"status": t["status"], "error": t.get("error")}
+
+
+async def _run_tts_task(task_id: str, payload: dict):
+    """后台执行推理"""
+    text             = (payload.get("text") or "").strip()
+    prompt_audio_b64 = payload.get("prompt_audio", "")
+    emotion           = payload.get("emotion", "neutral")
+    emo_alpha_override = payload.get("emo_alpha_override")
+    speed             = float(payload.get("speed", 1.0))
+
+    if not text or not prompt_audio_b64:
+        with _tasks_lock:
+            _tasks[task_id]["status"] = "error"
+            _tasks[task_id]["error"] = "text 或 prompt_audio 不能为空"
+        return
+
+    try:
+        spk_bytes = base64.b64decode(prompt_audio_b64)
+    except Exception:
+        with _tasks_lock:
+            _tasks[task_id]["status"] = "error"
+            _tasks[task_id]["error"] = "prompt_audio base64 解码失败"
+        return
+
+    suffix = ".mp3" if (spk_bytes[:3] == b"ID3" or spk_bytes[:2] == b"\xff\xfb") else ".wav"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+        f.write(spk_bytes)
+        spk_path = f.name
+
+    output_path = os.path.join(OUTPUT_DIR, f"{task_id}.wav")
+    emo_path  = EMOTION_TEMPLATES.get(emotion)
+    emo_alpha = float(emo_alpha_override) if emo_alpha_override is not None else EMOTION_ALPHA.get(emotion, 0.0)
+    if emo_path and not os.path.exists(emo_path):
+        emo_path, emo_alpha = None, 0.0
+
+    try:
+        with _tasks_lock:
+            _tasks[task_id]["status"] = "running"
+        async with inference_lock:
+            await asyncio.to_thread(_run_inference, spk_path, text, output_path, speed, emo_path, emo_alpha)
+        with open(output_path, "rb") as f:
+            audio_b64 = base64.b64encode(f.read()).decode()
+        with _tasks_lock:
+            _tasks[task_id].update({"status": "done", "audio": audio_b64, "format": "wav"})
+    except Exception as e:
+        with _tasks_lock:
+            _tasks[task_id].update({"status": "error", "error": f"{type(e).__name__}: {str(e)[:300]}"})
+    finally:
+        for p in [spk_path, output_path]:
+            try:
+                if os.path.exists(p): os.unlink(p)
             except Exception:
                 pass
 
