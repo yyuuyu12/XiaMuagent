@@ -4459,29 +4459,18 @@ async function handlePostProcess() {
   setState({ postProcessing: true, postProcessErr: '' });
   touchCloneTaskActivity();
   try {
-    const asrUrl = S.asrUrl || (await (async () => {
-      const r = await api.get('/ai/asr-url');
-      if (r.code !== 200) throw new Error('获取服务地址失败');
-      setState({ asrUrl: r.data.url });
-      return r.data.url;
-    })());
-
-    const resp = await fetch(`${asrUrl}/video/postprocess`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        video_task_id: S.avatarDoneTaskId || null,
-        video_b64:     S.avatarVideoB64 || null,
-        audio_b64:     S.ttsAudioB64,
-        audio_fmt:     'mp3',
-        sub_color:     S.subColor,
-        outline_color: S.subOutlineColor,
-        outline_width: S.subOutlineWidth,
-        fontsize:      S.subFontsize,
-      }),
+    const r2 = await api.post('/ai/video/postprocess', {
+      video_task_id: S.avatarDoneTaskId || null,
+      video_b64:     S.avatarVideoB64 || null,
+      audio_b64:     S.ttsAudioB64,
+      audio_fmt:     'mp3',
+      sub_color:     S.subColor,
+      outline_color: S.subOutlineColor,
+      outline_width: S.subOutlineWidth,
+      fontsize:      S.subFontsize,
     });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || '后期处理失败');
+    if (r2.code !== 200) throw new Error(r2.msg || '后期处理失败');
+    const data = r2.data;
 
     // base64 → blob URL
     const raw = atob(data.video_b64);

@@ -645,6 +645,30 @@ router.post('/video/cancel/:taskId', requireAuth, async (req, res) => {
   }
 });
 
+// 字幕烧录代理（前端是 HTTPS，不能直连 HTTP 的 ASR，需走 Zeabur 中转）
+router.post('/video/postprocess', requireAuth, async (req, res) => {
+  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+  const asrUrl = (rows[0]?.value || '').trim();
+  if (!asrUrl) return res.json({ code: 500, msg: '未配置 asr_url' });
+  try {
+    const resp = await fetch(`${asrUrl}/video/postprocess`, {
+      method: 'POST',
+      headers: { ...PUBLIC_TUNNEL_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+      signal: AbortSignal.timeout(300000), // 5 分钟
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      return res.json({ code: 500, msg: `字幕烧录失败: ${text.slice(0, 300)}` });
+    }
+    const data = await resp.json();
+    return res.json({ code: 200, data });
+  } catch (e) {
+    const isTimeout = e.message && (e.message.includes('timeout') || e.message.includes('aborted'));
+    return res.json({ code: 500, msg: isTimeout ? '字幕烧录超时，视频较长时请重试' : `字幕烧录失败: ${e.message}` });
+  }
+});
+
 // IndexTTS 异步任务轮询
 router.get('/tts/indextts/task/:taskId', requireAuth, async (req, res) => {
   const { taskId } = req.params;
