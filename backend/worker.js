@@ -76,18 +76,38 @@ async function doTranscribe(taskId, mp4Urls, cacheKey, asrUrl, openaiKey, openai
 
   if (asrUrl) {
     try {
-      const asrRes = await fetch(`${asrUrl}/asr/transcribe`, {
+      // ---- 异步提交模式：每次 frp 请求 <1s，彻底规避 HTTP 隧道超时 ----
+      const submitRes = await fetch(`${asrUrl}/asr/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, mp4Url: firstUrl }),
-        signal: AbortSignal.timeout(300000),
+        body: JSON.stringify({ mp4Url: firstUrl }),
+        signal: AbortSignal.timeout(30000),   // 提交本身只需几百毫秒
       });
-      if (!asrRes.ok) {
-        const body = await asrRes.text().catch(() => '');
-        throw new Error(`本地ASR返回错误: ${asrRes.status}${body ? ' - ' + body.slice(0, 300) : ''}`);
+      if (!submitRes.ok) {
+        const body = await submitRes.text().catch(() => '');
+        throw new Error(`本地ASR提交失败: ${submitRes.status}${body ? ' - ' + body.slice(0, 200) : ''}`);
       }
-      const asrData = await asrRes.json();
-      transcript = asrData.text?.trim() || '';
+      const { task_id: asrTaskId } = await submitRes.json();
+      if (!asrTaskId) throw new Error('ASR 未返回 task_id');
+
+      // ---- 轮询结果（每 3 秒一次，最多等 10 分钟）----
+      for (let i = 0; i < 200; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const pollRes = await fetch(`${asrUrl}/asr/task/${asrTaskId}`, {
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!pollRes.ok) continue;
+        const pollData = await pollRes.json();
+        if (pollData.status === 'done') {
+          transcript = (pollData.text || '').trim();
+          break;
+        }
+        if (pollData.status === 'error') {
+          throw new Error(`ASR 识别失败: ${pollData.error || '未知错误'}`);
+        }
+        // pending / running → 继续等
+      }
+      if (!transcript && transcript !== '') throw new Error('ASR 识别超时（超过10分钟）');
     } catch (asrErr) {
       if (!openaiKey) throw new Error(`本地语音识别服务不可用 (${asrErr.message})，且未配置 OpenAI API Key 作为备用`);
       console.warn(`[Worker] 本地ASR失败，降级到Whisper: ${asrErr.message}`);

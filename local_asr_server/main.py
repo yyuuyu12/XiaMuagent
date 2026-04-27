@@ -38,65 +38,84 @@ print("正在加载 Whisper medium 模型（首次约需1-2分钟下载）...")
 model = whisper.load_model("medium")
 print("Whisper 模型加载完成！")
 
+# ===================== ASR 异步任务状态表 =====================
+# 以 task_id 为键，存 { status, text, error }
+# status: pending → running → done / error
+_asr_tasks: dict = {}
 
-# ===================== 转写接口 =====================
-@app.post("/asr/transcribe")
-async def transcribe(payload: dict):
-    task_id = payload.get("taskId", "")
-    mp4_url = payload.get("mp4Url", "")
+# ===================== 转写核心（同步，跑在线程池里）=====================
+def _transcribe_sync(mp4_url: str) -> str:
+    """下载视频 → ffmpeg 提音频 → Whisper 识别，全同步，供 run_in_executor 调用"""
+    import requests as _req
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+        "Referer": "https://www.douyin.com/",
+    }
+    resp = _req.get(mp4_url, headers=headers, timeout=120, allow_redirects=True)
+    if resp.status_code != 200:
+        raise RuntimeError(f"视频下载失败: HTTP {resp.status_code}")
+    content = resp.content
+    if len(content) < 1000:
+        raise RuntimeError(f"视频内容异常（{len(content)} 字节），可能被 CDN 拦截")
 
-    if not mp4_url:
-        raise HTTPException(status_code=400, detail="mp4Url 不能为空")
-
-    try:
-      return await _do_transcribe(task_id, mp4_url)
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:400]}\n{traceback.format_exc()[-600:]}")
-
-async def _do_transcribe(task_id: str, mp4_url: str):
     with tempfile.TemporaryDirectory() as tmpdir:
         mp4_path = os.path.join(tmpdir, "video.mp4")
         audio_path = os.path.join(tmpdir, "audio.wav")
-
-        # 下载 MP4（需要移动端 UA + Referer，否则抖音 CDN 拒绝）
-        headers = {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-            "Referer": "https://www.douyin.com/",
-        }
-        async with httpx.AsyncClient(timeout=120, headers=headers, follow_redirects=True) as client:
-            response = await client.get(mp4_url)
-            if response.status_code != 200:
-                raise HTTPException(status_code=502, detail=f"视频下载失败: HTTP {response.status_code}")
-            content = response.content
-            if len(content) < 1000:
-                raise HTTPException(status_code=502, detail=f"视频内容异常（{len(content)} 字节），可能被 CDN 拦截")
-            with open(mp4_path, "wb") as f:
-                f.write(content)
-
-        # ffmpeg 提取音频（16kHz 单声道，Whisper 最优）
+        with open(mp4_path, "wb") as f:
+            f.write(content)
         try:
-            (
-                ffmpeg
-                .input(mp4_path)
-                .output(audio_path, ar=16000, ac=1)
-                .overwrite_output()
-                .run(quiet=True)
-            )
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail=f"ffmpeg 未找到，请确认已安装 ffmpeg 并在 PATH 中。当前 PATH: {os.environ.get('PATH','')[:300]}")
+            ffmpeg.input(mp4_path).output(audio_path, ar=16000, ac=1).overwrite_output().run(quiet=True)
         except ffmpeg.Error as e:
-            raise HTTPException(status_code=500, detail=f"音频提取失败（ffmpeg）: {e.stderr.decode(errors='ignore')[-300:] if e.stderr else str(e)}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"音频提取异常: {type(e).__name__}: {str(e)[:300]}")
+            raise RuntimeError(f"音频提取失败: {e.stderr.decode(errors='ignore')[-200:] if e.stderr else str(e)}")
+        result = model.transcribe(audio_path, language="zh", task="transcribe",
+                                  word_timestamps=False, condition_on_previous_text=True,
+                                  initial_prompt="以下是普通话内容，请加上标点符号。")
+        return result["text"].strip()
 
-        # Whisper 语音识别
-        result = model.transcribe(audio_path, language="zh", task="transcribe", word_timestamps=False, condition_on_previous_text=True, initial_prompt="以下是普通话内容，请加上标点符号。")
-        text = result["text"].strip()
+# ===================== ASR 异步后台任务 =====================
+async def _run_asr_bg(task_id: str, mp4_url: str):
+    _asr_tasks[task_id]["status"] = "running"
+    try:
+        loop = asyncio.get_event_loop()
+        text = await loop.run_in_executor(None, _transcribe_sync, mp4_url)
+        _asr_tasks[task_id].update({"status": "done", "text": text})
+    except Exception as e:
+        import traceback
+        _asr_tasks[task_id].update({"status": "error", "error": f"{type(e).__name__}: {str(e)[:400]}"})
 
-    return {"taskId": task_id, "text": text, "status": "done"}
+# ===================== 新接口：提交（立刻返回 task_id）=====================
+@app.post("/asr/submit")
+async def asr_submit(payload: dict):
+    mp4_url = payload.get("mp4Url", "")
+    if not mp4_url:
+        raise HTTPException(status_code=400, detail="mp4Url 不能为空")
+    task_id = str(uuid.uuid4())
+    _asr_tasks[task_id] = {"status": "pending", "text": None, "error": None}
+    asyncio.create_task(_run_asr_bg(task_id, mp4_url))
+    return {"task_id": task_id, "status": "pending"}
+
+# ===================== 新接口：轮询结果 =====================
+@app.get("/asr/task/{task_id}")
+async def asr_task_status(task_id: str):
+    task = _asr_tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    return {"task_id": task_id, **task}
+
+# ===================== 旧接口保留（兼容）=====================
+@app.post("/asr/transcribe")
+async def transcribe(payload: dict):
+    mp4_url = payload.get("mp4Url", "")
+    task_id = payload.get("taskId", str(uuid.uuid4()))
+    if not mp4_url:
+        raise HTTPException(status_code=400, detail="mp4Url 不能为空")
+    try:
+        loop = asyncio.get_event_loop()
+        text = await loop.run_in_executor(None, _transcribe_sync, mp4_url)
+        return {"taskId": task_id, "text": text, "status": "done"}
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)[:400]}\n{traceback.format_exc()[-400:]}")
 
 
 # ===================== 语音合成接口（edge-tts）=====================
