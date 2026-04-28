@@ -493,8 +493,8 @@ def _build_ass_douyin_legacy(segments: list, vid_w: int = 720, vid_h: int = 1280
 
 def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1280) -> str:
     margin = max(int(vid_w * 0.05), 18)
-    bottom_margin = max(int(vid_h * 0.08), int(vid_w * 0.055), 32)
-    sub_cn_size = max(int(vid_w * 0.045), 24)
+    bottom_margin = max(int(vid_h * 0.10), int(vid_w * 0.065), 42)
+    sub_cn_size = max(int(vid_w * 0.058), 30)
     main_cn_size = max(int(vid_w * 0.082), 44)
     sub_en_size = max(int(sub_cn_size * 0.70), 13)
     main_en_size = max(int(main_cn_size * 0.70), 20)
@@ -565,7 +565,7 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
         if not text:
             return []
         usable_w = max(120, vid_w - margin * 2)
-        max_chars = min(14, max(6, int(usable_w / max(size * 1.04, 1))))
+        max_chars = min(9, max(5, int(usable_w / max(size * 1.04, 1))))
         chunks, cur = [], ""
         punct = "，。！？、,.!?；;：:"
         for ch in text:
@@ -577,11 +577,9 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
                     break
         if cur and len(chunks) < max_lines:
             chunks.append(cur.strip(punct))
-        if len(text) > sum(len(x) for x in chunks) and chunks:
-            chunks[-1] = chunks[-1].rstrip("...") + "..."
         return [x for x in chunks if x]
 
-    def paginate_cn_text(text: str, max_chars: int = 10) -> list:
+    def paginate_cn_text(text: str, max_chars: int = 8) -> list:
         text = re.sub(r"\s+", "", text or "")
         text = text.strip("，。！？、,.!?；;：:")
         if not text:
@@ -601,7 +599,7 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
                     best = 0
                     for w in words:
                         pos += len(w)
-                        if max_chars - 4 <= pos <= max_chars:
+                        if max_chars - 3 <= pos <= max_chars:
                             best = pos
                     if best:
                         cut = best
@@ -655,7 +653,7 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
         raw_full = ass_escape(seg.get("text", ""))
         if not raw_full:
             continue
-        pages = paginate_cn_text(raw_full, 10)
+        pages = paginate_cn_text(raw_full, 8)
         seg_start = max(0.0, float(seg["start"]))
         seg_end = max(seg_start + 0.2, float(seg["end"]))
         span = seg_end - seg_start
@@ -677,7 +675,7 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
             main_en_fit = fit_size(main_en_size, main_en, 28, 0.76)
             sub_size = fit_size(sub_cn_size, sub_cn, 8, 0.80)
             sub_en_fit = fit_size(sub_en_size, sub_en, 16, 0.82)
-            main_cn_lines = wrap_cn_lines(main_cn, main_size, 2)
+            main_cn_lines = wrap_cn_lines(main_cn, main_size, 1)
 
             lines = []
             if sub_cn:
