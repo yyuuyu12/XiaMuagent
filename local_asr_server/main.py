@@ -350,6 +350,142 @@ def _wrap_subtitle(text: str, max_chars: int) -> str:
     return r"\N".join(lines)
 
 
+def _split_cn_douyin(text: str) -> tuple:
+    """把中文字幕拆成 (副标题短语, 主体文字)，副标题取首个短词（2-4字）"""
+    text = text.strip()
+    if len(text) <= 3:
+        return ("", text)
+    try:
+        import jieba
+        words = list(jieba.cut(text))
+        first = words[0] if words else ""
+        if 2 <= len(first) <= 4 and len(first) <= len(text) * 0.5:
+            return (first, text[len(first):])
+        if len(first) == 1 and len(words) >= 2:
+            two = first + words[1]
+            if len(two) <= 5:
+                return (two, text[len(two):])
+    except ImportError:
+        pass
+    # fallback：前 2-3 字作副标题
+    cut = 3 if len(text) >= 8 else 2
+    return (text[:cut], text[cut:])
+
+
+def _build_ass_douyin(segments: list, vid_w: int = 720, vid_h: int = 1280) -> str:
+    """
+    双层抖音风格 ASS：
+      上层副标题 白色小字（首个短语）
+      下层主标题 金色大字（主体句子，关键词橙色高亮）
+    """
+    # ── 尺寸 ─────────────────────────────────────────────────────────────────
+    mg      = max(int(vid_w * 0.04), 16)    # 左/底边距
+    ms      = max(int(vid_w * 0.065), 28)   # 主标题字号
+    ss      = max(int(vid_w * 0.035), 18)   # 副标题字号
+    mb      = max(int(ms  * 0.08), 2)       # 主标题描边
+    sb      = max(int(ss  * 0.08), 2)       # 副标题描边
+    mlh     = int(ms  * 1.35)               # 主标题行高
+    slh     = int(ss  * 1.35)               # 副标题行高
+    cn_gap  = 10                            # 副标题与主标题的间距
+
+    # ── ASS 颜色 (&HAABBGGRR) ─────────────────────────────────────────────
+    C_WHITE  = "&H00FFFFFF"
+    C_GOLD   = "&H0000D7FF"   # #FFD700
+    C_ORANGE = "&H00356BFF"   # #FF6B35 关键词高亮
+    C_BLACK  = "&H00000000"
+    C_TRANS  = "&HFF000000"
+
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        f"PlayResX: {vid_w}\n"
+        f"PlayResY: {vid_h}\n"
+        "WrapStyle: 2\n"
+        "ScaledBorderAndShadow: yes\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
+        "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
+        "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Base,Microsoft YaHei,40,{C_WHITE},{C_WHITE},{C_BLACK},{C_TRANS},"
+        "0,0,0,0,100,100,0,0,1,3,0,7,0,0,0,1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+
+    def dial(st, en, x, y, color, font, size, bord, lines):
+        if not lines:
+            return ""
+        tags = "{" + f"\\an7\\pos({x},{y})\\fn{font}\\c{color}\\fs{size}\\b1\\bord{bord}\\shad0" + "}"
+        body = r"\N".join(lines)
+        return f"Dialogue: 0,{st},{en},Base,,0,0,0,,{tags}{body}"
+
+    def wrap_cn(text, max_ch=12):
+        if len(text) <= max_ch:
+            return [text]
+        lines, cur = [], ""
+        for ch in text:
+            cur += ch
+            if len(cur) >= max_ch:
+                lines.append(cur); cur = ""
+        if cur:
+            lines.append(cur)
+        return lines[:2]
+
+    def highlight_kw(text, color_base):
+        """简单关键词高亮：找最长的名词性词语（2字以上）"""
+        try:
+            import jieba.posseg as pseg
+            result = text
+            kws = []
+            for w, flag in pseg.cut(text):
+                if len(w) >= 2 and (flag.startswith('n') or flag.startswith('v')):
+                    kws.append(w)
+                if len(kws) >= 2:
+                    break
+            for kw in kws:
+                result = result.replace(
+                    kw,
+                    "{\\c" + C_ORANGE + "}" + kw + "{\\c" + color_base + "}"
+                )
+            return result
+        except Exception:
+            return text
+
+    max_ch = min(12, max(5, int((vid_w - mg * 2) / (ms * 1.4))))
+    events = [header]
+    x = mg
+
+    for seg in segments:
+        raw  = seg["text"].strip()
+        if not raw:
+            continue
+        st   = _seconds_to_ass_time(max(0.0, seg["start"]))
+        en   = _seconds_to_ass_time(seg["end"])
+        sub_ph, main_body = _split_cn_douyin(raw)
+
+        mcn = wrap_cn(main_body or raw, max_ch)
+        scn = wrap_cn(sub_ph) if sub_ph else []
+
+        # ── y 坐标从底部往上排列 ─────────────────────────────────────────
+        # 主标题底 → 副标题
+        y_main_top = vid_h - mg - len(mcn) * mlh
+        y_sub_top  = y_main_top - cn_gap - (len(scn) or 1) * slh
+
+        # 主标题（金色，关键词高亮）
+        hi_mcn = [highlight_kw(ln, C_GOLD) for ln in mcn]
+        d = dial(st, en, x, y_main_top, C_GOLD,  "Microsoft YaHei", ms, mb, hi_mcn)
+        if d: events.append(d)
+
+        # 副标题（白色小字）
+        if scn:
+            d = dial(st, en, x, y_sub_top, C_WHITE, "Microsoft YaHei", ss, sb, scn)
+            if d: events.append(d)
+
+    return "\n".join(events) + "\n"
+
+
 def _build_ass(segments: list, fontsize: int, sub_color: str,
                outline_color: str, outline_width: float,
                vid_w: int = 720) -> str:
@@ -488,11 +624,15 @@ async def video_postprocess(payload: dict):
         if not segments:
             raise HTTPException(500, "未识别到任何语音内容，无法生成字幕")
 
-        # 检测视频宽度（决定折行字符数）
-        vid_w, _ = await _get_video_size(video_in)
+        # 检测视频宽高
+        vid_w, vid_h = await _get_video_size(video_in)
 
         # 生成 ASS 字幕
-        ass_content = _build_ass(segments, fontsize, sub_color, outline_col, outline_w, vid_w)
+        sub_style = payload.get("sub_style", "default")
+        if sub_style == "douyin":
+            ass_content = _build_ass_douyin(segments, vid_w, vid_h)
+        else:
+            ass_content = _build_ass(segments, fontsize, sub_color, outline_col, outline_w, vid_w)
         Path(ass_file).write_text(ass_content, encoding="utf-8-sig")
 
         # FFmpeg 烧录
