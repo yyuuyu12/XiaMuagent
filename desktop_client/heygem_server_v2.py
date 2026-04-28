@@ -51,7 +51,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 tasks: dict[str, dict] = {}
 _task_lock = threading.Lock()
-_hd_module = None   # hdModule main，主进程初始化后赋值
+_hd_module = None     # hdModule main，主进程初始化后赋值
+_hd_processor = None  # 单例 HDDigitalHumanProcessor，模型只加载一次
 
 
 class GenerateReq(BaseModel):
@@ -64,12 +65,12 @@ class GenerateReq(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": "heygem-v2"}
+    return {"status": "ok", "model": "heygem-v2", "processor_ready": _hd_processor is not None}
 
 
 @app.post("/video/generate")
 async def generate(req: GenerateReq):
-    if _hd_module is None:
+    if _hd_processor is None:
         raise HTTPException(503, "V2模型尚未初始化")
     task_id = uuid.uuid4().hex
     with _task_lock:
@@ -283,8 +284,8 @@ def _do_work_v2(task_id, audio_path, video_path):
         with _task_lock:
             tasks[task_id].update({"progress": 28, "msg": "V2 GPU高清推理中..."})
 
-        # hdModule 的 generateDigitalHuman 直接接受文件路径，output_dir 指定输出目录
-        result = _hd_module.generateDigitalHuman(
+        # 直接调用单例 processor 的实例方法，避免每次重新加载 256.onnx + HuBERT（省 10~30 秒）
+        result = _hd_processor.generate_digital_human(
             audio_file=norm_audio,
             video_file=norm_video,
             watermark=False,
@@ -402,7 +403,12 @@ if __name__ == '__main__':
     print("[HeyGemV2] 正在初始化高清模型V2，请稍候（约30~90秒）...")
     import main as _hd_module_raw
     _hd_module = _hd_module_raw
-    print("[HeyGemV2] 高清模型V2初始化完成，服务就绪")
+
+    # 创建单例 processor，模型（256.onnx + chinese-hubert-large）只加载一次
+    # 后续每次生成直接调用 _hd_processor.generate_digital_human()，省去重复加载开销
+    print("[HeyGemV2] 正在创建 HDDigitalHumanProcessor 单例（256.onnx + HuBERT 加载中）...")
+    _hd_processor = _hd_module_raw.HDDigitalHumanProcessor()
+    print("[HeyGemV2] 高清模型V2初始化完成，服务就绪（模型已常驻内存）")
     print(f"   模型目录: {HEYGEM_DIR}")
     print(f"   输出目录: {OUTPUT_DIR}")
 
