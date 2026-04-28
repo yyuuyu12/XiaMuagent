@@ -374,6 +374,10 @@ def _split_cn_douyin(text: str) -> tuple:
 
 
 def _build_ass_douyin(segments: list, vid_w: int = 720, vid_h: int = 1280) -> str:
+    return _build_ass_bilingual_douyin(segments, vid_w, vid_h)
+
+
+def _build_ass_douyin_legacy(segments: list, vid_w: int = 720, vid_h: int = 1280) -> str:
     """
     双层抖音风格 ASS：
       上层副标题 白色小字（首个短语）
@@ -501,6 +505,9 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
     C_BLACK = "&H00000000"
     C_TRANS = "&HFF000000"
 
+    zh_font = "SimSun"
+    en_font = "Georgia"
+
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -513,7 +520,7 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Base,Microsoft YaHei,40,{C_WHITE},{C_WHITE},{C_BLACK},{C_TRANS},"
+        f"Style: Base,{zh_font},40,{C_WHITE},{C_WHITE},{C_BLACK},{C_TRANS},"
         "0,0,0,0,100,100,0,0,1,3,0,7,0,0,0,1\n"
         "\n"
         "[Events]\n"
@@ -611,10 +618,10 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
 
         lines = []
         if sub_cn:
-            lines.append(("sub_cn", sub_cn, sub_size, C_WHITE, C_SOFT_GOLD, max(int(sub_size * 0.05), 1), max(int(sub_size * 0.13), 3), "Microsoft YaHei"))
-            lines.append(("sub_en", sub_en, sub_en_fit, C_WHITE, C_BLACK, max(int(sub_en_fit * 0.06), 1), max(int(sub_en_fit * 0.14), 2), "Arial"))
-        lines.append(("main_cn", highlight_kw(main_cn, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 4), "Microsoft YaHei"))
-        lines.append(("main_en", main_en, main_en_fit, C_WHITE, C_BLACK, max(int(main_en_fit * 0.06), 1), max(int(main_en_fit * 0.13), 3), "Arial"))
+            lines.append(("sub_cn", sub_cn, sub_size, C_WHITE, C_SOFT_GOLD, max(int(sub_size * 0.05), 1), max(int(sub_size * 0.13), 3), zh_font))
+            lines.append(("sub_en", sub_en, sub_en_fit, C_WHITE, C_BLACK, max(int(sub_en_fit * 0.06), 1), max(int(sub_en_fit * 0.14), 2), en_font))
+        lines.append(("main_cn", highlight_kw(main_cn, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 4), zh_font))
+        lines.append(("main_en", main_en, main_en_fit, C_WHITE, C_BLACK, max(int(main_en_fit * 0.06), 1), max(int(main_en_fit * 0.13), 3), en_font))
 
         heights = [int(item[2] * (1.10 if item[0].endswith("cn") else 1.03)) for item in lines]
         gaps = []

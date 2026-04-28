@@ -1233,7 +1233,7 @@ const S = {
   avatarMgmtUploading: false, avatarMgmtUploadName: '', avatarMgmtErr: '', avatarMgmtMode: 'manage',
   avatarMgmtPendingFile: null, avatarMgmtPendingFileName: '', avatarMgmtPendingFileSize: 0,
   ttsAudioB64: null,
-  subColor: '#FFFFFF', subOutlineColor: '#000000', subFontsize: 44, subOutlineWidth: 2.5, subTemplate: 'classic', subStyle: 'default',
+  subColor: '#FFD700', subOutlineColor: '#000000', subFontsize: 46, subOutlineWidth: 3, subTemplate: 'bilingual_douyin', subStyle: 'bilingual_douyin',
   postProcessing: false, postProcessedVideoUrl: null, postProcessedB64: null, postProcessErr: '',
   coverFrameUrl: null, coverTitle: '', coverGenerating: false, coverSeekTime: 1.0,
   // 步骤5：后期制作
@@ -2465,10 +2465,10 @@ function tCloneStep5(sb) {
                border:2.5px solid ${active ? '#F97316' : '#3A3630'};position:relative;box-sizing:border-box">
         ${checkMark}
         <div style="margin-bottom:5px">
-          <div style="font-size:10px;font-weight:800;color:#fff;text-shadow:${douyinShadow};line-height:1.05">能够</div>
-          <div style="font-size:8px;font-weight:800;color:#fff;text-shadow:${douyinShadow};line-height:1.05;font-family:Arial">Can</div>
-          <div style="font-size:16px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};letter-spacing:.5px;line-height:1.1;margin-top:3px">好好过日子</div>
-          <div style="font-size:11px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};line-height:1.05;font-family:Arial">people who live well</div>
+          <div style="font-size:10px;font-weight:900;color:#fff;text-shadow:${douyinShadow};line-height:1.05;font-family:SimSun,serif">能够</div>
+          <div style="font-size:8px;font-weight:900;color:#fff;text-shadow:${douyinShadow};line-height:1.05;font-family:Georgia,serif">Can</div>
+          <div style="font-size:16px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};letter-spacing:.5px;line-height:1.1;margin-top:3px;font-family:SimSun,serif">好好过日子</div>
+          <div style="font-size:11px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};line-height:1.05;font-family:Georgia,serif">people who live well</div>
         </div>
         <div style="font-size:11px;color:${active?'#F97316':'#A8A49C'};font-weight:600">${t.name}</div>
         <div style="font-size:10px;color:#6B6860;margin-top:2px">${t.desc}</div>
@@ -4713,6 +4713,7 @@ async function saveCloneSession(cloneStep) {
     subFontsize:      S.subFontsize,
     subOutlineWidth:  S.subOutlineWidth,
     subTemplate:      S.subTemplate,
+    subStyle:         S.subStyle,
     postProcessedB64: S.postProcessedB64 || null,   // 步骤5完成后有值
     coverFrameUrl:    S.coverFrameUrl    || null,   // 封面（dataURL，不大）
     coverTitle:       S.coverTitle       || '',
@@ -4758,11 +4759,12 @@ async function restoreCloneSession(taskId) {
       avatarLibKey:         s.avatarLibKey    || null,
       avatarLibName:        s.avatarLibName   || '',
       avatarLibThumb:       s.avatarLibThumb  || '',
-      subColor:             s.subColor        || '#FFFFFF',
+      subColor:             s.subColor        || '#FFD700',
       subOutlineColor:      s.subOutlineColor || '#000000',
-      subFontsize:          s.subFontsize     || 44,
-      subOutlineWidth:      s.subOutlineWidth || 2.5,
-      subTemplate:          s.subTemplate     || 'classic',
+      subFontsize:          s.subFontsize     || 46,
+      subOutlineWidth:      s.subOutlineWidth || 3,
+      subTemplate:          s.subTemplate     || 'bilingual_douyin',
+      subStyle:             s.subStyle        || 'bilingual_douyin',
       coverTitle:           s.coverTitle      || '',
       publishTitle:         s.publishTitle    || '',
       publishTags:          s.publishTags     || [],
