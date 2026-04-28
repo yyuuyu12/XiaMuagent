@@ -12,6 +12,7 @@ import asyncio
 import edge_tts
 import json
 import uuid
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -486,6 +487,151 @@ def _build_ass_douyin(segments: list, vid_w: int = 720, vid_h: int = 1280) -> st
     return "\n".join(events) + "\n"
 
 
+def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1280) -> str:
+    margin = max(int(vid_w * 0.05), 18)
+    sub_cn_size = max(int(vid_w * 0.035), 18)
+    main_cn_size = max(int(vid_w * 0.065), 30)
+    sub_en_size = max(int(sub_cn_size * 0.70), 13)
+    main_en_size = max(int(main_cn_size * 0.70), 20)
+
+    C_WHITE = "&H00FFFFFF"
+    C_GOLD = "&H0000D7FF"
+    C_SOFT_GOLD = "&H0066E5FF"
+    C_ORANGE = "&H00356BFF"
+    C_BLACK = "&H00000000"
+    C_TRANS = "&HFF000000"
+
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        f"PlayResX: {vid_w}\n"
+        f"PlayResY: {vid_h}\n"
+        "WrapStyle: 2\n"
+        "ScaledBorderAndShadow: yes\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
+        "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
+        "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Base,Microsoft YaHei,40,{C_WHITE},{C_WHITE},{C_BLACK},{C_TRANS},"
+        "0,0,0,0,100,100,0,0,1,3,0,7,0,0,0,1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+
+    phrase_map = {
+        "能够": "Can", "能": "Can", "可以": "Can", "一定": "Surely", "必须": "Must",
+        "好好过日子的人": "people who live well", "好好过日子": "live well",
+        "过日子的人": "people who live", "的人": "people", "人": "people",
+        "生活": "life", "努力": "work hard", "坚持": "keep going", "赚钱": "make money",
+        "选择": "choice", "改变": "change", "成长": "growth", "机会": "chance",
+        "家庭": "family", "孩子": "children", "自己": "myself", "未来": "future",
+    }
+
+    def ass_escape(s: str) -> str:
+        return (s or "").replace("{", "").replace("}", "").replace("\n", " ").strip()
+
+    def translate_piece(text: str) -> str:
+        text = re.sub(r"[，。！？、,.!?；;：:\s]+", "", text or "")
+        if not text:
+            return ""
+        if text in phrase_map:
+            return phrase_map[text]
+        for zh, en in sorted(phrase_map.items(), key=lambda x: len(x[0]), reverse=True):
+            if zh in text and len(zh) >= 2:
+                return en
+        # Fallback: keep a short neutral English gloss so every Chinese line has an English line.
+        if len(text) <= 3:
+            return "Can"
+        return "people who live well" if "人" in text else "live well"
+
+    def fit_size(base_size: int, text: str, max_units: int, min_ratio: float = 0.72) -> int:
+        units = max(1, len(text or ""))
+        if units <= max_units:
+            return base_size
+        return max(int(base_size * min_ratio), int(base_size * max_units / units))
+
+    def wrap_en(text: str, max_chars: int = 28) -> str:
+        words = (text or "").split()
+        if not words:
+            return ""
+        line = ""
+        for w in words:
+            nxt = w if not line else f"{line} {w}"
+            if len(nxt) <= max_chars:
+                line = nxt
+            else:
+                break
+        return line or words[0][:max_chars]
+
+    def highlight_kw(text: str, color_base: str) -> str:
+        try:
+            import jieba.posseg as pseg
+            kws = []
+            for w, flag in pseg.cut(text):
+                if len(w) >= 2 and (flag.startswith("n") or flag.startswith("v")):
+                    kws.append(w)
+                if len(kws) >= 2:
+                    break
+            result = text
+            for kw in kws:
+                result = result.replace(kw, "{\\c" + C_ORANGE + "}" + kw + "{\\c" + color_base + "}", 1)
+            return result
+        except Exception:
+            return text
+
+    def draw_line(st, en, layer, x, y, text, size, color, outline, bord, font):
+        if not text:
+            return ""
+        tags = "{" + f"\\an7\\pos({x},{y})\\fn{font}\\fs{size}\\b1\\c{color}\\3c{outline}\\bord{bord}\\shad0" + "}"
+        return f"Dialogue: {layer},{st},{en},Base,,0,0,0,,{tags}{text}"
+
+    events = [header]
+    x = margin
+
+    for seg in segments:
+        raw = ass_escape(seg.get("text", ""))
+        if not raw:
+            continue
+        st = _seconds_to_ass_time(max(0.0, seg["start"]))
+        en = _seconds_to_ass_time(seg["end"])
+        sub_cn, main_cn = _split_cn_douyin(raw)
+        if not main_cn:
+            main_cn = raw
+        sub_cn = ass_escape(sub_cn)
+        main_cn = ass_escape(main_cn)
+        sub_en = wrap_en(translate_piece(sub_cn), 28)
+        main_en = wrap_en(translate_piece(main_cn), 28)
+
+        main_size = fit_size(main_cn_size, main_cn, 14, 0.70)
+        main_en_fit = fit_size(main_en_size, main_en, 28, 0.76)
+        sub_size = fit_size(sub_cn_size, sub_cn, 8, 0.80)
+        sub_en_fit = fit_size(sub_en_size, sub_en, 16, 0.82)
+
+        lines = []
+        if sub_cn:
+            lines.append(("sub_cn", sub_cn, sub_size, C_WHITE, C_SOFT_GOLD, max(int(sub_size * 0.05), 1), max(int(sub_size * 0.13), 3), "Microsoft YaHei"))
+            lines.append(("sub_en", sub_en, sub_en_fit, C_WHITE, C_BLACK, max(int(sub_en_fit * 0.06), 1), max(int(sub_en_fit * 0.14), 2), "Arial"))
+        lines.append(("main_cn", highlight_kw(main_cn, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 4), "Microsoft YaHei"))
+        lines.append(("main_en", main_en, main_en_fit, C_WHITE, C_BLACK, max(int(main_en_fit * 0.06), 1), max(int(main_en_fit * 0.13), 3), "Arial"))
+
+        heights = [int(item[2] * (1.10 if item[0].endswith("cn") else 1.03)) for item in lines]
+        gaps = []
+        for idx, item in enumerate(lines[:-1]):
+            gaps.append(max(2, int(vid_w * 0.004)) if item[0] != "sub_en" else max(7, int(vid_w * 0.012)))
+        total_h = sum(heights) + sum(gaps)
+        y = max(margin, vid_h - margin - total_h)
+
+        for idx, item in enumerate(lines):
+            _, text, size, color, front_outline, front_bord, back_bord, font = item
+            events.append(draw_line(st, en, 0, x, y, text, size, color, C_BLACK, back_bord, font))
+            events.append(draw_line(st, en, 1, x, y, text, size, color, front_outline, front_bord, font))
+            y += heights[idx] + (gaps[idx] if idx < len(gaps) else 0)
+
+    return "\n".join(events) + "\n"
+
+
 def _build_ass(segments: list, fontsize: int, sub_color: str,
                outline_color: str, outline_width: float,
                vid_w: int = 720) -> str:
@@ -629,7 +775,9 @@ async def video_postprocess(payload: dict):
 
         # 生成 ASS 字幕
         sub_style = payload.get("sub_style", "default")
-        if sub_style == "douyin":
+        if sub_style == "bilingual_douyin":
+            ass_content = _build_ass_bilingual_douyin(segments, vid_w, vid_h)
+        elif sub_style == "douyin":
             ass_content = _build_ass_douyin(segments, vid_w, vid_h)
         else:
             ass_content = _build_ass(segments, fontsize, sub_color, outline_col, outline_w, vid_w)

@@ -2430,6 +2430,7 @@ function tCloneStep4(sb) {
 
 // ===== 步骤5：后期制作 =====
 const SUBTITLE_TEMPLATES = [
+  { id:'bilingual_douyin', name:'双语爆款', desc:'左下角中英双层', color:'#FFD700', ol:'#000000', size:46, ow:3, type:'bilingual_douyin' },
   { id:'douyin',   name:'双层抖音', desc:'爆款高级感', color:'#FFD700', ol:'#000000', size:44, ow:3,   type:'douyin' },
   { id:'classic',  name:'经典白字', desc:'百搭首选',   color:'#FFFFFF', ol:'#000000', size:44, ow:2.5 },
   { id:'variety',  name:'综艺黄字', desc:'活泼抢眼',   color:'#FFEE00', ol:'#000000', size:40, ow:3   },
@@ -2457,6 +2458,22 @@ function tCloneStep5(sb) {
     const checkMark = active ? `<div style="position:absolute;top:5px;right:6px;width:16px;height:16px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center">
         <svg width="9" height="9" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>` : '';
     // 双层抖音模板特殊预览
+    if (t.type === 'bilingual_douyin') {
+      const douyinShadow = `1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000,0 2px 4px rgba(0,0,0,.9)`;
+      return `<div onclick="applySubTemplate('${t.id}')"
+        style="flex:1;min-width:calc(50% - 4px);background:#2C2820;border-radius:10px;padding:10px 8px 8px;cursor:pointer;
+               border:2.5px solid ${active ? '#F97316' : '#3A3630'};position:relative;box-sizing:border-box">
+        ${checkMark}
+        <div style="margin-bottom:5px">
+          <div style="font-size:10px;font-weight:800;color:#fff;text-shadow:${douyinShadow};line-height:1.05">能够</div>
+          <div style="font-size:8px;font-weight:800;color:#fff;text-shadow:${douyinShadow};line-height:1.05;font-family:Arial">Can</div>
+          <div style="font-size:16px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};letter-spacing:.5px;line-height:1.1;margin-top:3px">好好过日子</div>
+          <div style="font-size:11px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};line-height:1.05;font-family:Arial">people who live well</div>
+        </div>
+        <div style="font-size:11px;color:${active?'#F97316':'#A8A49C'};font-weight:600">${t.name}</div>
+        <div style="font-size:10px;color:#6B6860;margin-top:2px">${t.desc}</div>
+      </div>`;
+    }
     if (t.type === 'douyin') {
       const douyinShadow = `1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000,0 2px 4px rgba(0,0,0,.9)`;
       return `<div onclick="applySubTemplate('${t.id}')"
@@ -4498,6 +4515,7 @@ async function handlePostProcess() {
       outline_width: S.subOutlineWidth,
       fontsize:      S.subFontsize,
       sub_style:     S.subStyle || 'default',
+      source_text:    S.rewrittenScript || S.extractedScript || '',
     });
     if (r2.code !== 200) throw new Error(r2.msg || '后期处理失败');
     const data = r2.data;
