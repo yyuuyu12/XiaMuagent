@@ -2252,9 +2252,10 @@ function tCloneStep3(sb) {
     <div class="section-card" style="background:#FFF8F3;border:1.5px solid #FFD5B8">
       <div class="section-label" style="margin-bottom:8px;color:#9A3412">情绪风格</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${curEmo!=='neutral'?'14px':'0'}">
-        ${[['neutral','自然'],['happy','开心'],['excited','激动'],['sad','忧郁'],['calm','平静']].map(([id,name])=>{
+        ${[['neutral','自然',0],['happy','开心',3],['excited','激动',5],['sad','忧郁',4],['calm','平静',3]].map(([id,name,defInt])=>{
           const on = curEmo === id;
-          return `<div onclick="setState({ttsIndexEmotion:'${id}'})"
+          // 切换情绪时同时重置到该情绪的默认强度
+          return `<div onclick="setState({ttsIndexEmotion:'${id}'${id!=='neutral'?`,ttsEmoIntensity:S.ttsIndexEmotion==='${id}'?S.ttsEmoIntensity:${defInt}`:''}});document.querySelector('.emo-intensity-range')?.dispatchEvent(new Event('sync'))"
             style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid ${on?'#F97316':'#E8E4DC'};background:${on?'#FFF1E8':'#F7F6F2'};color:${on?'#9A3412':'#6B7280'}">${name}</div>`;
         }).join('')}
       </div>
@@ -3901,6 +3902,7 @@ async function handleTTSGenerate() {
   if (!ensureLoggedIn()) return;
   const text = (S.rewrittenScript || '').trim();
   if (!text) { showToast('请先完成文案改写'); setState({ extractStep: 2 }); return; }
+  stopTTSAudio();
   setState({ ttsGenerating: true, ttsErr: '', extractStep: 'tts_gen' });
   touchCloneTaskActivity();
   try {
@@ -3989,6 +3991,15 @@ function _b64ToBlobUrl(b64, mime) {
 }
 
 let _ttsAudio = null;
+
+// 停止 TTS 音频播放（切步骤/重新合成时调用）
+function stopTTSAudio() {
+  if (_ttsAudio && !_ttsAudio.paused) {
+    _ttsAudio.pause();
+    _ttsAudio.currentTime = 0;
+    _updatePlayBtn(false);
+  }
+}
 
 function playTTSAudio() {
   if (!S.ttsAudioUrl) return;
@@ -4265,6 +4276,7 @@ function setTTSSpeedPreset(v) {
 }
 
 function goToCloneStep4() {
+  stopTTSAudio();
   setState({ extractStep: 4, avatarErr: '' });
   saveCloneSession(4); // 进入步骤4时立刻保存，防止离开后恢复回步骤3
 }

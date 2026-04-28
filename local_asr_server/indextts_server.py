@@ -70,12 +70,13 @@ EMOTION_TEMPLATES = {
     "calm":    os.path.join(EXAMPLES_DIR, "voice_03.wav"),              # 平静：用模板引导
 }
 # emo_alpha 权重：0=忽略情感，1=完全按情感音频
+# 调低 happy/excited 默认权重，避免过于激动（用户反馈 happy 0.6 太夸张）
 EMOTION_ALPHA = {
     "neutral": 0.0,   # 不叠加任何情感模板，完全克隆参考音频
-    "happy":   0.6,
-    "excited": 0.9,
-    "sad":     0.8,
-    "calm":    0.75,
+    "happy":   0.3,   # 开心：轻柔叠加，自然愉悦（原0.6太激动）
+    "excited": 0.6,   # 激动：中等叠加（原0.9过于夸张）
+    "sad":     0.5,   # 忧郁：适度（原0.8太沉重）
+    "calm":    0.45,  # 平静：轻柔引导（原0.75偏重）
 }
 # ==============================
 
