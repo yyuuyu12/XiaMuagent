@@ -581,6 +581,38 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
             chunks[-1] = chunks[-1].rstrip("...") + "..."
         return [x for x in chunks if x]
 
+    def paginate_cn_text(text: str, max_chars: int = 10) -> list:
+        text = re.sub(r"\s+", "", text or "")
+        text = text.strip("，。！？、,.!?；;：:")
+        if not text:
+            return []
+        clauses = [x for x in re.split(r"[，。！？、,.!?；;：:]+", text) if x]
+        if not clauses:
+            clauses = [text]
+        pages = []
+        for clause in clauses:
+            while len(clause) > max_chars:
+                cut = max_chars
+                # Prefer a natural jieba boundary near the target width.
+                try:
+                    import jieba
+                    words = list(jieba.cut(clause))
+                    pos = 0
+                    best = 0
+                    for w in words:
+                        pos += len(w)
+                        if max_chars - 4 <= pos <= max_chars:
+                            best = pos
+                    if best:
+                        cut = best
+                except Exception:
+                    pass
+                pages.append(clause[:cut])
+                clause = clause[cut:]
+            if clause:
+                pages.append(clause)
+        return pages or [text[:max_chars]]
+
     def wrap_en(text: str, max_chars: int = 28) -> str:
         words = (text or "").split()
         if not words:
@@ -620,45 +652,53 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
     x = margin
 
     for seg in segments:
-        raw = ass_escape(seg.get("text", ""))
-        if not raw:
+        raw_full = ass_escape(seg.get("text", ""))
+        if not raw_full:
             continue
-        st = _seconds_to_ass_time(max(0.0, seg["start"]))
-        en = _seconds_to_ass_time(seg["end"])
-        sub_cn, main_cn = _split_cn_douyin(raw)
-        if not main_cn:
-            main_cn = raw
-        sub_cn = ass_escape(sub_cn)
-        main_cn = ass_escape(main_cn)
-        sub_en = wrap_en(translate_piece(sub_cn), 28)
-        main_en = wrap_en(translate_piece(main_cn), 28)
+        pages = paginate_cn_text(raw_full, 10)
+        seg_start = max(0.0, float(seg["start"]))
+        seg_end = max(seg_start + 0.2, float(seg["end"]))
+        span = seg_end - seg_start
 
-        main_size = main_cn_size
-        main_en_fit = fit_size(main_en_size, main_en, 28, 0.76)
-        sub_size = fit_size(sub_cn_size, sub_cn, 8, 0.80)
-        sub_en_fit = fit_size(sub_en_size, sub_en, 16, 0.82)
-        main_cn_lines = wrap_cn_lines(main_cn, main_size, 2)
+        for page_idx, raw in enumerate(pages):
+            page_start = seg_start + span * page_idx / len(pages)
+            page_end = seg_start + span * (page_idx + 1) / len(pages)
+            st = _seconds_to_ass_time(page_start)
+            en = _seconds_to_ass_time(page_end)
+            sub_cn, main_cn = _split_cn_douyin(raw)
+            if not main_cn:
+                main_cn = raw
+            sub_cn = ass_escape(sub_cn)
+            main_cn = ass_escape(main_cn)
+            sub_en = wrap_en(translate_piece(sub_cn), 28)
+            main_en = wrap_en(translate_piece(main_cn), 28)
 
-        lines = []
-        if sub_cn:
-            lines.append(("sub_cn", sub_cn, sub_size, C_WHITE, C_SOFT_GOLD, max(int(sub_size * 0.05), 1), max(int(sub_size * 0.13), 3), zh_font))
-            lines.append(("sub_en", sub_en, sub_en_fit, C_WHITE, C_BLACK, max(int(sub_en_fit * 0.06), 1), max(int(sub_en_fit * 0.14), 2), en_font))
-        for line in main_cn_lines:
-            lines.append(("main_cn", highlight_kw(line, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 5), zh_font))
-        lines.append(("main_en", main_en, main_en_fit, C_WHITE, C_BLACK, max(int(main_en_fit * 0.06), 1), max(int(main_en_fit * 0.13), 3), en_font))
+            main_size = main_cn_size
+            main_en_fit = fit_size(main_en_size, main_en, 28, 0.76)
+            sub_size = fit_size(sub_cn_size, sub_cn, 8, 0.80)
+            sub_en_fit = fit_size(sub_en_size, sub_en, 16, 0.82)
+            main_cn_lines = wrap_cn_lines(main_cn, main_size, 2)
 
-        heights = [int(item[2] * (1.10 if item[0].endswith("cn") else 1.03)) for item in lines]
-        gaps = []
-        for idx, item in enumerate(lines[:-1]):
-            gaps.append(max(2, int(vid_w * 0.004)) if item[0] != "sub_en" else max(7, int(vid_w * 0.012)))
-        total_h = sum(heights) + sum(gaps)
-        y = max(margin, vid_h - bottom_margin - total_h)
+            lines = []
+            if sub_cn:
+                lines.append(("sub_cn", sub_cn, sub_size, C_WHITE, C_SOFT_GOLD, max(int(sub_size * 0.05), 1), max(int(sub_size * 0.13), 3), zh_font))
+                lines.append(("sub_en", sub_en, sub_en_fit, C_WHITE, C_BLACK, max(int(sub_en_fit * 0.06), 1), max(int(sub_en_fit * 0.14), 2), en_font))
+            for line in main_cn_lines:
+                lines.append(("main_cn", highlight_kw(line, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 5), zh_font))
+            lines.append(("main_en", main_en, main_en_fit, C_WHITE, C_BLACK, max(int(main_en_fit * 0.06), 1), max(int(main_en_fit * 0.13), 3), en_font))
 
-        for idx, item in enumerate(lines):
-            _, text, size, color, front_outline, front_bord, back_bord, font = item
-            events.append(draw_line(st, en, 0, x, y, text, size, color, C_BLACK, back_bord, font))
-            events.append(draw_line(st, en, 1, x, y, text, size, color, front_outline, front_bord, font))
-            y += heights[idx] + (gaps[idx] if idx < len(gaps) else 0)
+            heights = [int(item[2] * (1.10 if item[0].endswith("cn") else 1.03)) for item in lines]
+            gaps = []
+            for idx, item in enumerate(lines[:-1]):
+                gaps.append(max(2, int(vid_w * 0.004)) if item[0] != "sub_en" else max(7, int(vid_w * 0.012)))
+            total_h = sum(heights) + sum(gaps)
+            y = max(margin, vid_h - bottom_margin - total_h)
+
+            for idx, item in enumerate(lines):
+                _, text, size, color, front_outline, front_bord, back_bord, font = item
+                events.append(draw_line(st, en, 0, x, y, text, size, color, C_BLACK, back_bord, font))
+                events.append(draw_line(st, en, 1, x, y, text, size, color, front_outline, front_bord, font))
+                y += heights[idx] + (gaps[idx] if idx < len(gaps) else 0)
 
     return "\n".join(events) + "\n"
 
