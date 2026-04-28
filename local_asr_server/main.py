@@ -496,8 +496,6 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
     bottom_margin = max(int(vid_h * 0.10), int(vid_w * 0.065), 42)
     sub_cn_size = max(int(vid_w * 0.058), 30)
     main_cn_size = max(int(vid_w * 0.082), 44)
-    sub_en_size = max(int(sub_cn_size * 0.70), 13)
-    main_en_size = max(int(main_cn_size * 0.70), 20)
 
     C_WHITE = "&H00FFFFFF"
     C_GOLD = "&H0000D7FF"
@@ -507,7 +505,6 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
     C_TRANS = "&HFF000000"
 
     zh_font = "SimSun"
-    en_font = "Georgia"
 
     header = (
         "[Script Info]\n"
@@ -668,27 +665,18 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
                 main_cn = raw
             sub_cn = ass_escape(sub_cn)
             main_cn = ass_escape(main_cn)
-            sub_en = wrap_en(translate_piece(sub_cn), 28)
-            main_en = wrap_en(translate_piece(main_cn), 28)
-
             main_size = main_cn_size
-            main_en_fit = fit_size(main_en_size, main_en, 28, 0.76)
             sub_size = fit_size(sub_cn_size, sub_cn, 8, 0.80)
-            sub_en_fit = fit_size(sub_en_size, sub_en, 16, 0.82)
             main_cn_lines = wrap_cn_lines(main_cn, main_size, 1)
 
             lines = []
             if sub_cn:
                 lines.append(("sub_cn", sub_cn, sub_size, C_WHITE, C_SOFT_GOLD, max(int(sub_size * 0.05), 1), max(int(sub_size * 0.13), 3), zh_font))
-                lines.append(("sub_en", sub_en, sub_en_fit, C_WHITE, C_BLACK, max(int(sub_en_fit * 0.06), 1), max(int(sub_en_fit * 0.14), 2), en_font))
             for line in main_cn_lines:
                 lines.append(("main_cn", highlight_kw(line, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 5), zh_font))
-            lines.append(("main_en", main_en, main_en_fit, C_WHITE, C_BLACK, max(int(main_en_fit * 0.06), 1), max(int(main_en_fit * 0.13), 3), en_font))
 
             heights = [int(item[2] * (1.10 if item[0].endswith("cn") else 1.03)) for item in lines]
-            gaps = []
-            for idx, item in enumerate(lines[:-1]):
-                gaps.append(max(2, int(vid_w * 0.004)) if item[0] != "sub_en" else max(7, int(vid_w * 0.012)))
+            gaps = [max(6, int(vid_w * 0.012)) for _ in lines[:-1]]
             total_h = sum(heights) + sum(gaps)
             y = max(margin, vid_h - bottom_margin - total_h)
 
