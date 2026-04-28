@@ -493,8 +493,9 @@ def _build_ass_douyin_legacy(segments: list, vid_w: int = 720, vid_h: int = 1280
 
 def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1280) -> str:
     margin = max(int(vid_w * 0.05), 18)
-    sub_cn_size = max(int(vid_w * 0.035), 18)
-    main_cn_size = max(int(vid_w * 0.065), 30)
+    bottom_margin = max(int(vid_h * 0.08), int(vid_w * 0.055), 32)
+    sub_cn_size = max(int(vid_w * 0.045), 24)
+    main_cn_size = max(int(vid_w * 0.082), 44)
     sub_en_size = max(int(sub_cn_size * 0.70), 13)
     main_en_size = max(int(main_cn_size * 0.70), 20)
 
@@ -559,6 +560,27 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
             return base_size
         return max(int(base_size * min_ratio), int(base_size * max_units / units))
 
+    def wrap_cn_lines(text: str, size: int, max_lines: int = 2) -> list:
+        text = re.sub(r"\s+", "", text or "")
+        if not text:
+            return []
+        usable_w = max(120, vid_w - margin * 2)
+        max_chars = min(14, max(6, int(usable_w / max(size * 1.04, 1))))
+        chunks, cur = [], ""
+        punct = "，。！？、,.!?；;：:"
+        for ch in text:
+            cur += ch
+            if len(cur) >= max_chars or (ch in punct and len(cur) >= max(5, max_chars - 3)):
+                chunks.append(cur.strip(punct))
+                cur = ""
+                if len(chunks) >= max_lines:
+                    break
+        if cur and len(chunks) < max_lines:
+            chunks.append(cur.strip(punct))
+        if len(text) > sum(len(x) for x in chunks) and chunks:
+            chunks[-1] = chunks[-1].rstrip("...") + "..."
+        return [x for x in chunks if x]
+
     def wrap_en(text: str, max_chars: int = 28) -> str:
         words = (text or "").split()
         if not words:
@@ -611,16 +633,18 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
         sub_en = wrap_en(translate_piece(sub_cn), 28)
         main_en = wrap_en(translate_piece(main_cn), 28)
 
-        main_size = fit_size(main_cn_size, main_cn, 14, 0.70)
+        main_size = main_cn_size
         main_en_fit = fit_size(main_en_size, main_en, 28, 0.76)
         sub_size = fit_size(sub_cn_size, sub_cn, 8, 0.80)
         sub_en_fit = fit_size(sub_en_size, sub_en, 16, 0.82)
+        main_cn_lines = wrap_cn_lines(main_cn, main_size, 2)
 
         lines = []
         if sub_cn:
             lines.append(("sub_cn", sub_cn, sub_size, C_WHITE, C_SOFT_GOLD, max(int(sub_size * 0.05), 1), max(int(sub_size * 0.13), 3), zh_font))
             lines.append(("sub_en", sub_en, sub_en_fit, C_WHITE, C_BLACK, max(int(sub_en_fit * 0.06), 1), max(int(sub_en_fit * 0.14), 2), en_font))
-        lines.append(("main_cn", highlight_kw(main_cn, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 4), zh_font))
+        for line in main_cn_lines:
+            lines.append(("main_cn", highlight_kw(line, C_GOLD), main_size, C_GOLD, C_WHITE, max(int(main_size * 0.055), 2), max(int(main_size * 0.12), 5), zh_font))
         lines.append(("main_en", main_en, main_en_fit, C_WHITE, C_BLACK, max(int(main_en_fit * 0.06), 1), max(int(main_en_fit * 0.13), 3), en_font))
 
         heights = [int(item[2] * (1.10 if item[0].endswith("cn") else 1.03)) for item in lines]
@@ -628,7 +652,7 @@ def _build_ass_bilingual_douyin(segments: list, vid_w: int = 720, vid_h: int = 1
         for idx, item in enumerate(lines[:-1]):
             gaps.append(max(2, int(vid_w * 0.004)) if item[0] != "sub_en" else max(7, int(vid_w * 0.012)))
         total_h = sum(heights) + sum(gaps)
-        y = max(margin, vid_h - margin - total_h)
+        y = max(margin, vid_h - bottom_margin - total_h)
 
         for idx, item in enumerate(lines):
             _, text, size, color, front_outline, front_bord, back_bord, font = item
