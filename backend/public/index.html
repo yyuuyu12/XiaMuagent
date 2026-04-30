@@ -2552,6 +2552,16 @@ function tCloneStep4(sb) {
     </div>`;
   }
 
+  // 已完成但视频URL还在异步加载中（从OSS恢复会话），显示Loading避免闪烁
+  if (S.avatarDoneTaskId && !S.avatarVideoUrl) {
+    return `${sb}<div class="tab-page">
+      <div style="text-align:center;padding:80px 20px;color:#9E9890;font-size:14px">
+        <div style="font-size:32px;margin-bottom:12px">⏳</div>
+        视频加载中…
+      </div>
+    </div>`;
+  }
+
   // 视频来源：数字人库已选 > 本次上传 > 空
   const hasVideo = !!(S.avatarLibKey || S.avatarSrcVideoB64);
   let vidSection;

@@ -34,12 +34,12 @@ router.get('/', requireAuth, async (req, res) => {
         let step = Math.max(1, Number(task.clone_step) || 1);
         if (result?.rewritten || session?.rewrittenScript) step = Math.max(step, 3);
         if (session?.ttsAudioB64) step = Math.max(step, 4);
-        if (session?.avatarTaskId || session?.avatarVideoB64) step = Math.max(step, 4);
-        if (session?.avatarVideoB64) step = Math.max(step, 5);
+        if (session?.avatarTaskId || session?.avatarVideoB64 || session?.avatarDoneTaskId) step = Math.max(step, 4);
+        if (session?.avatarVideoB64 || session?.avatarDoneTaskId) step = Math.max(step, 5);
         if (session?.postProcessedB64 || session?.coverFrameUrl || session?.publishTitle) step = Math.max(step, 6);
         if (!(result?.rewritten || session?.rewrittenScript)) step = Math.min(step, 2);
         if (step > 3 && !session?.ttsAudioB64) step = 3;
-        if (step > 4 && !session?.avatarVideoB64 && !session?.avatarTaskId) step = 4;
+        if (step > 4 && !session?.avatarVideoB64 && !session?.avatarTaskId && !session?.avatarDoneTaskId) step = 4;
         if (step > 5 && !session?.postProcessedB64 && !session?.coverFrameUrl && !session?.publishTitle) step = 5;
         task.clone_step = step;
       }
