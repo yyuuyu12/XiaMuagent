@@ -4567,6 +4567,32 @@ async function handleAvatarVideoSelect(event) {
 
 let _avatarPoller = null;
 let _avatarRunSeq = 0;
+let _bgAvatarPoller = null; // 切换任务后后台保活轮询
+let _bgAvatarTaskId = null;
+
+function _startBgAvatarPoller(taskId) {
+  if (_bgAvatarPoller) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; }
+  _bgAvatarTaskId = taskId;
+  let failCount = 0;
+  _bgAvatarPoller = setInterval(async () => {
+    if (!_bgAvatarTaskId) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; return; }
+    try {
+      const r = await api.get(`/ai/video/task/${_bgAvatarTaskId}`);
+      if (r.code !== 200) {
+        if (++failCount > 8) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; }
+        return;
+      }
+      const t = r.data;
+      if (t.video_url || t.status === 'done') {
+        clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null;
+        loadTasks();
+        showToast('数字人视频已生成完成，请回到对应任务查看');
+      } else if (t.status === 'error' || t.status === 'cancelled') {
+        clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null;
+      }
+    } catch { if (++failCount > 8) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; } }
+  }, 15000);
+}
 
 async function handleAvatarGenerate() {
   if (!S.ttsAudioUrl) { showToast('请先完成步骤3语音合成'); return; }
@@ -5106,16 +5132,20 @@ async function restoreCloneSession(taskId) {
           setState({ avatarVideoUrl: URL.createObjectURL(mp4Blob) });
         } catch {}
       }, 300);
-    } else if (s.avatarTaskId && s.avatarAsrUrl) {
+    } else if (s.avatarTaskId) {
       // 视频未完成但有任务ID → 恢复"生成中"状态并重启poller
+      // 注意：avatarAsrUrl 在新流程中始终为 null，不能用它做判断
       patch.avatarTaskId    = s.avatarTaskId;
-      patch.avatarAsrUrl    = s.avatarAsrUrl;
+      patch.avatarAsrUrl    = s.avatarAsrUrl || null;
       patch.avatarGenerating = true;
       patch.extractStep     = 'avatar_gen';
       patch.avatarProgressMsg = '恢复中，继续等待生成...';
       patch.avatarProgressPct = 30;
-      // setState 之后再启动 poller
-      setTimeout(() => _startAvatarPoller(s.avatarTaskId, s.avatarAsrUrl), 500);
+      // setState 之后再启动 poller（停掉后台 poller，改为前台展示进度）
+      if (_bgAvatarPoller && _bgAvatarTaskId === s.avatarTaskId) {
+        clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null;
+      }
+      setTimeout(() => _startAvatarPoller(s.avatarTaskId, s.avatarAsrUrl || null), 500);
     }
     // 后期视频 base64 → Blob URL 恢复
     if (s.postProcessedB64) {
@@ -5134,9 +5164,14 @@ async function restoreCloneSession(taskId) {
 }
 
 async function openExtractWithTask(taskId, fromHistory) {
-  // ★ 停掉上一个任务的 avatar poller，防止它继续污染全局状态
+  // 如果当前任务正在生成数字人，转为后台轮询，HeyGem 继续跑
+  if (S.avatarGenerating && S.avatarTaskId) {
+    _startBgAvatarPoller(S.avatarTaskId);
+    showToast('数字人生成中，已转至后台，回到该任务可继续查看进度');
+  }
+  // ★ 停掉前台 poller，避免继续写入当前页面状态
   if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
-  _avatarRunSeq++; // 使任何仍在途中的异步回调立即失效
+  _avatarRunSeq++;
 
   // ★ 立即重置所有生成中状态，防止切换任务时上一个任务的状态残留
   setState({
