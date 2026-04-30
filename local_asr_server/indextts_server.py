@@ -86,7 +86,7 @@ tts = IndexTTS2(
     cfg_path=os.path.join(CHECKPOINTS_DIR, "config.yaml"),
     use_fp16=torch.cuda.is_available(),
     use_deepspeed=False,
-    use_cuda_kernel=False,
+    use_cuda_kernel=torch.cuda.is_available(),  # RTX 5070Ti 支持，可提升推理速度
 )
 print(f"IndexTTS2 v2 加载完成！GPU: {torch.cuda.is_available()}")
 
