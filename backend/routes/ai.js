@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const jwt = require('jsonwebtoken');
 const { requireAuth } = require('./auth');
+const oss = require('../oss');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 
@@ -585,9 +586,51 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
     } catch {
       return res.json({ code: 500, msg: htmlServiceError(videoUrl, text) });
     }
-    // 生成完成时，把直连下载 URL 注入给前端（浏览器直接从 heygem 公网地址下载，走下行带宽，不走 Zeabur 中转）
+    // 生成完成时，尝试上传到 OSS；未配置 OSS 则退回直连
     if (data && data.status === 'done') {
-      data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
+      const ossConfigured = await oss.isConfigured().catch(() => false);
+      if (ossConfigured) {
+        // 先查 user_videos，看是否已经上传过（避免重复上传）
+        const [existing] = await db.query(
+          `SELECT oss_url FROM user_videos WHERE task_id = ?`, [taskId]
+        );
+        if (existing.length > 0) {
+          data.video_url = existing[0].oss_url;
+        } else {
+          // 从本地服务下载视频 buffer
+          try {
+            const dlResp = await fetch(`${videoUrl}/video/file/${taskId}`, {
+              headers: VIDEO_FETCH_HEADERS,
+              signal: AbortSignal.timeout(300000),
+            });
+            if (!dlResp.ok) throw new Error(`下载失败 HTTP ${dlResp.status}`);
+            const buf = Buffer.from(await dlResp.arrayBuffer());
+
+            // 清理超出限额的旧视频（超10条删最旧）
+            await oss.enforceUserLimit(req.userId, 10);
+
+            // 上传到 OSS
+            const ossKey = `videos/${req.userId}/${taskId}.mp4`;
+            const ossUrl = await oss.uploadBuffer(ossKey, buf);
+
+            // 记录到 user_videos
+            await db.query(
+              `INSERT IGNORE INTO user_videos (user_id, task_id, oss_key, oss_url) VALUES (?, ?, ?, ?)`,
+              [req.userId, taskId, ossKey, ossUrl]
+            );
+
+            data.video_url = ossUrl;
+            console.log(`[OSS] 上传成功 user=${req.userId} taskId=${taskId} url=${ossUrl}`);
+          } catch (uploadErr) {
+            // OSS 上传失败时静默降级为直连，不影响用户
+            console.error('[OSS] 上传失败，降级为直连:', uploadErr.message);
+            data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
+          }
+        }
+      } else {
+        // OSS 未配置，走原来的直连方式
+        data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
+      }
     }
     return res.json({ code: 200, data });
   } catch (e) {

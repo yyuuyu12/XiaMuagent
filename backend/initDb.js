@@ -269,6 +269,20 @@ async function initDb() {
     ) CHARACTER SET utf8mb4
   `);
 
+  // user_videos 表（OSS存储：每用户最多保留 N 条视频，超出自动删最旧）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS user_videos (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      user_id    INT NOT NULL,
+      task_id    VARCHAR(36) NOT NULL,
+      oss_key    VARCHAR(512) NOT NULL,
+      oss_url    VARCHAR(1024) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      INDEX idx_user_created (user_id, created_at),
+      UNIQUE KEY uk_task (task_id)
+    ) CHARACTER SET utf8mb4
+  `);
+
   console.log('✅ 数据库初始化完成');
 }
 
