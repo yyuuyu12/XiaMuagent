@@ -534,24 +534,36 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .home-task-mini-action-red { color: #DC2626; background: #FEF2F2; }
 .home-page .home-task-card { border-radius: 20px !important; padding: 16px 18px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important; }
 .home-page .home-task-card:active { transform: scale(0.98); }
-/* ── 首页"后台生成中"实时卡 ──────────────────────────────── */
-.home-live-card { background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:10px; border:1.5px solid #FFDAB0; box-shadow:0 2px 12px rgba(245,118,42,.10); }
-.hlc-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-.hlc-label { font-size:13px; font-weight:700; color:#1A1814; display:flex; align-items:center; gap:6px; }
-.hlc-badge-live { background:#FFF3E8; color:#F5762A; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; display:flex; align-items:center; gap:4px; }
-.hlc-pct { font-size:14px; font-weight:700; color:#F5762A; }
-.hlc-bar-wrap { background:#F0EDE8; border-radius:4px; height:5px; margin-bottom:10px; overflow:hidden; }
-.hlc-bar-fill { height:5px; border-radius:4px; background:linear-gradient(90deg,#F5762A,#FF9B5E); transition:width .5s ease; }
-.hlc-hint { font-size:12px; color:#A8A49C; margin-bottom:10px; }
+/* ── 首页"后台生成中"实时卡（设计稿 task-active 样式）── */
+.home-live-card { background:linear-gradient(135deg,rgba(255,128,64,0.04),rgba(245,96,42,0.07)); border-radius:20px; padding:16px 18px; margin-bottom:10px; box-shadow:0 2px 12px rgba(0,0,0,0.06); border:1.5px solid rgba(245,118,42,0.18); cursor:pointer; transition:transform 0.15s; -webkit-tap-highlight-color:transparent; }
+.home-live-card:active { transform:scale(0.98); }
+.hlc-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; gap:10px; }
+.hlc-title { font-size:13px; font-weight:600; color:#1A1614; line-height:1.5; flex:1; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.hlc-badge-running { flex-shrink:0; display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:20px; background:#FFF3E8; color:#F5762A; font-size:11px; font-weight:600; white-space:nowrap; }
+.hlc-status-dot { width:5px; height:5px; border-radius:50%; background:currentColor; animation:pulse 1.2s infinite; }
+.hlc-hint { font-size:12px; color:#F5762A; font-weight:500; margin-bottom:8px; display:flex; align-items:center; gap:5px; }
+.hlc-progress-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.hlc-bar-wrap { flex:1; height:4px; background:#F0EDE8; border-radius:4px; overflow:hidden; }
+.hlc-bar-fill { height:100%; background:linear-gradient(90deg,#FF8040,#F5602A); border-radius:4px; transition:width 0.4s; }
+.hlc-pct { font-size:11px; font-weight:600; color:#F5762A; }
+.hlc-steps { display:flex; align-items:center; gap:0; margin-bottom:10px; }
+.hlc-step-dot { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; }
+.hlc-step-dot.sdone { background:#F5762A; color:#fff; }
+.hlc-step-dot.sactive { background:#FFF3E8; color:#F5762A; border:1.5px solid #F5762A; }
+.hlc-step-dot.sinactive { background:#F0EDE8; color:#B0AA9F; }
+.hlc-step-line { flex:1; height:1.5px; background:#F0EDE8; }
+.hlc-step-line.done { background:#F5762A; }
 .hlc-actions { display:flex; gap:8px; }
-.hlc-btn-view { flex:1; height:36px; border-radius:50px; background:#F5762A; color:#fff; font-size:13px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; }
-.hlc-btn-stop { height:36px; padding:0 16px; border-radius:50px; background:#FFF0F0; color:#DC2626; font-size:13px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; border:1px solid #FECACA; flex-shrink:0; }
-/* 生成中页面内"后台生成"块 */
-.gen-bg-block { background:#FFF8F3; border-radius:12px; padding:14px 16px; margin-top:14px; border:1.5px solid #FFD0A0; }
-.gen-bg-title { font-size:12px; color:#9A3412; font-weight:600; margin-bottom:8px; }
-.gen-bg-actions { display:flex; gap:8px; }
-.gen-bg-btn-home { flex:1; height:40px; border-radius:50px; background:#F5762A; color:#fff; font-size:13px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; gap:6px; }
-.gen-bg-btn-stop { height:40px; padding:0 16px; border-radius:50px; background:#FFF0F0; color:#DC2626; font-size:13px; border:1px solid #FECACA; display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; flex-shrink:0; }
+.hlc-btn-view { flex:1; padding:8px; text-align:center; background:rgba(245,118,42,0.08); border-radius:10px; font-size:12px; font-weight:500; color:#F5762A; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:center; }
+.hlc-btn-stop { padding:8px 14px; background:#fff; border:1px solid #F0EDE8; border-radius:10px; font-size:12px; font-weight:500; color:#9E9890; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:center; }
+/* 生成中页面内"后台继续"块（设计稿：分割线+灰色大按钮+文字停止） */
+.gen-bg-divider { height:1px; background:#F7F5F1; margin:0 -22px 18px; }
+.gen-bg-block { padding:0 0 4px; }
+.gen-bg-title { font-size:13px; color:#1A1614; font-weight:700; margin-bottom:4px; }
+.gen-bg-subtitle { font-size:12px; color:#9E9890; margin-bottom:14px; line-height:1.6; }
+.gen-bg-btn-home { width:100%; padding:13px; background:#F7F5F1; border:1.5px solid #EDE9E3; border-radius:14px; font-size:14px; font-weight:600; color:#1A1614; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; user-select:none; box-sizing:border-box; }
+.gen-bg-stop-row { margin:14px 22px 0; text-align:center; }
+.gen-bg-stop-btn { background:none; border:none; font-size:12px; color:#B0AA9F; cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-family:inherit; }
 .home-page .htc-step-circle { width: 24px; height: 24px; font-size: 10px; }
 .home-page .htc-step-active { background: #FFF3E8; color: #F5762A; border: 1.5px solid #F5762A; box-shadow: none; }
 .home-page .htc-step-done { background: #F5762A; color: #fff; }
@@ -1892,45 +1904,71 @@ function tHomeTaskSection() {
 
   // ── 实时生成卡：语音 / 数字人 / 字幕烧录 ──────────────────────────────
   let liveCard = '';
+  const _svgCheck = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
+  const _svgActiveDot = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" fill="#F5762A"/></svg>`;
+  function _hlcSteps(activeStep) {
+    const labels = ['提取','改写','语音','数字人','后期','发布'];
+    let html = '';
+    for (let i = 0; i < labels.length; i++) {
+      const cls = i < activeStep ? 'sdone' : i === activeStep ? 'sactive' : 'sinactive';
+      const inner = i < activeStep ? _svgCheck : i === activeStep ? _svgActiveDot : (i+1);
+      html += `<div class="hlc-step-dot ${cls}">${inner}</div>`;
+      if (i < labels.length - 1) html += `<div class="hlc-step-line${i < activeStep ? ' done' : ''}"></div>`;
+    }
+    return html;
+  }
+
   if (S.ttsGenerating) {
     const pct = S.ttsProgressPct || 5;
-    liveCard = `<div class="home-live-card">
+    liveCard = `<div class="home-live-card" onclick="setState({currentTab:'extract'});render()">
       <div class="hlc-top">
-        <div class="hlc-label"><span class="hlc-badge-live"><span class="task-live-dot"></span>后台生成中</span>语音合成</div>
-        <span class="hlc-pct">${pct}%</span>
+        <div class="hlc-title">语音合成</div>
+        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>后台生成</div>
       </div>
-      <div class="hlc-bar-wrap"><div class="hlc-bar-fill" style="width:${pct}%"></div></div>
-      <div class="hlc-hint">${esc(S.cloneTaskTitle||'克隆任务')} · 通常10~20秒</div>
+      <div class="hlc-hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" stroke="#F5762A" stroke-width="1.8"/><path d="M5 11C5 14.866 8.134 18 12 18" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round"/></svg>正在合成语音中...</div>
+      <div class="hlc-progress-row">
+        <div class="hlc-bar-wrap"><div class="hlc-bar-fill" style="width:${pct}%"></div></div>
+        <div class="hlc-pct">${pct}%</div>
+      </div>
+      <div class="hlc-steps">${_hlcSteps(2)}</div>
       <div class="hlc-actions">
-        <div class="hlc-btn-view" onclick="setState({currentTab:'extract'});render()">查看进展</div>
-        <div class="hlc-btn-stop" onclick="stopTTSGenerate()">停止</div>
+        <div class="hlc-btn-view" onclick="event.stopPropagation();setState({currentTab:'extract'});render()">查看进展</div>
+        <div class="hlc-btn-stop" onclick="event.stopPropagation();stopTTSGenerate()">停止</div>
       </div>
     </div>`;
   } else if (S.avatarGenerating) {
     const pct = S.avatarProgressPct || 20;
-    liveCard = `<div class="home-live-card">
+    liveCard = `<div class="home-live-card" onclick="setState({currentTab:'extract'});render()">
       <div class="hlc-top">
-        <div class="hlc-label"><span class="hlc-badge-live"><span class="task-live-dot"></span>后台生成中</span>数字人视频</div>
-        <span class="hlc-pct">${pct}%</span>
+        <div class="hlc-title">数字人视频</div>
+        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>后台生成</div>
       </div>
-      <div class="hlc-bar-wrap"><div class="hlc-bar-fill" style="width:${pct}%"></div></div>
-      <div class="hlc-hint">${esc(S.cloneTaskTitle||'克隆任务')} · ${esc(S.avatarProgressMsg||'渲染中...')}</div>
+      <div class="hlc-hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#F5762A" stroke-width="1.8"/><path d="M3 9h18M9 21V9" stroke="#F5762A" stroke-width="1.8"/></svg>${esc(S.avatarProgressMsg||'GPU 渲染中...')}</div>
+      <div class="hlc-progress-row">
+        <div class="hlc-bar-wrap"><div class="hlc-bar-fill" style="width:${pct}%"></div></div>
+        <div class="hlc-pct">${pct}%</div>
+      </div>
+      <div class="hlc-steps">${_hlcSteps(3)}</div>
       <div class="hlc-actions">
-        <div class="hlc-btn-view" onclick="setState({currentTab:'extract'});render()">查看进展</div>
-        <div class="hlc-btn-stop" onclick="handleAvatarStop()">停止</div>
+        <div class="hlc-btn-view" onclick="event.stopPropagation();setState({currentTab:'extract'});render()">查看进展</div>
+        <div class="hlc-btn-stop" onclick="event.stopPropagation();handleAvatarStop()">停止</div>
       </div>
     </div>`;
   } else if (S.postProcessing) {
     const pct = S.postProgressPct || 5;
-    liveCard = `<div class="home-live-card">
+    liveCard = `<div class="home-live-card" onclick="setState({currentTab:'extract'});render()">
       <div class="hlc-top">
-        <div class="hlc-label"><span class="hlc-badge-live"><span class="task-live-dot"></span>后台生成中</span>字幕烧录</div>
-        <span class="hlc-pct">${pct}%</span>
+        <div class="hlc-title">字幕烧录</div>
+        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>后台生成</div>
       </div>
-      <div class="hlc-bar-wrap"><div class="hlc-bar-fill" style="width:${pct}%"></div></div>
-      <div class="hlc-hint">${esc(S.cloneTaskTitle||'克隆任务')} · 约30~60秒</div>
+      <div class="hlc-hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="10" rx="2" stroke="#F5762A" stroke-width="1.8"/><path d="M6 11h4M6 14h8" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round"/></svg>正在烧录字幕...</div>
+      <div class="hlc-progress-row">
+        <div class="hlc-bar-wrap"><div class="hlc-bar-fill" style="width:${pct}%"></div></div>
+        <div class="hlc-pct">${pct}%</div>
+      </div>
+      <div class="hlc-steps">${_hlcSteps(4)}</div>
       <div class="hlc-actions">
-        <div class="hlc-btn-view" onclick="setState({currentTab:'extract'});render()">查看进展</div>
+        <div class="hlc-btn-view" onclick="event.stopPropagation();setState({currentTab:'extract'});render()">查看进展</div>
       </div>
     </div>`;
   }
@@ -2273,24 +2311,41 @@ function tCloneStep3(sb) {
   if (S.extractStep === 'tts_gen') {
     const ttsPct = S.ttsProgressPct || 5;
     return `${sb}<div class="tab-page">
-      <div class="input-card" style="text-align:center;padding:32px 20px;margin-top:4px">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="1.5" style="margin-bottom:12px"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在合成语音</div>
-        <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">通常需要 10~20 秒</div>
-        <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:${ttsPct}%"></div></div>
-        <div style="font-size:13px;font-weight:600;color:#F5762A;margin-top:6px">${ttsPct}%</div>
-      </div>
-      <div class="gen-bg-block">
-        <div class="gen-bg-title">后台继续生成</div>
-        <div style="font-size:12px;color:#6B6860;margin-bottom:10px">合成完成后会自动保存，随时回来查看</div>
-        <div class="gen-bg-actions">
+      <div class="input-card" style="padding:28px 22px 22px;margin-top:4px">
+        <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:20px">
+          <div style="position:relative;margin-bottom:16px">
+            <div style="width:72px;height:72px;border-radius:22px;background:linear-gradient(135deg,#FFF3E8,#FFE4CC);display:flex;align-items:center;justify-content:center;animation:iconPulse 2s ease-in-out infinite">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+            <div style="position:absolute;inset:-8px;border-radius:30px;border:2px solid rgba(245,118,42,0.12);animation:ripple 2s ease-out infinite"></div>
+          </div>
+          <div style="font-size:17px;font-weight:700;color:#1A1614;margin-bottom:5px">正在合成语音</div>
+          <div style="font-size:13px;color:#9E9890">通常需要 10~20 秒</div>
+        </div>
+        <div style="height:6px;background:#F0EDE8;border-radius:6px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:${ttsPct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:6px;transition:width 0.3s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div style="font-size:12px;color:#B0AA9F">正在处理中…</div>
+          <div style="font-size:13px;font-weight:700;color:#F5762A">${ttsPct}%</div>
+        </div>
+        <div class="gen-bg-divider"></div>
+        <div class="gen-bg-block">
+          <div class="gen-bg-title">后台继续，稍后查看</div>
+          <div class="gen-bg-subtitle">完成后通知您，现在可以去逛逛，随时回来查看进展。</div>
           <div class="gen-bg-btn-home" onclick="goHomeBackground()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6E6860" stroke-width="1.8" stroke-linejoin="round"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z"/></svg>
             回首页后台生成
           </div>
-          <div class="gen-bg-btn-stop" onclick="stopTTSGenerate()">停止</div>
         </div>
       </div>
+      <div class="gen-bg-stop-row">
+        <button class="gen-bg-stop-btn" onclick="stopTTSGenerate()">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="#C8C3BC"><rect width="12" height="12" rx="2"/></svg>
+          停止生成
+        </button>
+      </div>
+      <style>@keyframes iconPulse{0%,100%{transform:scale(1)} 50%{transform:scale(1.07)}} @keyframes ripple{0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.35)}}</style>
     </div>`;
   }
 
@@ -2416,25 +2471,41 @@ function tCloneStep4(sb) {
   if (S.extractStep === 'avatar_gen') {
     const avPct = S.avatarProgressPct || 20;
     return `${sb}<div class="tab-page">
-      <div class="input-card" style="text-align:center;padding:32px 20px;margin-top:4px">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.5" style="margin-bottom:12px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        <div style="font-size:15px;font-weight:600;color:#1A1814;margin-bottom:6px">正在生成数字人视频</div>
-        <div style="font-size:12px;color:#A8A49C;margin-bottom:10px">GPU 渲染中，通常 1~3 分钟</div>
-        <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:${avPct}%"></div></div>
-        <div style="font-size:13px;font-weight:600;color:#F5762A;margin-top:6px">${avPct}%</div>
-        <div style="font-size:12px;color:#6B6860;margin-top:4px">${S.avatarProgressMsg||'初始化中...'}</div>
-      </div>
-      <div class="gen-bg-block">
-        <div class="gen-bg-title">后台继续生成</div>
-        <div style="font-size:12px;color:#6B6860;margin-bottom:10px">视频生成完成后自动保存，可先去做别的事</div>
-        <div class="gen-bg-actions">
+      <div class="input-card" style="padding:28px 22px 22px;margin-top:4px">
+        <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:20px">
+          <div style="position:relative;margin-bottom:16px">
+            <div style="width:72px;height:72px;border-radius:22px;background:linear-gradient(135deg,#FFF3E8,#FFE4CC);display:flex;align-items:center;justify-content:center;animation:iconPulse 2s ease-in-out infinite">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            </div>
+            <div style="position:absolute;inset:-8px;border-radius:30px;border:2px solid rgba(245,118,42,0.12);animation:ripple 2s ease-out infinite"></div>
+          </div>
+          <div style="font-size:17px;font-weight:700;color:#1A1614;margin-bottom:5px">正在生成数字人视频</div>
+          <div style="font-size:13px;color:#9E9890">${esc(S.avatarProgressMsg||'GPU 渲染中，通常 1~3 分钟')}</div>
+        </div>
+        <div style="height:6px;background:#F0EDE8;border-radius:6px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:${avPct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:6px;transition:width 0.3s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div style="font-size:12px;color:#B0AA9F">正在处理中…</div>
+          <div style="font-size:13px;font-weight:700;color:#F5762A">${avPct}%</div>
+        </div>
+        <div class="gen-bg-divider"></div>
+        <div class="gen-bg-block">
+          <div class="gen-bg-title">后台继续，稍后查看</div>
+          <div class="gen-bg-subtitle">完成后通知您，现在可以去逛逛，随时回来查看进展。</div>
           <div class="gen-bg-btn-home" onclick="goHomeBackground()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6E6860" stroke-width="1.8" stroke-linejoin="round"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z"/></svg>
             回首页后台生成
           </div>
-          <div class="gen-bg-btn-stop" onclick="handleAvatarStop()">停止</div>
         </div>
       </div>
+      <div class="gen-bg-stop-row">
+        <button class="gen-bg-stop-btn" onclick="handleAvatarStop()">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="#C8C3BC"><rect width="12" height="12" rx="2"/></svg>
+          停止生成
+        </button>
+      </div>
+      <style>@keyframes iconPulse{0%,100%{transform:scale(1)} 50%{transform:scale(1.07)}} @keyframes ripple{0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.35)}}</style>
     </div>`;
   }
 
@@ -2644,22 +2715,41 @@ function tCloneStep5(sb) {
 
     ${S.postProcessErr ? `<div class="err-text">${esc(S.postProcessErr)}</div>` : ''}
     ${S.postProcessing ? `
-      <div class="input-card" style="text-align:center;padding:16px">
-        <div style="font-size:14px;color:#F5762A;font-weight:500;margin-bottom:8px">识别语音并烧录字幕中...</div>
-        <div class="path-a-progress-bar"><div class="path-a-progress-fill" style="width:${S.postProgressPct||5}%;animation:none;background:linear-gradient(90deg,#F5762A,#8B5CF6)"></div></div>
-        <div style="font-size:13px;font-weight:600;color:#F5762A;margin-top:6px">${S.postProgressPct||5}%</div>
-        <div style="font-size:12px;color:#A8A49C;margin-top:2px">约30~60秒</div>
-      </div>
-      <div class="gen-bg-block">
-        <div class="gen-bg-title">后台继续生成</div>
-        <div style="font-size:12px;color:#6B6860;margin-bottom:10px">烧录完成后自动保存，可先回首页</div>
-        <div class="gen-bg-actions">
+      <div class="input-card" style="padding:28px 22px 22px">
+        <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:20px">
+          <div style="position:relative;margin-bottom:16px">
+            <div style="width:72px;height:72px;border-radius:22px;background:linear-gradient(135deg,#FFF3E8,#FFE4CC);display:flex;align-items:center;justify-content:center;animation:iconPulse 2s ease-in-out infinite">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.5"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 11h4M6 14h8" stroke-linecap="round"/></svg>
+            </div>
+            <div style="position:absolute;inset:-8px;border-radius:30px;border:2px solid rgba(245,118,42,0.12);animation:ripple 2s ease-out infinite"></div>
+          </div>
+          <div style="font-size:17px;font-weight:700;color:#1A1614;margin-bottom:5px">正在烧录字幕</div>
+          <div style="font-size:13px;color:#9E9890">约 30~60 秒</div>
+        </div>
+        <div style="height:6px;background:#F0EDE8;border-radius:6px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:${S.postProgressPct||5}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:6px;transition:width 0.3s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div style="font-size:12px;color:#B0AA9F">正在处理中…</div>
+          <div style="font-size:13px;font-weight:700;color:#F5762A">${S.postProgressPct||5}%</div>
+        </div>
+        <div class="gen-bg-divider"></div>
+        <div class="gen-bg-block">
+          <div class="gen-bg-title">后台继续，稍后查看</div>
+          <div class="gen-bg-subtitle">完成后通知您，现在可以去逛逛，随时回来查看进展。</div>
           <div class="gen-bg-btn-home" onclick="goHomeBackground()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6E6860" stroke-width="1.8" stroke-linejoin="round"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z"/></svg>
             回首页后台生成
           </div>
         </div>
-      </div>` : ''}
+      </div>
+      <div class="gen-bg-stop-row">
+        <button class="gen-bg-stop-btn" onclick="setState({postProcessing:false,postProgressPct:0});render()">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="#C8C3BC"><rect width="12" height="12" rx="2"/></svg>
+          停止生成
+        </button>
+      </div>
+      <style>@keyframes iconPulse{0%,100%{transform:scale(1)} 50%{transform:scale(1.07)}} @keyframes ripple{0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.35)}}</style>` : ''}
 
     ${hasResult
       ? tCloneActions(
