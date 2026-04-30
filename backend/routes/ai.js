@@ -476,6 +476,33 @@ function normalizeServiceUrl(url) {
   return (url || '').trim().replace(/\/+$/, '');
 }
 
+// ── OSS 后台上传（非阻塞，避免阻塞轮询响应超时）─────────────────────────
+const _ossUploading = new Set(); // 防止同一 taskId 并发重复上传
+async function _scheduleOssUpload(taskId, videoUrl, userId) {
+  if (_ossUploading.has(taskId)) return;
+  _ossUploading.add(taskId);
+  try {
+    const dlResp = await fetch(`${videoUrl}/video/file/${taskId}`, {
+      headers: VIDEO_FETCH_HEADERS,
+      signal: AbortSignal.timeout(600000), // 10 分钟
+    });
+    if (!dlResp.ok) throw new Error(`下载失败 HTTP ${dlResp.status}`);
+    const buf = Buffer.from(await dlResp.arrayBuffer());
+    await oss.enforceUserLimit(userId, 10);
+    const ossKey = `videos/${userId}/${taskId}.mp4`;
+    const ossUrl = await oss.uploadBuffer(ossKey, buf);
+    await db.query(
+      `INSERT IGNORE INTO user_videos (user_id, task_id, oss_key, oss_url) VALUES (?, ?, ?, ?)`,
+      [userId, taskId, ossKey, ossUrl]
+    );
+    console.log(`[OSS] 后台上传完成 taskId=${taskId} url=${ossUrl}`);
+  } catch (e) {
+    console.error('[OSS] 后台上传失败:', e.message);
+  } finally {
+    _ossUploading.delete(taskId);
+  }
+}
+
 const VIDEO_FETCH_HEADERS = {
   'User-Agent': 'XiaMuagent-Zeabur/1.0',
   'Accept': 'application/json',
@@ -590,42 +617,17 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
     if (data && data.status === 'done') {
       const ossConfigured = await oss.isConfigured().catch(() => false);
       if (ossConfigured) {
-        // 先查 user_videos，看是否已经上传过（避免重复上传）
+        // 先查 user_videos，看是否已经上传完成
         const { rows: existingRows } = await db.query(
           `SELECT oss_url FROM user_videos WHERE task_id = ?`, [taskId]
         );
-        if (existingRows.length > 0) {
+        if (existingRows.length > 0 && existingRows[0].oss_url) {
+          // OSS 已有，直接返回
           data.video_url = existingRows[0].oss_url;
         } else {
-          // 从本地服务下载视频 buffer
-          try {
-            const dlResp = await fetch(`${videoUrl}/video/file/${taskId}`, {
-              headers: VIDEO_FETCH_HEADERS,
-              signal: AbortSignal.timeout(300000),
-            });
-            if (!dlResp.ok) throw new Error(`下载失败 HTTP ${dlResp.status}`);
-            const buf = Buffer.from(await dlResp.arrayBuffer());
-
-            // 清理超出限额的旧视频（超10条删最旧）
-            await oss.enforceUserLimit(req.userId, 10);
-
-            // 上传到 OSS
-            const ossKey = `videos/${req.userId}/${taskId}.mp4`;
-            const ossUrl = await oss.uploadBuffer(ossKey, buf);
-
-            // 记录到 user_videos
-            await db.query(
-              `INSERT IGNORE INTO user_videos (user_id, task_id, oss_key, oss_url) VALUES ($1, $2, $3, $4)`,
-              [req.userId, taskId, ossKey, ossUrl]
-            );
-
-            data.video_url = ossUrl;
-            console.log(`[OSS] 上传成功 user=${req.userId} taskId=${taskId} url=${ossUrl}`);
-          } catch (uploadErr) {
-            // OSS 上传失败时静默降级为直连，不影响用户
-            console.error('[OSS] 上传失败，降级为直连:', uploadErr.message);
-            data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
-          }
+          // 触发后台上传（非阻塞），本次先返回直连地址，下次轮询再拿 OSS 链接
+          _scheduleOssUpload(taskId, videoUrl, req.userId);
+          data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
         }
       } else {
         // OSS 未配置，走原来的直连方式
