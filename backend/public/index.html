@@ -5094,26 +5094,23 @@ async function restoreCloneSession(taskId) {
       patch.avatarVideoUrl = _b64ToBlobUrl(s.avatarVideoB64, 'video/mp4');
     } else if (s.avatarDoneTaskId) {
       patch.avatarDoneTaskId = s.avatarDoneTaskId;
-      // 异步恢复视频：优先用 OSS URL，无则走 stream proxy
+      // 异步恢复视频：优先用 OSS URL，无则直接用 stream proxy URL（不下载整个 blob）
       setTimeout(async () => {
         try {
           const r = await api.get(`/ai/video/task/${s.avatarDoneTaskId}`);
           if (r?.code === 200 && r.data?.video_url) {
-            // OSS 直链
             setState({ avatarVideoUrl: r.data.video_url });
             return;
           }
+          if (r?.code === 200 && r.data?.video_direct_url) {
+            const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
+            setState({ avatarVideoUrl: streamUrl });
+            return;
+          }
         } catch {}
-        // 降级：stream proxy
-        try {
-          const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
-          const resp = await fetch(streamUrl);
-          if (!resp.ok) return;
-          const blob = await resp.blob();
-          if (!blob.size) return;
-          const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
-          setState({ avatarVideoUrl: URL.createObjectURL(mp4Blob) });
-        } catch {}
+        // 兜底：直接构造 stream proxy URL
+        const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
+        setState({ avatarVideoUrl: streamUrl });
       }, 300);
     } else if (s.avatarTaskId) {
       // 视频未完成但有任务ID → 恢复"生成中"状态并重启poller
