@@ -1993,7 +1993,7 @@ function tHomeTaskSection() {
       <span class="home-section-title">${(hasLive || liveCard) ? `<span class="task-live-dot"></span>` : ''}我的任务</span>
       <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px;padding:0 22px">
+    <div style="display:flex;flex-direction:column;gap:10px">
     ${liveCard}
     ${bigCards.map(t => {
       const isClone = t.type === 'clone_video';
@@ -2034,7 +2034,7 @@ function tHomeTaskSection() {
       </div>`;
     }).join('')}
     </div>
-    ${smallItems.length > 0 ? `<div class="home-task-small-scroll" style="padding:0 22px">
+    ${smallItems.length > 0 ? `<div class="home-task-small-scroll">
       ${smallItems.map(it => {
         if (it._type === 'task') {
           const t = it._task;
