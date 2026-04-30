@@ -241,30 +241,43 @@ def _try_ffmpeg_video(cmd: list, out_path, timeout=180) -> bool:
 def _normalize_video(task_id: str, video_path: str) -> str:
     """
     将任意上传视频转为 HeyGem 可用的 H.264 yuv420p 25fps MP4。
-    三级降级策略：
-      1. CUDA 硬件解码 + 软件编码（RTX 5070Ti，速度最快，兼容 HEVC/10bit）
-      2. 纯软件解码，仅 -r 25 控制帧率（不用 fps filter，避免 -22 Invalid argument）
-      3. 流复制（仅修容器格式，不重编码，最后兜底）
+    四级降级策略（从原有可靠路径开始，逐步放宽）：
+      1. 软件解码 + fps=25 filter（原始可靠路径，去掉 -map 0:v:0）
+      2. CUDA 硬解 + fps=25 filter（兼容 HEVC/H.265/10bit）
+      3. 软件解码 + -r 25（不用 fps filter，兼容变帧率）
+      4. 流复制兜底（仅修容器格式）
     """
     def _out(suffix): return TEMP_DIR / f"{task_id}_video_norm{suffix}.mp4"
 
-    # ── 级别1：CUDA 硬解 + 软件编码（兼容 HEVC/H.265/10bit）──────────────
+    # ── 级别1：软件解码 + fps=25 filter（原始方式，对 H.264 最稳定）────────
     p1 = _out("1")
     if _try_ffmpeg_video([
         "ffmpeg", "-y",
-        "-hwaccel", "cuda", "-hwaccel_output_format", "nv12",
         "-i", video_path,
         "-an",
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
-        "-r", "25",
+        "-vf", "fps=25,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
         "-movflags", "+faststart",
         str(p1),
     ], p1):
         _validate_video(str(p1)); return str(p1)
 
-    # ── 级别2：纯软件，去掉 fps filter，用 -r 25 输出帧率 ─────────────────
+    # ── 级别2：CUDA 硬解 + fps=25 filter（HEVC/H.265/10bit 等软解失败时）──
     p2 = _out("2")
+    if _try_ffmpeg_video([
+        "ffmpeg", "-y",
+        "-hwaccel", "cuda",
+        "-i", video_path,
+        "-an",
+        "-vf", "fps=25,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-movflags", "+faststart",
+        str(p2),
+    ], p2):
+        _validate_video(str(p2)); return str(p2)
+
+    # ── 级别3：软件解码 + -r 25（变帧率视频 fps filter 报 -22 时的备选）───
+    p3 = _out("3")
     if _try_ffmpeg_video([
         "ffmpeg", "-y",
         "-i", video_path,
@@ -273,22 +286,21 @@ def _normalize_video(task_id: str, video_path: str) -> str:
         "-r", "25",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
         "-movflags", "+faststart",
-        str(p2),
-    ], p2):
-        _validate_video(str(p2)); return str(p2)
+        str(p3),
+    ], p3):
+        _validate_video(str(p3)); return str(p3)
 
-    # ── 级别3：流复制（只修容器，不重编码）兜底 ───────────────────────────
-    p3 = _out("3")
+    # ── 级别4：流复制（只修容器，不重编码）最后兜底 ──────────────────────
+    p4 = _out("4")
     if _try_ffmpeg_video([
         "ffmpeg", "-y",
         "-i", video_path,
         "-an", "-c:v", "copy",
         "-movflags", "+faststart",
-        str(p3),
-    ], p3):
-        _validate_video(str(p3)); return str(p3)
+        str(p4),
+    ], p4):
+        _validate_video(str(p4)); return str(p4)
 
-    # 全部失败，给出清晰提示
     raise ValueError(
         "头像视频格式转换失败，请重新上传清晰正脸 MP4（推荐手机直拍或微信录制，3-15 秒，H.264 编码）"
     )
