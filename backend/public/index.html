@@ -4686,29 +4686,12 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
         setState({ avatarGenerating: false, avatarVideoUrl: t.video_url, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
         saveCloneSession(4);
       } else if (t.status === 'done' && t.video_direct_url) {
-        // 无 OSS 时走 stream proxy（Zeabur 网关 chunked transfer 问题 → 前端 fetch Blob）
+        // 直接用 stream proxy URL 作为 video src，浏览器自己流式加载，不再 blob 整个下载
         if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
-        setState({ avatarProgressMsg: '生成完成，正在加载视频...', avatarProgressPct: 95 });
-        try {
-          const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
-          const resp = await fetch(streamUrl);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const blob = await resp.blob();
-          if (!blob.size || (blob.type && !blob.type.includes('video') && blob.size < 1024 * 1024)) {
-            throw new Error('没有拿到有效视频文件');
-          }
-          const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
-          const blobUrl = URL.createObjectURL(mp4Blob);
-          if (S.avatarVideoUrl && S.avatarVideoUrl.startsWith && S.avatarVideoUrl.startsWith('blob:')) {
-            try { URL.revokeObjectURL(S.avatarVideoUrl); } catch {}
-          }
-          setState({ avatarGenerating: false, avatarVideoUrl: blobUrl, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
-          saveCloneSession(4);
-        } catch (e) {
-          console.error('[avatar download]', e);
-          setState({ avatarGenerating: false, avatarErr: `视频下载失败: ${e.message}`, extractStep: 4 });
-        }
+        const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
+        setState({ avatarGenerating: false, avatarVideoUrl: streamUrl, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
+        saveCloneSession(4);
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });
