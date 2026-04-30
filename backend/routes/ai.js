@@ -591,11 +591,11 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
       const ossConfigured = await oss.isConfigured().catch(() => false);
       if (ossConfigured) {
         // 先查 user_videos，看是否已经上传过（避免重复上传）
-        const [existing] = await db.query(
+        const { rows: existingRows } = await db.query(
           `SELECT oss_url FROM user_videos WHERE task_id = ?`, [taskId]
         );
-        if (existing.length > 0) {
-          data.video_url = existing[0].oss_url;
+        if (existingRows.length > 0) {
+          data.video_url = existingRows[0].oss_url;
         } else {
           // 从本地服务下载视频 buffer
           try {
@@ -615,7 +615,7 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
 
             // 记录到 user_videos
             await db.query(
-              `INSERT IGNORE INTO user_videos (user_id, task_id, oss_key, oss_url) VALUES (?, ?, ?, ?)`,
+              `INSERT IGNORE INTO user_videos (user_id, task_id, oss_key, oss_url) VALUES ($1, $2, $3, $4)`,
               [req.userId, taskId, ossKey, ossUrl]
             );
 

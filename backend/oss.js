@@ -21,12 +21,11 @@ async function getOssConfig() {
   const now = Date.now();
   if (_ossConfig && now < _ossExpires) return _ossConfig;
 
-  const [rows] = await db.query(
-    `SELECT cfg_key, cfg_value FROM system_config WHERE cfg_key IN
-     ('oss_region','oss_access_key_id','oss_access_key_secret','oss_bucket','oss_cdn_domain','oss_video_limit')`
+  const res = await db.query(
+    `SELECT config_key, value FROM system_config WHERE config_key IN ('oss_region','oss_access_key_id','oss_access_key_secret','oss_bucket','oss_cdn_domain','oss_video_limit')`
   );
   const map = {};
-  for (const r of rows) map[r.cfg_key] = r.cfg_value;
+  for (const r of (res.rows || [])) map[r.config_key] = r.value;
 
   _ossConfig = map;
   _ossClient = null; // 配置变了，清掉旧 client
@@ -110,7 +109,7 @@ async function enforceUserLimit(userId, limit = 10) {
   const maxVideos = parseInt(cfg.oss_video_limit) || limit;
 
   // 查出该用户所有视频，按创建时间升序（最旧在前）
-  const [rows] = await db.query(
+  const { rows } = await db.query(
     `SELECT id, oss_key FROM user_videos WHERE user_id = ? ORDER BY created_at ASC`,
     [userId]
   );
