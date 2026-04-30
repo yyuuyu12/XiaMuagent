@@ -7,13 +7,57 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #F0F2FF; font-family: 'PingFang SC', -apple-system, sans-serif; min-height: 100vh; }
-    .header { background: #fff; border-bottom: 1px solid #E8EDFF; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
-    .header h1 { font-size: 18px; font-weight: 800; color: #1E1B4B; }
-    .logout-btn { background: rgba(239,68,68,0.08); color: #EF4444; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
-    
-    .container { max-width: 960px; margin: 28px auto; padding: 0 24px; }
-    .section { background: #fff; border-radius: 16px; border: 1px solid #E8EDFF; padding: 24px; margin-bottom: 20px; }
-    .section h2 { font-size: 15px; font-weight: 700; color: #1E1B4B; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #E8EDFF; }
+
+    /* ---- 登录 ---- */
+    .login-box { max-width: 400px; margin: 80px auto; background: #fff; border-radius: 20px; padding: 36px; border: 1px solid #E8EDFF; }
+    .login-box h2 { font-size: 20px; font-weight: 800; color: #1E1B4B; margin-bottom: 6px; }
+    .login-box p { font-size: 13px; color: #9CA3AF; margin-bottom: 24px; }
+
+    /* ---- 整体布局 ---- */
+    .admin-layout { display: flex; min-height: 100vh; }
+
+    /* ---- 侧边栏 ---- */
+    .sidebar {
+      width: 200px; flex-shrink: 0;
+      background: #fff; border-right: 1px solid #E8EDFF;
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 20;
+    }
+    .sidebar-logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid #F0F2FF;
+    }
+    .sidebar-logo .logo-title { font-size: 14px; font-weight: 800; color: #1E1B4B; line-height: 1.3; }
+    .sidebar-logo .logo-sub { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+    .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; border-radius: 10px; cursor: pointer;
+      font-size: 13px; font-weight: 600; color: #6B7280;
+      transition: all 0.15s; margin-bottom: 4px; user-select: none;
+    }
+    .nav-item:hover { background: #F5F5FF; color: #4338CA; }
+    .nav-item.active { background: linear-gradient(135deg, #6366F1, #818CF8); color: #fff; box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+    .nav-item .nav-icon { font-size: 16px; flex-shrink: 0; }
+    .sidebar-footer { padding: 14px 10px; border-top: 1px solid #F0F2FF; }
+    .sidebar-user { font-size: 12px; color: #9CA3AF; padding: 0 4px 10px; }
+    .logout-btn { width: 100%; background: rgba(239,68,68,0.08); color: #EF4444; border: none; padding: 9px; border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 600; }
+
+    /* ---- 主内容区 ---- */
+    .main-area { margin-left: 200px; flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+    .main-header {
+      background: #fff; border-bottom: 1px solid #E8EDFF;
+      padding: 14px 28px; display: flex; align-items: center;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .main-header .page-title { font-size: 16px; font-weight: 700; color: #1E1B4B; }
+    .main-header .page-sub { font-size: 12px; color: #9CA3AF; margin-top: 1px; }
+    .main-content { padding: 24px 28px; flex: 1; max-width: 900px; }
+
+    /* ---- 通用组件 ---- */
+    .section { background: #fff; border-radius: 14px; border: 1px solid #E8EDFF; padding: 22px; margin-bottom: 18px; }
+    .section-title { font-size: 14px; font-weight: 700; color: #1E1B4B; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #F0F2FF; display: flex; align-items: center; gap: 8px; }
+    .section-title .stag { font-size: 12px; font-weight: 500; color: #9CA3AF; margin-left: auto; }
     .form-row { margin-bottom: 14px; }
     .form-row label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 5px; }
     .form-row input, .form-row select, .form-row textarea {
@@ -34,8 +78,16 @@
     .msg.error { background: rgba(239,68,68,0.1); color: #DC2626; display: block; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-    @media(max-width:600px) { .grid-2,.grid-3 { grid-template-columns: 1fr; } .container { padding: 0 16px; } }
-    /* Prompt items */
+    @media(max-width:700px) {
+      .sidebar { width: 56px; }
+      .nav-item .nav-label { display: none; }
+      .sidebar-logo .logo-title,.sidebar-logo .logo-sub,.sidebar-user { display: none; }
+      .main-area { margin-left: 56px; }
+      .main-content { padding: 16px; }
+      .grid-2,.grid-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ---- 提示词 ---- */
     .prompt-item { border: 1px solid #E8EDFF; border-radius: 10px; overflow: hidden; margin-bottom: 6px; }
     .prompt-item-head { display: flex; align-items: center; padding: 10px 14px; cursor: pointer; gap: 10px; background: #fff; }
     .prompt-item-head:hover { background: #F8F9FF; }
@@ -44,7 +96,8 @@
     .badge { font-size: 11px; padding: 2px 8px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
     .badge-purple { color: #6366F1; background: rgba(99,102,241,0.08); }
     .badge-yellow { color: #D97706; background: rgba(245,158,11,0.1); }
-    /* Auth code table */
+
+    /* ---- 授权码 ---- */
     .code-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .code-table th { text-align: left; padding: 8px 12px; font-size: 12px; color: #6B7280; font-weight: 600; border-bottom: 2px solid #E8EDFF; }
     .code-table td { padding: 10px 12px; border-bottom: 1px solid #F3F4F6; vertical-align: middle; }
@@ -55,27 +108,21 @@
     .status-unused { background: rgba(99,102,241,0.1); color: #6366F1; }
     .status-active { background: rgba(16,185,129,0.1); color: #059669; }
     .status-disabled { background: rgba(107,114,128,0.1); color: #6B7280; }
-    /* Plan cards */
-    .plan-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
-    @media(max-width:700px) { .plan-grid { grid-template-columns: 1fr 1fr; } }
-    .plan-card { border: 2px solid #E8EDFF; border-radius: 12px; padding: 14px 12px; text-align: center; }
-    .plan-card .plan-name { font-size: 14px; font-weight: 700; color: #1E1B4B; margin-bottom: 4px; }
-    .plan-card .plan-period { font-size: 11px; color: #9CA3AF; margin-bottom: 10px; }
-    .plan-card input { width: 100%; padding: 8px; border: 2px solid #E8EDFF; border-radius: 8px; font-size: 15px; font-weight: 700; color: #6366F1; text-align: center; outline: none; }
-    .plan-card input:focus { border-color: #6366F1; }
-    /* Login */
-    .login-box { max-width: 400px; margin: 80px auto; background: #fff; border-radius: 20px; padding: 36px; border: 1px solid #E8EDFF; }
-    .login-box h2 { font-size: 20px; font-weight: 800; color: #1E1B4B; margin-bottom: 6px; }
-    .login-box p { font-size: 13px; color: #9CA3AF; margin-bottom: 24px; }
-    /* Day buttons */
     .day-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
     .day-btn { padding: 5px 14px; border-radius: 7px; border: 2px solid #E8EDFF; background: #fff; font-size: 13px; cursor: pointer; font-weight: 600; color: #374151; }
     .day-btn.active { border-color: #6366F1; color: #6366F1; background: rgba(99,102,241,0.07); }
-    /* Modal */
+
+    /* ---- 弹窗 ---- */
     .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
     .modal-bg.open { display: flex; }
     .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; }
     .modal-box h3 { font-size: 16px; font-weight: 700; color: #1E1B4B; margin-bottom: 16px; }
+
+    /* ---- OSS info ---- */
+    .oss-info-card { background: linear-gradient(135deg, #EEF2FF, #F5F3FF); border: 1px solid #C7D2FE; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+    .oss-info-card .oss-status { font-size: 13px; font-weight: 600; color: #3730A3; margin-bottom: 4px; }
+    .oss-info-card .oss-desc { font-size: 12px; color: #6B7280; line-height: 1.6; }
+
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -94,300 +141,305 @@
 </div>
 
 <!-- 管理界面 -->
-<div id="admin-view" style="display:none">
-  <div class="header">
-    <h1>爆款文案工坊 · 后台管理</h1>
-    <div style="display:flex;align-items:center;gap:16px">
-      <span id="admin-name" style="font-size:13px;color:#6B7280"></span>
+<div id="admin-view" class="admin-layout" style="display:none">
+
+  <!-- 左侧栏 -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-title">爆款文案工坊</div>
+      <div class="logo-sub">后台管理系统</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" id="nav-model" onclick="showSection('model')">
+        <span class="nav-icon">🔑</span><span class="nav-label">模型配置</span>
+      </div>
+      <div class="nav-item" id="nav-oss" onclick="showSection('oss')">
+        <span class="nav-icon">☁️</span><span class="nav-label">OSS 存储</span>
+      </div>
+      <div class="nav-item" id="nav-codes" onclick="showSection('codes')">
+        <span class="nav-icon">🎫</span><span class="nav-label">授权码</span>
+      </div>
+      <div class="nav-item" id="nav-videos" onclick="showSection('videos')">
+        <span class="nav-icon">🎬</span><span class="nav-label">行业精选视频</span>
+      </div>
+      <div class="nav-item" id="nav-prompts" onclick="showSection('prompts')">
+        <span class="nav-icon">📝</span><span class="nav-label">提示词配置</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="admin-name"></div>
       <button class="logout-btn" onclick="doLogout()">退出登录</button>
     </div>
   </div>
 
-  <div class="container">
+  <!-- 右侧主区 -->
+  <div class="main-area">
+    <div class="main-header">
+      <div>
+        <div class="page-title" id="header-title">模型配置</div>
+        <div class="page-sub" id="header-sub">AI 服务商 / API Key / 语音识别</div>
+      </div>
+    </div>
+    <div class="main-content">
 
-    <!-- 模型配置 -->
-    <div class="section">
-      <h2>🔑 模型配置</h2>
-      <div id="key-msg" class="msg"></div>
-      <div class="form-row">
-        <label>当前 AI 提供商</label>
-        <select id="ai_provider">
-          <option value="openai">OpenAI 兼容（含自建代理）</option>
-          <option value="qwen">通义千问（OpenAI 兼容地址）</option>
-          <option value="claude">Anthropic Claude</option>
-          <option value="zhipu">智谱 GLM（bigmodel.cn）</option>
-          <option value="deepseek">DeepSeek</option>
-        </select>
-        <div class="hint">保存时会写入数据库，请勿随意切换未配置 Key 的提供商</div>
-      </div>
-      <div class="grid-2">
-        <div class="form-row">
-          <label>OpenAI / 兼容 API Key</label>
-          <input id="openai_api_key" type="password" placeholder="sk-..." />
-        </div>
-        <div class="form-row">
-          <label>模型名称</label>
-          <input id="openai_model" placeholder="gpt-4o-mini" />
-        </div>
-      </div>
-      <div class="form-row">
-        <label>Base URL（OpenAI 兼容，官方可留空）</label>
-        <input id="openai_base_url" placeholder="https://api.openai.com/v1" />
-        <div class="hint">千问兼容示例：https://dashscope.aliyuncs.com/compatible-mode/v1</div>
-      </div>
-      <div class="grid-2" style="padding-top:12px;border-top:1px solid #E8EDFF;margin-top:8px">
-        <div class="form-row">
-          <label>智谱 API Key</label>
-          <input id="zhipu_api_key" type="password" placeholder="智谱开放平台" />
-        </div>
-        <div class="form-row">
-          <label>智谱模型</label>
-          <input id="zhipu_model" placeholder="glm-4-flash" />
-        </div>
-      </div>
-      <div class="grid-2" style="padding-top:12px;border-top:1px solid #E8EDFF;margin-top:8px">
-        <div class="form-row">
-          <label>DeepSeek API Key</label>
-          <input id="deepseek_api_key" type="password" placeholder="sk-..." />
-        </div>
-        <div class="form-row">
-          <label>DeepSeek 模型</label>
-          <input id="deepseek_model" placeholder="deepseek-chat" />
-        </div>
-      </div>
-      <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
-        <label>🎵 Tikhub API Key（抖音文案提取）</label>
-        <input id="tikhub_api_key" type="password" placeholder="注册 tikhub.io 获取" />
-        <div class="hint">注册 tikhub.io 可获得免费额度</div>
-      </div>
-      <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
-        <label>🎙️ ASR 语音识别服务地址</label>
-        <input id="asr_url" placeholder="例如：http://asr.yyagent.top" />
-        <div class="hint">本地 Whisper 服务地址（frp 穿透域名），用于抖音视频转文字。留空则禁用该功能。</div>
-      </div>
-      <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
-        <label>🎭 数字人视频服务地址（video_url）</label>
-        <input id="video_url" placeholder="例如：http://heygem.yyagent.top" />
-        <div class="hint">HeyGem / VideoReTalking / SadTalker 的 frp 穿透公网地址。配置后优先于 ASR 地址用于数字人生成。</div>
-      </div>
-      <div class="form-row" style="padding-top:14px;border-top:1px solid #E8EDFF;margin-top:4px">
-        <label>🐟 Fish Audio API Key（音色克隆）</label>
-        <input id="fish_audio_api_key" type="password" placeholder="在 fish.audio 注册后获取" />
-        <div class="hint">用于用户音色克隆功能。留空则克隆功能不可用，普通 edge-tts 语音合成不受影响。</div>
-      </div>
-      <div style="padding-top:18px;border-top:2px dashed #E8EDFF;margin-top:16px">
-        <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:14px">☁️ 阿里云 OSS 视频存储（可选）</div>
-        <div class="hint" style="margin-bottom:12px;font-size:12px;color:#6B7280">配置后视频生成完自动上传 OSS，每用户最多保留 oss_video_limit 条，超出自动删最旧。未填则继续使用直连方式。</div>
-        <div class="grid-2">
-          <div class="form-row" style="margin-bottom:10px">
-            <label>地域 (oss_region)</label>
-            <input id="oss_region" placeholder="例：oss-cn-beijing" />
+      <!-- ===== 模型配置 ===== -->
+      <div id="sec-model">
+        <div class="section">
+          <div class="section-title">AI 服务商</div>
+          <div id="key-msg" class="msg"></div>
+          <div class="form-row">
+            <label>当前 AI 提供商</label>
+            <select id="ai_provider">
+              <option value="openai">OpenAI 兼容（含自建代理）</option>
+              <option value="qwen">通义千问（OpenAI 兼容地址）</option>
+              <option value="claude">Anthropic Claude</option>
+              <option value="zhipu">智谱 GLM（bigmodel.cn）</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+            <div class="hint">保存时写入数据库，请勿随意切换未配置 Key 的提供商</div>
           </div>
-          <div class="form-row" style="margin-bottom:10px">
-            <label>Bucket 名称 (oss_bucket)</label>
-            <input id="oss_bucket" placeholder="例：xiamuagent-videos" />
+          <div class="grid-2">
+            <div class="form-row">
+              <label>OpenAI / 兼容 API Key</label>
+              <input id="openai_api_key" type="password" placeholder="sk-..." />
+            </div>
+            <div class="form-row">
+              <label>模型名称</label>
+              <input id="openai_model" placeholder="gpt-4o-mini" />
+            </div>
           </div>
-          <div class="form-row" style="margin-bottom:10px">
-            <label>AccessKey ID</label>
-            <input id="oss_access_key_id" placeholder="LTAI5t..." />
+          <div class="form-row">
+            <label>Base URL（OpenAI 兼容，官方可留空）</label>
+            <input id="openai_base_url" placeholder="https://api.openai.com/v1" />
+            <div class="hint">千问兼容示例：https://dashscope.aliyuncs.com/compatible-mode/v1</div>
           </div>
-          <div class="form-row" style="margin-bottom:10px">
-            <label>AccessKey Secret</label>
-            <input id="oss_access_key_secret" type="password" placeholder="填入 Secret" />
+          <div class="grid-2" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <div class="form-row">
+              <label>智谱 API Key</label>
+              <input id="zhipu_api_key" type="password" placeholder="智谱开放平台" />
+            </div>
+            <div class="form-row">
+              <label>智谱模型</label>
+              <input id="zhipu_model" placeholder="glm-4-flash" />
+            </div>
           </div>
-          <div class="form-row" style="margin-bottom:10px">
-            <label>CDN 加速域名（可选）</label>
-            <input id="oss_cdn_domain" placeholder="例：https://cdn.yourdomain.com" />
+          <div class="grid-2" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <div class="form-row">
+              <label>DeepSeek API Key</label>
+              <input id="deepseek_api_key" type="password" placeholder="sk-..." />
+            </div>
+            <div class="form-row">
+              <label>DeepSeek 模型</label>
+              <input id="deepseek_model" placeholder="deepseek-chat" />
+            </div>
           </div>
-          <div class="form-row" style="margin-bottom:10px">
-            <label>每用户最多保留视频数</label>
-            <input id="oss_video_limit" type="number" placeholder="默认 10" />
+          <button class="btn-primary" onclick="saveKeys()">保存 AI 配置</button>
+        </div>
+
+        <div class="section">
+          <div class="section-title">辅助服务</div>
+          <div class="form-row">
+            <label>🎵 Tikhub API Key（抖音文案提取）</label>
+            <input id="tikhub_api_key" type="password" placeholder="注册 tikhub.io 获取" />
+            <div class="hint">注册 tikhub.io 可获得免费额度</div>
+          </div>
+          <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <label>🎙️ ASR 语音识别服务地址</label>
+            <input id="asr_url" placeholder="例如：http://asr.yyagent.top" />
+            <div class="hint">本地 Whisper 服务地址（frp 穿透域名），用于抖音视频转文字。</div>
+          </div>
+          <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <label>🎭 数字人视频服务地址（video_url）</label>
+            <input id="video_url" placeholder="例如：http://heygem.yyagent.top" />
+            <div class="hint">HeyGem / VideoReTalking / SadTalker 的 frp 穿透公网地址。</div>
+          </div>
+          <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <label>🐟 Fish Audio API Key（音色克隆）</label>
+            <input id="fish_audio_api_key" type="password" placeholder="在 fish.audio 注册后获取" />
+            <div class="hint">用于用户音色克隆功能。留空则克隆功能不可用。</div>
+          </div>
+          <button class="btn-primary" onclick="saveKeys()">保存辅助配置</button>
+        </div>
+      </div>
+
+      <!-- ===== OSS 存储 ===== -->
+      <div id="sec-oss" style="display:none">
+        <div class="oss-info-card">
+          <div class="oss-status">☁️ 阿里云 OSS 视频存储</div>
+          <div class="oss-desc">配置后，视频生成完毕自动上传 OSS，每位用户最多保留 N 条（超出自动删最旧）。未配置则使用本地直连方式。</div>
+        </div>
+        <div class="section">
+          <div class="section-title">Bucket 配置</div>
+          <div id="oss-msg" class="msg"></div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label>地域 (Region)</label>
+              <input id="oss_region" placeholder="例：oss-cn-beijing" />
+            </div>
+            <div class="form-row">
+              <label>Bucket 名称</label>
+              <input id="oss_bucket" placeholder="例：xiamuagent-videos" />
+            </div>
+            <div class="form-row">
+              <label>AccessKey ID</label>
+              <input id="oss_access_key_id" placeholder="LTAI5t..." />
+            </div>
+            <div class="form-row">
+              <label>AccessKey Secret</label>
+              <input id="oss_access_key_secret" type="password" placeholder="填入 Secret" />
+            </div>
+            <div class="form-row">
+              <label>CDN 加速域名（可选）</label>
+              <input id="oss_cdn_domain" placeholder="例：https://cdn.yourdomain.com" />
+            </div>
+            <div class="form-row">
+              <label>每用户最多保留视频数</label>
+              <input id="oss_video_limit" type="number" placeholder="默认 10" />
+            </div>
+          </div>
+          <button class="btn-primary" onclick="saveKeys()">保存 OSS 配置</button>
+        </div>
+      </div>
+
+      <!-- ===== 授权码 ===== -->
+      <div id="sec-codes" style="display:none">
+        <div class="section">
+          <div class="section-title">批量生成授权码</div>
+          <div id="code-msg" class="msg"></div>
+          <div class="grid-3">
+            <div class="form-row" style="margin-bottom:0">
+              <label>生成数量</label>
+              <input id="gen-count" type="number" value="1" min="1" max="100" />
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <label>有效天数</label>
+              <input id="gen-days" type="number" value="30" min="1" />
+            </div>
+            <div class="form-row" style="margin-bottom:0">
+              <label>每日次数上限</label>
+              <input id="gen-limit" type="number" value="30" min="1" max="999" />
+            </div>
+          </div>
+          <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+            <button class="btn-primary" onclick="generateCodes()">生成授权码</button>
+            <span style="font-size:12px;color:#9CA3AF">生成后可复制给用户在个人中心激活</span>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">授权码列表</div>
+          <div style="overflow-x:auto">
+            <table class="code-table">
+              <thead>
+                <tr><th>授权码</th><th>天数</th><th>每日次数</th><th>状态</th><th>激活用户</th><th>激活时间</th><th>操作</th></tr>
+              </thead>
+              <tbody id="code-tbody"><tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:24px">加载中...</td></tr></tbody>
+            </table>
           </div>
         </div>
       </div>
-      <button class="btn-primary" onclick="saveKeys()">保存配置</button>
-    </div>
 
-    <!-- 授权码配置 -->
-    <div class="section">
-      <h2>🎫 授权码管理</h2>
-      <div id="code-msg" class="msg"></div>
-
-      <!-- 生成表单 -->
-      <div style="background:#F8F9FF;border-radius:12px;padding:16px;margin-bottom:16px">
-        <div style="font-size:13px;font-weight:700;color:#1E1B4B;margin-bottom:12px">批量生成授权码</div>
-        <div class="grid-3">
-          <div class="form-row" style="margin-bottom:0">
-            <label>生成数量</label>
-            <input id="gen-count" type="number" value="1" min="1" max="100" />
+      <!-- ===== 行业精选视频 ===== -->
+      <div id="sec-videos" style="display:none">
+        <div class="section">
+          <div class="section-title">采集控制</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+            <button id="iv-trigger-btn" onclick="ivTrigger('')" class="btn-primary" style="font-size:13px;padding:8px 18px">全部采集</button>
+            <button id="iv-pause-btn" onclick="ivPause()" style="font-size:13px;padding:8px 14px;border:2px solid #F59E0B;color:#B45309;background:#FEF3C7;border-radius:8px;cursor:pointer">暂停</button>
+            <button onclick="ivStop()" style="font-size:13px;padding:8px 14px;border:2px solid #EF4444;color:#DC2626;background:#FEF2F2;border-radius:8px;cursor:pointer">停止</button>
+            <span style="color:#D1D5DB">|</span>
+            <span style="font-size:12px;color:#6B7280">定时采集：</span>
+            <input id="iv-schedule-time" type="time" style="padding:6px 10px;border:2px solid #E8EDFF;border-radius:8px;font-size:13px;outline:none" />
+            <button onclick="ivSaveSchedule()" style="font-size:13px;padding:8px 14px;border:2px solid #E8EDFF;border-radius:8px;background:#fff;cursor:pointer">保存定时</button>
           </div>
-          <div class="form-row" style="margin-bottom:0">
-            <label>有效天数</label>
-            <input id="gen-days" type="number" value="30" min="1" />
+          <div id="iv-collect-status" style="font-size:12px;color:#9CA3AF">加载中...</div>
+        </div>
+
+        <!-- 采集进度 -->
+        <div id="iv-progress-box" style="display:none;background:#F0F4FF;border:1.5px solid #C7D2FE;border-radius:12px;padding:14px 16px;margin-bottom:18px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span id="iv-progress-spinner" style="flex-shrink:0;display:inline-block;width:14px;height:14px;border:2px solid #6366F1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></span>
+            <span id="iv-progress-title" style="font-size:14px;font-weight:700;color:#3730A3;flex:1">采集进行中...</span>
           </div>
-          <div class="form-row" style="margin-bottom:0">
-            <label>每日次数上限</label>
-            <input id="gen-limit" type="number" value="30" min="1" max="999" />
+          <div style="display:flex;gap:16px;margin-bottom:10px;padding:10px 14px;background:#fff;border-radius:8px;border:1px solid #C7D2FE">
+            <div style="text-align:center">
+              <div id="iv-cnt-saved" style="font-size:24px;font-weight:800;color:#059669;line-height:1">0</div>
+              <div style="font-size:11px;color:#6B7280;margin-top:2px">已入库</div>
+            </div>
+            <div style="text-align:center">
+              <div id="iv-cnt-skipped" style="font-size:24px;font-weight:800;color:#9CA3AF;line-height:1">0</div>
+              <div style="font-size:11px;color:#6B7280;margin-top:2px">已跳过</div>
+            </div>
+            <div style="text-align:center;flex:1;text-align:left;padding-left:12px;border-left:1px solid #E8EDFF">
+              <div id="iv-cur-industry" style="font-size:13px;font-weight:700;color:#1E1B4B">-</div>
+              <div id="iv-cur-keyword" style="font-size:12px;color:#6B7280;margin-top:2px">等待采集开始...</div>
+              <div id="iv-cur-elapsed" style="font-size:11px;color:#9CA3AF;margin-top:2px"></div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#6B6860;margin-bottom:4px;font-weight:600">📡 实时入库记录</div>
+          <div id="iv-items-feed" style="font-size:11px;font-family:monospace;background:#EEF2FF;border-radius:6px;padding:8px;max-height:140px;overflow-y:auto;line-height:1.8"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">行业关键词配置</div>
+          <div id="iv-industry-config-list" style="margin-bottom:12px"><div style="color:#9CA3AF;font-size:13px">加载中...</div></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="iv-new-ind" placeholder="新行业名称" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:8px;font-size:13px;outline:none;width:160px" />
+            <button onclick="ivAddIndustry()" class="btn-primary" style="padding:8px 16px;font-size:13px">+ 添加行业</button>
           </div>
         </div>
-        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-          <button class="btn-primary" onclick="generateCodes()">生成授权码</button>
-          <span style="font-size:12px;color:#9CA3AF">生成后可复制给用户在个人中心激活</span>
+
+        <div id="iv-msg" class="msg"></div>
+
+        <div class="section">
+          <div class="section-title">
+            内容管理
+            <span class="stag" id="iv-total"></span>
+            <span style="font-size:11px;color:#C4BFB8;margin-left:8px" id="iv-last-refresh"></span>
+          </div>
+          <div id="iv-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+            <span style="font-size:13px;color:#9CA3AF">加载行业标签...</span>
+          </div>
+          <div style="margin-bottom:10px">
+            <button onclick="loadIndustryVideos(ivIndustry,1)" style="font-size:12px;padding:6px 12px;border:2px solid #E8EDFF;border-radius:8px;background:#fff;cursor:pointer">刷新列表</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="code-table">
+              <thead><tr><th>作者</th><th>文案</th><th>点赞</th><th>采集时间</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="iv-tbody"><tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">请先选择上方行业标签</td></tr></tbody>
+            </table>
+          </div>
+          <div id="iv-pagination" style="margin-top:12px;display:flex;gap:6px;justify-content:center"></div>
         </div>
       </div>
 
-      <!-- 授权码列表 -->
-      <div id="code-list-wrap" style="overflow-x:auto">
-        <table class="code-table">
-          <thead>
-            <tr>
-              <th>授权码</th><th>天数</th><th>每日次数</th><th>状态</th><th>激活用户</th><th>激活时间</th><th>操作</th>
-            </tr>
-          </thead>
-          <tbody id="code-tbody"><tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:24px">加载中...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- 会员配置 -->
-    <div class="section">
-      <h2>👑 会员套餐配置</h2>
-      <div id="member-msg" class="msg"></div>
-      <div class="plan-grid">
-        <div class="plan-card">
-          <div class="plan-name">日会员</div>
-          <div class="plan-period">有效期 1 天</div>
-          <input id="plan-day" type="number" step="0.01" placeholder="9.90" />
-          <div style="font-size:11px;color:#9CA3AF;margin-top:4px">元</div>
+      <!-- ===== 提示词配置 ===== -->
+      <div id="sec-prompts" style="display:none">
+        <div class="section">
+          <div class="section-title">改写提示词</div>
+          <div id="prompt-msg" class="msg"></div>
+          <div id="prompt-list"></div>
         </div>
-        <div class="plan-card">
-          <div class="plan-name">周会员</div>
-          <div class="plan-period">有效期 7 天</div>
-          <input id="plan-week" type="number" step="0.01" placeholder="29.90" />
-          <div style="font-size:11px;color:#9CA3AF;margin-top:4px">元</div>
+
+        <div class="section">
+          <div class="section-title">行业标签</div>
+          <div id="ind-msg" class="msg"></div>
+          <div id="ind-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input id="new-ind-name" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:9px;font-size:13px;outline:none;width:160px" placeholder="新行业名称" />
+            <button class="btn-primary" style="padding:8px 18px" onclick="addIndustry()">添加</button>
+          </div>
         </div>
-        <div class="plan-card">
-          <div class="plan-name">月会员</div>
-          <div class="plan-period">有效期 30 天</div>
-          <input id="plan-month" type="number" step="0.01" placeholder="69.90" />
-          <div style="font-size:11px;color:#9CA3AF;margin-top:4px">元</div>
-        </div>
-        <div class="plan-card">
-          <div class="plan-name">永久会员</div>
-          <div class="plan-period">永久有效</div>
-          <input id="plan-forever" type="number" step="0.01" placeholder="199.00" />
-          <div style="font-size:11px;color:#9CA3AF;margin-top:4px">元</div>
-        </div>
-      </div>
-      <div class="form-row">
-        <label>支付页备注文案（红色加粗展示在支付按钮下方）</label>
-        <textarea id="member-note" rows="3" style="font-family:inherit;font-size:14px" placeholder="请添加客服微信：Yu975196416"></textarea>
-      </div>
-      <button class="btn-primary" onclick="saveMemberPlans()">保存会员配置</button>
-    </div>
 
-  <!-- 行业精选视频管理 -->
-  <div class="section">
-    <h2>🎬 行业精选视频管理</h2>
-
-    <!-- 采集控制栏 -->
-    <div style="background:#F8F9FF;border:1.5px solid #E8EDFF;border-radius:10px;padding:14px;margin-bottom:14px">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button id="iv-trigger-btn" onclick="ivTrigger('')" class="btn-primary" style="font-size:13px;padding:8px 18px">全部采集</button>
-        <button id="iv-pause-btn" onclick="ivPause()" style="font-size:13px;padding:8px 14px;border:2px solid #F59E0B;color:#B45309;background:#FEF3C7;border-radius:8px;cursor:pointer">暂停</button>
-        <button onclick="ivStop()" style="font-size:13px;padding:8px 14px;border:2px solid #EF4444;color:#DC2626;background:#FEF2F2;border-radius:8px;cursor:pointer">停止</button>
-        <span style="color:#D1D5DB">|</span>
-        <span style="font-size:12px;color:#6B7280">定时采集：</span>
-        <input id="iv-schedule-time" type="time" style="padding:6px 10px;border:2px solid #E8EDFF;border-radius:8px;font-size:13px;outline:none" />
-        <button onclick="ivSaveSchedule()" style="font-size:13px;padding:8px 14px;border:2px solid #E8EDFF;border-radius:8px;background:#fff;cursor:pointer">保存定时</button>
-      </div>
-      <div id="iv-collect-status" style="font-size:12px;color:#9CA3AF;margin-top:8px">加载中...</div>
-    </div>
-
-    <!-- 采集进度面板 -->
-    <div id="iv-progress-box" style="display:none;background:#F0F4FF;border:1.5px solid #C7D2FE;border-radius:10px;padding:14px 16px;margin-bottom:14px">
-      <!-- 标题行 -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span id="iv-progress-spinner" style="flex-shrink:0;display:inline-block;width:14px;height:14px;border:2px solid #6366F1;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></span>
-        <span id="iv-progress-title" style="font-size:14px;font-weight:700;color:#3730A3;flex:1">采集进行中...</span>
-      </div>
-      <!-- 核心计数（醒目大字） -->
-      <div style="display:flex;gap:16px;margin-bottom:10px;padding:10px 14px;background:#fff;border-radius:8px;border:1px solid #C7D2FE">
-        <div style="text-align:center">
-          <div id="iv-cnt-saved" style="font-size:24px;font-weight:800;color:#059669;line-height:1">0</div>
-          <div style="font-size:11px;color:#6B7280;margin-top:2px">已入库</div>
-        </div>
-        <div style="text-align:center">
-          <div id="iv-cnt-skipped" style="font-size:24px;font-weight:800;color:#9CA3AF;line-height:1">0</div>
-          <div style="font-size:11px;color:#6B7280;margin-top:2px">已跳过</div>
-        </div>
-        <div style="text-align:center;flex:1;text-align:left;padding-left:12px;border-left:1px solid #E8EDFF">
-          <div id="iv-cur-industry" style="font-size:13px;font-weight:700;color:#1E1B4B">-</div>
-          <div id="iv-cur-keyword" style="font-size:12px;color:#6B7280;margin-top:2px">等待采集开始...</div>
-          <div id="iv-cur-elapsed" style="font-size:11px;color:#9CA3AF;margin-top:2px"></div>
-        </div>
-      </div>
-      <!-- 实时入库 Feed -->
-      <div style="font-size:11px;color:#6B6860;margin-bottom:4px;font-weight:600">📡 实时入库记录</div>
-      <div id="iv-items-feed" style="font-size:11px;font-family:monospace;background:#EEF2FF;border-radius:6px;padding:8px;max-height:140px;overflow-y:auto;line-height:1.8"></div>
-    </div>
-
-    <!-- 行业关键词配置 -->
-    <div style="margin-bottom:16px">
-      <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:10px">📋 行业关键词配置</div>
-      <div id="iv-industry-config-list" style="margin-bottom:10px"><div style="color:#9CA3AF;font-size:13px">加载中...</div></div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="iv-new-ind" placeholder="新行业名称" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:8px;font-size:13px;outline:none;width:160px" />
-        <button onclick="ivAddIndustry()" class="btn-primary" style="padding:8px 16px;font-size:13px">+ 添加行业</button>
-      </div>
-    </div>
-
-    <div id="iv-msg" class="msg" style="margin-bottom:10px"></div>
-
-    <!-- 内容列表（行业 Tab） -->
-    <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:10px">📝 内容管理</div>
-    <div id="iv-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-      <span style="font-size:13px;color:#9CA3AF">加载行业标签...</span>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <button onclick="loadIndustryVideos(ivIndustry,1)" style="font-size:12px;padding:6px 12px;border:2px solid #E8EDFF;border-radius:8px;background:#fff;cursor:pointer">刷新列表</button>
-      <span id="iv-total" style="font-size:12px;color:#9CA3AF"></span>
-      <span id="iv-last-refresh" style="font-size:11px;color:#C4BFB8"></span>
-    </div>
-    <div style="overflow-x:auto">
-      <table class="code-table">
-        <thead><tr>
-          <th>作者</th><th>文案</th><th>点赞</th><th>采集时间</th><th>状态</th><th>操作</th>
-        </tr></thead>
-        <tbody id="iv-tbody"><tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">请先选择上方行业标签</td></tr></tbody>
-      </table>
-    </div>
-    <div id="iv-pagination" style="margin-top:10px;display:flex;gap:6px;justify-content:center"></div>
-  </div>
-
-  <div class="section">
-      <h2>📝 提示词配置</h2>
-      <div id="prompt-msg" class="msg"></div>
-      <div id="prompt-list"></div>
-
-      <div style="border-top:1px solid #E8EDFF;padding-top:16px;margin-top:14px">
-        <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:10px">行业标签</div>
-        <div id="ind-msg" class="msg"></div>
-        <div id="ind-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input id="new-ind-name" style="padding:8px 12px;border:2px solid #E8EDFF;border-radius:9px;font-size:13px;outline:none;width:160px" placeholder="新行业名称" />
-          <button class="btn-primary" style="padding:8px 18px" onclick="addIndustry()">添加</button>
+        <div class="section">
+          <div class="section-title">行业风格提示词</div>
+          <div style="font-size:12px;color:#9CA3AF;margin-bottom:14px">为每个行业设置专属风格提示词，留空则使用通用风格。</div>
+          <div id="ind-prompt-list"></div>
         </div>
       </div>
 
-      <div style="border-top:1px solid #E8EDFF;padding-top:16px;margin-top:16px">
-        <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:4px">行业提示词</div>
-        <div style="font-size:12px;color:#9CA3AF;margin-bottom:12px">为每个行业设置专属风格提示词，留空则使用通用风格。支持换行和代码格式书写。</div>
-        <div id="ind-prompt-list"></div>
-      </div>
-    </div>
-  </div>
-</div>
+    </div><!-- /.main-content -->
+  </div><!-- /.main-area -->
+</div><!-- /.admin-layout -->
 
 <!-- 编辑授权码弹窗 -->
 <div class="modal-bg" id="edit-code-modal">
@@ -427,6 +479,34 @@
 <script>
 const API = '/api';
 let token = localStorage.getItem('wf_token');
+let _currentSection = 'model';
+
+const SECTION_META = {
+  model:   { title: '模型配置',       sub: 'AI 服务商 / API Key / 语音识别' },
+  oss:     { title: 'OSS 存储',       sub: '阿里云对象存储 · 视频加速分发' },
+  codes:   { title: '授权码管理',     sub: '生成与管理用户授权码' },
+  videos:  { title: '行业精选视频',   sub: '采集控制 / 关键词配置 / 内容管理' },
+  prompts: { title: '提示词配置',     sub: '改写提示词 / 行业标签 / 风格提示' },
+};
+
+function showSection(name) {
+  _currentSection = name;
+  // 切换侧边栏激活项
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('nav-' + name)?.classList.add('active');
+  // 切换内容区
+  ['model','oss','codes','videos','prompts'].forEach(s => {
+    document.getElementById('sec-' + s).style.display = (s === name) ? '' : 'none';
+  });
+  // 更新 header
+  const meta = SECTION_META[name] || {};
+  document.getElementById('header-title').textContent = meta.title || '';
+  document.getElementById('header-sub').textContent = meta.sub || '';
+  // 按需加载
+  if (name === 'codes') loadCodes();
+  if (name === 'prompts') { loadPrompts(); loadIndustries(); }
+  if (name === 'videos') { ivLoadConfig(); }
+}
 
 async function req(path, opts={}) {
   const r = await fetch(API + path, {
@@ -438,8 +518,9 @@ async function req(path, opts={}) {
 
 function showMsg(id, text, type='success') {
   const el = document.getElementById(id);
+  if (!el) return;
   el.textContent = text; el.className = `msg ${type}`;
-  setTimeout(() => el.className = 'msg', 3500);
+  setTimeout(() => { if(el) el.className = 'msg'; }, 3500);
 }
 
 function escapeHtml(s) {
@@ -469,12 +550,12 @@ function doLogout() {
 
 async function showAdmin() {
   document.getElementById('login-view').style.display = 'none';
-  document.getElementById('admin-view').style.display = '';
-  await loadKeys(); await loadMemberPlans(); await loadCodes(); await loadPrompts();
+  document.getElementById('admin-view').style.display = 'flex';
+  await loadKeys();
+  showSection('model');
 }
 
-
-// ---- 模型配置 ----
+// ---- 模型 & OSS 配置 ----
 async function loadKeys() {
   const r = await req('/config/ai-keys');
   if (r.code !== 200) return;
@@ -523,31 +604,8 @@ async function saveKeys() {
     oss_video_limit: document.getElementById('oss_video_limit').value,
   };
   const r = await req('/config/ai-keys', { method:'POST', body: JSON.stringify(body) });
-  if (r.code===200) showMsg('key-msg','配置已保存'); else showMsg('key-msg',r.msg||'保存失败','error');
-}
-
-// ---- 会员套餐 ----
-async function loadMemberPlans() {
-  const r = await req('/config/member-plans');
-  if (r.code !== 200) return;
-  const d = r.data;
-  document.getElementById('plan-day').value = d.member_plan_day_price || '';
-  document.getElementById('plan-week').value = d.member_plan_week_price || '';
-  document.getElementById('plan-month').value = d.member_plan_month_price || '';
-  document.getElementById('plan-forever').value = d.member_plan_forever_price || '';
-  document.getElementById('member-note').value = d.member_note || '';
-}
-
-async function saveMemberPlans() {
-  const body = {
-    member_plan_day_price: document.getElementById('plan-day').value,
-    member_plan_week_price: document.getElementById('plan-week').value,
-    member_plan_month_price: document.getElementById('plan-month').value,
-    member_plan_forever_price: document.getElementById('plan-forever').value,
-    member_note: document.getElementById('member-note').value,
-  };
-  const r = await req('/config/member-plans', { method:'POST', body: JSON.stringify(body) });
-  if (r.code===200) showMsg('member-msg','保存成功'); else showMsg('member-msg',r.msg||'保存失败','error');
+  const msgId = _currentSection === 'oss' ? 'oss-msg' : 'key-msg';
+  if (r.code===200) showMsg(msgId,'配置已保存'); else showMsg(msgId, r.msg||'保存失败','error');
 }
 
 // ---- 授权码 ----
@@ -661,7 +719,6 @@ async function loadPrompts() {
       </div>
     </div>`).join('');
 
-  // 改写提示词默认展开（常见只有一条）
   if (show[0]) {
     const firstBody = document.getElementById(`pb-${show[0].id}`);
     if (firstBody) firstBody.classList.add('open');
@@ -710,7 +767,6 @@ async function loadIndustries() {
   if (r.code !== 200) return;
   r.data.forEach(i => _indCache[i.id] = i);
 
-  // 标签区
   const indList = document.getElementById('ind-list');
   indList.innerHTML = r.data.map(ind => `
     <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#F3F4F6;border-radius:20px;font-size:13px;font-weight:600;color:#374151">
@@ -718,7 +774,6 @@ async function loadIndustries() {
       <span style="cursor:pointer;color:#9CA3AF;font-size:12px" onclick="deleteIndustry(${ind.id})">✕</span>
     </div>`).join('');
 
-  // 提示词区（每个行业的 style_hint 可编辑）
   const promptList = document.getElementById('ind-prompt-list');
   promptList.innerHTML = r.data.map(ind => `
     <div style="border:1px solid #E8EDFF;border-radius:10px;padding:14px;margin-bottom:8px">
@@ -774,7 +829,6 @@ async function deleteIndustry(id) {
 // ==================== 行业精选视频管理 ====================
 let ivPage = 1, ivIndustry = '', ivConfigData = null, ivProgressTimer = null;
 
-// ---- 采集控制 ----
 async function ivTrigger(industry) {
   if (document.getElementById('iv-trigger-btn').disabled) return;
   const label = industry ? `[${industry}]` : '全部行业';
@@ -828,17 +882,14 @@ async function ivSaveSchedule() {
   ivLoadConfig();
 }
 
-// ---- 行业配置 ----
 async function ivLoadConfig() {
   const r = await req('/industry-videos/admin/collect-config');
   if (!r || r.code !== 200) return;
   ivConfigData = r.data;
 
-  // 更新定时输入
   const schedEl = document.getElementById('iv-schedule-time');
   if (schedEl) schedEl.value = r.data.schedule || '';
 
-  // 更新状态文字
   const statusEl = document.getElementById('iv-collect-status');
   if (statusEl) {
     const lastArr = (r.data.industries || []).map(i => i.last_collected).filter(Boolean).sort();
@@ -943,7 +994,6 @@ async function ivAddIndustry() {
   else showMsg('iv-msg', r?.msg || '添加失败', 'error');
 }
 
-// ---- 行业 Tab ----
 function ivRenderTabs(industries) {
   const tabs = document.getElementById('iv-tabs');
   if (!tabs) return;
@@ -964,20 +1014,17 @@ function ivSelectTab(ind) {
   loadIndustryVideos(ind, 1);
 }
 
-// ---- 内容列表 ----
 async function loadIndustryVideos(industry, page) {
   if (industry !== undefined) ivIndustry = industry;
   if (page !== undefined) ivPage = page;
   const tbody = document.getElementById('iv-tbody');
-  const msg   = document.getElementById('iv-msg');
   if (!ivIndustry) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">请先选择上方行业标签</td></tr>';
     return;
   }
   const url = `/industry-videos/admin?industry=${encodeURIComponent(ivIndustry)}&page=${ivPage}&pageSize=20`;
   const r = await req(url);
-  if (!r || r.code !== 200) { if(msg) msg.textContent = '加载失败'; return; }
-  if(msg) msg.textContent = '';
+  if (!r || r.code !== 200) return;
   document.getElementById('iv-total').textContent = `共 ${r.total} 条`;
   const refreshEl = document.getElementById('iv-last-refresh');
   if (refreshEl) refreshEl.textContent = `刷新于 ${new Date().toLocaleTimeString('zh-CN', {hour12:false})}`;
@@ -1046,7 +1093,6 @@ async function ivDelete(id) {
   if (r?.code === 200) { document.getElementById(`iv-row-${id}`)?.remove(); }
 }
 
-// ---- 进度轮询 ----
 function ivStartProgressPoll() {
   if (ivProgressTimer) return;
   ivPollProgress();
@@ -1082,7 +1128,6 @@ async function ivPollProgress() {
   if (!p.running && !p.startedAt) { box.style.display = 'none'; return; }
   box.style.display = 'block';
 
-  // 实时 Feed（含时间戳）
   if (feedDiv) {
     if (p.items && p.items.length) {
       feedDiv.innerHTML = p.items.map(item => {
@@ -1104,37 +1149,27 @@ async function ivPollProgress() {
     spinner.style.display = 'inline-block';
     const isWaiting = !p.industry || p.industry.includes('等待') || p.industry.includes('定时');
     if (p.paused) {
-      title.textContent = '⏸ 采集已暂停';
-      title.style.color = '#B45309';
+      title.textContent = '⏸ 采集已暂停'; title.style.color = '#B45309';
     } else if (isWaiting) {
-      title.textContent = '⏳ 等待本地ASR接单...';
-      title.style.color = '#6B7280';
+      title.textContent = '⏳ 等待本地ASR接单...'; title.style.color = '#6B7280';
     } else {
-      title.textContent = '🔄 采集进行中';
-      title.style.color = '#3730A3';
+      title.textContent = '🔄 采集进行中'; title.style.color = '#3730A3';
     }
     btn.disabled = true; btn.textContent = '采集中...';
     if (pauseBtn) pauseBtn.textContent = p.paused ? '继续' : '暂停';
-
     if (cntSaved)   cntSaved.textContent   = p.saved   || 0;
     if (cntSkipped) cntSkipped.textContent = p.skipped || 0;
     if (curInd) curInd.textContent = isWaiting ? '等待本地服务（约30秒）' : (p.industry || '-');
     if (curKw) {
-      if (isWaiting) {
-        curKw.textContent = '本地ASR每30秒轮询一次任务队列';
-      } else if (p.keyword) {
-        curKw.textContent = `关键词 ${p.keywordIdx||'?'}/${p.keywordTotal||'?'}: ${p.keyword}`;
-      } else {
-        curKw.textContent = '正在搜索视频...';
-      }
+      if (isWaiting) curKw.textContent = '本地ASR每30秒轮询一次任务队列';
+      else if (p.keyword) curKw.textContent = `关键词 ${p.keywordIdx||'?'}/${p.keywordTotal||'?'}: ${p.keyword}`;
+      else curKw.textContent = '正在搜索视频...';
     }
     if (curEl && p.startedAt) {
       curEl.textContent = `开始: ${fmtSec(p.startedAt)}  已用: ${fmtElapsed(Date.now() - new Date(p.startedAt))}`;
     }
-
     if (!window._ivAutoRefreshTimer) {
       window._ivAutoRefreshTimer = setInterval(() => {
-        // 自动切到当前采集的行业 tab（若用户没手动选其他行业）
         const activeInd = p.industry && !p.industry.includes('等待') ? p.industry : ivIndustry;
         if (activeInd) {
           if (ivIndustry !== activeInd) ivSelectTab(activeInd);
@@ -1149,7 +1184,6 @@ async function ivPollProgress() {
     if (p.error) { title.textContent = '❌ 采集出错'; title.style.color = '#DC2626'; }
     else { title.textContent = `✅ 完成！入库 ${p.saved} 条，跳过 ${p.skipped} 条`; title.style.color = '#059669'; }
     if (pauseBtn) pauseBtn.textContent = '暂停';
-
     if (cntSaved)   cntSaved.textContent   = p.saved   || 0;
     if (cntSkipped) cntSkipped.textContent = p.skipped || 0;
     if (curInd) curInd.textContent = '采集已结束';
@@ -1159,24 +1193,19 @@ async function ivPollProgress() {
       curKw.textContent = `${start} → ${end}  耗时 ${elapsed}`;
     }
     if (curEl) curEl.textContent = p.error ? `错误: ${p.error}` : '';
-
     if (window._ivAutoRefreshTimer) { clearInterval(window._ivAutoRefreshTimer); window._ivAutoRefreshTimer = null; }
     if (ivIndustry) loadIndustryVideos(ivIndustry, ivPage);
     ivLoadConfig();
   }
 }
 
-// 页面加载时初始化
 window.addEventListener('DOMContentLoaded', () => {
   setTimeout(async () => {
-    await ivLoadConfig();
     const r = await req('/industry-videos/admin/progress').catch(() => null);
     if (r?.data?.running) ivStartProgressPoll();
     else if (r?.data?.startedAt) ivPollProgress();
   }, 800);
 });
 </script>
-
-  </div><!-- /.container -->
 </body>
 </html>
