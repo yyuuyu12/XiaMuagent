@@ -535,7 +535,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .home-page .home-task-card { border-radius: 20px !important; padding: 16px 18px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important; }
 .home-page .home-task-card:active { transform: scale(0.98); }
 /* ── 首页"后台生成中"实时卡（设计稿 task-active 样式）── */
-.home-live-card { background:linear-gradient(135deg,rgba(255,128,64,0.04),rgba(245,96,42,0.07)); border-radius:20px; padding:16px 18px; margin-bottom:10px; box-shadow:0 2px 12px rgba(0,0,0,0.06); border:1.5px solid rgba(245,118,42,0.18); cursor:pointer; transition:transform 0.15s; -webkit-tap-highlight-color:transparent; }
+.home-live-card { background:#FFF8F3; border-radius:18px; padding:14px 16px; margin-bottom:0; box-shadow:0 4px 16px rgba(245,96,42,0.08); border:1.5px solid rgba(245,118,42,0.2); cursor:pointer; transition:transform 0.15s; -webkit-tap-highlight-color:transparent; }
 .home-live-card:active { transform:scale(0.98); }
 .hlc-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; gap:10px; }
 .hlc-title { font-size:13px; font-weight:600; color:#1A1614; line-height:1.5; flex:1; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -1772,28 +1772,35 @@ function tHomeTaskSection() {
     </div>`;
   }
 
-  // Helper: 6-step bar for clone tasks
-  function cloneStepBar(currentStep) {
+  // Helper: 6-step row with labels (设计稿统一样式)
+  function stepsWithLabels(currentStep) {
     const labels = ['提取','改写','语音','数字人','后期','发布'];
-    let html = '<div class="htc-step-bar">';
+    const svgCheck = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const svgDot = `<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="#F5762A"/></svg>`;
+    let html = '<div style="display:flex;align-items:center;width:100%">';
     for (let i = 0; i < 6; i++) {
-      const n = i + 1;
-      const isDone = n < currentStep;
-      const isActive = n === currentStep;
-      const cls = isDone ? 'htc-step-done' : isActive ? 'htc-step-active' : 'htc-step-inactive';
-      const lblCls = isActive ? 'htc-step-lbl htc-step-lbl-active' : 'htc-step-lbl';
-      const icon = isDone
-        ? `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-        : `${n}`;
-      html += `<div class="htc-step"><div class="htc-step-circle ${cls}">${icon}</div><span class="${lblCls}">${labels[i]}</span></div>`;
+      const isDone = i + 1 < currentStep;
+      const isActive = i + 1 === currentStep;
+      const cirBg = isDone ? '#F5762A' : isActive ? 'rgba(245,118,42,0.12)' : '#F0EDE8';
+      const cirColor = isDone ? '#fff' : isActive ? '#F5762A' : '#B0AA9F';
+      const cirBorder = isActive ? '1.5px solid #F5762A' : 'none';
+      const lblColor = i + 1 <= currentStep ? '#F5762A' : '#C8C3BC';
+      const lblWeight = isActive ? '700' : '400';
+      const inner = isDone ? svgCheck : isActive ? svgDot : (i + 1);
+      html += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${cirBg};color:${cirColor};border:${cirBorder};flex-shrink:0">${inner}</div>
+        <div style="font-size:9px;font-weight:${lblWeight};color:${lblColor};white-space:nowrap">${labels[i]}</div>
+      </div>`;
       if (i < 5) {
-        const lineCls = isDone ? 'htc-step-line htc-step-line-done' : 'htc-step-line htc-step-line-inactive';
-        html += `<div class="${lineCls}"></div>`;
+        const lineColor = isDone ? '#F5762A' : '#F0EDE8';
+        html += `<div style="flex:1;height:1.5px;background:${lineColor};margin-bottom:14px"></div>`;
       }
     }
     html += '</div>';
     return html;
   }
+  // legacy alias
+  function cloneStepBar(currentStep) { return stepsWithLabels(currentStep); }
 
   // Clone task icon SVG
   const iconClone = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`;
@@ -1978,6 +1985,7 @@ function tHomeTaskSection() {
       <span class="home-section-title">${(hasLive || liveCard) ? `<span class="task-live-dot"></span>` : ''}我的任务</span>
       <span class="home-section-more" onclick="openHistoryPage()">查看全部 ›</span>
     </div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:0 22px">
     ${liveCard}
     ${bigCards.map(t => {
       const isClone = t.type === 'clone_video';
@@ -1988,25 +1996,37 @@ function tHomeTaskSection() {
         : (t.status === 'failed'
           ? friendlyError(t.error_msg)
           : (t.thinking || (t.status === 'pending' ? '等待处理...' : t.status === 'done' ? '最近生成完成' : t.status === 'extracted' ? '文案已提取，可继续改写' : '处理中...')));
-      const liveDot = (t.status === 'running' || t.status === 'pending') ? '<span class="htc-live-dot"></span>' : '';
-      const badgeCls = isClone ? cloneBadgeCls(t) : (t.status === 'failed' ? 'htc-badge-failed' : t.status === 'done' ? 'htc-badge-done' : t.status === 'extracted' ? 'htc-badge-extracted' : t.status === 'pending' ? 'htc-badge-pending' : 'htc-badge-running');
-      return `<div class="home-task-card" style="cursor:pointer" onclick="${openTaskAction(t)}">
-        <div class="htc-top-row">
-          <div class="htc-title">${esc(t.title)}</div>
-          <div class="htc-status-running">${liveDot}<span class="htc-badge ${badgeCls}">${statusText(t)}</span></div>
+      // 徽章颜色（设计稿统一规范）
+      const isRunning = t.status === 'running' || (isClone && clonePhaseOf(t).phase === 'extracting') || (isClone && clonePhaseOf(t).phase === 'rewriting');
+      const isPending = t.status === 'pending' || (isClone && (clonePhaseOf(t).phase === 'pending' || clonePhaseOf(t).phase === 'rewrite_pending'));
+      const isDone = t.status === 'done' || (isClone && clonePhaseOf(t).phase === 'published');
+      const isFailed = t.status === 'failed' || (isClone && clonePhaseOf(t).phase === 'failed');
+      const bdgColor = isFailed ? '#E5534B' : isDone ? '#22C55E' : isPending ? '#6B6FE0' : '#F5762A';
+      const bdgBg = isFailed ? '#FFF0F0' : isDone ? '#F0FDF4' : isPending ? '#EEF0FF' : '#FFF3E8';
+      const showPulse = isRunning || isPending;
+      return `<div style="background:#FFF8F3;border-radius:18px;padding:14px 16px;border:1.5px solid rgba(245,118,42,0.2);box-shadow:0 4px 16px rgba(245,96,42,0.08);cursor:pointer;transition:transform 0.15s;-webkit-tap-highlight-color:transparent;margin-bottom:0" onclick="${openTaskAction(t)}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:600;color:#1A1614;line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(t.title)}</div>
+          <div style="flex-shrink:0;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;color:${bdgColor};background:${bdgBg};white-space:nowrap;display:flex;align-items:center;gap:4px">
+            ${showPulse ? `<div style="width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 1.2s infinite"></div>` : ''}
+            ${statusText(t)}
+          </div>
         </div>
-        <div class="htc-progress-row">
-          <div class="htc-progress-wrap" style="flex:1"><div class="htc-progress-fill" style="width:${pct}%"></div></div>
-          <span class="htc-progress-pct">${pct}%</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:11px;color:#9E9890;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">${esc(thinking)}</div>
+          <div style="font-size:12px;font-weight:700;color:#F5762A;flex-shrink:0">${pct}%</div>
         </div>
-        ${isClone ? cloneStepBar(cloneStep) : ''}
-        <div class="htc-footer-row">
-          <span class="htc-thinking">${esc(thinking)}</span>
-          <span class="htc-detail-link" onclick="event.stopPropagation();${openTaskAction(t)}">${bigActionText(t)}</span>
+        <div style="height:4px;background:rgba(245,118,42,0.15);border-radius:4px;overflow:hidden;margin-bottom:12px">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
+        </div>
+        <div style="margin-bottom:12px">${stepsWithLabels(cloneStep)}</div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;padding:9px;text-align:center;background:rgba(245,118,42,0.08);border-radius:10px;font-size:13px;font-weight:600;color:#F5762A;cursor:pointer" onclick="event.stopPropagation();${openTaskAction(t)}">${bigActionText(t)}</div>
         </div>
       </div>`;
     }).join('')}
-    ${smallItems.length > 0 ? `<div class="home-task-small-scroll">
+    </div>
+    ${smallItems.length > 0 ? `<div class="home-task-small-scroll" style="padding:0 22px">
       ${smallItems.map(it => {
         if (it._type === 'task') {
           const t = it._task;
