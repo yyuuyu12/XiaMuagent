@@ -175,6 +175,36 @@
         <input id="fish_audio_api_key" type="password" placeholder="在 fish.audio 注册后获取" />
         <div class="hint">用于用户音色克隆功能。留空则克隆功能不可用，普通 edge-tts 语音合成不受影响。</div>
       </div>
+      <div style="padding-top:18px;border-top:2px dashed #E8EDFF;margin-top:16px">
+        <div style="font-size:14px;font-weight:700;color:#1E1B4B;margin-bottom:14px">☁️ 阿里云 OSS 视频存储（可选）</div>
+        <div class="hint" style="margin-bottom:12px;font-size:12px;color:#6B7280">配置后视频生成完自动上传 OSS，每用户最多保留 oss_video_limit 条，超出自动删最旧。未填则继续使用直连方式。</div>
+        <div class="grid-2">
+          <div class="form-row" style="margin-bottom:10px">
+            <label>地域 (oss_region)</label>
+            <input id="oss_region" placeholder="例：oss-cn-beijing" />
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <label>Bucket 名称 (oss_bucket)</label>
+            <input id="oss_bucket" placeholder="例：xiamuagent-videos" />
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <label>AccessKey ID</label>
+            <input id="oss_access_key_id" placeholder="LTAI5t..." />
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <label>AccessKey Secret</label>
+            <input id="oss_access_key_secret" type="password" placeholder="填入 Secret" />
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <label>CDN 加速域名（可选）</label>
+            <input id="oss_cdn_domain" placeholder="例：https://cdn.yourdomain.com" />
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <label>每用户最多保留视频数</label>
+            <input id="oss_video_limit" type="number" placeholder="默认 10" />
+          </div>
+        </div>
+      </div>
       <button class="btn-primary" onclick="saveKeys()">保存配置</button>
     </div>
 
@@ -463,6 +493,12 @@ async function loadKeys() {
   document.getElementById('asr_url').value = d.asr_url || '';
   document.getElementById('video_url').value = d.video_url || '';
   document.getElementById('fish_audio_api_key').value = d.fish_audio_api_key || '';
+  document.getElementById('oss_region').value = d.oss_region || '';
+  document.getElementById('oss_bucket').value = d.oss_bucket || '';
+  document.getElementById('oss_access_key_id').value = d.oss_access_key_id || '';
+  document.getElementById('oss_access_key_secret').value = d.oss_access_key_secret || '';
+  document.getElementById('oss_cdn_domain').value = d.oss_cdn_domain || '';
+  document.getElementById('oss_video_limit').value = d.oss_video_limit || '';
 }
 
 async function saveKeys() {
@@ -479,6 +515,12 @@ async function saveKeys() {
     asr_url: document.getElementById('asr_url').value,
     video_url: document.getElementById('video_url').value,
     fish_audio_api_key: document.getElementById('fish_audio_api_key').value,
+    oss_region: document.getElementById('oss_region').value,
+    oss_bucket: document.getElementById('oss_bucket').value,
+    oss_access_key_id: document.getElementById('oss_access_key_id').value,
+    oss_access_key_secret: document.getElementById('oss_access_key_secret').value,
+    oss_cdn_domain: document.getElementById('oss_cdn_domain').value,
+    oss_video_limit: document.getElementById('oss_video_limit').value,
   };
   const r = await req('/config/ai-keys', { method:'POST', body: JSON.stringify(body) });
   if (r.code===200) showMsg('key-msg','配置已保存'); else showMsg('key-msg',r.msg||'保存失败','error');
