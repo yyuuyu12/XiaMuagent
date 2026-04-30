@@ -4644,11 +4644,19 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       const pct = Math.min(90, 10 + elapsed * 0.6);
       setState({ avatarProgressPct: pct, avatarProgressMsg: t.msg || '处理中...' });
 
-      if (t.status === 'done' && t.video_direct_url) {
+      if (t.status === 'done' && t.video_url) {
+        // OSS 链接：直接用，无需经过 stream proxy
         if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
-        // 关键：流式 URL 走 Zeabur 网关会被改成 chunked transfer，Content-Length 丢失，video 元素拿不到时长 → 0:00 灰色不可点
-        // 解决：前端 fetch 完整 Blob 再 createObjectURL，浏览器拿到本地资源，有明确长度可播
+        if (S.avatarVideoUrl && S.avatarVideoUrl.startsWith && S.avatarVideoUrl.startsWith('blob:')) {
+          try { URL.revokeObjectURL(S.avatarVideoUrl); } catch {}
+        }
+        setState({ avatarGenerating: false, avatarVideoUrl: t.video_url, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
+        saveCloneSession(4);
+      } else if (t.status === 'done' && t.video_direct_url) {
+        // 无 OSS 时走 stream proxy（Zeabur 网关 chunked transfer 问题 → 前端 fetch Blob）
+        if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
+        clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarProgressMsg: '生成完成，正在加载视频...', avatarProgressPct: 95 });
         try {
           const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
@@ -4658,10 +4666,8 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
           if (!blob.size || (blob.type && !blob.type.includes('video') && blob.size < 1024 * 1024)) {
             throw new Error('没有拿到有效视频文件');
           }
-          // 强制 mp4 类型，部分代理会把 content-type 改掉
           const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
           const blobUrl = URL.createObjectURL(mp4Blob);
-          // 释放上一段 blob URL，避免内存泄漏
           if (S.avatarVideoUrl && S.avatarVideoUrl.startsWith && S.avatarVideoUrl.startsWith('blob:')) {
             try { URL.revokeObjectURL(S.avatarVideoUrl); } catch {}
           }
@@ -5073,8 +5079,17 @@ async function restoreCloneSession(taskId) {
       patch.avatarVideoUrl = _b64ToBlobUrl(s.avatarVideoB64, 'video/mp4');
     } else if (s.avatarDoneTaskId) {
       patch.avatarDoneTaskId = s.avatarDoneTaskId;
-      // 异步拉取视频，不阻塞 setState
+      // 异步恢复视频：优先用 OSS URL，无则走 stream proxy
       setTimeout(async () => {
+        try {
+          const r = await api.get(`/ai/video/task/${s.avatarDoneTaskId}`);
+          if (r?.code === 200 && r.data?.video_url) {
+            // OSS 直链
+            setState({ avatarVideoUrl: r.data.video_url });
+            return;
+          }
+        } catch {}
+        // 降级：stream proxy
         try {
           const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
           const resp = await fetch(streamUrl);
