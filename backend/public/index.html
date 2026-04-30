@@ -2159,10 +2159,6 @@ function cloneCurrentStep() {
   const s = S.extractStep;
   if (s === 0 || s === 'cloning' || s === 'review') return 1;
   if (s === 'rewriting' || s === 2) return 2;
-  if ((s === 3 || s === 'tts_gen') && !(S.rewrittenScript || '').trim()) return 2;
-  if ((s === 4 || s === 'avatar_gen') && !S.ttsAudioUrl) return 3;
-  if (s === 5 && !S.avatarVideoUrl) return 4;
-  if (s === 6 && !S.postProcessedVideoUrl && !S.avatarVideoUrl) return 5;
   if (s === 3 || s === 'tts_gen') return 3;
   if (s === 4 || s === 'avatar_gen') return 4;
   if (s === 5) return 5;
@@ -5140,6 +5136,7 @@ async function restoreCloneSession(taskId) {
 async function openExtractWithTask(taskId, fromHistory) {
   // ★ 停掉上一个任务的 avatar poller，防止它继续污染全局状态
   if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
+  _avatarRunSeq++; // 使任何仍在途中的异步回调立即失效
 
   // ★ 立即重置所有生成中状态，防止切换任务时上一个任务的状态残留
   setState({
@@ -6052,7 +6049,6 @@ async function loadTasks() {
 function startTasksPolling() {
   if (tasksPollerTimer) return;
   tasksPollerTimer = setInterval(async () => {
-    if (S.currentTab !== 'history' && S.currentTab !== 'home') return;
     try {
       const r = await api.get('/tasks');
       if (r.code === 200) {

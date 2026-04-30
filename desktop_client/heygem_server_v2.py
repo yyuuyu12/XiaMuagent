@@ -234,10 +234,11 @@ def _normalize_audio(task_id: str, audio_path: str) -> str:
 
 def _normalize_video(task_id: str, video_path: str) -> str:
     out_path = TEMP_DIR / f"{task_id}_video_norm.mp4"
+    # 不使用 -map 0:v:0，让 ffmpeg 自动选最优可解码视频流，
+    # 避免 HEVC/H.265 等格式触发 "received no packets" 错误。
     proc = _run_cmd([
         "ffmpeg", "-y",
         "-i", video_path,
-        "-map", "0:v:0",
         "-an",
         "-vf", "fps=25,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
         "-c:v", "libx264",
@@ -246,10 +247,29 @@ def _normalize_video(task_id: str, video_path: str) -> str:
         "-movflags", "+faststart",
         str(out_path),
     ], timeout=180)
-    if proc.returncode != 0 or not out_path.exists() or out_path.stat().st_size < 1000:
-        raise ValueError(f"头像视频格式转换失败，请重新上传 MP4 视频。{proc.stderr[-160:]}")
-    _validate_video(str(out_path))
-    return str(out_path)
+    if proc.returncode == 0 and out_path.exists() and out_path.stat().st_size >= 1000:
+        _validate_video(str(out_path))
+        return str(out_path)
+    # 第一次失败时尝试加 -vcodec libx264 -pix_fmt yuv420p 的宽松参数
+    out_path2 = TEMP_DIR / f"{task_id}_video_norm2.mp4"
+    proc2 = _run_cmd([
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-an",
+        "-pix_fmt", "yuv420p",
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-r", "25",
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "23",
+        "-movflags", "+faststart",
+        str(out_path2),
+    ], timeout=180)
+    if proc2.returncode == 0 and out_path2.exists() and out_path2.stat().st_size >= 1000:
+        _validate_video(str(out_path2))
+        return str(out_path2)
+    err = (proc2.stderr or proc.stderr or '')[-300:]
+    raise ValueError(f"头像视频格式转换失败，请重新上传清晰正脸 MP4（推荐 H.264 编码，3-15 秒）。详情：{err}")
 
 
 def _friendly_error(e: Exception) -> str:
