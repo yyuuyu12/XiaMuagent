@@ -1820,7 +1820,7 @@ function tHomeTaskSection() {
   const iconRun = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
 
   const clampPct = n => Math.max(0, Math.min(100, Math.round(n || 0)));
-  const cloneStepOf = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 3 : 1)));
+  const cloneStepOf = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 2 : 1)));
   const clonePhaseOf = t => {
     const stage = t.stage || '';
     const savedStep = cloneStepOf(t);
@@ -5191,7 +5191,7 @@ function patchLocalCloneTaskStep(taskId, cloneStep) {
 async function saveCloneSession(cloneStep) {
   const taskId = S.cloneTaskId;
   if (!taskId) return;
-  cloneStep = Math.max(parseInt(cloneStep) || 1, currentCloneStepFromState());
+  cloneStep = parseInt(cloneStep) || 1;   // 直接用调用方传入的步骤，不再与UI当前步骤取max
   patchLocalCloneTaskStep(taskId, cloneStep);
   // 只保存纯数据（base64），不保存 Blob URL（跨会话无效）
   const session = {
