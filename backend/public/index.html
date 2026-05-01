@@ -4686,12 +4686,28 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
         setState({ avatarGenerating: false, avatarVideoUrl: t.video_url, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
         saveCloneSession(4);
       } else if (t.status === 'done' && t.video_direct_url) {
-        // 直接用 stream proxy URL 作为 video src，浏览器自己流式加载，不再 blob 整个下载
+        // 视频通过 frp 隧道传输，必须先完整下载成 blob 再播放，否则边传边播会不断转圈缓冲
         if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
-        const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
-        setState({ avatarGenerating: false, avatarVideoUrl: streamUrl, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
-        saveCloneSession(4);
+        setState({ avatarProgressMsg: '视频生成完成，正在下载视频文件（视频较大请稍候…）', avatarProgressPct: 50 });
+        try {
+          const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
+          const resp = await fetch(streamUrl);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const blob = await resp.blob();
+          if (!blob.size) throw new Error('未收到视频文件');
+          if (runSeq !== _avatarRunSeq) return;
+          const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
+          if (S.avatarVideoUrl?.startsWith('blob:')) URL.revokeObjectURL(S.avatarVideoUrl);
+          setState({ avatarGenerating: false, avatarVideoUrl: URL.createObjectURL(mp4Blob), avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
+          saveCloneSession(4);
+        } catch (e) {
+          if (runSeq !== _avatarRunSeq) return;
+          // 下载失败则降级为直接流式播放（会转圈但至少能看）
+          const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
+          setState({ avatarGenerating: false, avatarVideoUrl: streamUrl, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
+          saveCloneSession(4);
+        }
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
         setState({ avatarGenerating: false, avatarErr: t.error || '生成失败', extractStep: 4 });
@@ -5094,23 +5110,30 @@ async function restoreCloneSession(taskId) {
       patch.avatarVideoUrl = _b64ToBlobUrl(s.avatarVideoB64, 'video/mp4');
     } else if (s.avatarDoneTaskId) {
       patch.avatarDoneTaskId = s.avatarDoneTaskId;
-      // 异步恢复视频：优先用 OSS URL，无则直接用 stream proxy URL（不下载整个 blob）
+      // 异步恢复视频：优先用 OSS URL（直接播放），无则下载 blob（避免 frp 流式转圈）
       setTimeout(async () => {
         try {
           const r = await api.get(`/ai/video/task/${s.avatarDoneTaskId}`);
           if (r?.code === 200 && r.data?.video_url) {
+            // OSS 直链：CDN 带宽足，直接播放无需 blob
             setState({ avatarVideoUrl: r.data.video_url });
             return;
           }
-          if (r?.code === 200 && r.data?.video_direct_url) {
-            const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
-            setState({ avatarVideoUrl: streamUrl });
-            return;
-          }
         } catch {}
-        // 兜底：直接构造 stream proxy URL
-        const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
-        setState({ avatarVideoUrl: streamUrl });
+        // 无 OSS：通过 stream proxy 下载完整 blob，保证播放流畅
+        try {
+          const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
+          const resp = await fetch(streamUrl);
+          if (!resp.ok) throw new Error('download failed');
+          const blob = await resp.blob();
+          if (!blob.size) throw new Error('empty');
+          const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
+          setState({ avatarVideoUrl: URL.createObjectURL(mp4Blob) });
+        } catch {
+          // 兜底：实在不行再走流式（会转圈）
+          const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
+          setState({ avatarVideoUrl: streamUrl });
+        }
       }, 300);
     } else if (s.avatarTaskId) {
       // 视频未完成但有任务ID → 恢复"生成中"状态并重启poller
