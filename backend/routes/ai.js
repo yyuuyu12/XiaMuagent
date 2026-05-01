@@ -323,12 +323,16 @@ router.post('/tts', requireAuth, async (req, res) => {
     const { indexRefAudio, indexEmotion, indexEmoAlpha } = req.body;
     if (!indexRefAudio) return res.json({ code: 400, msg: '请先上传参考音频（你的声音样本）才能使用克隆音色' });
     try {
+      const t0 = Date.now();
       // 计算声音指纹（md5），与 IndexTTS spk_cache 命名规则一致
       const voiceId = crypto.createHash('md5').update(Buffer.from(indexRefAudio, 'base64')).digest('hex');
       const regKey = `${asrUrl}:${voiceId}`;
+      const audioKB = Math.round(indexRefAudio.length * 3 / 4 / 1024);
+      console.log(`[TIMING][Zeabur] TTS开始 voice_id=${voiceId.slice(0,8)} 音频${audioKB}KB 已注册=${_registeredVoices.has(regKey)}`);
 
       // 首次使用该声音：先注册（一次性传全量音频到本地），后续只传 voice_id
       if (!_registeredVoices.has(regKey)) {
+        const tReg0 = Date.now();
         try {
           const regResp = await fetch(`${asrUrl}/tts/indextts/register_voice`, {
             method: 'POST',
@@ -338,17 +342,24 @@ router.post('/tts', requireAuth, async (req, res) => {
           });
           if (regResp.ok) {
             _registeredVoices.set(regKey, true);
-            console.log(`[IndexTTS] 声音已注册 voice_id=${voiceId}`);
+            console.log(`[TIMING][Zeabur] register_voice 完成 ${Date.now()-tReg0}ms`);
+          } else {
+            console.log(`[TIMING][Zeabur] register_voice 失败 ${Date.now()-tReg0}ms，降级传全量音频`);
           }
           // 注册失败不阻断，降级到正常携带全量音频提交
-        } catch (_) { /* 注册失败不阻断 */ }
+        } catch (regErr) {
+          console.log(`[TIMING][Zeabur] register_voice 异常 ${Date.now()-tReg0}ms: ${regErr.message}，降级传全量音频`);
+        }
       }
 
       // submit：已注册只传 key（省去 MB 级音频通过 frp 传输），否则传全量
-      const submitBody = _registeredVoices.has(regKey)
+      const useKey = _registeredVoices.has(regKey);
+      const submitBody = useKey
         ? { text: trimText, prompt_audio_key: voiceId, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }
         : { text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 };
 
+      const tSub0 = Date.now();
+      console.log(`[TIMING][Zeabur] submit 开始 用key=${useKey} 文字${trimText.length}字`);
       const resp = await fetch(`${asrUrl}/tts/indextts/submit`, {
         method: 'POST',
         headers: PUBLIC_TUNNEL_HEADERS,
@@ -361,6 +372,7 @@ router.post('/tts', requireAuth, async (req, res) => {
       }
       const data = await resp.json();
       if (!data.task_id) return res.json({ code: 500, msg: 'IndexTTS 未返回 task_id' });
+      console.log(`[TIMING][Zeabur] submit 完成 ${Date.now()-tSub0}ms，全程 ${Date.now()-t0}ms，task_id=${data.task_id.slice(0,8)}`);
       return res.json({ code: 202, task_id: data.task_id, asr_url: asrUrl });
     } catch (e) {
       return res.json({ code: 500, msg: `IndexTTS 提交失败: ${e.message}` });

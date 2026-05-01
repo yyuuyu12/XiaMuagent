@@ -267,16 +267,34 @@ async def _run_tts_task(task_id: str, payload: dict):
     if emo_path and not os.path.exists(emo_path):
         emo_path, emo_alpha = None, 0.0
 
+    import time as _time
+    t_submit = _time.perf_counter()
+    char_count = len(text)
+    print(f"[TIMING][{task_id[:8]}] 任务开始，文字{char_count}字，等待推理锁...")
+
     try:
         with _tasks_lock:
             _tasks[task_id]["status"] = "running"
+        t_lock_wait_start = _time.perf_counter()
         async with inference_lock:
+            t_lock_acquired = _time.perf_counter()
+            print(f"[TIMING][{task_id[:8]}] 获得推理锁，等锁耗时 {t_lock_acquired - t_lock_wait_start:.2f}s，开始推理...")
             await asyncio.to_thread(_run_inference, spk_path, text, output_path, speed, emo_path, emo_alpha)
+            t_infer_done = _time.perf_counter()
+            print(f"[TIMING][{task_id[:8]}] 推理完成，耗时 {t_infer_done - t_lock_acquired:.2f}s")
+
+        t_io_start = _time.perf_counter()
         with open(output_path, "rb") as f:
-            audio_b64 = base64.b64encode(f.read()).decode()
+            raw = f.read()
+        audio_b64 = base64.b64encode(raw).decode()
+        t_io_done = _time.perf_counter()
+        print(f"[TIMING][{task_id[:8]}] 读文件+base64编码 {t_io_done - t_io_start:.2f}s，音频大小 {len(raw)/1024:.1f}KB")
+        print(f"[TIMING][{task_id[:8]}] 全程总耗时 {t_io_done - t_submit:.2f}s（等锁{t_lock_acquired-t_lock_wait_start:.2f}s + 推理{t_infer_done-t_lock_acquired:.2f}s + IO{t_io_done-t_io_start:.2f}s）")
+
         with _tasks_lock:
             _tasks[task_id].update({"status": "done", "audio": audio_b64, "format": "wav"})
     except Exception as e:
+        print(f"[TIMING][{task_id[:8]}] 推理异常: {type(e).__name__}: {str(e)[:200]}")
         with _tasks_lock:
             _tasks[task_id].update({"status": "error", "error": f"{type(e).__name__}: {str(e)[:300]}"})
     finally:
@@ -288,6 +306,9 @@ async def _run_tts_task(task_id: str, payload: dict):
 
 
 def _run_inference(spk_path, text, output_path, speed, emo_path, emo_alpha):
+    import time as _time
+    t0 = _time.perf_counter()
+    print(f"[TIMING][infer] tts.infer 开始，spk={os.path.basename(spk_path)}，emo={emo_path and os.path.basename(emo_path)}，alpha={emo_alpha}")
     tts.infer(
         spk_audio_prompt=spk_path,
         text=text,
@@ -299,6 +320,7 @@ def _run_inference(spk_path, text, output_path, speed, emo_path, emo_alpha):
         use_random=False,
         speed=speed,
     )
+    print(f"[TIMING][infer] tts.infer 完成，耗时 {_time.perf_counter()-t0:.2f}s")
 
 
 @app.get("/health")

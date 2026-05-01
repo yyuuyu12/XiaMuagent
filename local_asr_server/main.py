@@ -205,9 +205,15 @@ def health():
 @app.post("/tts/indextts/register_voice")
 async def tts_indextts_register_voice(payload: dict):
     """注册声音到 IndexTTS（一次性传全量音频），返回 voice_id；后续 submit 只传 voice_id"""
+    import time as _time
+    audio_b64 = payload.get("prompt_audio", "")
+    audio_kb = len(audio_b64) * 3 // 4 // 1024  # base64→bytes 近似
+    t0 = _time.perf_counter()
+    print(f"[TIMING][ASR] register_voice 开始，音频约 {audio_kb}KB")
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(f"{INDEXTTS_URL}/tts/register_voice", json=payload)
+        print(f"[TIMING][ASR] register_voice 完成，耗时 {_time.perf_counter()-t0:.2f}s")
         return resp.json()
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="IndexTTS 服务未启动，请运行 start_indextts.bat 后重试")
@@ -216,9 +222,16 @@ async def tts_indextts_register_voice(payload: dict):
 @app.post("/tts/indextts/submit")
 async def tts_indextts_submit(payload: dict):
     """异步提交 IndexTTS 任务，立即返回 task_id"""
+    import time as _time
+    has_key = bool(payload.get("prompt_audio_key"))
+    has_audio = bool(payload.get("prompt_audio"))
+    audio_kb = len(payload.get("prompt_audio", "")) * 3 // 4 // 1024
+    t0 = _time.perf_counter()
+    print(f"[TIMING][ASR] submit 开始，key={'有' if has_key else '无'} audio={'有('+str(audio_kb)+'KB)' if has_audio else '无'}")
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(f"{INDEXTTS_URL}/tts/submit", json=payload)
+        print(f"[TIMING][ASR] submit 完成，耗时 {_time.perf_counter()-t0:.2f}s")
         return resp.json()
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="IndexTTS 服务未启动，请运行 start_indextts.bat 后重试")
