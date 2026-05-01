@@ -2355,7 +2355,9 @@ function tExtract() {
 
 // ===== 步骤3：语音合成 =====
 function tCloneStep3(sb) {
-  if (!(S.rewrittenScript || '').trim()) {
+  // 音频已存在 → 改写文案曾经有值（当前可能是 session 恢复途中临时为空），跳过拦截
+  const hasAudio = !!(S.ttsAudioUrl || S.ttsAudioB64);
+  if (!(S.rewrittenScript || '').trim() && !hasAudio) {
     return `${sb}<div class="tab-page">
       <div class="input-card" style="text-align:center;padding:26px 18px;margin-top:4px">
         <div style="font-size:15px;font-weight:700;color:#1A1814;margin-bottom:8px">请先完成文案改写</div>
@@ -4303,7 +4305,9 @@ function goToCloneStep3() {
 async function handleTTSGenerate() {
   if (!ensureLoggedIn()) return;
   const text = (S.rewrittenScript || '').trim();
-  if (!text) { showToast('请先完成文案改写'); setState({ extractStep: 2 }); return; }
+  // 有音频说明文案曾存在（可能 session 恢复途中临时为空），允许继续
+  if (!text && !(S.ttsAudioUrl || S.ttsAudioB64)) { showToast('请先完成文案改写'); setState({ extractStep: 2 }); return; }
+  if (!text) return; // 有音频但文案为空，等 session 恢复完成再操作
   stopTTSAudio();
   _ttsAbortFlag = false;
   setState({ ttsGenerating: true, ttsErr: '', extractStep: 'tts_gen', ttsProgressPct: 5 });
