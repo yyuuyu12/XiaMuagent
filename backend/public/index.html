@@ -6091,8 +6091,11 @@ function startTasksPolling() {
       const r = await api.get('/tasks');
       if (r.code === 200) {
         const tasks = mergeActiveCloneTaskStep(r.data);
-        setState({ tasksList: tasks });
+        // 直接写内存，不走 setState（避免 render），防止在 extract 页每2.5秒整页重绘导致抖动
+        S.tasksList = tasks;
         updateHomeDoneSeen();
+        // 只在 home/history 页触发渲染（用户能看到任务卡片的地方）
+        if (S.currentTab === 'home' || S.currentTab === 'history') render();
         const hasRunning = tasks.some(t => t.status === 'pending' || t.status === 'running');
         if (!hasRunning) { stopTasksPolling(); stopTasksTickTimer(); }
       }
