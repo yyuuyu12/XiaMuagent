@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.join(VOICE_MODULE_DIR, "indextts"))
 
 import asyncio
 import base64
-import tempfile
+import hashlib
 import threading
 import traceback
 import uuid
@@ -56,7 +56,28 @@ from indextts.infer_v2 import IndexTTS2
 
 CHECKPOINTS_DIR = os.path.join(VOICE_MODULE_DIR, "checkpoints")
 OUTPUT_DIR      = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tts_outputs")
+# 说话人参考音频持久化缓存目录：同一个声音始终用同一个文件路径，
+# 使 tts.cache_audio_prompt 路径匹配，直接复用 cache_cond_mel，跳过耗时的音频编码
+SPK_CACHE_DIR   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "spk_cache")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(SPK_CACHE_DIR, exist_ok=True)
+
+
+def _get_spk_path(spk_bytes: bytes) -> str:
+    """
+    按参考音频内容 hash 生成固定路径（而非随机临时文件）。
+    相同声音 → 相同路径 → tts 内部 cache_cond_mel 命中 → 跳过 conditioning 提取，大幅提速。
+    """
+    md5 = hashlib.md5(spk_bytes).hexdigest()
+    suffix = ".mp3" if (spk_bytes[:3] == b"ID3" or spk_bytes[:2] == b"\xff\xfb") else ".wav"
+    path = os.path.join(SPK_CACHE_DIR, f"{md5}{suffix}")
+    if not os.path.exists(path):
+        with open(path, "wb") as f:
+            f.write(spk_bytes)
+        print(f"[SPK_CACHE] 新声音已缓存: {md5}{suffix}")
+    else:
+        print(f"[SPK_CACHE] 命中缓存，跳过音频编码: {md5}{suffix}")
+    return path
 
 # ========== 情绪配置 ==========
 # v2 支持真实情感控制：emo_audio_prompt（情感参考音频）+ emo_alpha（权重）
@@ -110,17 +131,13 @@ async def generate(payload: dict):
     if not prompt_audio_b64:
         raise HTTPException(400, "prompt_audio 不能为空（需要参考音频来克隆音色）")
 
-    # 解码说话人参考音频
+    # 解码说话人参考音频，写入持久化缓存（相同声音 → 相同路径 → cache_cond_mel 命中）
     try:
         spk_bytes = base64.b64decode(prompt_audio_b64)
     except Exception:
         raise HTTPException(400, "prompt_audio base64 解码失败")
 
-    suffix = ".mp3" if (spk_bytes[:3] == b"ID3" or spk_bytes[:2] == b"\xff\xfb") else ".wav"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-        f.write(spk_bytes)
-        spk_path = f.name
-
+    spk_path    = _get_spk_path(spk_bytes)
     output_path = os.path.join(OUTPUT_DIR, f"{uuid.uuid4()}.wav")
 
     # 情感参考音频（可选：用 examples/ 里的模板）
@@ -149,12 +166,12 @@ async def generate(payload: dict):
     except Exception as e:
         raise HTTPException(500, f"推理失败: {type(e).__name__}: {str(e)[:400]}\n{traceback.format_exc()[-400:]}")
     finally:
-        for p in [spk_path, output_path]:
-            try:
-                if os.path.exists(p):
-                    os.unlink(p)
-            except Exception:
-                pass
+        # spk_path 是持久化缓存文件，不删除（相同声音下次可直接复用）
+        try:
+            if os.path.exists(output_path):
+                os.unlink(output_path)
+        except Exception:
+            pass
 
 
 @app.post("/tts/submit")
@@ -201,11 +218,7 @@ async def _run_tts_task(task_id: str, payload: dict):
             _tasks[task_id]["error"] = "prompt_audio base64 解码失败"
         return
 
-    suffix = ".mp3" if (spk_bytes[:3] == b"ID3" or spk_bytes[:2] == b"\xff\xfb") else ".wav"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-        f.write(spk_bytes)
-        spk_path = f.name
-
+    spk_path    = _get_spk_path(spk_bytes)
     output_path = os.path.join(OUTPUT_DIR, f"{task_id}.wav")
     emo_path  = EMOTION_TEMPLATES.get(emotion)
     emo_alpha = float(emo_alpha_override) if emo_alpha_override is not None else EMOTION_ALPHA.get(emotion, 0.0)
@@ -225,11 +238,11 @@ async def _run_tts_task(task_id: str, payload: dict):
         with _tasks_lock:
             _tasks[task_id].update({"status": "error", "error": f"{type(e).__name__}: {str(e)[:300]}"})
     finally:
-        for p in [spk_path, output_path]:
-            try:
-                if os.path.exists(p): os.unlink(p)
-            except Exception:
-                pass
+        # spk_path 是持久化缓存文件，不删除（相同声音下次可直接复用）
+        try:
+            if os.path.exists(output_path): os.unlink(output_path)
+        except Exception:
+            pass
 
 
 def _run_inference(spk_path, text, output_path, speed, emo_path, emo_alpha):
