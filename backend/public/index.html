@@ -3400,6 +3400,17 @@ async function featuredSelectIndustry(ind) {
 }
 
 async function startCloneFromFeatured(videoId, transcript) {
+  // ★ 生成中拦截（从 featuredRewrite 直接调用时已检查过，此处防止其他入口绕过）
+  const isGenerating = S.ttsGenerating || S.avatarGenerating || S.postProcessing;
+  if (isGenerating) {
+    const genLabel = S.ttsGenerating ? '语音生成' : S.avatarGenerating ? '数字人视频生成' : '字幕烧录';
+    const ok = await showConfirmModal({
+      title: `${genLabel}进行中`,
+      body: `切换任务将会导致当前 ${genLabel} 进展中断，确定要切换吗？`,
+      confirmText: '切换任务', cancelText: '继续等待', confirmDanger: true,
+    });
+    if (!ok) return;
+  }
   if (_featuredRefreshTimer) { clearInterval(_featuredRefreshTimer); _featuredRefreshTimer = null; }
   setState({
     currentTab: 'extract',
@@ -3474,6 +3485,17 @@ async function featuredRewrite() {
   if (!ensureLoggedIn()) return;
   const v = (S.featuredVideos || [])[S.featuredDetailIdx];
   if (!v) return;
+  // ★ 生成中拦截
+  const isGenerating = S.ttsGenerating || S.avatarGenerating || S.postProcessing;
+  if (isGenerating) {
+    const genLabel = S.ttsGenerating ? '语音生成' : S.avatarGenerating ? '数字人视频生成' : '字幕烧录';
+    const ok = await showConfirmModal({
+      title: `${genLabel}进行中`,
+      body: `切换任务将会导致当前 ${genLabel} 进展中断，确定要切换吗？`,
+      confirmText: '切换任务', cancelText: '继续等待', confirmDanger: true,
+    });
+    if (!ok) return;
+  }
   if (v.id) {
     await startCloneFromFeatured(v.id, v.transcript);
     return;
@@ -5015,13 +5037,15 @@ function resetCloneWorkspace(keepTaskId = true) {
 }
 
 // 入口点击：生成中则继续，否则全新开始（清掉旧任务ID）
-function openCloneEntry() {
+async function openCloneEntry() {
   if (S.ttsGenerating || S.avatarGenerating || S.postProcessing) {
-    switchTab('extract'); // 有任务跑着，进去看
-  } else {
-    resetCloneWorkspace(false); // false = 不保留旧任务ID，全新开始
-    switchTab('extract');
+    switchTab('extract'); // 有任务跑着，直接进去看，不中断
+    return;
   }
+  // 有已有任务但未在生成中 → 新建前弹确认（防止意外覆盖进行中的流程步骤）
+  // 无任务直接新建
+  resetCloneWorkspace(false);
+  switchTab('extract');
 }
 
 function resetAvatarSelection() {
