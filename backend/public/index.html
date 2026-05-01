@@ -5323,8 +5323,8 @@ function patchLocalCloneTaskStep(taskId, cloneStep, extraFields) {
       ...(extraFields || {}),
     };
   });
-  // 在首页/历史页时立即刷新任务卡片，避免等下一次 loadTasks 才更新
-  if (S.currentTab === 'home' || S.currentTab === 'history') render();
+  // 任何时候都 render，确保 S.tasksList 更新后卡片即时生效（render 是轻量的）
+  render();
 }
 
 // 保存当前克隆流程的关键状态到服务器（静默，失败不影响用户）
