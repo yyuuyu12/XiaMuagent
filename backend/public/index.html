@@ -4367,9 +4367,12 @@ async function handleTTSGenerate() {
 async function _pollIndexTTSTask(taskId) {
   const ownerTaskId = S.cloneTaskId; // ★ 记录发起时的任务ID
   const maxWait = 20 * 60 * 1000;
-  const interval = 5000;
   const start = Date.now();
+  let pollCount = 0;
   while (Date.now() - start < maxWait) {
+    // 前5次每1.5s查一次（覆盖大多数推理完成时机），之后每4s一次
+    const interval = pollCount < 5 ? 1500 : 4000;
+    pollCount++;
     if (_ttsAbortFlag || S.cloneTaskId !== ownerTaskId) { _stopTTSProgressTimer(); return; } // ★ abort 或已切换任务
     await new Promise(r => setTimeout(r, interval));
     if (_ttsAbortFlag || S.cloneTaskId !== ownerTaskId) { _stopTTSProgressTimer(); return; } // ★ 等待期间可能已切换
