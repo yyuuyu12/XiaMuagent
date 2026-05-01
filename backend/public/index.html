@@ -4873,14 +4873,14 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
           try { URL.revokeObjectURL(S.avatarVideoUrl); } catch {}
         }
         setState({ avatarGenerating: false, avatarVideoUrl: t.video_url, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
-        saveCloneSession(4);
+        saveCloneSession(5); // 数字人视频已就绪 → step5（进入后期步骤）
       } else if (t.status === 'done' && t.video_direct_url) {
         // 视频通过 frp 隧道传输，必须先完整下载成 blob 再播放，否则边传边播会不断转圈缓冲
         if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
         // ★ 立即设 doneTaskId、清 taskId 并保存 session，确保切换任务后走 doneTaskId 恢复路径而非重启 poller
         setState({ avatarDoneTaskId: taskId, avatarTaskId: null, avatarProgressMsg: '视频生成完成，正在下载视频文件（视频较大请稍候…）', avatarProgressPct: Math.max(S.avatarProgressPct || 0, 92) });
-        saveCloneSession(4);
+        saveCloneSession(4); // 视频还在下载中，先保存 step4
         try {
           const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
           const resp = await fetch(streamUrl);
@@ -4891,13 +4891,13 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
           const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
           if (S.avatarVideoUrl?.startsWith('blob:')) URL.revokeObjectURL(S.avatarVideoUrl);
           setState({ avatarGenerating: false, avatarVideoUrl: URL.createObjectURL(mp4Blob), avatarVideoB64: null, extractStep: 4, avatarProgressPct: 100 });
-          saveCloneSession(4);
+          saveCloneSession(5); // 下载完成，视频可用 → step5
         } catch (e) {
           if (runSeq !== _avatarRunSeq) return;
           // 下载失败则降级为直接流式播放（会转圈但至少能看）
           const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
           setState({ avatarGenerating: false, avatarVideoUrl: streamUrl, avatarVideoB64: null, extractStep: 4, avatarProgressPct: 100 });
-          saveCloneSession(4);
+          saveCloneSession(5); // 降级 URL 也是"视频可用" → step5
         }
       } else if (t.status === 'error') {
         clearInterval(_avatarPoller); _avatarPoller = null;
@@ -5044,6 +5044,7 @@ async function handlePostProcess() {
     }
     _stopPostProgressTimer();
     // postProcessedB64 不再保存到 state（太大），OSS URL 已能持久化
+    patchLocalCloneTaskStep(S.cloneTaskId, 5, { post_process_done: true }); // 立即更新首页卡片
     setState({ postProcessing: false, postProgressPct: 100, postProcessedVideoUrl: url });
     saveCloneSession(5); // ★ 步骤5：后期制作完成，保存 OSS URL 到 session
   } catch (e) {
@@ -5190,7 +5191,7 @@ function currentCloneStepFromState() {
   return Number.isFinite(n) ? Math.max(1, Math.min(6, n)) : 1;
 }
 
-function patchLocalCloneTaskStep(taskId, cloneStep) {
+function patchLocalCloneTaskStep(taskId, cloneStep, extraFields) {
   if (!taskId) return;
   const nowIso = new Date().toISOString();
   const pct = Math.max(0, Math.min(100, Math.round((cloneStep / 6) * 100)));
@@ -5201,9 +5202,12 @@ function patchLocalCloneTaskStep(taskId, cloneStep) {
       clone_step: cloneStep,           // 直接写当前步骤，允许回退
       progress: Math.max(t.progress || 0, pct),
       activity_at: nowIso,
-      updated_at: nowIso
+      updated_at: nowIso,
+      ...(extraFields || {}),
     };
   });
+  // 在首页/历史页时立即刷新任务卡片，避免等下一次 loadTasks 才更新
+  if (S.currentTab === 'home' || S.currentTab === 'history') render();
 }
 
 // 保存当前克隆流程的关键状态到服务器（静默，失败不影响用户）
