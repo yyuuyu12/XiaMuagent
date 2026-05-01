@@ -2552,7 +2552,7 @@ function tCloneStep4(sb) {
       <div style="display:flex;justify-content:center;padding:8px 0 4px">
         <div style="width:62%;position:relative">
           <div style="aspect-ratio:9/16;border-radius:24px;overflow:hidden;background:#000;box-shadow:0 12px 40px rgba(0,0,0,0.25)">
-            <video src="${S.avatarVideoUrl}" controls playsinline preload="metadata"
+            <video src="${S.avatarVideoUrl}" controls playsinline preload="auto"
               style="width:100%;height:100%;object-fit:cover;display:block"></video>
           </div>
         </div>
@@ -2821,7 +2821,7 @@ function tCloneStep5(sb) {
     ${videoSrc ? `<div style="display:flex;justify-content:center;padding:0 16px 0;margin-bottom:12px">
       <div style="width:55%;position:relative">
         <div style="aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
-          <video src="${videoSrc}" controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block"></video>
+          <video src="${videoSrc}" controls playsinline preload="auto" style="width:100%;height:100%;object-fit:cover;display:block"></video>
         </div>
         <div style="font-size:11px;color:${hasResult?'#059669':'#A8A49C'};text-align:center;margin-top:6px;font-weight:${hasResult?600:400}">
           ${hasResult ? '✓ 字幕已烧录' : '原始视频（未加字幕）'}
@@ -5188,7 +5188,11 @@ async function saveCloneSession(cloneStep) {
     subOutlineWidth:  S.subOutlineWidth,
     subTemplate:      S.subTemplate,
     subStyle:         S.subStyle,
-    postProcessedB64: S.postProcessedB64 || null,   // 步骤5完成后有值
+    // postProcessedB64 可能超过 MySQL 16MB 限制，改用标志位 + OSS URL 记录
+    postProcessDone: !!(S.postProcessedVideoUrl || S.postProcessedB64),
+    postProcessedVideoUrl: (S.postProcessedVideoUrl && !S.postProcessedVideoUrl.startsWith('blob:')) ? S.postProcessedVideoUrl : null,
+    // postProcessedB64 仅在小视频时保存，限制 4MB
+    postProcessedB64: (S.postProcessedB64 && S.postProcessedB64.length < 4 * 1024 * 1024) ? S.postProcessedB64 : null,
     coverFrameUrl:    S.coverFrameUrl    || null,   // 封面（dataURL，不大）
     coverTitle:       S.coverTitle       || '',
     publishTitle:     S.publishTitle     || '',
@@ -5385,8 +5389,10 @@ async function restoreCloneSession(taskId) {
       }
       setTimeout(() => _startAvatarPoller(s.avatarTaskId, s.avatarAsrUrl || null), 500);
     }
-    // 后期视频 base64 → Blob URL 恢复
-    if (s.postProcessedB64) {
+    // 后期视频恢复：优先用 OSS URL，其次 base64
+    if (s.postProcessedVideoUrl) {
+      patch.postProcessedVideoUrl = s.postProcessedVideoUrl;
+    } else if (s.postProcessedB64) {
       patch.postProcessedB64 = s.postProcessedB64;
       patch.postProcessedVideoUrl = _b64ToBlobUrl(s.postProcessedB64, 'video/mp4');
     }

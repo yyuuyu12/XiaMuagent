@@ -35,12 +35,16 @@ router.get('/', requireAuth, async (req, res) => {
         if (result?.rewritten || session?.rewrittenScript) step = Math.max(step, 3);
         if (session?.ttsAudioB64) step = Math.max(step, 4);
         if (session?.avatarTaskId || session?.avatarVideoB64 || session?.avatarDoneTaskId) step = Math.max(step, 4);
-        if (session?.avatarVideoB64 || session?.avatarDoneTaskId) step = Math.max(step, 5);
-        if (session?.postProcessedB64 || session?.coverFrameUrl || session?.publishTitle) step = Math.max(step, 6);
+        // avatarVideoUrl(OSS) 也是"数字人完成"的信号
+        if (session?.avatarVideoB64 || session?.avatarDoneTaskId || session?.avatarVideoUrl) step = Math.max(step, 5);
+        // postProcessDone/postProcessedVideoUrl 表示后期完成(step5)，不要跳到 step6
+        if (session?.postProcessedB64 || session?.postProcessDone || session?.postProcessedVideoUrl) step = Math.max(step, 5);
+        // coverFrameUrl / publishTitle 才是进入 step6 的信号
+        if (session?.coverFrameUrl || session?.publishTitle) step = Math.max(step, 6);
         if (!(result?.rewritten || session?.rewrittenScript)) step = Math.min(step, 2);
         if (step > 3 && !session?.ttsAudioB64) step = 3;
-        if (step > 4 && !session?.avatarVideoB64 && !session?.avatarTaskId && !session?.avatarDoneTaskId) step = 4;
-        if (step > 5 && !session?.postProcessedB64 && !session?.coverFrameUrl && !session?.publishTitle) step = 5;
+        if (step > 4 && !session?.avatarVideoB64 && !session?.avatarTaskId && !session?.avatarDoneTaskId && !session?.avatarVideoUrl) step = 4;
+        if (step > 5 && !session?.postProcessedB64 && !session?.postProcessDone && !session?.postProcessedVideoUrl && !session?.coverFrameUrl && !session?.publishTitle) step = 5;
         task.clone_step = step;
       }
       delete task.result;
