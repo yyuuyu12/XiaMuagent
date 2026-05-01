@@ -1841,6 +1841,8 @@ function tHomeTaskSection() {
     if (info.phase === 'extracting') return '提取中';
     if (info.phase === 'rewriting') return '改写中';
     if (info.phase === 'extracted') return '提取完毕';
+    // step5 需区分"数字人完成"vs"后期完成"
+    if (info.step === 5 && t.post_process_done) return '后期完毕';
     return cloneDoneLabels[info.step - 1] || '已完成';
   };
   const cloneHintText = t => {
@@ -1856,7 +1858,7 @@ function tHomeTaskSection() {
       '提取完毕，点击查看',
       '改写完毕，点击查看',
       '语音已完成，点击查看',
-      '数字人视频已生成，点击查看',
+      t.post_process_done ? '后期完成，去发布' : '数字人视频已生成，点击查看',
       '后期制作完成，去发布'
     ];
     return hints[info.step - 1] || '可继续完成当前步骤';
@@ -2010,7 +2012,10 @@ function tHomeTaskSection() {
       return true;
     }).map(t => {
       const isClone = t.type === 'clone_video';
-      const cloneStep = isClone ? clonePhaseOf(t).step : cloneStepOf(t);
+      // post_process_done: 步骤5后期已完成 → 视觉上显示为 step6（步骤5打勾，步骤6待发布）
+      const cloneStep = isClone
+        ? (clonePhaseOf(t).step === 5 && t.post_process_done ? 6 : clonePhaseOf(t).step)
+        : cloneStepOf(t);
       const pct = bigProgress(t);
       const thinking = isClone
         ? cloneHintText(t)
@@ -6181,6 +6186,7 @@ function tHistory() {
       if (info.phase === 'running' || info.phase === 'extracting') return '提取中';
       if (info.phase === 'extracted') return '提取完毕';
       const labels = ['提取中','提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕'];
+      if (info.step === 5 && t.post_process_done) return '后期完毕';
       return labels[info.step - 1] || '已完成';
     }
     return ({ pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败' }[t.status] || t.status);
@@ -6216,7 +6222,9 @@ function tHistory() {
   const isBig = t => Date.now() - taskTimeLocal(t) < DONE_BIG_WINDOW;
 
   const bigHtml = allTasks.filter(isBig).map(t => {
-    const cloneStep = cloneStepOfH(t);
+    // post_process_done: 后期完成 → 视觉步骤显示为 step6（步骤5打勾）
+    const cloneStep = (t.type === 'clone_video' && clonePhaseOfH(t).step === 5 && t.post_process_done)
+      ? 6 : cloneStepOfH(t);
     const pct = bigProgressH(t);
     const isDone = t.status === 'done' || (t.type === 'clone_video' && clonePhaseOfH(t).phase === 'published');
     const isFailed = t.status === 'failed';

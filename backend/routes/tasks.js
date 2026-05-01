@@ -46,6 +46,8 @@ router.get('/', requireAuth, async (req, res) => {
         if (step > 4 && !session?.avatarVideoB64 && !session?.avatarTaskId && !session?.avatarDoneTaskId && !session?.avatarVideoUrl) step = 4;
         if (step > 5 && !session?.postProcessedB64 && !session?.postProcessDone && !session?.postProcessedVideoUrl && !session?.coverFrameUrl && !session?.publishTitle) step = 5;
         task.clone_step = step;
+        // 后期完成标志：让前端区分"数字人完成(step5)"和"后期完成(step5+pp)"
+        task.post_process_done = !!(session?.postProcessedB64 || session?.postProcessDone || session?.postProcessedVideoUrl);
       }
       delete task.result;
       delete task.session_json;
