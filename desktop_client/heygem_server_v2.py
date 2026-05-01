@@ -69,14 +69,17 @@ class OssConfig(BaseModel):
     prefix:     str = "videos"
     cdn_domain: Optional[str] = None  # 有则用 CDN URL，无则用 OSS 原始域名
 
+AVATARS_DIR = Path(__file__).parent.parent / "local_asr_server" / "avatars"
+
 class GenerateReq(BaseModel):
     audio_b64:  str
-    video_b64:  str
+    video_b64:  Optional[str] = None         # video_b64 与 avatar_key 二选一
+    avatar_key: Optional[str] = None         # 数字人库 key，本地磁盘路径，优先于 video_b64
     audio_fmt:  str = "wav"
     video_fmt:  str = "mp4"
     enhancer:   bool = False
     oss_config: Optional[OssConfig] = None   # 提供时本地直传 OSS，跳过 Zeabur 中转
-    user_id:    Optional[str] = None         # 用于 OSS 路径
+    user_id:    Optional[str] = None         # 用于 OSS 路径和 avatar_key 目录
 
 
 @app.get("/health")
@@ -88,15 +91,35 @@ def health():
 async def generate(req: GenerateReq):
     if _hd_processor is None:
         raise HTTPException(503, "V2模型尚未初始化")
+
+    # 解析视频来源：avatar_key（数字人库文件）优先于 video_b64
+    video_b64 = req.video_b64
+    video_fmt  = req.video_fmt
+    if req.avatar_key and not video_b64:
+        # 尝试按 u{userId}/{key} 路径读取，也兼容直接 key 路径
+        uid = req.user_id or "unknown"
+        candidates = [
+            AVATARS_DIR / f"u{uid}" / req.avatar_key,
+            AVATARS_DIR / req.avatar_key,
+        ]
+        avatar_path = next((p for p in candidates if p.exists()), None)
+        if not avatar_path:
+            raise HTTPException(404, f"数字人文件不存在: {req.avatar_key}（已找路径: {[str(p) for p in candidates]}）")
+        video_b64 = base64.b64encode(avatar_path.read_bytes()).decode()
+        video_fmt  = avatar_path.suffix.lstrip(".") or "mp4"
+
+    if not video_b64:
+        raise HTTPException(400, "请提供 video_b64 或 avatar_key")
+
     task_id = uuid.uuid4().hex
     with _task_lock:
         tasks[task_id] = {"status": "pending", "progress": 0, "msg": "等待中", "video_b64": None, "error": None}
 
     audio_path = TEMP_DIR / f"{task_id}.{req.audio_fmt}"
-    video_path = TEMP_DIR / f"{task_id}_src.{req.video_fmt}"
+    video_path = TEMP_DIR / f"{task_id}_src.{video_fmt}"
     try:
         audio_path.write_bytes(base64.b64decode(req.audio_b64))
-        video_path.write_bytes(base64.b64decode(req.video_b64))
+        video_path.write_bytes(base64.b64decode(video_b64))
     except Exception as e:
         raise HTTPException(400, f"base64解码失败: {e}")
 

@@ -4637,16 +4637,21 @@ async function handleAvatarGenerate() {
   setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '正在提交生成任务...', avatarProgressPct: 20 });
   touchCloneTaskActivity();
 
+  // 90 秒提交超时：大文件上传慢时给明确错误而非永久挂起
+  const _submitAbort = new AbortController();
+  const _submitTimeout = setTimeout(() => _submitAbort.abort(), 90000);
+
   try {
     const videoPayload = S.avatarLibKey
-      ? { avatar_key: S.avatarLibKey }
+      ? { avatar_key: S.avatarLibKey, user_id: String(S.userInfo?.id || '') }
       : { video_b64: S.avatarSrcVideoB64, video_fmt: S.avatarSrcVideoFmt || 'mp4' };
     const r = await api.post('/ai/video/generate', {
       audio_b64: audioB64,
       audio_fmt: 'wav',
       enhancer: S.avatarBeauty,
       ...videoPayload,
-    });
+    }, _submitAbort.signal);
+    clearTimeout(_submitTimeout);
     if (runSeq !== _avatarRunSeq) return;
     if (r.code !== 200 || !r.data?.task_id) {
       setState({ avatarGenerating: false, avatarErr: r.msg || '数字人生成任务提交失败', extractStep: 4 });
@@ -4658,11 +4663,19 @@ async function handleAvatarGenerate() {
       return;
     }
     setState({ avatarTaskId: taskId, avatarAsrUrl: null, avatarProgressMsg: '任务已提交，正在生成...' });
-    saveCloneSession(4); // 生成任务已提交，立即保存 taskId 以便跨会话恢复
+    saveCloneSession(4);
     _startAvatarPoller(taskId, null, runSeq);
   } catch (e) {
+    clearTimeout(_submitTimeout);
     if (runSeq === _avatarRunSeq) {
-      setState({ avatarGenerating: false, avatarErr: '数字人生成任务提交失败，请重试', extractStep: 4 });
+      const isTimeout = e?.name === 'AbortError';
+      setState({
+        avatarGenerating: false,
+        avatarErr: isTimeout
+          ? '提交超时（90秒）：数字人服务无响应，请检查服务是否正常运行后重试'
+          : ('数字人生成任务提交失败：' + (e?.message || '未知错误')),
+        extractStep: 4,
+      });
     }
   }
 }
