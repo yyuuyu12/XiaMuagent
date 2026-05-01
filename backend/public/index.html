@@ -2316,14 +2316,14 @@ function tExtract() {
       <span class="input-label">粘贴抖音视频链接或分享文字</span>
       <div class="url-input-wrap">
         <textarea class="url-textarea-v2" id="f-url" placeholder="例如：https://v.douyin.com/xxx 或直接粘贴分享文字..."
-          oninput="S.videoUrl=this.value;render()">${esc(S.videoUrl)}</textarea>
+          oninput="S.videoUrl=this.value;var b=document.getElementById('start-clone-btn');if(b)b.className='btn-primary'+(this.value.trim()?'':' btn-disabled')">${esc(S.videoUrl)}</textarea>
         <div class="paste-btn" onclick="pasteFromClipboard()">粘贴</div>
       </div>
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
       ${S.extractRawErr?`<div style="font-size:10px;color:#B4B2A9;margin-top:4px;word-break:break-all">原始错误：${esc(S.extractRawErr)}</div>`:''}
       ${S.extractLoading
         ? `<div class="btn-primary btn-disabled">⏳ 提交中...</div>`
-        : `<div class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">开始克隆</div>`}
+        : `<div id="start-clone-btn" class="btn-primary ${!S.videoUrl.trim()?'btn-disabled':''}" onclick="handleExtract()">开始克隆</div>`}
     </div>
     <div class="tip-card-v2">
       <span class="tip-line">1. 在抖音找到想参考的视频，点击分享复制链接</span>
