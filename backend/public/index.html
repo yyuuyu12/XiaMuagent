@@ -3066,7 +3066,7 @@ function tCloneStep6(sb) {
       { text: S.publishCopied ? '✓ 已复制，去发布！' : '复制信息去发布', onclick: 'handlePublishCopy()' },
       [
         { text: '上一步', onclick: 'setState({extractStep:5})' },
-        { text: '完成，返回首页', onclick: 'resetExtract()' }
+        { text: '完成，返回首页', onclick: 'resetExtract();setState({currentTab:"home"});loadTasks();render()' }
       ]
     )}
   </div>`;
