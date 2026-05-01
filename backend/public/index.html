@@ -4042,9 +4042,11 @@ function startClonePoller(taskId) {
   if (clonePollerTimer) clearInterval(clonePollerTimer);
   clonePollerTimer = setInterval(async () => {
     if (S.currentTab !== 'extract') return;
+    if (S.cloneTaskId !== taskId) { stopClonePoller(); return; } // ★ 已切换到其他任务
     try {
       const r = await api.get(`/tasks/${taskId}`);
       if (r.code !== 200) return;
+      if (S.cloneTaskId !== taskId) return; // ★ 请求返回期间可能已切换
       const task = r.data;
       setState({ cloneTaskData: task });
       if (task.status === 'extracted') {
@@ -4215,14 +4217,17 @@ async function handleTTSGenerate() {
 }
 
 async function _pollIndexTTSTask(taskId) {
-  const maxWait = 20 * 60 * 1000; // 最长等20分钟
+  const ownerTaskId = S.cloneTaskId; // ★ 记录发起时的任务ID
+  const maxWait = 20 * 60 * 1000;
   const interval = 5000;
   const start = Date.now();
   while (Date.now() - start < maxWait) {
-    if (_ttsAbortFlag) { _stopTTSProgressTimer(); return; }
+    if (_ttsAbortFlag || S.cloneTaskId !== ownerTaskId) { _stopTTSProgressTimer(); return; } // ★ abort 或已切换任务
     await new Promise(r => setTimeout(r, interval));
+    if (_ttsAbortFlag || S.cloneTaskId !== ownerTaskId) { _stopTTSProgressTimer(); return; } // ★ 等待期间可能已切换
     try {
       const r = await api.get(`/ai/tts/indextts/task/${taskId}`);
+      if (S.cloneTaskId !== ownerTaskId) return; // ★ 请求返回期间可能已切换
       if (r.code === 200 && r.data) {
         const audioFmt = (r.data.format || 'wav').toLowerCase();
         const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
@@ -4235,12 +4240,13 @@ async function _pollIndexTTSTask(taskId) {
         setState({ ttsGenerating: false, ttsErr: r.msg || '声音克隆失败', extractStep: 3 });
         return;
       }
-      // code 202：还在推理中，继续等
     } catch {
       // 网络抖动，继续等
     }
   }
-  setState({ ttsGenerating: false, ttsErr: '声音克隆超时，请重试', extractStep: 3 });
+  if (S.cloneTaskId === ownerTaskId) {
+    setState({ ttsGenerating: false, ttsErr: '声音克隆超时，请重试', extractStep: 3 });
+  }
 }
 
 function _b64ToBlobUrl(b64, mime) {
@@ -5151,29 +5157,31 @@ async function restoreCloneSession(taskId) {
     } else if (s.avatarDoneTaskId) {
       patch.avatarDoneTaskId = s.avatarDoneTaskId;
       // 异步恢复视频：优先用 OSS URL（直接播放），无则下载 blob（避免 frp 流式转圈）
+      const _restoreOwnerTask = taskId; // ★ 记录恢复时的任务ID，防止写错任务状态
       setTimeout(async () => {
         // 轮询直到 OSS 完成或超时（最多等 5 分钟，每 8 秒查一次）
         const MAX_WAIT = 5 * 60 * 1000;
         const POLL_INTERVAL = 8000;
         const startTime = Date.now();
         while (true) {
+          if (S.cloneTaskId !== _restoreOwnerTask) return; // ★ 已切换到其他任务，放弃
           try {
             const r = await api.get(`/ai/video/task/${s.avatarDoneTaskId}`);
+            if (S.cloneTaskId !== _restoreOwnerTask) return; // ★ 请求返回期间可能已切换
             if (r?.code === 200 && r.data?.video_url) {
               setState({ avatarVideoUrl: r.data.video_url });
               return;
             }
-            // OSS 还在上传，等待后再试
             if (r?.code === 200 && r.data?.oss_uploading) {
               if (Date.now() - startTime < MAX_WAIT) {
                 await new Promise(res => setTimeout(res, POLL_INTERVAL));
                 continue;
               }
-              // 超时：降级直连下载
             }
           } catch {}
-          break; // 非 oss_uploading 或超时，走 blob 下载
+          break;
         }
+        if (S.cloneTaskId !== _restoreOwnerTask) return; // ★ 最终写入前再校验一次
         // 无 OSS：通过 stream proxy 下载完整 blob，保证播放流畅
         try {
           const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
@@ -5181,10 +5189,11 @@ async function restoreCloneSession(taskId) {
           if (!resp.ok) throw new Error('download failed');
           const blob = await resp.blob();
           if (!blob.size) throw new Error('empty');
+          if (S.cloneTaskId !== _restoreOwnerTask) return; // ★ 下载期间可能已切换
           const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
           setState({ avatarVideoUrl: URL.createObjectURL(mp4Blob) });
         } catch {
-          // 兜底：实在不行再走流式（会转圈）
+          if (S.cloneTaskId !== _restoreOwnerTask) return;
           const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
           setState({ avatarVideoUrl: streamUrl });
         }
@@ -6204,8 +6213,10 @@ function cpPathBScript(e, idx) {
 function startPathAPolling(taskId) {
   if (pathAPollerTimer) clearInterval(pathAPollerTimer);
   pathAPollerTimer = setInterval(async () => {
+    if (S.pathALastTaskId !== taskId) { clearInterval(pathAPollerTimer); pathAPollerTimer = null; return; } // ★ 已切换到其他任务
     try {
       const r = await api.get(`/tasks/${taskId}`);
+      if (S.pathALastTaskId !== taskId) return; // ★ 请求返回期间可能已切换
       if (r.code === 200) {
         setState({ pathATaskData: r.data });
         if (r.data.status === 'done' || r.data.status === 'failed') {
