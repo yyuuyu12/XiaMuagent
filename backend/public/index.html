@@ -2047,7 +2047,7 @@ function tHomeTaskSection() {
       </div>`;
     }).join('')}
     </div>
-    ${smallItems.length > 0 ? `<div class="home-task-small-scroll">
+    ${smallItems.length > 0 ? `<div class="home-task-small-scroll" style="margin-top:10px">
       ${smallItems.map(it => {
         if (it._type === 'task') {
           const t = it._task;
