@@ -780,6 +780,7 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .analysis-card { background: #EEF2FF; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 .typewriter-text::after { content: '|'; animation: tw-blink 1s step-end infinite; color: #E8650A; }
 @keyframes tw-blink { 50% { opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 .home-task-card { background:#fff; border-radius:12px; padding:14px; margin-bottom:8px; }
 .home-task-card-done { cursor:pointer; display:flex; align-items:center; gap:10px; }
 .task-live-dot { display:inline-block; width:7px; height:7px; background:#E8650A; border-radius:50%; margin-right:5px; animation:live-pulse 1.4s ease-in-out infinite; }
@@ -1859,13 +1860,14 @@ function tHomeTaskSection() {
     if (info.phase === 'extracting') return t.thinking || '正在提取视频文案，请稍候';
     if (info.phase === 'rewriting') return t.thinking || '正在AI改写文案，请稍候';
     if (info.phase === 'extracted') return '文案提取完毕';
+    // 后端 step 含义：step=3→改写完(待语音) step=4→音频完(待数字人) step=5→数字人完(待后期)
     const hints = [
-      '文案提取完毕',
-      '改写完毕',
-      '语音已生成',
-      '数字人视频已生成',
-      t.post_process_done ? '后期视频已就绪' : '数字人视频已生成',
-      '视频待发布'
+      '文案提取完毕',       // step 1
+      '文案提取完毕',       // step 2
+      '改写完毕',           // step 3：有改写稿，下一步生成语音
+      '语音已生成',         // step 4：有音频，下一步选数字人
+      t.post_process_done ? '后期视频已就绪' : '数字人视频已生成',  // step 5：有数字人视频
+      '视频待发布'          // step 6
     ];
     return hints[info.step - 1] || '可继续完成当前步骤';
   };
@@ -1912,9 +1914,8 @@ function tHomeTaskSection() {
       if (info.phase === 'extracted') return '去改写 ›';
       // step_done 按步骤给出明确动作
       if (info.phase === 'step_done' || info.phase === 'published') {
-        if (info.step === 2) return '查看改写结果 ›';
-        if (info.step === 3) return '查看语音结果 ›';
-        if (info.step === 4) return '查看数字人视频 ›';
+        if (info.step <= 3) return '查看改写结果 ›';   // step2/3：改写完，待语音
+        if (info.step === 4) return '查看语音结果 ›';  // step4：语音完，待数字人
         if (info.step === 5) return t.post_process_done ? '查看后期视频 ›' : '查看数字人视频 ›';
         if (info.step >= 6) return '去发布 ›';
       }
@@ -2585,14 +2586,13 @@ function tCloneStep4(sb) {
     </div>`;
   }
 
-  // 已完成但视频URL还在异步加载中（blob下载中），显示Loading + 逃生按钮
+  // 已完成但视频URL还在异步加载中（blob下载中），显示Loading
   if (S.avatarDoneTaskId && !S.avatarVideoUrl) {
     return `${sb}<div class="tab-page">
       <div style="text-align:center;padding:60px 20px;color:#9E9890;font-size:14px">
-        <div style="font-size:32px;margin-bottom:12px">⏳</div>
-        <div style="margin-bottom:20px">视频加载中，请稍候…</div>
-        <div style="color:#bbb;font-size:12px;margin-bottom:24px">视频通过本地网络传输，文件较大时需要一点时间</div>
-        <button class="btn-ghost" style="font-size:13px;padding:8px 20px" onclick="resetAvatarSelection()">重新选择数字人形象</button>
+        <div style="width:44px;height:44px;border:3px solid rgba(245,118,42,0.2);border-top-color:#F5762A;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 20px"></div>
+        <div style="margin-bottom:8px;color:#6B6560">视频加载中，请稍候…</div>
+        <div style="color:#bbb;font-size:12px">视频通过本地网络传输，文件较大时需要一点时间</div>
       </div>
     </div>`;
   }
@@ -6184,9 +6184,8 @@ function tHistory() {
       if (info.phase === 'pending' || info.phase === 'running') return '查看提取进展 ›';
       if (info.phase === 'extracted') return '去改写 ›';
       if (info.phase === 'step_done' || info.phase === 'published') {
-        if (info.step === 2) return '查看改写结果 ›';
-        if (info.step === 3) return '查看语音结果 ›';
-        if (info.step === 4) return '查看数字人视频 ›';
+        if (info.step <= 3) return '查看改写结果 ›';   // step2/3：改写完，待语音
+        if (info.step === 4) return '查看语音结果 ›';  // step4：语音完，待数字人
         if (info.step === 5) return t.post_process_done ? '查看后期视频 ›' : '查看数字人视频 ›';
         if (info.step >= 6) return '去发布 ›';
       }
