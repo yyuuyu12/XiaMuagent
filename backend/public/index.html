@@ -1938,10 +1938,11 @@ function tHomeTaskSection() {
       if (info.phase === 'failed') return '查看详情 ›';
       if (info.phase === 'pending' || info.phase === 'extracting') return '查看提取进展 ›';
       if (info.phase === 'rewrite_pending' || info.phase === 'rewriting') return '查看改写进展 ›';
-      if (info.phase === 'extracted') return '去改写 ›';
+      if (info.phase === 'extracted') return '查看提取结果 ›';  // step1：文案已提取，待改写
       // step_done 按步骤给出明确动作
       if (info.phase === 'step_done' || info.phase === 'published') {
-        if (info.step <= 3) return '查看改写结果 ›';   // step2/3：改写完，待语音
+        if (info.step === 2) return '查看提取结果 ›';  // step2：进入改写步骤但未改写，查看提取内容
+        if (info.step === 3) return '查看改写结果 ›';  // step3：改写完成，待语音
         if (info.step === 4) return '查看语音结果 ›';  // step4：语音完，待数字人
         if (info.step === 5) return t.post_process_done ? '查看后期视频 ›' : '查看数字人视频 ›';
         if (info.step >= 6) return '去发布 ›';
@@ -6345,9 +6346,10 @@ function tHistory() {
       const info = clonePhaseOfH(t);
       if (info.phase === 'failed') return '查看详情 ›';
       if (info.phase === 'pending' || info.phase === 'running') return '查看提取进展 ›';
-      if (info.phase === 'extracted') return '去改写 ›';
+      if (info.phase === 'extracted') return '查看提取结果 ›';  // step1：文案已提取，待改写
       if (info.phase === 'step_done' || info.phase === 'published') {
-        if (info.step <= 3) return '查看改写结果 ›';   // step2/3：改写完，待语音
+        if (info.step === 2) return '查看提取结果 ›';  // step2：进入改写步骤但未改写
+        if (info.step === 3) return '查看改写结果 ›';  // step3：改写完成，待语音
         if (info.step === 4) return '查看语音结果 ›';  // step4：语音完，待数字人
         if (info.step === 5) return t.post_process_done ? '查看后期视频 ›' : '查看数字人视频 ›';
         if (info.step >= 6) return '去发布 ›';
