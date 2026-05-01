@@ -2543,7 +2543,7 @@ function tCloneStep4(sb) {
       ${S.avatarErr?`<div class="err-text">${esc(S.avatarErr)}</div>`:''}
       ${tCloneActions(
         { text: '下一步：后期制作 →', onclick: 'goToCloneStep5()' },
-        [{ text: '重新生成', onclick: 'setState({avatarVideoUrl:null,avatarTaskId:null,extractStep:4})' }]
+        [{ text: '重新选择数字人形象', onclick: 'resetAvatarSelection()' }]
       )}
     </div>`;
   }
@@ -2555,7 +2555,7 @@ function tCloneStep4(sb) {
         <div style="font-size:32px;margin-bottom:12px">⏳</div>
         <div style="margin-bottom:20px">视频加载中，请稍候…</div>
         <div style="color:#bbb;font-size:12px;margin-bottom:24px">视频通过本地网络传输，文件较大时需要一点时间</div>
-        <button class="btn-ghost" style="font-size:13px;padding:8px 20px" onclick="setState({avatarDoneTaskId:null,avatarVideoUrl:null,avatarTaskId:null,avatarGenerating:false,avatarErr:'',avatarProgressPct:0,avatarProgressMsg:''})">重新生成</button>
+        <button class="btn-ghost" style="font-size:13px;padding:8px 20px" onclick="resetAvatarSelection()">重新选择数字人形象</button>
       </div>
     </div>`;
   }
@@ -4733,6 +4733,32 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       inFlight = false;
     }
   }, 5000);
+}
+
+function resetAvatarSelection() {
+  // 停掉所有轮询
+  if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
+  if (_bgAvatarPoller) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; }
+  _avatarRunSeq++;
+  // 清空数字人所有状态，回到步骤4选择界面
+  setState({
+    extractStep:       4,
+    avatarVideoUrl:    null,
+    avatarVideoB64:    null,
+    avatarTaskId:      null,
+    avatarDoneTaskId:  null,
+    avatarGenerating:  false,
+    avatarErr:         '',
+    avatarProgressPct: 0,
+    avatarProgressMsg: '',
+    avatarSrcVideoB64: null,
+    avatarSrcVideoName:'',
+    avatarLibKey:      null,
+    avatarLibName:     '',
+    avatarLibThumb:    '',
+    selectedAvatarId:  'self',
+  });
+  saveCloneSession(4);
 }
 
 function cancelRemoteAvatarTask(taskId, asrUrl) {
