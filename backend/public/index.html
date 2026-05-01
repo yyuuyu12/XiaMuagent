@@ -1933,12 +1933,17 @@ function tHomeTaskSection() {
     return html;
   }
 
+  // liveCard 对应的任务标题（用于卡片顶部，避免和 bigCards 重复时看不出是哪个任务）
+  const _liveTaskTitle = S.cloneTaskId
+    ? (bigCards.find(t => String(t.id) === String(S.cloneTaskId))?.title || '')
+    : '';
+
   if (S.ttsGenerating) {
     const pct = S.ttsProgressPct || 5;
     liveCard = `<div class="home-live-card" onclick="setState({currentTab:'extract'});render()">
       <div class="hlc-top">
-        <div class="hlc-title">语音合成</div>
-        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>后台生成</div>
+        <div class="hlc-title">${_liveTaskTitle ? esc(_liveTaskTitle) : '语音合成'}</div>
+        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>语音合成中</div>
       </div>
       <div class="hlc-hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" stroke="#F5762A" stroke-width="1.8"/><path d="M5 11C5 14.866 8.134 18 12 18" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round"/></svg>正在合成语音中...</div>
       <div class="hlc-progress-row">
@@ -1955,8 +1960,8 @@ function tHomeTaskSection() {
     const pct = S.avatarProgressPct || 20;
     liveCard = `<div class="home-live-card" onclick="setState({currentTab:'extract'});render()">
       <div class="hlc-top">
-        <div class="hlc-title">数字人视频</div>
-        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>后台生成</div>
+        <div class="hlc-title">${_liveTaskTitle ? esc(_liveTaskTitle) : '数字人视频'}</div>
+        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>数字人生成中</div>
       </div>
       <div class="hlc-hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#F5762A" stroke-width="1.8"/><path d="M3 9h18M9 21V9" stroke="#F5762A" stroke-width="1.8"/></svg>${esc(S.avatarProgressMsg||'GPU 渲染中...')}</div>
       <div class="hlc-progress-row">
@@ -1973,8 +1978,8 @@ function tHomeTaskSection() {
     const pct = S.postProgressPct || 5;
     liveCard = `<div class="home-live-card" onclick="setState({currentTab:'extract'});render()">
       <div class="hlc-top">
-        <div class="hlc-title">字幕烧录</div>
-        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>后台生成</div>
+        <div class="hlc-title">${_liveTaskTitle ? esc(_liveTaskTitle) : '字幕烧录'}</div>
+        <div class="hlc-badge-running"><div class="hlc-status-dot"></div>字幕烧录中</div>
       </div>
       <div class="hlc-hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="10" rx="2" stroke="#F5762A" stroke-width="1.8"/><path d="M6 11h4M6 14h8" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round"/></svg>正在烧录字幕...</div>
       <div class="hlc-progress-row">
@@ -1995,7 +2000,11 @@ function tHomeTaskSection() {
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
     ${liveCard}
-    ${bigCards.map(t => {
+    ${bigCards.filter(t => {
+      // liveCard 已经展示了这个任务，bigCards 里不重复渲染
+      if (liveCard && S.cloneTaskId && String(t.id) === String(S.cloneTaskId)) return false;
+      return true;
+    }).map(t => {
       const isClone = t.type === 'clone_video';
       const cloneStep = isClone ? clonePhaseOf(t).step : cloneStepOf(t);
       const pct = bigProgress(t);
