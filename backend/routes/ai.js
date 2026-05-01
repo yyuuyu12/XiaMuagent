@@ -634,6 +634,7 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
           const elapsed = Date.now() - (_ossUploadStart.get(taskId) || Date.now());
           if (elapsed < OSS_UPLOAD_TIMEOUT_MS) {
             data.status = 'processing';
+            data.oss_uploading = true; // 前端据此立即写 avatarDoneTaskId，避免切换任务后走"恢复生成"路径
             data.msg = `OSS 上传中，请稍候（${Math.round(elapsed / 1000)}s）...`;
             delete data.video_url;
             delete data.video_direct_url;
@@ -645,6 +646,7 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
           // 首次到达：触发后台上传，本次让前端继续轮询而非立即下载
           _scheduleOssUpload(taskId, videoUrl, req.userId);
           data.status = 'processing';
+          data.oss_uploading = true;
           data.msg = 'OSS 上传中，请稍候...';
           delete data.video_url;
           delete data.video_direct_url;

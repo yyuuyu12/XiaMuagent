@@ -4677,6 +4677,11 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       const t = r.data;
       const pct = Math.max(S.avatarProgressPct || 0, Math.min(90, 10 + elapsed * 0.6));
       setState({ avatarProgressPct: pct, avatarProgressMsg: t.msg || '处理中...' });
+      // OSS 上传中：提前记录 doneTaskId，避免切换任务后 session 仍走"恢复生成"路径
+      if (t.oss_uploading && !S.avatarDoneTaskId) {
+        setState({ avatarDoneTaskId: taskId });
+        saveCloneSession(4);
+      }
 
       if (t.status === 'done' && t.video_url) {
         // OSS 链接：直接用，无需经过 stream proxy
@@ -5116,14 +5121,28 @@ async function restoreCloneSession(taskId) {
       patch.avatarDoneTaskId = s.avatarDoneTaskId;
       // 异步恢复视频：优先用 OSS URL（直接播放），无则下载 blob（避免 frp 流式转圈）
       setTimeout(async () => {
-        try {
-          const r = await api.get(`/ai/video/task/${s.avatarDoneTaskId}`);
-          if (r?.code === 200 && r.data?.video_url) {
-            // OSS 直链：CDN 带宽足，直接播放无需 blob
-            setState({ avatarVideoUrl: r.data.video_url });
-            return;
-          }
-        } catch {}
+        // 轮询直到 OSS 完成或超时（最多等 5 分钟，每 8 秒查一次）
+        const MAX_WAIT = 5 * 60 * 1000;
+        const POLL_INTERVAL = 8000;
+        const startTime = Date.now();
+        while (true) {
+          try {
+            const r = await api.get(`/ai/video/task/${s.avatarDoneTaskId}`);
+            if (r?.code === 200 && r.data?.video_url) {
+              setState({ avatarVideoUrl: r.data.video_url });
+              return;
+            }
+            // OSS 还在上传，等待后再试
+            if (r?.code === 200 && r.data?.oss_uploading) {
+              if (Date.now() - startTime < MAX_WAIT) {
+                await new Promise(res => setTimeout(res, POLL_INTERVAL));
+                continue;
+              }
+              // 超时：降级直连下载
+            }
+          } catch {}
+          break; // 非 oss_uploading 或超时，走 blob 下载
+        }
         // 无 OSS：通过 stream proxy 下载完整 blob，保证播放流畅
         try {
           const streamUrl = `${API_BASE}/ai/video/stream/${s.avatarDoneTaskId}?t=${encodeURIComponent(getToken())}`;
