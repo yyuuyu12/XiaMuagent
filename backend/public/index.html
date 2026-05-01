@@ -4593,7 +4593,7 @@ function _startBgAvatarPoller(taskId) {
         clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null;
       }
     } catch { if (++failCount > 8) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; } }
-  }, 15000);
+  }, 8000);
 }
 
 async function handleAvatarGenerate() {
@@ -4732,7 +4732,7 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
     } finally {
       inFlight = false;
     }
-  }, 10000);
+  }, 5000);
 }
 
 function cancelRemoteAvatarTask(taskId, asrUrl) {

@@ -17,10 +17,16 @@ import json
 import subprocess
 import threading
 from pathlib import Path
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+try:
+    import oss2
+    _OSS2_AVAILABLE = True
+except ImportError:
+    _OSS2_AVAILABLE = False
 
 # ===== 路径配置（V2 = hdModule）=====
 HEYGEM_DIR = Path(r"C:\ChaojiIP\aigc-human\python-modules\hdModule")
@@ -55,12 +61,22 @@ _hd_module = None     # hdModule main，主进程初始化后赋值
 _hd_processor = None  # 单例 HDDigitalHumanProcessor，模型只加载一次
 
 
+class OssConfig(BaseModel):
+    endpoint:   str
+    bucket:     str
+    access_key: str
+    secret_key: str
+    prefix:     str = "videos"
+    cdn_domain: Optional[str] = None  # 有则用 CDN URL，无则用 OSS 原始域名
+
 class GenerateReq(BaseModel):
-    audio_b64: str
-    video_b64: str
-    audio_fmt: str = "wav"
-    video_fmt: str = "mp4"
-    enhancer:  bool = False
+    audio_b64:  str
+    video_b64:  str
+    audio_fmt:  str = "wav"
+    video_fmt:  str = "mp4"
+    enhancer:   bool = False
+    oss_config: Optional[OssConfig] = None   # 提供时本地直传 OSS，跳过 Zeabur 中转
+    user_id:    Optional[str] = None         # 用于 OSS 路径
 
 
 @app.get("/health")
@@ -84,7 +100,10 @@ async def generate(req: GenerateReq):
     except Exception as e:
         raise HTTPException(400, f"base64解码失败: {e}")
 
-    asyncio.create_task(_run_heygem_v2(task_id, str(audio_path), str(video_path)))
+    asyncio.create_task(_run_heygem_v2(
+        task_id, str(audio_path), str(video_path),
+        oss_config=req.oss_config, user_id=req.user_id or "unknown",
+    ))
     return {"task_id": task_id}
 
 
@@ -356,7 +375,8 @@ def _do_work_v2(task_id, audio_path, video_path):
                 pass
 
 
-async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str):
+async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str,
+                         oss_config=None, user_id: str = "unknown"):
     result = None
     try:
         result = await asyncio.wait_for(
@@ -397,40 +417,99 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str):
                     tasks[task_id].update({"status": "error", "error": f"V2未找到输出视频，候选: {candidates[:3]}"})
             return
 
-        # 压缩 + faststart：限制最大 1080p，CRF 22 压缩到 4-6Mbps，同时把 moov 搬到文件头。
-        # 相比原始 20Mbps 输出，文件体积减少约 70-80%，OSS 上传/下载速度大幅提升。
+        # 压缩 + faststart：限制最大 1080p，压缩到 4-6Mbps，同时把 moov 搬到文件头。
+        # 优先用 GPU 编码（h264_nvenc，秒级完成），失败自动降级 CPU libx264（约30-60s）。
         try:
             faststart_path = OUTPUT_DIR / f"{task_id}_faststart.mp4"
-            ff_proc = _run_cmd([
+            _compress_ok = False
+            _vf = "scale=-2:'min(ih,1080)',format=yuv420p"
+
+            # 尝试 GPU 编码（RTX，速度是 CPU 的 10-20x）
+            _gpu_proc = _run_cmd([
                 "ffmpeg", "-y",
                 "-i", result_path,
-                "-vf", "scale=-2:'min(ih,1080)',format=yuv420p",
-                "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                "-vf", _vf,
+                "-c:v", "h264_nvenc", "-preset", "fast", "-cq", "22",
                 "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
                 str(faststart_path),
-            ], timeout=600)
-            if ff_proc.returncode == 0 and faststart_path.exists() and faststart_path.stat().st_size > 1000:
-                # 替换 result_path 为 faststart 版本，原文件可以删除
+            ], timeout=120)
+            if _gpu_proc.returncode == 0 and faststart_path.exists() and faststart_path.stat().st_size > 1000:
+                _compress_ok = True
+                print(f"[HeyGemV2] GPU 压缩完成: {faststart_path}")
+            else:
+                print(f"[HeyGemV2] GPU 编码失败(rc={_gpu_proc.returncode})，降级 CPU libx264")
+                try: faststart_path.unlink(missing_ok=True)
+                except Exception: pass
+                # 降级 CPU 编码
+                _cpu_proc = _run_cmd([
+                    "ffmpeg", "-y",
+                    "-i", result_path,
+                    "-vf", _vf,
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    str(faststart_path),
+                ], timeout=600)
+                if _cpu_proc.returncode == 0 and faststart_path.exists() and faststart_path.stat().st_size > 1000:
+                    _compress_ok = True
+                    print(f"[HeyGemV2] CPU 压缩完成: {faststart_path}")
+                else:
+                    print(f"[HeyGemV2] CPU 编码也失败(rc={_cpu_proc.returncode})，兜底 copy+faststart")
+
+            if not _compress_ok:
+                # 最终兜底：仅搬 moov，不压缩
+                _copy_proc = _run_cmd([
+                    "ffmpeg", "-y", "-i", result_path,
+                    "-c", "copy", "-movflags", "+faststart", str(faststart_path),
+                ], timeout=120)
+                if _copy_proc.returncode == 0 and faststart_path.exists() and faststart_path.stat().st_size > 1000:
+                    _compress_ok = True
+
+            if _compress_ok:
                 old_path = result_path
                 result_path = str(faststart_path)
-                try:
-                    Path(old_path).unlink(missing_ok=True)
-                except Exception:
-                    pass
-                print(f"[HeyGemV2] faststart 完成: {result_path}")
+                try: Path(old_path).unlink(missing_ok=True)
+                except Exception: pass
+                print(f"[HeyGemV2] 输出文件: {result_path}")
             else:
-                print(f"[HeyGemV2] faststart 失败，使用原始输出: rc={ff_proc.returncode}")
+                print(f"[HeyGemV2] 所有压缩方案均失败，使用原始输出")
         except Exception as ff_err:
-            print(f"[HeyGemV2] faststart 异常，使用原始输出: {ff_err}")
+            print(f"[HeyGemV2] 压缩异常，使用原始输出: {ff_err}")
+
+        # 直传 OSS（如果 Zeabur 提供了 oss_config）
+        oss_url = None
+        if oss_config and _OSS2_AVAILABLE:
+            try:
+                with _task_lock:
+                    if tasks.get(task_id, {}).get("status") != "cancelled":
+                        tasks[task_id].update({"msg": "上传至 OSS..."})
+                auth   = oss2.Auth(oss_config.access_key, oss_config.secret_key)
+                bucket = oss2.Bucket(auth, oss_config.endpoint, oss_config.bucket)
+                oss_key = f"{oss_config.prefix.strip('/')}/{user_id}/{task_id}.mp4"
+                with open(result_path, "rb") as fp:
+                    bucket.put_object(oss_key, fp, headers={"Content-Type": "video/mp4"})
+                if oss_config.cdn_domain:
+                    cdn = oss_config.cdn_domain.rstrip('/')
+                    oss_url = f"{cdn}/{oss_key}"
+                else:
+                    ep = oss_config.endpoint.replace('https://','').replace('http://','')
+                    oss_url = f"https://{oss_config.bucket}.{ep}/{oss_key}"
+                print(f"[HeyGemV2] OSS 直传完成: {oss_url}")
+            except Exception as oss_err:
+                print(f"[HeyGemV2] OSS 直传失败（将由 Zeabur 补传）: {oss_err}")
+                oss_url = None
 
         with _task_lock:
             if tasks.get(task_id, {}).get("status") != "cancelled":
-                tasks[task_id].update({
+                update = {
                     "status": "done", "progress": 100, "msg": "V2高清完成",
                     "result_path": result_path,
                     "video_size": os.path.getsize(result_path),
-                })
+                }
+                if oss_url:
+                    update["oss_url"] = oss_url  # 有则直接给前端 video_url，Zeabur 跳过中转
+                tasks[task_id].update(update)
     except asyncio.TimeoutError:
         with _task_lock:
             if tasks.get(task_id, {}).get("status") != "cancelled":

@@ -573,6 +573,23 @@ router.post('/video/generate', requireAuth, async (req, res) => {
   const videoUrl = await getVideoUrl();
   if (!videoUrl) return res.json({ code: 500, msg: '请在后台配置数字人服务地址（video_url）' });
 
+  // 读取 OSS 配置，传给 HeyGem 实现本地直传（省去 Zeabur 中转下载大文件）
+  let ossPayload = null;
+  try {
+    const ossConfigured = await oss.isConfigured().catch(() => false);
+    if (ossConfigured) {
+      const cfg = await oss.getOssConfig();
+      ossPayload = {
+        endpoint:   `https://${cfg.oss_region}.aliyuncs.com`,
+        bucket:     cfg.oss_bucket,
+        access_key: cfg.oss_access_key_id,
+        secret_key: cfg.oss_access_key_secret,
+        prefix:     'videos',
+        cdn_domain: cfg.oss_cdn_domain || null,
+      };
+    }
+  } catch {}
+
   try {
     const resp = await fetch(`${videoUrl}/video/generate`, {
       method: 'POST',
@@ -582,6 +599,7 @@ router.post('/video/generate', requireAuth, async (req, res) => {
         audio_fmt: audio_fmt || 'wav',
         enhancer: !!enhancer,
         ...(avatar_key ? { avatar_key } : { video_b64, video_fmt: video_fmt || 'mp4' }),
+        ...(ossPayload ? { oss_config: ossPayload, user_id: String(req.userId) } : {}),
       }),
       signal: AbortSignal.timeout(120000),
     });
@@ -622,34 +640,40 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
     if (data && data.status === 'done') {
       const ossConfigured = await oss.isConfigured().catch(() => false);
       if (ossConfigured) {
-        // 先查 user_videos，看是否已经上传完成
-        const { rows: existingRows } = await db.query(
-          `SELECT oss_url FROM user_videos WHERE task_id = ?`, [taskId]
-        );
-        if (existingRows.length > 0 && existingRows[0].oss_url) {
-          // OSS 已有，直接返回
-          data.video_url = existingRows[0].oss_url;
-        } else if (_ossUploading.has(taskId)) {
-          // OSS 正在上传中：判断是否超时，未超时则让前端继续轮询（避免前后端同时下载大文件抢带宽）
-          const elapsed = Date.now() - (_ossUploadStart.get(taskId) || Date.now());
-          if (elapsed < OSS_UPLOAD_TIMEOUT_MS) {
+        // ① HeyGem 本地已直传 OSS（最快路径）
+        if (data.oss_url) {
+          data.video_url = data.oss_url;
+          // 写入 DB 供后续恢复使用（IGNORE 避免重复写）
+          db.query(
+            `INSERT IGNORE INTO user_videos (user_id, task_id, oss_key, oss_url) VALUES (?, ?, ?, ?)`,
+            [req.userId, taskId, `videos/${req.userId}/${taskId}.mp4`, data.oss_url]
+          ).catch(() => {});
+        } else {
+          // ② Zeabur 中转（本地直传失败时的降级）
+          const { rows: existingRows } = await db.query(
+            `SELECT oss_url FROM user_videos WHERE task_id = ?`, [taskId]
+          );
+          if (existingRows.length > 0 && existingRows[0].oss_url) {
+            data.video_url = existingRows[0].oss_url;
+          } else if (_ossUploading.has(taskId)) {
+            const elapsed = Date.now() - (_ossUploadStart.get(taskId) || Date.now());
+            if (elapsed < OSS_UPLOAD_TIMEOUT_MS) {
+              data.status = 'processing';
+              data.oss_uploading = true;
+              data.msg = `OSS 上传中，请稍候（${Math.round(elapsed / 1000)}s）...`;
+              delete data.video_url;
+              delete data.video_direct_url;
+            } else {
+              data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
+            }
+          } else {
+            _scheduleOssUpload(taskId, videoUrl, req.userId);
             data.status = 'processing';
-            data.oss_uploading = true; // 前端据此立即写 avatarDoneTaskId，避免切换任务后走"恢复生成"路径
-            data.msg = `OSS 上传中，请稍候（${Math.round(elapsed / 1000)}s）...`;
+            data.oss_uploading = true;
+            data.msg = 'OSS 上传中，请稍候...';
             delete data.video_url;
             delete data.video_direct_url;
-          } else {
-            // 超时降级：让前端自己下载
-            data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
           }
-        } else {
-          // 首次到达：触发后台上传，本次让前端继续轮询而非立即下载
-          _scheduleOssUpload(taskId, videoUrl, req.userId);
-          data.status = 'processing';
-          data.oss_uploading = true;
-          data.msg = 'OSS 上传中，请稍候...';
-          delete data.video_url;
-          delete data.video_direct_url;
         }
       } else {
         // OSS 未配置，走原来的直连方式
