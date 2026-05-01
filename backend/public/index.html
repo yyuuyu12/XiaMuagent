@@ -1696,10 +1696,14 @@ function tTopBar() {
 
   const isDeepSub = !!(S.inspireMode || (t === 'history' && S.tasksView === 'detail'));
   const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:36px;flex-shrink:0"></div>';
+  // extract tab 右上角固定显示"重新开始"按钮
+  const rightSlot = (t === 'extract')
+    ? `<button type="button" onclick="resetCloneWorkspace();render()" style="background:none;border:none;padding:4px 8px;font-size:12px;color:#9E9890;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent">重新开始</button>`
+    : (isDeepSub ? '<div style="width:36px;flex-shrink:0"></div>' : loginHint);
   return `<div class="top-bar top-bar-sub">
     <button type="button" class="back-btn" onclick="${backAction}" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <span class="sub-page-title">${esc(title)}</span>
-    ${isDeepSub ? '<div style="width:36px;flex-shrink:0"></div>' : loginHint}
+    ${rightSlot}
   </div>`;
 }
 
@@ -2134,7 +2138,7 @@ function tHome() {
     <div class="home-section-header" style="margin-top:8px">
       <span class="home-section-title">核心功能</span>
     </div>
-    <div class="feat-clone-card" onclick="switchTab('extract')">
+    <div class="feat-clone-card" onclick="openCloneEntry()">
       <div class="feat-clone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
       <div class="feat-clone-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
       <div class="feat-clone-title">爆款克隆</div>
@@ -4761,6 +4765,39 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       inFlight = false;
     }
   }, 5000);
+}
+
+// 完全清空克隆工作区（用于重新开始 / 入口新建）
+function resetCloneWorkspace() {
+  stopClonePoller();
+  if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
+  if (_bgAvatarPoller) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; }
+  _avatarRunSeq++;
+  _ttsAbortFlag = true;
+  setState({
+    extractStep: 0, cloneTaskId: null, cloneTaskData: null,
+    extractedScript: '', rewrittenScript: '', extractErr: '', videoUrl: '',
+    rewriteSourceExpanded: false,
+    ttsAudioUrl: null, ttsAudioB64: null, ttsGenerating: false, ttsErr: '',
+    avatarVideoUrl: null, avatarVideoB64: null,
+    avatarTaskId: null, avatarDoneTaskId: null,
+    avatarGenerating: false, avatarErr: '',
+    avatarProgressPct: 0, avatarProgressMsg: '',
+    avatarSrcVideoB64: null, avatarSrcVideoName: '',
+    avatarLibKey: null, avatarLibName: '', avatarLibThumb: '',
+    postProcessedVideoUrl: null, postProcessedB64: null, postProcessing: false,
+    coverFrameUrl: null, publishTitle: '', publishTags: [],
+  });
+}
+
+// 入口点击：生成中则继续，否则直接新建
+function openCloneEntry() {
+  if (S.ttsGenerating || S.avatarGenerating || S.postProcessing) {
+    switchTab('extract'); // 有任务跑着，进去看
+  } else {
+    resetCloneWorkspace();
+    switchTab('extract'); // 全新开始
+  }
 }
 
 function resetAvatarSelection() {
