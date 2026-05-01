@@ -1698,7 +1698,7 @@ function tTopBar() {
   const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '<div style="width:36px;flex-shrink:0"></div>';
   // extract tab 右上角固定显示"重新开始"按钮
   const rightSlot = (t === 'extract')
-    ? `<button type="button" onclick="resetCloneWorkspace();render()" style="background:none;border:none;padding:4px 8px;font-size:12px;color:#9E9890;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent">重新开始</button>`
+    ? `<button type="button" onclick="resetCloneWorkspace();render()" style="background:none;border:none;padding:4px 8px;font-size:12px;color:#9E9890;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent">清空内容</button>`
     : (isDeepSub ? '<div style="width:36px;flex-shrink:0"></div>' : loginHint);
   return `<div class="top-bar top-bar-sub">
     <button type="button" class="back-btn" onclick="${backAction}" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
