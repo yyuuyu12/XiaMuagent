@@ -331,7 +331,9 @@ router.post('/tts', requireAuth, async (req, res) => {
       console.log(`[TIMING][Zeabur] TTS开始 voice_id=${voiceId.slice(0,8)} 音频${audioKB}KB 已注册=${_registeredVoices.has(regKey)}`);
 
       // 首次使用该声音：先注册（一次性传全量音频到本地），后续只传 voice_id
+      // 注意：先标记再 await，避免并发请求同时进入注册逻辑（race condition）
       if (!_registeredVoices.has(regKey)) {
+        _registeredVoices.set(regKey, false); // 占位：注册进行中（false=未完成）
         const tReg0 = Date.now();
         try {
           const regResp = await fetch(`${asrUrl}/tts/indextts/register_voice`, {
@@ -341,19 +343,20 @@ router.post('/tts', requireAuth, async (req, res) => {
             signal: AbortSignal.timeout(60000),
           });
           if (regResp.ok) {
-            _registeredVoices.set(regKey, true);
+            _registeredVoices.set(regKey, true); // 注册成功
             console.log(`[TIMING][Zeabur] register_voice 完成 ${Date.now()-tReg0}ms`);
           } else {
+            _registeredVoices.delete(regKey); // 失败则清除占位，下次重试
             console.log(`[TIMING][Zeabur] register_voice 失败 ${Date.now()-tReg0}ms，降级传全量音频`);
           }
-          // 注册失败不阻断，降级到正常携带全量音频提交
         } catch (regErr) {
+          _registeredVoices.delete(regKey);
           console.log(`[TIMING][Zeabur] register_voice 异常 ${Date.now()-tReg0}ms: ${regErr.message}，降级传全量音频`);
         }
       }
 
-      // submit：已注册只传 key（省去 MB 级音频通过 frp 传输），否则传全量
-      const useKey = _registeredVoices.has(regKey);
+      // submit：注册成功(true)才传 key，注册中(false)/未注册则传全量音频
+      const useKey = _registeredVoices.get(regKey) === true;
       const submitBody = useKey
         ? { text: trimText, prompt_audio_key: voiceId, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }
         : { text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 };
