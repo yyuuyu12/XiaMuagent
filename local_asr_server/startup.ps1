@@ -98,4 +98,14 @@ if ($frpcRunning) {
     }
 }
 
+# 5. watchdog 守护进程（后台静默运行，每60秒巡检，挂了自动重启）
+$wdRunning = Get-Process -Name "powershell" -ErrorAction SilentlyContinue |
+             Where-Object { $_.MainWindowTitle -like "*watchdog*" }
+if (-not $wdRunning) {
+    Start-Process powershell `
+        -ArgumentList "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", "$PSScriptRoot\watchdog.ps1" `
+        -WindowStyle Hidden
+    Log "[watchdog] 守护进程已启动（后台运行，日志 -> watchdog.log）"
+}
+
 Log "=== startup complete ==="

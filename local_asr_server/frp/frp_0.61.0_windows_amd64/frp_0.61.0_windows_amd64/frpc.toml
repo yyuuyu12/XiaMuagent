@@ -1,0 +1,20 @@
+serverAddr = "106.14.151.37"
+serverPort = 7000
+
+[transport]
+heartbeatInterval = 10
+heartbeatTimeout  = 90
+
+[[proxies]]
+name = "asr"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 8765
+customDomains = ["asr.yyagent.top"]
+
+[[proxies]]
+name = "heygem"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 7861
+customDomains = ["heygem.yyagent.top"]
