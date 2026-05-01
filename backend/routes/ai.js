@@ -562,6 +562,25 @@ function htmlServiceError(url, text) {
   return `${hint} 当前地址：${url}`;
 }
 
+// ==================== 数字人服务健康预检 ====================
+router.get('/video/health', requireAuth, async (req, res) => {
+  const videoUrl = await getVideoUrl();
+  if (!videoUrl) return res.json({ code: 500, msg: '未配置数字人服务地址' });
+  try {
+    const resp = await fetch(`${videoUrl}/health`, {
+      headers: VIDEO_FETCH_HEADERS,
+      signal: AbortSignal.timeout(7000),
+    });
+    if (!resp.ok) return res.json({ code: 502, msg: `数字人服务异常: HTTP ${resp.status}` });
+    const data = await resp.json().catch(() => ({}));
+    res.json({ code: 200, data });
+  } catch (e) {
+    const msg = e.message || '';
+    if (msg.includes('ECONNREFUSED') || msg.includes('503')) return res.json({ code: 503, msg: '数字人服务未启动' });
+    res.json({ code: 504, msg: '数字人服务连接超时，请检查 frp 穿透是否正常' });
+  }
+});
+
 // ==================== 数字人视频生成 ====================
 router.post('/video/generate', requireAuth, async (req, res) => {
   const { audio_b64, video_b64, avatar_key, audio_fmt, video_fmt, enhancer } = req.body;

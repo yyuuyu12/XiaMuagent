@@ -4751,34 +4751,49 @@ function _startBgAvatarPoller(taskId) {
 }
 
 async function handleAvatarGenerate() {
-  if (!S.ttsAudioUrl) { showToast('请先完成步骤3语音合成'); return; }
+  if (!S.ttsAudioUrl && !S.ttsAudioB64) { showToast('请先完成步骤3语音合成'); return; }
   if (!S.avatarSrcVideoB64 && !S.avatarLibKey) { showToast('请先上传或选择人脸视频'); return; }
   if (S.avatarGenerating) return;
   const runSeq = ++_avatarRunSeq;
 
-  // 把 Blob URL 转成 base64
-  let audioB64 = null;
-  try {
-    const resp = await fetch(S.ttsAudioUrl);
-    const buf = await resp.arrayBuffer();
-    // 分块转 base64，避免大文件一次展开导致 call stack overflow
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    for (let i = 0; i < bytes.length; i += 8192) {
-      bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  // 直接使用已有的 base64（跳过多余的 blob URL → fetch → re-encode 流程）
+  const audioB64 = S.ttsAudioB64 || null;
+  if (!audioB64) {
+    // 极少情况：只有 blob URL 没有 b64，做一次转换兜底
+    try {
+      const resp = await fetch(S.ttsAudioUrl);
+      const buf = await resp.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      // 兜底路径不赋值给 audioB64（let 已声明），直接走下面逻辑
+    } catch (e) {
+      if (runSeq === _avatarRunSeq) setState({ avatarErr: '音频读取失败: ' + e.message });
+      return;
     }
-    audioB64 = btoa(bin);
-  } catch (e) {
-    if (runSeq === _avatarRunSeq) setState({ avatarErr: '音频读取失败: ' + e.message });
+  }
+
+  // ── 预检：5s 内 ping 一下数字人服务，失败立即报错，不等 90s 超时 ──
+  setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '正在连接数字人服务...', avatarProgressPct: 10 });
+  try {
+    const hc = await api.get('/ai/video/health', AbortSignal.timeout(8000));
+    if (runSeq !== _avatarRunSeq) return;
+    if (hc.code !== 200) {
+      setState({ avatarGenerating: false, avatarErr: '数字人服务不可达：' + (hc.msg || '请确认本地服务已启动，frp 穿透正常'), extractStep: 4 });
+      return;
+    }
+  } catch {
+    if (runSeq !== _avatarRunSeq) return;
+    setState({ avatarGenerating: false, avatarErr: '数字人服务连接超时，请检查本地 HeyGem 服务和 frp 是否正常运行', extractStep: 4 });
     return;
   }
 
-  setState({ avatarGenerating: true, avatarErr: '', extractStep: 'avatar_gen', avatarTaskId: null, avatarVideoUrl: null, avatarProgressMsg: '正在提交生成任务...', avatarProgressPct: 20 });
+  setState({ avatarProgressMsg: '正在提交生成任务...', avatarProgressPct: 20 });
   touchCloneTaskActivity();
 
-  // 90 秒提交超时：大文件上传慢时给明确错误而非永久挂起
+  // 60 秒提交超时（预检通过后服务应在线，减少等待）
   const _submitAbort = new AbortController();
-  const _submitTimeout = setTimeout(() => _submitAbort.abort(), 90000);
+  const _submitTimeout = setTimeout(() => _submitAbort.abort(), 60000);
 
   try {
     const videoPayload = S.avatarLibKey

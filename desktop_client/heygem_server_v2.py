@@ -92,11 +92,11 @@ async def generate(req: GenerateReq):
     if _hd_processor is None:
         raise HTTPException(503, "V2模型尚未初始化")
 
-    # 解析视频来源：avatar_key（数字人库文件）优先于 video_b64
-    video_b64 = req.video_b64
-    video_fmt  = req.video_fmt
+    # 解析视频来源：avatar_key 时直接记录文件路径，不在请求线程里读文件（避免阻塞事件循环）
+    video_b64   = req.video_b64
+    video_fmt   = req.video_fmt
+    avatar_path = None
     if req.avatar_key and not video_b64:
-        # 尝试按 u{userId}/{key} 路径读取，也兼容直接 key 路径
         uid = req.user_id or "unknown"
         candidates = [
             AVATARS_DIR / f"u{uid}" / req.avatar_key,
@@ -105,10 +105,9 @@ async def generate(req: GenerateReq):
         avatar_path = next((p for p in candidates if p.exists()), None)
         if not avatar_path:
             raise HTTPException(404, f"数字人文件不存在: {req.avatar_key}（已找路径: {[str(p) for p in candidates]}）")
-        video_b64 = base64.b64encode(avatar_path.read_bytes()).decode()
-        video_fmt  = avatar_path.suffix.lstrip(".") or "mp4"
+        video_fmt = avatar_path.suffix.lstrip(".") or "mp4"
 
-    if not video_b64:
+    if not video_b64 and not avatar_path:
         raise HTTPException(400, "请提供 video_b64 或 avatar_key")
 
     task_id = uuid.uuid4().hex
@@ -117,11 +116,20 @@ async def generate(req: GenerateReq):
 
     audio_path = TEMP_DIR / f"{task_id}.{req.audio_fmt}"
     video_path = TEMP_DIR / f"{task_id}_src.{video_fmt}"
-    try:
+
+    # 用线程执行所有磁盘 I/O，避免阻塞 uvicorn 事件循环
+    def _write_files():
         audio_path.write_bytes(base64.b64decode(req.audio_b64))
-        video_path.write_bytes(base64.b64decode(video_b64))
+        if avatar_path:
+            import shutil
+            shutil.copy2(str(avatar_path), str(video_path))   # 直接复制，省去 base64 来回转换
+        else:
+            video_path.write_bytes(base64.b64decode(video_b64))
+
+    try:
+        await asyncio.to_thread(_write_files)
     except Exception as e:
-        raise HTTPException(400, f"base64解码失败: {e}")
+        raise HTTPException(400, f"文件写入失败: {e}")
 
     asyncio.create_task(_run_heygem_v2(
         task_id, str(audio_path), str(video_path),
