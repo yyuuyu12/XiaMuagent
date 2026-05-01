@@ -1743,6 +1743,10 @@ function tHomeTaskSection() {
     if (!t) return '克隆';
     if (t.task_kind === 'industry' || t.type === 'industry_gen') return '行业';
     if (t.type === 'profile_analyze' || t.type === 'single_video_analyze') return '对标';
+    if (t.type === 'clone_video') {
+      const res = typeof t.result === 'string' ? (() => { try { return JSON.parse(t.result); } catch { return {}; } })() : (t.result || {});
+      if (res.source === 'featured') return '行业';
+    }
     return '克隆';
   };
   // 右上角徽章：只展示任务类型，不展示步骤状态
@@ -1856,10 +1860,10 @@ function tHomeTaskSection() {
     if (info.phase === 'rewriting') return t.thinking || '正在AI改写文案，请稍候';
     if (info.phase === 'extracted') return '文案提取完毕';
     const hints = [
-      '正在提取视频文案，请稍候',
-      '改写完毕',
+      '文案提取完毕',
       '改写完毕',
       '语音已生成',
+      '数字人视频已生成',
       t.post_process_done ? '后期视频已就绪' : '数字人视频已生成',
       '视频待发布'
     ];
@@ -1909,7 +1913,8 @@ function tHomeTaskSection() {
       // step_done 按步骤给出明确动作
       if (info.phase === 'step_done' || info.phase === 'published') {
         if (info.step === 2) return '查看改写结果 ›';
-        if (info.step === 3 || info.step === 4) return '查看语音结果 ›';
+        if (info.step === 3) return '查看语音结果 ›';
+        if (info.step === 4) return '查看数字人视频 ›';
         if (info.step === 5) return t.post_process_done ? '查看后期视频 ›' : '查看数字人视频 ›';
         if (info.step >= 6) return '去发布 ›';
       }
@@ -6181,7 +6186,8 @@ function tHistory() {
       if (info.phase === 'extracted') return '去改写 ›';
       if (info.phase === 'step_done' || info.phase === 'published') {
         if (info.step === 2) return '查看改写结果 ›';
-        if (info.step === 3 || info.step === 4) return '查看语音结果 ›';
+        if (info.step === 3) return '查看语音结果 ›';
+        if (info.step === 4) return '查看数字人视频 ›';
         if (info.step === 5) return t.post_process_done ? '查看后期视频 ›' : '查看数字人视频 ›';
         if (info.step >= 6) return '去发布 ›';
       }
