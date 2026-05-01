@@ -477,10 +477,14 @@ function normalizeServiceUrl(url) {
 }
 
 // ── OSS 后台上传（非阻塞，避免阻塞轮询响应超时）─────────────────────────
-const _ossUploading = new Set(); // 防止同一 taskId 并发重复上传
+const _ossUploading = new Set();    // 防止同一 taskId 并发重复上传
+const _ossUploadStart = new Map();  // taskId → 开始时间戳，用于超时降级
+const OSS_UPLOAD_TIMEOUT_MS = 4 * 60 * 1000; // 4 分钟后降级给前端直连
+
 async function _scheduleOssUpload(taskId, videoUrl, userId) {
   if (_ossUploading.has(taskId)) return;
   _ossUploading.add(taskId);
+  _ossUploadStart.set(taskId, Date.now());
   try {
     const dlResp = await fetch(`${videoUrl}/video/file/${taskId}`, {
       headers: VIDEO_FETCH_HEADERS,
@@ -500,6 +504,7 @@ async function _scheduleOssUpload(taskId, videoUrl, userId) {
     console.error('[OSS] 后台上传失败:', e.message);
   } finally {
     _ossUploading.delete(taskId);
+    _ossUploadStart.delete(taskId);
   }
 }
 
@@ -624,10 +629,25 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
         if (existingRows.length > 0 && existingRows[0].oss_url) {
           // OSS 已有，直接返回
           data.video_url = existingRows[0].oss_url;
+        } else if (_ossUploading.has(taskId)) {
+          // OSS 正在上传中：判断是否超时，未超时则让前端继续轮询（避免前后端同时下载大文件抢带宽）
+          const elapsed = Date.now() - (_ossUploadStart.get(taskId) || Date.now());
+          if (elapsed < OSS_UPLOAD_TIMEOUT_MS) {
+            data.status = 'processing';
+            data.msg = `OSS 上传中，请稍候（${Math.round(elapsed / 1000)}s）...`;
+            delete data.video_url;
+            delete data.video_direct_url;
+          } else {
+            // 超时降级：让前端自己下载
+            data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
+          }
         } else {
-          // 触发后台上传（非阻塞），本次先返回直连地址，下次轮询再拿 OSS 链接
+          // 首次到达：触发后台上传，本次让前端继续轮询而非立即下载
           _scheduleOssUpload(taskId, videoUrl, req.userId);
-          data.video_direct_url = `${videoUrl}/video/file/${taskId}`;
+          data.status = 'processing';
+          data.msg = 'OSS 上传中，请稍候...';
+          delete data.video_url;
+          delete data.video_direct_url;
         }
       } else {
         // OSS 未配置，走原来的直连方式
