@@ -4987,18 +4987,27 @@ async function handlePostProcess() {
       fontsize:      S.subFontsize,
       sub_style:     S.subStyle || 'default',
       source_text:    S.rewrittenScript || S.extractedScript || '',
+      task_id:       S.cloneTaskId || null, // 用于 OSS key 命名
     });
     if (r2.code !== 200) throw new Error(r2.msg || '后期处理失败');
     const data = r2.data;
 
-    // base64 → blob URL
-    const raw = atob(data.video_b64);
-    const buf = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
-    const url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
+    // 优先用 OSS URL（持久化，可跨会话恢复）；无 OSS 则降级 base64 → blob URL
+    let url;
+    if (data.oss_url) {
+      url = data.oss_url; // OSS 永久链接，直接用
+    } else if (data.video_b64) {
+      const raw = atob(data.video_b64);
+      const buf = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+      url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
+    } else {
+      throw new Error('后期处理未返回视频');
+    }
     _stopPostProgressTimer();
-    setState({ postProcessing: false, postProgressPct: 100, postProcessedVideoUrl: url, postProcessedB64: data.video_b64 });
-    saveCloneSession(5); // ★ 步骤5：后期制作完成，保存 session
+    // postProcessedB64 不再保存到 state（太大），OSS URL 已能持久化
+    setState({ postProcessing: false, postProgressPct: 100, postProcessedVideoUrl: url });
+    saveCloneSession(5); // ★ 步骤5：后期制作完成，保存 OSS URL 到 session
   } catch (e) {
     _stopPostProgressTimer();
     setState({ postProcessing: false, postProgressPct: 0, postProcessErr: e.message });

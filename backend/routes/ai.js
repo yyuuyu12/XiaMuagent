@@ -760,6 +760,21 @@ router.post('/video/postprocess', requireAuth, async (req, res) => {
       return res.json({ code: 500, msg: `字幕烧录失败: ${text.slice(0, 300)}` });
     }
     const data = await resp.json();
+
+    // ── 字幕烧录完成后上传 OSS，方便后续恢复 ──────────────────────────
+    if (data.video_b64) {
+      try {
+        const buf = Buffer.from(data.video_b64, 'base64');
+        const taskId = req.body.task_id || ('pp_' + Date.now());
+        const ossKey = `postprocess/${req.userId}/${taskId}.mp4`;
+        const ossUrl = await oss.uploadBuffer(ossKey, buf);
+        data.oss_url = ossUrl; // 附加到响应，前端直接存
+        console.log(`[postprocess] OSS 上传完成 url=${ossUrl}`);
+      } catch (ossErr) {
+        console.warn('[postprocess] OSS 上传失败（不影响主流程）:', ossErr.message);
+      }
+    }
+
     return res.json({ code: 200, data });
   } catch (e) {
     const isTimeout = e.message && (e.message.includes('timeout') || e.message.includes('aborted'));
