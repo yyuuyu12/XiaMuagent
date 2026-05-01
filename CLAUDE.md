@@ -243,15 +243,42 @@ max_text_tokens_per_segment=300
 
 ## 数字人视频流程
 
+> ⚠️ 此流程已优化，请严格遵守，不要改动关键环节。
+
 ```
 前端提交音频 + 数字人素材
   → Zeabur /api/ai/video/generate
-  → HeyGem /video/generate → 返回 task_id
-  → 前端轮询 /api/ai/video/task/{taskId}
-  → 完成后拉取 /api/ai/video/stream/{taskId}（Zeabur 代理）
-  → HeyGem /video/file/{taskId}（faststart mp4）
-  → 浏览器 Blob URL 播放
+      ↳ 读取 OSS 配置 → 附带 oss_config + user_id 传给 HeyGem
+  → HeyGem /video/generate → 立即返回 task_id（异步生成）
+  → 前端每 5 秒轮询 /api/ai/video/task/{taskId}
+
+【HeyGem 本地后台执行】
+  1. GPU 推理生成原始视频（~90s）
+  2. GPU 压缩至 1080p CRF22（h264_nvenc，~5s；失败降级 libx264 ~45s）
+  3. 本地直传 OSS（本机网络直连阿里云，~10-20s）→ 写入 task.oss_url
+  4. 任务状态变为 done，oss_url 已就绪
+
+【Zeabur 轮询代理 /api/ai/video/task/{taskId}】
+  - 检测到 data.oss_url → 直接作为 video_url 返回，同时写入 user_videos 表
+  - 若 oss_url 为空（本地直传失败）→ 降级：Zeabur 从 frp 下载再传 OSS（慢）
+  - 若 OSS 未配置 → 返回 video_direct_url（frp 直连，最慢）
+
+【前端收到 video_url（OSS CDN 链接）】
+  → setState({ avatarVideoUrl, avatarDoneTaskId }) + saveCloneSession(4)
+  → 视频立即播放，URL 写入 session，下次回来直接展示无需等待
 ```
+
+### ⚠️ 关键约束（不要破坏）
+
+| 约束 | 原因 |
+|------|------|
+| HeyGem 本地直传 OSS，不经 Zeabur 中转 | frp 带宽有限，Zeabur 中转会占满带宽导致前后端同时下载竞争 |
+| 视频压缩优先用 `h264_nvenc`，失败才降级 `libx264` | GPU 编码 ~5s vs CPU ~45s |
+| 压缩参数：`scale=-2:'min(ih,1080)'` + `crf/cq 22` | 限制 1080p，文件从 ~190MB 压到 ~30-50MB |
+| 轮询间隔前台 5s，后台 8s | 之前 10s/15s 体感太慢 |
+| `avatarDoneTaskId` 在 OSS 上传开始前就写入 session | 防止用户切任务后恢复时走"生成中30%"错误路径 |
+| OSS URL（http 开头）直接存入 session | 恢复时无需异步请求，视频立即显示 |
+| `oss2` 已装在 hdModule venv | `C:\ChaojiIP\aigc-human\python-modules\hdModule\venv\python.exe -m pip install oss2` |
 
 ---
 
