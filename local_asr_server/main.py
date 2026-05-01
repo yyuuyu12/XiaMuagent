@@ -202,6 +202,17 @@ def health():
     return {"status": "ok"}
 
 
+@app.post("/tts/indextts/register_voice")
+async def tts_indextts_register_voice(payload: dict):
+    """注册声音到 IndexTTS（一次性传全量音频），返回 voice_id；后续 submit 只传 voice_id"""
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(f"{INDEXTTS_URL}/tts/register_voice", json=payload)
+        return resp.json()
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="IndexTTS 服务未启动，请运行 start_indextts.bat 后重试")
+
+
 @app.post("/tts/indextts/submit")
 async def tts_indextts_submit(payload: dict):
     """异步提交 IndexTTS 任务，立即返回 task_id"""

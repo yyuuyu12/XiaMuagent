@@ -1,10 +1,16 @@
 const express = require('express');
 const db = require('../db');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { requireAuth } = require('./auth');
 const oss = require('../oss');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
+
+// voice_id → true：已注册到本地 IndexTTS，后续 submit 只传 key，不再传 MB 级音频
+// 注：Zeabur 重启会清空，但同时 IndexTTS 进程也需重启（会重新扫描 spk_cache 目录），
+//     第一次提交会自动走 register 路径，之后仍走 key 路径。
+const _registeredVoices = new Map(); // voiceId → asrUrl（不同 asrUrl 视为不同注册）
 
 const PUBLIC_TUNNEL_HEADERS = {
   'Content-Type': 'application/json',
@@ -317,10 +323,36 @@ router.post('/tts', requireAuth, async (req, res) => {
     const { indexRefAudio, indexEmotion, indexEmoAlpha } = req.body;
     if (!indexRefAudio) return res.json({ code: 400, msg: '请先上传参考音频（你的声音样本）才能使用克隆音色' });
     try {
+      // 计算声音指纹（md5），与 IndexTTS spk_cache 命名规则一致
+      const voiceId = crypto.createHash('md5').update(Buffer.from(indexRefAudio, 'base64')).digest('hex');
+      const regKey = `${asrUrl}:${voiceId}`;
+
+      // 首次使用该声音：先注册（一次性传全量音频到本地），后续只传 voice_id
+      if (!_registeredVoices.has(regKey)) {
+        try {
+          const regResp = await fetch(`${asrUrl}/tts/indextts/register_voice`, {
+            method: 'POST',
+            headers: PUBLIC_TUNNEL_HEADERS,
+            body: JSON.stringify({ prompt_audio: indexRefAudio }),
+            signal: AbortSignal.timeout(60000),
+          });
+          if (regResp.ok) {
+            _registeredVoices.set(regKey, true);
+            console.log(`[IndexTTS] 声音已注册 voice_id=${voiceId}`);
+          }
+          // 注册失败不阻断，降级到正常携带全量音频提交
+        } catch (_) { /* 注册失败不阻断 */ }
+      }
+
+      // submit：已注册只传 key（省去 MB 级音频通过 frp 传输），否则传全量
+      const submitBody = _registeredVoices.has(regKey)
+        ? { text: trimText, prompt_audio_key: voiceId, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }
+        : { text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 };
+
       const resp = await fetch(`${asrUrl}/tts/indextts/submit`, {
         method: 'POST',
         headers: PUBLIC_TUNNEL_HEADERS,
-        body: JSON.stringify({ text: trimText, prompt_audio: indexRefAudio, emotion: indexEmotion || 'neutral', emo_alpha_override: indexEmoAlpha != null ? parseFloat(indexEmoAlpha) : null, speed: parseFloat(speed) || 1.0 }),
+        body: JSON.stringify(submitBody),
         signal: AbortSignal.timeout(30000),
       });
       if (!resp.ok) {

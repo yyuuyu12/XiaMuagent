@@ -62,6 +62,15 @@ SPK_CACHE_DIR   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "spk_
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(SPK_CACHE_DIR, exist_ok=True)
 
+# voice_id → spk_path 映射（启动时扫描已有缓存文件重建，后续 register_voice 追加）
+# voice_id = md5(音频bytes)，与 _get_spk_path 的命名规则一致
+_voice_path_map: dict = {}
+for _f in os.listdir(SPK_CACHE_DIR):
+    _stem, _ext = os.path.splitext(_f)
+    if _ext in (".wav", ".mp3") and len(_stem) == 32:
+        _voice_path_map[_stem] = os.path.join(SPK_CACHE_DIR, _f)
+print(f"[SPK_CACHE] 启动时扫描到 {len(_voice_path_map)} 个已注册声音")
+
 
 def _get_spk_path(spk_bytes: bytes) -> str:
     """
@@ -174,6 +183,25 @@ async def generate(payload: dict):
             pass
 
 
+@app.post("/tts/register_voice")
+async def register_voice(payload: dict):
+    """
+    预注册声音：上传参考音频 → 写入 spk_cache → 返回 voice_id（md5）。
+    后续 /tts/submit 传 prompt_audio_key=voice_id 即可跳过音频传输，直接走本地缓存。
+    """
+    prompt_audio_b64 = payload.get("prompt_audio", "")
+    if not prompt_audio_b64:
+        raise HTTPException(400, "prompt_audio 不能为空")
+    try:
+        spk_bytes = base64.b64decode(prompt_audio_b64)
+    except Exception:
+        raise HTTPException(400, "prompt_audio base64 解码失败")
+    spk_path = _get_spk_path(spk_bytes)
+    voice_id = hashlib.md5(spk_bytes).hexdigest()
+    _voice_path_map[voice_id] = spk_path
+    return {"voice_id": voice_id}
+
+
 @app.post("/tts/submit")
 async def tts_submit(payload: dict):
     """异步提交：立即返回 task_id，推理在后台运行"""
@@ -200,25 +228,39 @@ async def _run_tts_task(task_id: str, payload: dict):
     """后台执行推理"""
     text             = (payload.get("text") or "").strip()
     prompt_audio_b64 = payload.get("prompt_audio", "")
+    prompt_audio_key = payload.get("prompt_audio_key", "")   # voice_id（md5），跳过音频传输
     emotion           = payload.get("emotion", "neutral")
     emo_alpha_override = payload.get("emo_alpha_override")
     speed             = float(payload.get("speed", 1.0))
 
-    if not text or not prompt_audio_b64:
+    if not text:
         with _tasks_lock:
             _tasks[task_id]["status"] = "error"
-            _tasks[task_id]["error"] = "text 或 prompt_audio 不能为空"
+            _tasks[task_id]["error"] = "text 不能为空"
         return
 
-    try:
-        spk_bytes = base64.b64decode(prompt_audio_b64)
-    except Exception:
+    # 优先用 key（本地缓存路径），避免通过 frp 传输 MB 级音频
+    if prompt_audio_key and prompt_audio_key in _voice_path_map:
+        spk_path = _voice_path_map[prompt_audio_key]
+        print(f"[SPK_CACHE] 命中 prompt_audio_key={prompt_audio_key}，跳过音频传输")
+    elif prompt_audio_b64:
+        try:
+            spk_bytes = base64.b64decode(prompt_audio_b64)
+        except Exception:
+            with _tasks_lock:
+                _tasks[task_id]["status"] = "error"
+                _tasks[task_id]["error"] = "prompt_audio base64 解码失败"
+            return
+        spk_path = _get_spk_path(spk_bytes)
+        # 顺手注册到 map，下次可通过 key 跳过传输
+        voice_id = hashlib.md5(spk_bytes).hexdigest()
+        _voice_path_map[voice_id] = spk_path
+    else:
         with _tasks_lock:
             _tasks[task_id]["status"] = "error"
-            _tasks[task_id]["error"] = "prompt_audio base64 解码失败"
+            _tasks[task_id]["error"] = "prompt_audio 或 prompt_audio_key 不能同时为空"
         return
 
-    spk_path    = _get_spk_path(spk_bytes)
     output_path = os.path.join(OUTPUT_DIR, f"{task_id}.wav")
     emo_path  = EMOTION_TEMPLATES.get(emotion)
     emo_alpha = float(emo_alpha_override) if emo_alpha_override is not None else EMOTION_ALPHA.get(emotion, 0.0)
