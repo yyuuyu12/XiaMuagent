@@ -4675,7 +4675,7 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
       pollFailCount = 0;
       if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
       const t = r.data;
-      const pct = Math.min(90, 10 + elapsed * 0.6);
+      const pct = Math.max(S.avatarProgressPct || 0, Math.min(90, 10 + elapsed * 0.6));
       setState({ avatarProgressPct: pct, avatarProgressMsg: t.msg || '处理中...' });
 
       if (t.status === 'done' && t.video_url) {
@@ -4691,7 +4691,9 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
         // 视频通过 frp 隧道传输，必须先完整下载成 blob 再播放，否则边传边播会不断转圈缓冲
         if (runSeq !== _avatarRunSeq || String(S.avatarTaskId || '') !== String(taskId)) return;
         clearInterval(_avatarPoller); _avatarPoller = null;
-        setState({ avatarProgressMsg: '视频生成完成，正在下载视频文件（视频较大请稍候…）', avatarProgressPct: 50 });
+        // ★ 立即设 doneTaskId、清 taskId 并保存 session，确保切换任务后走 doneTaskId 恢复路径而非重启 poller
+        setState({ avatarDoneTaskId: taskId, avatarTaskId: null, avatarProgressMsg: '视频生成完成，正在下载视频文件（视频较大请稍候…）', avatarProgressPct: Math.max(S.avatarProgressPct || 0, 92) });
+        saveCloneSession(4);
         try {
           const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
           const resp = await fetch(streamUrl);
@@ -4701,13 +4703,13 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
           if (runSeq !== _avatarRunSeq) return;
           const mp4Blob = blob.type === 'video/mp4' ? blob : new Blob([blob], { type: 'video/mp4' });
           if (S.avatarVideoUrl?.startsWith('blob:')) URL.revokeObjectURL(S.avatarVideoUrl);
-          setState({ avatarGenerating: false, avatarVideoUrl: URL.createObjectURL(mp4Blob), avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
+          setState({ avatarGenerating: false, avatarVideoUrl: URL.createObjectURL(mp4Blob), avatarVideoB64: null, extractStep: 4, avatarProgressPct: 100 });
           saveCloneSession(4);
         } catch (e) {
           if (runSeq !== _avatarRunSeq) return;
           // 下载失败则降级为直接流式播放（会转圈但至少能看）
           const streamUrl = `${API_BASE}/ai/video/stream/${taskId}?t=${encodeURIComponent(getToken())}`;
-          setState({ avatarGenerating: false, avatarVideoUrl: streamUrl, avatarVideoB64: null, avatarDoneTaskId: taskId, avatarTaskId: null, extractStep: 4, avatarProgressPct: 100 });
+          setState({ avatarGenerating: false, avatarVideoUrl: streamUrl, avatarVideoB64: null, extractStep: 4, avatarProgressPct: 100 });
           saveCloneSession(4);
         }
       } else if (t.status === 'error') {
