@@ -5177,10 +5177,9 @@ function patchLocalCloneTaskStep(taskId, cloneStep) {
   const pct = Math.max(0, Math.min(100, Math.round((cloneStep / 6) * 100)));
   S.tasksList = (S.tasksList || []).map(t => {
     if (String(t.id) !== String(taskId)) return t;
-    const prev = parseInt(t.clone_step) || 1;
     return {
       ...t,
-      clone_step: Math.max(prev, cloneStep),
+      clone_step: cloneStep,           // 直接写当前步骤，允许回退
       progress: Math.max(t.progress || 0, pct),
       activity_at: nowIso,
       updated_at: nowIso

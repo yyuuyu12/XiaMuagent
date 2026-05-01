@@ -184,16 +184,29 @@ router.post('/:id/session', requireAuth, async (req, res) => {
     try { oldSession = oldRows[0]?.session_json ? JSON.parse(oldRows[0].session_json) : {}; } catch {}
     const incomingSession = session || {};
     const mergedSession = { ...oldSession, ...incomingSession };
-    ['ttsAudioB64', 'avatarVideoB64', 'postProcessedB64', 'coverFrameUrl'].forEach(k => {
-      if ((incomingSession[k] == null || incomingSession[k] === '') && oldSession[k]) mergedSession[k] = oldSession[k];
-    });
-    const nextStep = Math.max(Number(oldRows[0]?.clone_step) || 1, Number(clone_step) || 1);
+    const nextStep = Number(clone_step) || 1;  // 直接写当前步骤，允许回退（不再 GREATEST）
+    // 回退时清除下游数据，防止旧步骤的结果在恢复时残留
+    // step<=2(改写及以前)：清音频+数字人+后期；step<=3(语音)：清数字人+后期；step<=4(数字人)：清后期
+    if (nextStep <= 2) {
+      ['ttsAudioB64', 'avatarVideoB64', 'avatarVideoUrl', 'avatarDoneTaskId',
+       'postProcessDone', 'postProcessedVideoUrl', 'postProcessedB64', 'coverFrameUrl'].forEach(k => { mergedSession[k] = null; });
+    } else if (nextStep <= 3) {
+      ['avatarVideoB64', 'avatarVideoUrl', 'avatarDoneTaskId',
+       'postProcessDone', 'postProcessedVideoUrl', 'postProcessedB64', 'coverFrameUrl'].forEach(k => { mergedSession[k] = null; });
+    } else if (nextStep <= 4) {
+      ['postProcessDone', 'postProcessedVideoUrl', 'postProcessedB64', 'coverFrameUrl'].forEach(k => { mergedSession[k] = null; });
+    } else {
+      // step > oldStep 时正常保留，不清除（大二进制文件仅在 incoming 有值时覆盖）
+      ['ttsAudioB64', 'avatarVideoB64', 'postProcessedB64', 'coverFrameUrl'].forEach(k => {
+        if ((incomingSession[k] == null || incomingSession[k] === '') && oldSession[k]) mergedSession[k] = oldSession[k];
+      });
+    }
     const sessionJson = JSON.stringify(mergedSession);
     // MySQL UPSERT：存在则更新，不存在则插入
     await db.query(
       `INSERT INTO task_sessions (task_id, user_id, clone_step, session_json)
        VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE clone_step = GREATEST(clone_step, VALUES(clone_step)), session_json = VALUES(session_json), updated_at = NOW()`,
+       ON DUPLICATE KEY UPDATE clone_step = VALUES(clone_step), session_json = VALUES(session_json), updated_at = NOW()`,
       [req.params.id, req.userId, nextStep, sessionJson]
     );
     await db.query(
