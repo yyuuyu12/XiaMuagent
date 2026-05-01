@@ -5475,7 +5475,11 @@ async function restoreCloneSession(taskId) {
       coverTitle:           s.coverTitle      || '',
       publishTitle:         s.publishTitle    || '',
       publishTags:          s.publishTags     || [],
-      extractStep:          clone_step        || 2,
+      // ★ clone_step=4 表示"音频已完成"，但若还没进入数字人流程，应停在语音预览页(step3)
+      // clone_step=5+ 表示数字人/后期已完成，才真正跳到对应步骤
+      extractStep: (clone_step >= 4 && !s.avatarTaskId && !s.avatarDoneTaskId && !s.avatarVideoUrl && !s.avatarVideoB64)
+        ? 3
+        : (clone_step || 2),
       // ★ 显式重置所有"进行中"状态，防止旧 session 脏数据残留
       avatarGenerating:     false,
       avatarTaskId:         null,
