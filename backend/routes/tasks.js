@@ -10,7 +10,7 @@ router.get('/', requireAuth, async (req, res) => {
       `SELECT t.id, t.type, t.title, t.status, t.stage, t.progress, t.thinking, t.error_msg, t.created_at, t.updated_at, t.result,
               COALESCE(ts.clone_step, CASE WHEN t.status = 'done' THEN 3 ELSE 1 END) AS clone_step,
               ts.session_json,
-              GREATEST(t.updated_at, COALESCE(ts.updated_at, t.updated_at)) AS activity_at
+              GREATEST(t.updated_at, COALESCE(ts.updated_at, t.updated_at), COALESCE(t.last_operated_at, t.updated_at)) AS activity_at
        FROM tasks t
        LEFT JOIN task_sessions ts ON ts.task_id = t.id AND ts.user_id = t.user_id
        WHERE t.user_id = $1
@@ -209,7 +209,7 @@ router.post('/:id/touch', requireAuth, async (req, res) => {
     );
     if (!rows[0]) return res.status(404).json({ code: 404, msg: '任务不存在' });
     await db.query(
-      'UPDATE tasks SET updated_at = NOW() WHERE id = $1 AND user_id = $2',
+      'UPDATE tasks SET updated_at = NOW(), last_operated_at = NOW() WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     );
     res.json({ code: 200, msg: 'ok' });

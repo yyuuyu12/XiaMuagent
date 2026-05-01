@@ -214,6 +214,13 @@ async function initDb() {
     ) CHARACTER SET utf8mb4
   `);
 
+  // tasks 表新增 last_operated_at（用户主动操作时刷新，大卡判断依据）
+  try {
+    await db.query('ALTER TABLE tasks ADD COLUMN last_operated_at TIMESTAMP NULL DEFAULT NULL');
+  } catch (e) {
+    if (!String(e.message || e).includes('Duplicate column name')) console.warn('[initDb] last_operated_at:', e.message || e);
+  }
+
   // users 表新增 brand_name 字段
   try {
     await db.query('ALTER TABLE users ADD COLUMN brand_name VARCHAR(200) DEFAULT NULL');

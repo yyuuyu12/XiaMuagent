@@ -1755,7 +1755,7 @@ function tHomeTaskSection() {
   const sortedTasks = [...(S.tasksList || [])].sort((a, b) => taskTime(b) - taskTime(a));
   const bigCards = sortedTasks
     .filter(t => Date.now() - taskTime(t) < DONE_BIG_WINDOW)
-    .slice(0, 3);
+    .slice(0, 5);
   const bigIds = new Set(bigCards.map(t => String(t.id)));
   const oldDoneTasks = sortedTasks
     .filter(t => !bigIds.has(String(t.id)))
@@ -1764,7 +1764,7 @@ function tHomeTaskSection() {
     .map((it, idx) => ({ _type: 'clone', idx, label: '克隆', text: it.input || '', created_at: it.created_at }));
   const smallItems = [...oldDoneTasks, ...cloneItems]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 5);
+    .slice(0, Math.max(0, 5 - bigCards.length));
 
   if (!bigCards.length && !smallItems.length) {
     return `<div style="margin-bottom:14px">
@@ -1832,7 +1832,7 @@ function tHomeTaskSection() {
     return { step, phase: step >= 6 ? 'published' : 'step_done' };
   };
   const cloneDoneLabels = ['提取中','提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕'];
-  const cloneNextActions = ['查看进度 ›','去改写 ›','去语音 ›','去数字人 ›','去后期 ›','去发布 ›'];
+  const cloneNextActions = ['查看进度 ›','去查看 ›','去查看 ›','去查看 ›','去查看 ›','去查看 ›'];
   const cloneStatusText = t => {
     const info = clonePhaseOf(t);
     if (info.phase === 'failed') return '失败';
@@ -1853,10 +1853,10 @@ function tHomeTaskSection() {
     if (info.phase === 'extracted') return '提取完毕，去改写';
     const hints = [
       '正在提取视频文案，请稍候',
-      '提取完毕，去改写',
-      '改写完毕，去语音',
-      '语音已完成，去数字人',
-      '数字人视频已生成，去后期',
+      '提取完毕，点击查看',
+      '改写完毕，点击查看',
+      '语音已完成，点击查看',
+      '数字人视频已生成，点击查看',
       '后期制作完成，去发布'
     ];
     return hints[info.step - 1] || '可继续完成当前步骤';
@@ -1879,7 +1879,7 @@ function tHomeTaskSection() {
       // 改写中：实际进度
       if (info.phase === 'rewriting') return clampPct(t.progress || 20);
       // 某步骤完成、下一步尚未开始 → 0%（步骤点已表示进度，进度条重置）
-      if (info.phase === 'step_done') return 0;
+      if (info.phase === 'step_done') return null;
       // 全部完成
       if (info.phase === 'published') return 100;
       return 0;
@@ -2035,10 +2035,10 @@ function tHomeTaskSection() {
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div style="font-size:11px;color:#9E9890;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">${esc(thinking)}</div>
-          ${pct > 0 ? `<div style="font-size:12px;font-weight:700;color:#F5762A;flex-shrink:0">${pct}%</div>` : ''}
+          ${(pct != null && pct > 0) ? `<div style="font-size:12px;font-weight:700;color:#F5762A;flex-shrink:0">${pct}%</div>` : ''}
         </div>
-        <div style="height:4px;background:${pct>0?'rgba(245,118,42,0.15)':'#F0EDE8'};border-radius:4px;overflow:hidden;margin-bottom:12px">
-          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
+        <div style="height:4px;background:${(pct != null && pct>0)?'rgba(245,118,42,0.15)':'#F0EDE8'};border-radius:4px;overflow:hidden;margin-bottom:12px">
+          <div style="height:100%;width:${pct != null ? pct : 0}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
         </div>
         <div style="margin-bottom:12px">${stepsWithLabels(cloneStep)}</div>
         <div style="display:flex;gap:8px">
@@ -2650,73 +2650,162 @@ const SUBTITLE_TEMPLATES = [
 function applySubTemplate(id) {
   const t = SUBTITLE_TEMPLATES.find(x => x.id === id);
   if (!t) return;
-  setState({ subTemplate: id, subColor: t.color, subOutlineColor: t.ol, subFontsize: t.size, subOutlineWidth: t.ow, subStyle: t.type || 'default' });
+  S.subTemplate = id; S.subColor = t.color; S.subOutlineColor = t.ol;
+  S.subFontsize = t.size; S.subOutlineWidth = t.ow; S.subStyle = t.type || 'default';
+  saveCloneSession(5);
+  // 更新模板卡片选中状态（DOM-only，避免触发 render）
+  document.querySelectorAll('[data-tpl-id]').forEach(el => {
+    const active = el.dataset.tplId === id;
+    el.style.border = `2.5px solid ${active ? '#F97316' : '#3A3630'}`;
+    const chk = el.querySelector('[data-tpl-check]');
+    if (chk) chk.style.display = active ? 'flex' : 'none';
+  });
+  // 更新字幕颜色 dots
+  document.querySelectorAll('[data-color-dot]').forEach(el => {
+    const isActive = el.dataset.colorDot === t.color;
+    el.style.boxShadow = `0 0 0 ${isActive ? '3px #F97316' : '2px #D4D0C8'}`;
+  });
+  // 更新描边颜色 dots
+  document.querySelectorAll('[data-ol-dot]').forEach(el => {
+    const isActive = el.dataset.olDot === t.ol;
+    el.style.boxShadow = `0 0 0 ${isActive ? '3px #F97316' : '2px #D4D0C8'}`;
+    const label = el.querySelector('span');
+    if (label) label.style.color = isActive ? '#F97316' : '#A8A49C';
+  });
+  // 更新字体大小滑动条
+  const fsRange = document.querySelector('[data-fs-range]');
+  if (fsRange) fsRange.value = t.size;
+  const fsVal = document.querySelector('[data-fs-val]');
+  if (fsVal) fsVal.textContent = t.size + '像素';
+  // 更新描边粗细滑动条
+  const owRange = document.querySelector('[data-ow-range]');
+  if (owRange) owRange.value = t.ow;
+  const owVal = document.querySelector('[data-ow-val]');
+  if (owVal) owVal.textContent = t.ow;
+}
+
+function setSubColorDot(c) {
+  S.subColor = c; S.subTemplate = 'custom';
+  saveCloneSession(5);
+  document.querySelectorAll('[data-color-dot]').forEach(el => {
+    const isActive = el.dataset.colorDot === c;
+    el.style.boxShadow = `0 0 0 ${isActive ? '3px #F97316' : '2px #D4D0C8'}`;
+  });
+}
+
+function setSubOlDot(c) {
+  S.subOutlineColor = c; S.subTemplate = 'custom';
+  saveCloneSession(5);
+  document.querySelectorAll('[data-ol-dot]').forEach(el => {
+    const isActive = el.dataset.olDot === c;
+    const firstDiv = el.querySelector('div');
+    if (firstDiv) firstDiv.style.boxShadow = `0 0 0 ${isActive ? '3px #F97316' : '2px #D4D0C8'}`;
+    const label = el.querySelector('span');
+    if (label) label.style.color = isActive ? '#F97316' : '#A8A49C';
+  });
+}
+
+function onSubFsInput(v) {
+  S.subFontsize = +v; S.subTemplate = 'custom';
+  const el = document.querySelector('[data-fs-val]');
+  if (el) el.textContent = v + '像素';
+}
+
+function onSubOwInput(v) {
+  S.subOutlineWidth = +v; S.subTemplate = 'custom';
+  const el = document.querySelector('[data-ow-val]');
+  if (el) el.textContent = v;
+}
+
+function closeTplModal() {
+  document.getElementById('tpl-modal-overlay')?.remove();
+  document.body.style.overflow = '';
+}
+
+function toggleAllTpl() {
+  const cardsHtml = SUBTITLE_TEMPLATES.map(t => {
+    const active = S.subTemplate === t.id;
+    const shadow = t.ol === 'none' ? 'none'
+      : `1px 1px 0 ${t.ol},-1px 1px 0 ${t.ol},1px -1px 0 ${t.ol},-1px -1px 0 ${t.ol}`;
+    let previewHtml;
+    if (t.type === 'bilingual_douyin' || t.type === 'douyin') {
+      previewHtml = `<div style="font-size:13px;font-weight:900;color:#FFD700;text-shadow:1px 1px 0 #000,-1px 1px 0 #000">字幕示例</div>`;
+    } else {
+      previewHtml = `<div style="font-size:13px;font-weight:800;color:${t.color};text-shadow:${shadow}">字幕示例</div>`;
+    }
+    return `<div onclick="closeTplModal();applySubTemplate('${t.id}')"
+      style="background:#2C2820;border-radius:10px;padding:10px 8px 8px;cursor:pointer;
+             border:2.5px solid ${active ? '#F97316' : '#3A3630'};box-sizing:border-box">
+      <div style="margin-bottom:6px">${previewHtml}</div>
+      <div style="font-size:11px;color:${active?'#F97316':'#A8A49C'};font-weight:600">${t.name}</div>
+      <div style="font-size:10px;color:#6B6860;margin-top:2px">${t.desc}</div>
+    </div>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'tpl-modal-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;justify-content:flex-end';
+  modal.innerHTML = `
+    <div onclick="closeTplModal()" style="flex:1;background:rgba(0,0,0,0.45)"></div>
+    <div style="background:#F7F5F1;border-radius:22px 22px 0 0;padding:20px 16px 32px;max-height:75vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <span style="font-size:16px;font-weight:700;color:#1A1614">全部模板</span>
+        <span onclick="closeTplModal()" style="font-size:13px;color:#9E9890;cursor:pointer">关闭</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        ${cardsHtml}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.body.style.overflow = 'hidden';
 }
 
 function tCloneStep5(sb) {
   const videoSrc = S.postProcessedVideoUrl || S.avatarVideoUrl || '';
   const hasResult = !!S.postProcessedVideoUrl;
 
-  // 模板卡片——用 text-shadow 模拟描边（兼容所有浏览器）
-  const tplHtml = SUBTITLE_TEMPLATES.map(t => {
+  // ─── 模板横滑行（最多显示 6 张，超出可滚动）─────────────────────
+  const visibleTpls = SUBTITLE_TEMPLATES.slice(0, 6);
+  const tplCards = visibleTpls.map(t => {
     const active = S.subTemplate === t.id;
     const shadow = t.ol === 'none' ? 'none'
-      : `1px 1px 0 ${t.ol},-1px 1px 0 ${t.ol},1px -1px 0 ${t.ol},-1px -1px 0 ${t.ol},0 2px 4px rgba(0,0,0,.8)`;
-    const checkMark = active ? `<div style="position:absolute;top:5px;right:6px;width:16px;height:16px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center">
+      : `1px 1px 0 ${t.ol},-1px 1px 0 ${t.ol},1px -1px 0 ${t.ol},-1px -1px 0 ${t.ol}`;
+    const checkMark = active ? `<div style="position:absolute;top:5px;right:5px;width:16px;height:16px;background:#F97316;border-radius:50%;display:flex;align-items:center;justify-content:center">
         <svg width="9" height="9" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>` : '';
-    // 爆款大字模板特殊预览
+    let previewHtml;
     if (t.type === 'bilingual_douyin') {
-      const douyinShadow = `1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000,0 2px 4px rgba(0,0,0,.9)`;
-      return `<div onclick="applySubTemplate('${t.id}')"
-        style="flex:1;min-width:calc(50% - 4px);background:#2C2820;border-radius:10px;padding:10px 8px 8px;cursor:pointer;
-               border:2.5px solid ${active ? '#F97316' : '#3A3630'};position:relative;box-sizing:border-box">
-        ${checkMark}
-        <div style="margin-bottom:5px">
-          <div style="font-size:12px;font-weight:900;color:#fff;text-shadow:${douyinShadow};line-height:1.08;font-family:SimSun,serif">能够</div>
-          <div style="font-size:18px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};letter-spacing:.5px;line-height:1.12;margin-top:3px;font-family:SimSun,serif">好好过日子</div>
-        </div>
-        <div style="font-size:11px;color:${active?'#F97316':'#A8A49C'};font-weight:600">${t.name}</div>
-        <div style="font-size:10px;color:#6B6860;margin-top:2px">${t.desc}</div>
-      </div>`;
+      previewHtml = `<div style="font-size:10px;font-weight:900;color:#fff;text-shadow:${`1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000`};line-height:1.1">能够</div>
+        <div style="font-size:15px;font-weight:900;color:#FFD700;text-shadow:${`1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000`};line-height:1.1">好好过日子</div>`;
+    } else if (t.type === 'douyin') {
+      previewHtml = `<div style="font-size:9px;font-weight:700;color:#fff;text-shadow:${`1px 1px 0 #000,-1px 1px 0 #000`};line-height:1.2">能够</div>
+        <div style="font-size:13px;font-weight:900;color:#FFD700;text-shadow:${`1px 1px 0 #000,-1px 1px 0 #000`};line-height:1.2">好好过日子</div>`;
+    } else {
+      previewHtml = `<div style="font-size:13px;font-weight:800;color:${t.color};text-shadow:${shadow};letter-spacing:.3px">字幕示例</div>`;
     }
-    if (t.type === 'douyin') {
-      const douyinShadow = `1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000,0 2px 4px rgba(0,0,0,.9)`;
-      return `<div onclick="applySubTemplate('${t.id}')"
-        style="flex:1;min-width:calc(50% - 4px);background:#2C2820;border-radius:10px;padding:10px 8px 8px;cursor:pointer;
-               border:2.5px solid ${active ? '#F97316' : '#3A3630'};position:relative;box-sizing:border-box">
-        ${checkMark}
-        <div style="margin-bottom:4px">
-          <div style="font-size:10px;font-weight:700;color:#fff;text-shadow:${douyinShadow};letter-spacing:.3px;line-height:1.3">能够</div>
-          <div style="font-size:14px;font-weight:900;color:#FFD700;text-shadow:${douyinShadow};letter-spacing:.5px;line-height:1.3">好好过日子</div>
-        </div>
-        <div style="font-size:11px;color:${active?'#F97316':'#A8A49C'};font-weight:600">${t.name}</div>
-        <div style="font-size:10px;color:#6B6860;margin-top:2px">${t.desc}</div>
-      </div>`;
-    }
-    return `<div onclick="applySubTemplate('${t.id}')"
-      style="flex:1;min-width:calc(50% - 4px);background:#2C2820;border-radius:10px;padding:10px 8px 8px;cursor:pointer;
+    return `<div data-tpl-id="${t.id}" onclick="applySubTemplate('${t.id}')"
+      style="flex-shrink:0;width:100px;background:#2C2820;border-radius:10px;padding:8px 8px 7px;cursor:pointer;
              border:2.5px solid ${active ? '#F97316' : '#3A3630'};position:relative;box-sizing:border-box">
       ${checkMark}
-      <div style="font-size:14px;font-weight:800;color:${t.color};text-shadow:${shadow};margin-bottom:5px;letter-spacing:.5px">字幕示例</div>
-      <div style="font-size:11px;color:${active?'#F97316':'#A8A49C'};font-weight:600">${t.name}</div>
-      <div style="font-size:10px;color:#6B6860;margin-top:2px">${t.desc} · ${t.size}px</div>
+      <div style="margin-bottom:5px;min-height:34px;display:flex;flex-direction:column;justify-content:flex-end">${previewHtml}</div>
+      <div style="font-size:10px;color:${active?'#F97316':'#A8A49C'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+      <div style="font-size:9px;color:#6B6860;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.desc}</div>
     </div>`;
   }).join('');
 
-  // 自定义颜色色板
+  // ─── 颜色 dots ─────────────────────────────────────────────────
   const COLORS = ['#FFFFFF','#FFEE00','#00E87A','#FF6B35','#FF3B3B','#00BFFF'];
   const colorDots = COLORS.map(c => {
     const active = S.subColor === c;
-    return `<div onclick="setState({subColor:'${c}',subTemplate:'custom'})"
+    return `<div data-color-dot="${c}" onclick="setSubColorDot('${c}')"
       style="width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;flex-shrink:0;
-             box-shadow:0 0 0 ${active?'3px #F97316':'2px #D4D0C8'};border:2px solid #fff;transition:.15s"></div>`;
+             box-shadow:0 0 0 ${active?'3px #F97316':'2px #D4D0C8'};border:2px solid ${c==='#FFFFFF'?'#E0DDD8':'#fff'};transition:.15s"></div>`;
   }).join('');
 
   const OL_COLORS = [['#000000','黑'],['#FFFFFF','白'],['none','无']];
   const olDots = OL_COLORS.map(([c,label]) => {
     const active = S.subOutlineColor === c;
     const bg = c === 'none' ? 'repeating-linear-gradient(45deg,#ddd 0,#ddd 4px,#fff 4px,#fff 8px)' : c;
-    return `<div onclick="setState({subOutlineColor:'${c}',subTemplate:'custom'})" style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+    return `<div data-ol-dot="${c}" onclick="setSubOlDot('${c}')" style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
       <div style="width:26px;height:26px;border-radius:50%;background:${bg};box-shadow:0 0 0 ${active?'3px #F97316':'2px #D4D0C8'};border:2px solid #fff"></div>
       <span style="font-size:9px;color:${active?'#F97316':'#A8A49C'}">${label}</span>
     </div>`;
@@ -2724,42 +2813,57 @@ function tCloneStep5(sb) {
 
   return `${sb}<div class="tab-page">
 
-    ${videoSrc ? `<div class="section-card" style="padding:10px">
-      <video src="${videoSrc}" controls playsinline preload="metadata" style="width:100%;border-radius:10px;max-height:40vh"></video>
-      <div style="font-size:12px;color:${hasResult?'#059669':'#A8A49C'};text-align:center;margin-top:6px;font-weight:${hasResult?600:400}">
-        ${hasResult ? '✓ 字幕已烧录' : '原始视频（未加字幕）'}
+    ${videoSrc ? `<div style="display:flex;justify-content:center;padding:0 16px 0;margin-bottom:12px">
+      <div style="width:55%;position:relative">
+        <div style="aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+          <video src="${videoSrc}" controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block"></video>
+        </div>
+        <div style="font-size:11px;color:${hasResult?'#059669':'#A8A49C'};text-align:center;margin-top:6px;font-weight:${hasResult?600:400}">
+          ${hasResult ? '✓ 字幕已烧录' : '原始视频（未加字幕）'}
+        </div>
       </div>
     </div>` : ''}
 
     <div class="section-card">
-      <div class="section-label" style="margin-bottom:10px">快速选择模板</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">${tplHtml}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span class="section-label" style="margin:0">快速选择模板</span>
+        <span onclick="toggleAllTpl()" style="font-size:12px;color:#F97316;font-weight:600;cursor:pointer;padding:2px 0">查看全部</span>
+      </div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+        ${tplCards}
+      </div>
     </div>
 
     <div class="section-card">
       <div class="section-label" style="margin-bottom:12px">自定义微调</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span style="font-size:13px;color:#6B6860">字幕颜色</span>
-        <div style="display:flex;gap:8px;align-items:center">${colorDots}</div>
+        <div style="display:flex;gap:7px;align-items:center">${colorDots}</div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <span style="font-size:13px;color:#6B6860">描边颜色</span>
         <div style="display:flex;gap:10px;align-items:center">${olDots}</div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:13px;color:#6B6860">字体大小</span>
-        <span style="font-size:13px;font-weight:600;color:#F97316">${S.subFontsize}px</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <span style="font-size:12px;color:#6B6860">字体大小</span>
+            <span data-fs-val style="font-size:12px;font-weight:600;color:#F97316">${S.subFontsize}像素</span>
+          </div>
+          <input type="range" min="24" max="48" step="4" value="${S.subFontsize}" data-fs-range
+            style="width:100%;accent-color:#F97316"
+            oninput="onSubFsInput(this.value)"/>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <span style="font-size:12px;color:#6B6860">描边粗细</span>
+            <span data-ow-val style="font-size:12px;font-weight:600;color:#F97316">${S.subOutlineWidth}</span>
+          </div>
+          <input type="range" min="0" max="4" step="0.5" value="${S.subOutlineWidth}" data-ow-range
+            style="width:100%;accent-color:#F97316"
+            oninput="onSubOwInput(this.value)"/>
+        </div>
       </div>
-      <input type="range" min="24" max="48" step="4" value="${S.subFontsize}"
-        style="width:100%;accent-color:#F97316;margin-bottom:10px"
-        oninput="setState({subFontsize:+this.value,subTemplate:'custom'})"/>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:13px;color:#6B6860">描边粗细</span>
-        <span style="font-size:13px;font-weight:600;color:#F97316">${S.subOutlineWidth}</span>
-      </div>
-      <input type="range" min="0" max="4" step="0.5" value="${S.subOutlineWidth}"
-        style="width:100%;accent-color:#F97316"
-        oninput="setState({subOutlineWidth:+this.value,subTemplate:'custom'})"/>
     </div>
 
     ${S.postProcessErr ? `<div class="err-text">${esc(S.postProcessErr)}</div>` : ''}
@@ -5293,6 +5397,8 @@ async function restoreCloneSession(taskId) {
 }
 
 async function openExtractWithTask(taskId, fromHistory) {
+  // 刷新 last_operated_at，小卡点击立即变大卡
+  api.post(`/tasks/${taskId}/touch`).catch(()=>{});
   // 如果当前任务正在生成数字人，转为后台轮询，HeyGem 继续跑
   if (S.avatarGenerating && S.avatarTaskId) {
     _startBgAvatarPoller(S.avatarTaskId);
@@ -5984,74 +6090,179 @@ function openHistoryPage(tab = 'inspire') {
 function tHistory() {
   if (S.tasksView === 'detail' && S.viewingTask) return tTaskDetail();
 
-  const tabs = `<div class="history-tabs">
-    <div class="history-tab-btn ${S.historyTab==='inspire'?'history-tab-btn-active':''}" onclick="switchHistoryTab('inspire')">灵感发现</div>
-    <div class="history-tab-btn ${S.historyTab==='clone'?'history-tab-btn-active':''}" onclick="switchHistoryTab('clone')">文案克隆</div>
+  const taskKindLocal = t => {
+    if (!t) return '克隆';
+    if (t.task_kind === 'industry' || t.type === 'industry_gen') return '行业';
+    if (t.type === 'profile_analyze' || t.type === 'single_video_analyze') return '对标';
+    return '克隆';
+  };
+  const taskKindClsLocal = t => ({ '克隆':'home-task-mini-action-clone', '对标':'home-task-mini-action-benchmark', '行业':'home-task-mini-action-industry' }[taskKindLocal(t)] || '');
+  const DONE_BIG_WINDOW = 1 * 60 * 60 * 1000;
+  const taskTimeLocal = t => {
+    const raw = t && (t.activity_at || t.updated_at || t.created_at);
+    const n = raw ? new Date(raw).getTime() : 0;
+    return Number.isNaN(n) ? 0 : n;
+  };
+
+  if (!S.tasksLoaded) return `<div class="tab-page">
+    <div style="text-align:center;padding-top:60px;font-size:14px;color:#A8A49C">加载中...</div>
   </div>`;
 
-  if (S.historyTab === 'inspire') return tTasksList(tabs);
+  const allTasks = [...(S.tasksList || [])].sort((a,b) => taskTimeLocal(b) - taskTimeLocal(a)).slice(0, 10);
 
-  // 克隆 tab：clone_video 任务 + 旧 rewrite 历史
-  const cloneTasks = (S.tasksList || []).filter(t => t.type === 'clone_video');
-  const citems = S.cloneHistory;
-  if (!S.cloneHistoryLoaded && !S.tasksLoaded) return `<div class="tab-page">${tabs}
-    <div style="text-align:center;padding-top:40px;font-size:14px;color:#A8A49C">加载中...</div></div>`;
-  if (cloneTasks.length === 0 && citems.length === 0) return `<div class="tab-page">${tabs}
-    <div style="display:flex;flex-direction:column;align-items:center;padding-top:40px">
+  if (!allTasks.length) return `<div class="tab-page">
+    <div style="display:flex;flex-direction:column;align-items:center;padding-top:60px">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D0CECA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-      <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有克隆记录</div>
-      <div class="btn-primary" style="width:auto;padding:0 28px" onclick="switchTab('extract')">去克隆</div>
-    </div></div>`;
-  const statusLbl = { pending:'排队中', running:'进行中', extracted:'提取完毕', done:'已完成', failed:'失败' };
-  const cloneStatusLbl = t => {
-    const step = Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 2 : 1)));
-    const doneLabels = ['提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕','制作完成'];
-    if (t.status === 'pending') return (t.stage === 'extracted' || t.stage === 'rewrite') ? '等待改写' : '排队中';
-    if (t.status === 'running') return t.stage === 'rewrite' ? '改写中' : '提取中';
-    if (t.status === 'extracted') return '提取完毕';
-    if (t.status === 'done') return doneLabels[step - 1] || '已完成';
-    return statusLbl[t.status] || t.status;
+      <div style="font-size:14px;color:#A8A49C;margin-bottom:16px">还没有任务记录</div>
+    </div>
+  </div>`;
+
+  // 沿用首页辅助函数（已在 tHomeTaskSection 闭包外无法直接访问，这里内联一份轻量版）
+  const cloneStepOfH = t => Math.max(1, Math.min(6, parseInt(t.clone_step) || (t.status === 'done' ? 3 : 1)));
+  const clonePhaseOfH = t => {
+    const savedStep = cloneStepOfH(t);
+    if (t.status === 'failed') return { step: savedStep, phase: 'failed' };
+    if (t.status === 'pending') return { step: savedStep <= 2 ? 1 : savedStep, phase: 'pending' };
+    if (t.status === 'running') return { step: savedStep <= 2 ? 1 : savedStep, phase: 'running' };
+    if (t.status === 'extracted') return savedStep > 1 ? { step: savedStep, phase: 'step_done' } : { step: 1, phase: 'extracted' };
+    return { step: savedStep, phase: savedStep >= 6 ? 'published' : 'step_done' };
   };
-  return `<div class="tab-page">${tabs}
-    ${cloneTasks.map(t => {
-      const canClick = t.status === 'done' || t.status === 'extracted';
-      return `<div class="history-page-card ${canClick?'task-card-clickable':''}" onclick="${canClick?`openExtractWithTask('${t.id}',true)`:''}" >
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <span class="history-page-hook" style="-webkit-line-clamp:1;flex:1">${esc(t.title)}</span>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px">
-            <span style="font-size:11px;color:${t.status==='done'?'#10B981':t.status==='failed'?'#DC2626':'#E8650A'}">${cloneStatusLbl(t)}</span>
-            ${(t.status==='done'||t.status==='failed')?`<span style="display:flex;align-items:center;cursor:pointer" onclick="deleteTask(event,'${t.id}')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C8C4BB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span>`:''}
-          </div>
-        </div>
-        <div class="history-page-meta">
-          <span class="history-page-time">${esc(formatDisplayTime(t.created_at))}</span>
-          ${canClick && t.status !== 'extracted' ? `<span class="history-page-count">查看结果 ›</span>` : ''}
-        </div>
-        ${t.status==='running'?`<div style="font-size:12px;color:#6B6860;margin-top:6px">${esc(t.thinking||'处理中...')}</div>`:''}
-        ${t.status==='failed'?`<div style="font-size:12px;color:#E8650A;margin-top:6px">${esc(friendlyError(t.error_msg))}</div>`:''}
+  const bigProgressH = t => {
+    if (t.status === 'failed') return Math.max(0, Math.min(100, t.progress || 0));
+    if (t.type === 'clone_video') {
+      const info = clonePhaseOfH(t);
+      if (info.phase === 'step_done' || info.phase === 'published') return null;
+      if (info.phase === 'pending') return 0;
+      if (info.phase === 'extracting' || info.phase === 'running') return Math.min(88, Math.max(5, (t.progress || 10) * 0.9));
+      return t.progress || 0;
+    }
+    if (t.status === 'done') return null;
+    return Math.max(0, Math.min(100, t.progress || 0));
+  };
+  const cloneNextActionsH = ['查看进度 ›','去查看 ›','去查看 ›','去查看 ›','去查看 ›','去查看 ›'];
+  const bigActionTextH = t => {
+    if (t.type === 'clone_video') {
+      const info = clonePhaseOfH(t);
+      if (info.phase === 'failed') return '查看详情 ›';
+      if (info.phase === 'pending' || info.phase === 'running') return '查看进度 ›';
+      if (info.phase === 'extracted') return '去改写 ›';
+      return cloneNextActionsH[info.step - 1] || '继续 ›';
+    }
+    if (t.status === 'extracted') return '改写 ›';
+    if (t.status === 'done') return '查看结果 ›';
+    if (t.status === 'failed') return '查看详情 ›';
+    return '查看详情 ›';
+  };
+  const statusTextH = t => {
+    if (t.type === 'clone_video') {
+      const info = clonePhaseOfH(t);
+      if (info.phase === 'failed') return '失败';
+      if (info.phase === 'pending') return '排队中';
+      if (info.phase === 'running' || info.phase === 'extracting') return '提取中';
+      if (info.phase === 'extracted') return '提取完毕';
+      const labels = ['提取中','提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕'];
+      return labels[info.step - 1] || '已完成';
+    }
+    return ({ pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败' }[t.status] || t.status);
+  };
+  const openTaskActionH = t => t.type === 'clone_video' ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
+  const stepsWithLabelsH = currentStep => {
+    const labels = ['提取','改写','语音','数字人','后期','发布'];
+    const svgCheck = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const svgDot = `<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="#F5762A"/></svg>`;
+    let html = '<div style="display:flex;align-items:center;width:100%">';
+    for (let i = 0; i < 6; i++) {
+      const isDone = i + 1 < currentStep;
+      const isActive = i + 1 === currentStep;
+      const cirBg = isDone ? '#F5762A' : isActive ? 'rgba(245,118,42,0.12)' : '#F0EDE8';
+      const cirColor = isDone ? '#fff' : isActive ? '#F5762A' : '#B0AA9F';
+      const cirBorder = isActive ? '1.5px solid #F5762A' : 'none';
+      const lblColor = i + 1 <= currentStep ? '#F5762A' : '#C8C3BC';
+      const lblWeight = isActive ? '700' : '400';
+      const inner = isDone ? svgCheck : isActive ? svgDot : (i + 1);
+      html += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${cirBg};color:${cirColor};border:${cirBorder};flex-shrink:0">${inner}</div>
+        <div style="font-size:9px;font-weight:${lblWeight};color:${lblColor};white-space:nowrap">${labels[i]}</div>
       </div>`;
-    }).join('')}
-    ${citems.map((it,i)=>{
-      const text = typeof it.result === 'string' ? it.result : (it.result?.content || it.result?.result || '');
-      const expanded = S.historyPageExpanded === ('c'+i);
-      return `<div class="history-page-card" onclick="toggleClonePage(${i})">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between"><div style="flex:1;min-width:0"><span class="history-page-track" style="font-size:13px;font-weight:400;color:#A8A49C">原文</span>
-        <div class="history-page-hook" style="-webkit-line-clamp:1">${esc(it.input||'')}</div>
-        </div><span style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;margin-left:8px;padding-top:2px" onclick="deleteCloneHistoryItem(event,${it.id})"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#C8C4BB" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span></div>
-        <div class="history-page-meta">
-          <span class="history-page-time">${esc(formatDisplayTime(it.created_at))}</span>
-          <span class="history-page-count">改写</span>
+      if (i < 5) {
+        const lineColor = isDone ? '#F5762A' : '#F0EDE8';
+        html += `<div style="flex:1;height:1.5px;background:${lineColor};margin-bottom:14px"></div>`;
+      }
+    }
+    html += '</div>';
+    return html;
+  };
+
+  const isBig = t => Date.now() - taskTimeLocal(t) < DONE_BIG_WINDOW;
+
+  const bigHtml = allTasks.filter(isBig).map(t => {
+    const cloneStep = cloneStepOfH(t);
+    const pct = bigProgressH(t);
+    const isDone = t.status === 'done' || (t.type === 'clone_video' && clonePhaseOfH(t).phase === 'published');
+    const isFailed = t.status === 'failed';
+    const isPending = t.status === 'pending';
+    const isRunning = t.status === 'running';
+    const bdgColor = isFailed ? '#E5534B' : isDone ? '#22C55E' : isPending ? '#6B6FE0' : '#F5762A';
+    const bdgBg = isFailed ? '#FFF0F0' : isDone ? '#F0FDF4' : isPending ? '#EEF0FF' : '#FFF3E8';
+    const showPulse = isRunning || isPending;
+    return `<div style="background:#FFF8F3;border-radius:18px;padding:14px 16px;border:1.5px solid rgba(245,118,42,0.2);box-shadow:0 4px 16px rgba(245,96,42,0.08);cursor:pointer" onclick="${openTaskActionH(t)}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600;color:#1A1614;line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(t.title)}</div>
+        <div style="flex-shrink:0;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;color:${bdgColor};background:${bdgBg};white-space:nowrap;display:flex;align-items:center;gap:4px">
+          ${showPulse ? `<div style="width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 1.2s infinite"></div>` : ''}
+          ${statusTextH(t)}
         </div>
-        ${expanded?`
-          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F0EEE8">
-            <div style="font-size:11px;color:#A8A49C;margin-bottom:6px">改写结果</div>
-            <div style="font-size:13px;color:#1A1814;line-height:1.8;white-space:pre-wrap;word-break:break-all">${esc(text)}</div>
-            <div style="display:flex;justify-content:flex-end;margin-top:10px">
-              <div class="copy-btn" onclick="cpClonePage(event,${i})">复制全文</div>
-            </div>
-          </div>`:''}
-      </div>`;
-    }).join('')}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:11px;color:#9E9890;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">${esc(formatDisplayTime(t.activity_at || t.updated_at || t.created_at))}</div>
+        ${(pct != null && pct > 0) ? `<div style="font-size:12px;font-weight:700;color:#F5762A;flex-shrink:0">${pct}%</div>` : ''}
+      </div>
+      <div style="height:4px;background:${(pct != null && pct > 0) ? 'rgba(245,118,42,0.15)' : '#F0EDE8'};border-radius:4px;overflow:hidden;margin-bottom:12px">
+        <div style="height:100%;width:${pct != null ? pct : 0}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
+      </div>
+      <div style="margin-bottom:12px">${stepsWithLabelsH(cloneStep)}</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1;padding:9px;text-align:center;background:rgba(245,118,42,0.08);border-radius:10px;font-size:13px;font-weight:600;color:#F5762A;cursor:pointer" onclick="event.stopPropagation();${openTaskActionH(t)}">${bigActionTextH(t)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const iconCloneH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`;
+  const iconInspireH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+  const iconDoneH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D9B5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const iconFailedH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+  const iconRunH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+
+  const smallHtml = allTasks.filter(t => !isBig(t)).map(t => {
+    const knd = taskKindLocal(t);
+    const kndCls = taskKindClsLocal(t);
+    const clickFn = openTaskActionH(t);
+    let icon, iconCls;
+    if (t.status === 'failed') { icon = iconFailedH; iconCls = 'htc-icon-failed'; }
+    else if (t.status === 'done') { icon = iconDoneH; iconCls = 'htc-icon-done'; }
+    else if (t.status === 'pending' || t.status === 'running') { icon = iconRunH; iconCls = 'htc-icon-inspire'; }
+    else { icon = t.type === 'clone_video' ? iconCloneH : iconInspireH; iconCls = t.type === 'clone_video' ? 'htc-icon-clone' : 'htc-icon-inspire'; }
+    return `<div class="home-task-mini-card" onclick="${clickFn}">
+      <div class="home-task-mini-icon">
+        <div class="htc-icon-wrap ${iconCls}" style="width:34px;height:34px;border-radius:10px">${icon}</div>
+      </div>
+      <div class="home-task-mini-body">
+        <div class="home-task-mini-title">${esc(t.title)}</div>
+        <div class="home-task-mini-meta">${esc(formatDisplayTime(t.activity_at || t.updated_at || t.created_at))}</div>
+      </div>
+      <span class="home-task-mini-action ${kndCls}">${knd}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="tab-page">
+    <div style="padding:0 16px 8px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:16px;font-weight:700;color:#1A1614">我的任务</span>
+      <span style="font-size:12px;color:#A8A49C">${allTasks.length} 条记录</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:0 16px">
+      ${bigHtml}
+    </div>
+    ${smallHtml ? `<div class="home-task-small-scroll" style="padding:0 16px">${smallHtml}</div>` : ''}
   </div>`;
 }
 
