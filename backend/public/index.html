@@ -4972,6 +4972,7 @@ async function saveCloneSession(cloneStep) {
     ttsIndexEmotion:  S.ttsIndexEmotion  || 'neutral',
     avatarVideoB64:   S.avatarVideoB64   || null,   // 步骤4完成后有值（旧流程）
     avatarDoneTaskId: S.avatarDoneTaskId || null,   // 步骤4完成后有值（新流程，用于恢复视频）
+    avatarVideoUrl:   (S.avatarVideoUrl && !S.avatarVideoUrl.startsWith('blob:')) ? S.avatarVideoUrl : null, // OSS 永久链接直接保存，blob URL 不保存
     avatarTaskId:     S.avatarTaskId     || null,   // 数字人生成任务ID（生成中时有值）
     avatarAsrUrl:     S.avatarAsrUrl     || null,   // 数字人服务地址（用于恢复poller）
     avatarLibKey:     S.avatarLibKey     || null,
@@ -5113,10 +5114,14 @@ async function restoreCloneSession(taskId) {
       patch.ttsAudioB64 = s.ttsAudioB64;
       patch.ttsAudioUrl = _b64ToBlobUrl(s.ttsAudioB64, 'audio/mp3');
     }
-    // 数字人视频恢复：优先用 base64，其次用 doneTaskId 重新拉取
+    // 数字人视频恢复：优先用 base64，其次用已保存的 OSS URL，最后异步拉取
     if (s.avatarVideoB64) {
       patch.avatarVideoB64 = s.avatarVideoB64;
       patch.avatarVideoUrl = _b64ToBlobUrl(s.avatarVideoB64, 'video/mp4');
+    } else if (s.avatarVideoUrl) {
+      // OSS 永久链接已保存，直接用，无需异步请求
+      patch.avatarDoneTaskId = s.avatarDoneTaskId || null;
+      patch.avatarVideoUrl = s.avatarVideoUrl;
     } else if (s.avatarDoneTaskId) {
       patch.avatarDoneTaskId = s.avatarDoneTaskId;
       // 异步恢复视频：优先用 OSS URL（直接播放），无则下载 blob（避免 frp 流式转圈）
