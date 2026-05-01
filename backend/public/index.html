@@ -2548,12 +2548,14 @@ function tCloneStep4(sb) {
     </div>`;
   }
 
-  // 已完成但视频URL还在异步加载中（从OSS恢复会话），显示Loading避免闪烁
+  // 已完成但视频URL还在异步加载中（blob下载中），显示Loading + 逃生按钮
   if (S.avatarDoneTaskId && !S.avatarVideoUrl) {
     return `${sb}<div class="tab-page">
-      <div style="text-align:center;padding:80px 20px;color:#9E9890;font-size:14px">
+      <div style="text-align:center;padding:60px 20px;color:#9E9890;font-size:14px">
         <div style="font-size:32px;margin-bottom:12px">⏳</div>
-        视频加载中…
+        <div style="margin-bottom:20px">视频加载中，请稍候…</div>
+        <div style="color:#bbb;font-size:12px;margin-bottom:24px">视频通过本地网络传输，文件较大时需要一点时间</div>
+        <button class="btn-ghost" style="font-size:13px;padding:8px 20px" onclick="setState({avatarDoneTaskId:null,avatarVideoUrl:null,avatarTaskId:null,avatarGenerating:false,avatarErr:'',avatarProgressPct:0,avatarProgressMsg:''})">重新生成</button>
       </div>
     </div>`;
   }
