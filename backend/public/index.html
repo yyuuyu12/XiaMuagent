@@ -4404,7 +4404,7 @@ async function handleTTSGenerate() {
       const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
       _stopTTSProgressTimer();
       setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
-      saveCloneSession(3); // ★ 步骤3：语音合成完成，保存 session
+      saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
     } else {
       _stopTTSProgressTimer();
       setState({ ttsGenerating: false, ttsProgressPct: 0, ttsErr: r.msg || '语音合成失败，请重试', extractStep: 3 });
@@ -4435,7 +4435,7 @@ async function _pollIndexTTSTask(taskId) {
         const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
         const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
         setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
-        saveCloneSession(3);
+        saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
         return;
       }
       if (r.code === 500) {
