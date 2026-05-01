@@ -1346,6 +1346,33 @@ function showToast(msg) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2000);
 }
+
+// 通用确认弹窗，返回 Promise<boolean>（true=确认，false=取消）
+function showConfirmModal({ title, body, confirmText = '确认', cancelText = '取消', confirmDanger = false }) {
+  return new Promise(resolve => {
+    const old = document.getElementById('_global_confirm_modal');
+    if (old) old.remove();
+    const wrap = document.createElement('div');
+    wrap.id = '_global_confirm_modal';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(26,22,20,0.45);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)';
+    wrap.innerHTML = `
+      <div style="background:#fff;border-radius:18px;width:100%;max-width:320px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+        <div style="padding:22px 20px 6px">
+          <div style="font-size:16px;font-weight:700;color:#1A1814;margin-bottom:8px">${title}</div>
+          <div style="font-size:14px;color:#6B6560;line-height:1.6">${body}</div>
+        </div>
+        <div style="display:flex;gap:0;border-top:1px solid #F0EEE8;margin-top:18px">
+          <button id="_confirm_cancel" style="flex:1;height:50px;font-size:15px;color:#6B6560;background:none;border:none;border-right:1px solid #F0EEE8;cursor:pointer;font-weight:500">${cancelText}</button>
+          <button id="_confirm_ok" style="flex:1;height:50px;font-size:15px;color:${confirmDanger ? '#D94B2B' : '#F5762A'};background:none;border:none;cursor:pointer;font-weight:700">${confirmText}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const cleanup = (val) => { wrap.remove(); resolve(val); };
+    document.getElementById('_confirm_cancel').onclick = () => cleanup(false);
+    document.getElementById('_confirm_ok').onclick    = () => cleanup(true);
+    wrap.addEventListener('click', e => { if (e.target === wrap) cleanup(false); });
+  });
+}
 function tAppLoader(text = '加载中...') {
   return `<div class="app-loader">
     <div class="app-loader-mark">
@@ -4342,8 +4369,10 @@ async function handleTTSGenerate() {
     const r = await api.post('/ai/tts', payload);
     if (r.code === 202 && r.task_id) {
       // IndexTTS 异步模式：轮询直到完成
+      _currentTTSJobId = r.task_id; // ★ 记录供后台化使用
       setState({ ttsGenerating: true, ttsErr: '', extractStep: 'tts_gen' });
       await _pollIndexTTSTask(r.task_id);
+      _currentTTSJobId = null; // ★ 正常结束时清除
       return;
     }
     if (r.code === 200) {
@@ -4728,29 +4757,70 @@ let _avatarPoller = null;
 let _avatarRunSeq = 0;
 let _bgAvatarPoller = null; // 切换任务后后台保活轮询
 let _bgAvatarTaskId = null;
+let _bgAvatarOwnerId = null; // ★ 数字人所属的克隆任务ID，用于后台完成时存入正确session
 
-function _startBgAvatarPoller(taskId) {
+function _startBgAvatarPoller(taskId, ownerTaskId) {
   if (_bgAvatarPoller) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; }
   _bgAvatarTaskId = taskId;
+  _bgAvatarOwnerId = ownerTaskId || null; // ★ 记录归属任务
   let failCount = 0;
   _bgAvatarPoller = setInterval(async () => {
     if (!_bgAvatarTaskId) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; return; }
     try {
       const r = await api.get(`/ai/video/task/${_bgAvatarTaskId}`);
       if (r.code !== 200) {
-        if (++failCount > 8) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; }
+        if (++failCount > 8) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; _bgAvatarOwnerId = null; }
         return;
       }
       const t = r.data;
       if (t.video_url || t.status === 'done') {
-        clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null;
+        const ownerId = _bgAvatarOwnerId;
+        const doneTaskId = _bgAvatarTaskId;
+        clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; _bgAvatarOwnerId = null;
+        // ★ 把视频URL存入正确任务的session，让用户回来后能直接恢复
+        if (t.video_url && ownerId) {
+          _savePartialSessionForTask(ownerId, 5, { avatarVideoUrl: t.video_url, avatarDoneTaskId: doneTaskId, avatarTaskId: null });
+        }
         loadTasks();
         showToast('数字人视频已生成完成，请回到对应任务查看');
       } else if (t.status === 'error' || t.status === 'cancelled') {
-        clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null;
+        clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; _bgAvatarOwnerId = null;
       }
-    } catch { if (++failCount > 8) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; } }
+    } catch { if (++failCount > 8) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; _bgAvatarOwnerId = null; } }
   }, 8000);
+}
+
+// ★ TTS 后台轮询（切换任务后继续等待 IndexTTS 完成并存入正确任务session）
+let _bgTTSJobId = null;
+let _bgTTSOwnerId = null;
+let _bgTTSPoller = null;
+
+function _startBgTTSPoller(ttsJobId, ownerTaskId) {
+  if (_bgTTSPoller) { clearTimeout(_bgTTSPoller); _bgTTSPoller = null; }
+  _bgTTSJobId = ttsJobId;
+  _bgTTSOwnerId = ownerTaskId;
+  let failCount = 0;
+  async function poll() {
+    if (!_bgTTSJobId) return;
+    try {
+      const r = await api.get(`/ai/tts/indextts/task/${_bgTTSJobId}`);
+      if (r.code === 200 && r.data) {
+        const ownerId = _bgTTSOwnerId;
+        _bgTTSJobId = null; _bgTTSOwnerId = null;
+        await _savePartialSessionForTask(ownerId, 3, { ttsAudioB64: r.data.audio });
+        loadTasks();
+        showToast('语音已生成完成，请回到对应任务查看');
+        return;
+      }
+      if (r.code === 500) { _bgTTSJobId = null; _bgTTSOwnerId = null; return; } // 失败，放弃
+      if (++failCount > 80) { _bgTTSJobId = null; _bgTTSOwnerId = null; return; } // ~4分钟超时
+      _bgTTSPoller = setTimeout(poll, 3000);
+    } catch {
+      if (++failCount > 8) { _bgTTSJobId = null; _bgTTSOwnerId = null; return; }
+      _bgTTSPoller = setTimeout(poll, 3000);
+    }
+  }
+  poll();
 }
 
 async function handleAvatarGenerate() {
@@ -5491,6 +5561,19 @@ async function restoreCloneSession(taskId) {
 }
 
 async function openExtractWithTask(taskId, fromHistory) {
+  // ★ 生成中切换任务拦截：语音/数字人/后期处理进行时弹确认框
+  const isGenerating = S.ttsGenerating || S.avatarGenerating || S.postProcessing;
+  if (isGenerating && String(S.cloneTaskId) !== String(taskId)) {
+    const genLabel = S.ttsGenerating ? '语音生成' : S.avatarGenerating ? '数字人视频生成' : '字幕烧录';
+    const ok = await showConfirmModal({
+      title: `${genLabel}进行中`,
+      body: `切换任务将会导致当前 ${genLabel} 进展中断，确定要切换吗？`,
+      confirmText: '切换任务',
+      cancelText: '继续等待',
+      confirmDanger: true,
+    });
+    if (!ok) return; // 用户选"继续等待"，不切换
+  }
   // 刷新 last_operated_at，小卡点击立即变大卡
   api.post(`/tasks/${taskId}/touch`).catch(()=>{});
   // 如果当前任务正在生成数字人，转为后台轮询，HeyGem 继续跑
