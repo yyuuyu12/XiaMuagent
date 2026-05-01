@@ -143,4 +143,31 @@ router.post('/clone-start', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/video/clone-restart - 复用已有任务ID重新提取（清空内容后再次提交）
+router.post('/clone-restart', requireAuth, async (req, res) => {
+  const { url, taskId } = req.body;
+  if (!url?.trim() || !taskId) return res.status(400).json({ code: 400, msg: '参数错误' });
+
+  // 确认任务归属当前用户
+  const rows = await db.query('SELECT id FROM tasks WHERE id=$1 AND user_id=$2', [taskId, req.userId]);
+  if (!rows.rows.length) return res.status(404).json({ code: 404, msg: '任务不存在' });
+
+  const usage = await checkAndRecordUsage(req.userId, 'extract');
+  if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
+
+  try {
+    // 重置任务状态，更新输入URL
+    await db.query(
+      'UPDATE tasks SET status=$1, progress=$2, error_msg=$3, result=$4, input_data=$5, title=$6, stage=$7, thinking=$8 WHERE id=$9',
+      ['pending', 0, null, null, JSON.stringify({ url: url.trim() }), '克隆中...', null, '', taskId]
+    );
+    // 清除会话（步骤状态全部重置）
+    await db.query('DELETE FROM task_sessions WHERE task_id=$1', [taskId]);
+    require('../taskRunner').enqueue({ taskId, type: 'clone_video' });
+    res.json({ code: 200, data: { taskId } });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
 module.exports = router;

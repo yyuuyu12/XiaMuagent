@@ -4038,7 +4038,10 @@ async function handleExtract() {
   if (!S.videoUrl.trim() || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   try {
-    const r = await api.post('/video/clone-start', { url: S.videoUrl.trim() });
+    // 已有任务（清空内容后重新提交）→ 复用原任务ID，不新建
+    const r = S.cloneTaskId
+      ? await api.post('/video/clone-restart', { url: S.videoUrl.trim(), taskId: S.cloneTaskId })
+      : await api.post('/video/clone-start', { url: S.videoUrl.trim() });
     if (apiUnauthorized(r)) { setState({ extractLoading: false }); return; }
     if (r.code === 200) {
       setState({ extractLoading: false, cloneTaskId: r.data.taskId, cloneTaskData: null, extractStep: 'cloning' });
@@ -4768,14 +4771,15 @@ function _startAvatarPoller(taskId, asrUrl, runSeq = _avatarRunSeq) {
 }
 
 // 完全清空克隆工作区（用于重新开始 / 入口新建）
-function resetCloneWorkspace() {
+function resetCloneWorkspace(keepTaskId = true) {
   stopClonePoller();
   if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
   if (_bgAvatarPoller) { clearInterval(_bgAvatarPoller); _bgAvatarPoller = null; _bgAvatarTaskId = null; }
   _avatarRunSeq++;
   _ttsAbortFlag = true;
+  const extra = keepTaskId ? {} : { cloneTaskId: null }; // 从入口新建时清掉任务ID，清空内容时保留
   setState({
-    extractStep: 0, cloneTaskId: null, cloneTaskData: null,
+    extractStep: 0, cloneTaskData: null, ...extra,
     extractedScript: '', rewrittenScript: '', extractErr: '', videoUrl: '',
     rewriteSourceExpanded: false,
     ttsAudioUrl: null, ttsAudioB64: null, ttsGenerating: false, ttsErr: '',
@@ -4790,13 +4794,13 @@ function resetCloneWorkspace() {
   });
 }
 
-// 入口点击：生成中则继续，否则直接新建
+// 入口点击：生成中则继续，否则全新开始（清掉旧任务ID）
 function openCloneEntry() {
   if (S.ttsGenerating || S.avatarGenerating || S.postProcessing) {
     switchTab('extract'); // 有任务跑着，进去看
   } else {
-    resetCloneWorkspace();
-    switchTab('extract'); // 全新开始
+    resetCloneWorkspace(false); // false = 不保留旧任务ID，全新开始
+    switchTab('extract');
   }
 }
 
