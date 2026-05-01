@@ -872,4 +872,26 @@ router.get('/tts/indextts/task/:taskId', requireAuth, async (req, res) => {
   }
 });
 
+// ===== CORS 代理：用于封面帧抓取（OSS 跨域 toDataURL 问题）=====
+// 只允许白名单域名，防止被滥用当开放代理
+const CORS_PROXY_ALLOWED = ['aliyuncs.com', 'oss-cn-', 'myqcloud.com', 'amazonaws.com'];
+router.get('/cors-proxy', requireAuth, async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'url 参数必填' });
+  const isAllowed = CORS_PROXY_ALLOWED.some(d => url.includes(d));
+  if (!isAllowed) return res.status(403).json({ error: '不在允许代理的域名范围内' });
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!resp.ok) return res.status(resp.status).end();
+    const ct = resp.headers.get('content-type') || 'application/octet-stream';
+    res.set('Content-Type', ct);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=3600');
+    const buf = await resp.arrayBuffer();
+    res.send(Buffer.from(buf));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

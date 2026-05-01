@@ -2379,7 +2379,7 @@ function tCloneStep3(sb) {
             <div style="position:absolute;inset:-8px;border-radius:30px;border:2px solid rgba(245,118,42,0.12);animation:ripple 2s ease-out infinite"></div>
           </div>
           <div style="font-size:17px;font-weight:700;color:#1A1614;margin-bottom:5px">正在合成语音</div>
-          <div style="font-size:13px;color:#9E9890">通常需要 10~20 秒</div>
+          <div style="font-size:13px;color:#9E9890">已用时 <span style="color:#F5762A;font-weight:600">${S.ttsElapsedSecs || 0}s</span></div>
         </div>
         <div style="height:6px;background:#F0EDE8;border-radius:6px;overflow:hidden;margin-bottom:8px">
           <div style="height:100%;width:${ttsPct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:6px;transition:width 0.3s ease"></div>
@@ -2484,7 +2484,7 @@ function tCloneStep3(sb) {
         <div class="voice-preview-title">语音预览</div>
         <div class="voice-wave">${wave}</div>
       </div>
-      <span class="voice-done-badge">✓ 合成完成</span>
+      <span class="voice-done-badge">✓ 合成完成${S.ttsDuration ? '　' + S.ttsDuration + 's' : ''}</span>
     </div>` : '';
 
   return `${sb}<div class="tab-page clone-voice-page">
@@ -5054,12 +5054,30 @@ async function handlePostProcess() {
 }
 
 // ===== 封面生成 =====
-function _extractFrame(videoUrl, seekSec) {
+async function _extractFrame(videoUrl, seekSec) {
+  // OSS/跨域 URL → 通过后端 CORS 代理转成 blob URL，避免 canvas toDataURL tainted 报错
+  let srcUrl = videoUrl;
+  let blobCreated = false;
+  if (videoUrl && !videoUrl.startsWith('blob:') && !videoUrl.startsWith('data:')) {
+    try {
+      const proxyUrl = `${API_BASE}/ai/cors-proxy?url=${encodeURIComponent(videoUrl)}`;
+      const resp = await fetch(proxyUrl, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+      if (resp.ok) {
+        const blob = await resp.blob();
+        srcUrl = URL.createObjectURL(blob);
+        blobCreated = true;
+      }
+    } catch (proxyErr) {
+      console.warn('[_extractFrame] 代理失败，回退原始 URL:', proxyErr.message);
+    }
+  }
   return new Promise((resolve, reject) => {
     const v = document.createElement('video');
     v.muted = true;
     v.preload = 'auto';
-    v.src = videoUrl;
+    v.crossOrigin = 'anonymous';
+    v.src = srcUrl;
+    const cleanup = () => { if (blobCreated) { try { URL.revokeObjectURL(srcUrl); } catch {} } };
     v.addEventListener('loadeddata', () => {
       v.currentTime = Math.min(seekSec, Math.max(0.1, (v.duration || 10) - 0.5));
     }, { once: true });
@@ -5069,10 +5087,11 @@ function _extractFrame(videoUrl, seekSec) {
         c.width = v.videoWidth || 720;
         c.height = v.videoHeight || 1280;
         c.getContext('2d').drawImage(v, 0, 0);
+        cleanup();
         resolve({ dataUrl: c.toDataURL('image/jpeg', 0.9), w: c.width, h: c.height });
-      } catch (e) { reject(e); }
+      } catch (e) { cleanup(); reject(e); }
     }, { once: true });
-    v.addEventListener('error', () => reject(new Error('视频加载失败')), { once: true });
+    v.addEventListener('error', () => { cleanup(); reject(new Error('视频加载失败')); }, { once: true });
     v.load();
   });
 }
@@ -5263,22 +5282,33 @@ function goHomeBackground() {
   render();
 }
 
-// ── TTS 模拟进度计时器 ───────────────────────────────────────────────────
+// ── TTS 模拟进度 + 实时计时器 ──────────────────────────────────────────
 let _ttsProgressTimer = null;
+let _ttsElapsedTimer = null;
 function _startTTSProgressTimer() {
   _stopTTSProgressTimer();
-  setState({ ttsProgressPct: 5 });
+  const t0 = Date.now();
+  setState({ ttsProgressPct: 5, ttsStartTime: t0, ttsElapsedSecs: 0, ttsDuration: null });
   let pct = 5;
   _ttsProgressTimer = setInterval(() => {
     if (!S.ttsGenerating) { _stopTTSProgressTimer(); return; }
     if (pct < 88) {
       pct = Math.min(88, pct + (Math.random() * 3 + 0.5));
-      setState({ ttsProgressPct: Math.round(pct) });
+      S.ttsProgressPct = Math.round(pct);  // 直接写，避免触发完整 render
     }
   }, 700);
+  _ttsElapsedTimer = setInterval(() => {
+    if (!S.ttsGenerating) { _stopTTSProgressTimer(); return; }
+    const secs = Math.floor((Date.now() - t0) / 1000);
+    S.ttsElapsedSecs = secs;
+    // 只更新计时数字，不触发完整 render（直接操作 DOM）
+    const el = document.querySelector('[data-tts-elapsed]');
+    if (el) el.textContent = secs + 's';
+  }, 1000);
 }
 function _stopTTSProgressTimer() {
   if (_ttsProgressTimer) { clearInterval(_ttsProgressTimer); _ttsProgressTimer = null; }
+  if (_ttsElapsedTimer) { clearInterval(_ttsElapsedTimer); _ttsElapsedTimer = null; }
 }
 
 // ── 停止 TTS 生成 ────────────────────────────────────────────────────────
