@@ -5760,8 +5760,20 @@ async function openExtractWithTask(taskId, fromHistory) {
   _avatarRunSeq++;
 
   // ★ 立即重置所有生成中状态，防止切换任务时上一个任务的状态残留
+  // 同时从本地 tasksList 读取已知 clone_step，先跳到正确步骤再等接口返回
+  const _cachedTask = (S.tasksList || []).find(t => String(t.id) === String(taskId));
+  const _initStep = (() => {
+    if (!_cachedTask) return 0;
+    const s = _cachedTask.clone_step || 1;
+    const st = _cachedTask.status;
+    if (st === 'pending' || st === 'running') return ((_cachedTask.stage === 'rewrite' || _cachedTask.stage === 'extracted') ? 'rewriting' : 'cloning');
+    if (st === 'extracted') return s >= 3 ? s : 'review';
+    if (st === 'done') return s >= 2 ? s : 2;
+    return 0;
+  })();
   setState({
     currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null,
+    extractStep: _initStep,
     extractErr: '', extractFromHistory: !!fromHistory,
     avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null,
     avatarVideoUrl: null, avatarVideoB64: null, avatarErr: '',
