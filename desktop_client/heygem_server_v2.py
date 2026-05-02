@@ -133,30 +133,39 @@ async def generate(req: GenerateReq):
     else:
         _avatar_save_path = None
 
-    # 用线程执行所有磁盘 I/O，避免阻塞 uvicorn 事件循环
+    # 立即返回 task_id，文件写入 + 推理全在后台，避免 Zeabur 网关 502 超时
+    asyncio.create_task(_prepare_and_run(
+        task_id, req.audio_b64, audio_path, video_b64, video_path,
+        avatar_path, _avatar_save_path, req.oss_config, req.user_id or "unknown",
+    ))
+    return {"task_id": task_id, "avatar_key": saved_avatar_key}
+
+
+async def _prepare_and_run(task_id, audio_b64, audio_path, video_b64, video_path,
+                            avatar_path, avatar_save_path, oss_config, user_id):
+    """后台：先写文件，再启动推理。写文件失败直接标 error。"""
     def _write_files():
-        audio_path.write_bytes(base64.b64decode(req.audio_b64))
+        audio_path.write_bytes(base64.b64decode(audio_b64))
         if avatar_path:
             import shutil
             shutil.copy2(str(avatar_path), str(video_path))
         else:
             video_data = base64.b64decode(video_b64)
             video_path.write_bytes(video_data)
-            # 顺手存一份到形象库（本地 IO，和推理无关）
-            if _avatar_save_path:
-                _avatar_save_path.write_bytes(video_data)
-                print(f"[HeyGem] 形象已保存: {_avatar_save_path}")
-
+            if avatar_save_path:
+                avatar_save_path.write_bytes(video_data)
+                print(f"[HeyGem] 形象已保存: {avatar_save_path}")
     try:
         await asyncio.to_thread(_write_files)
     except Exception as e:
-        raise HTTPException(400, f"文件写入失败: {e}")
-
+        with _task_lock:
+            tasks[task_id]["status"] = "error"
+            tasks[task_id]["error"] = f"文件写入失败: {e}"
+        return
     asyncio.create_task(_run_heygem_v2(
         task_id, str(audio_path), str(video_path),
-        oss_config=req.oss_config, user_id=req.user_id or "unknown",
+        oss_config=oss_config, user_id=user_id,
     ))
-    return {"task_id": task_id, "avatar_key": saved_avatar_key}
 
 
 @app.get("/video/task/{task_id}")
