@@ -1998,8 +1998,8 @@ function tHomeTaskSection() {
       </div>
       <div class="hlc-hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" stroke="#F5762A" stroke-width="1.8"/><path d="M5 11C5 14.866 8.134 18 12 18" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round"/></svg>正在合成语音中...</div>
       <div class="hlc-progress-row">
-        <div class="hlc-bar-wrap"><div class="hlc-bar-fill" style="width:${pct}%"></div></div>
-        <div class="hlc-pct">${pct}%</div>
+        <div class="hlc-bar-wrap"><div class="hlc-bar-fill" data-tts-pct style="width:${pct}%"></div></div>
+        <div class="hlc-pct" data-tts-pct-text>${pct}%</div>
       </div>
       <div class="hlc-steps">${_hlcSteps(2)}</div>
       <div class="hlc-actions">
@@ -2220,7 +2220,7 @@ function tHome() {
 // ===== 克隆流程步骤条 =====
 function cloneCurrentStep() {
   const s = S.extractStep;
-  if (s === 0 || s === 'cloning' || s === 'review') return 1;
+  if (s === 0 || s === 'task_loading' || s === 'cloning' || s === 'review') return 1;
   if (s === 'rewriting' || s === 2) return 2;
   if (s === 3 || s === 'tts_gen') return 3;
   if (s === 4 || s === 'avatar_gen') return 4;
@@ -2263,6 +2263,16 @@ function tCloneActions(primary, secondary = []) {
 // ===== EXTRACT =====
 function tExtract() {
   const sb = tCloneStepBar();
+
+  // 任务加载中（openExtractWithTask 等待 session 恢复时的过渡态）
+  if (S.extractStep === 'task_loading') {
+    return `${sb}<div class="tab-page">
+      <div style="text-align:center;padding:80px 20px;color:#9E9890;font-size:14px">
+        <div style="width:36px;height:36px;border:3px solid rgba(245,118,42,0.2);border-top-color:#F5762A;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
+        <div>加载任务中…</div>
+      </div>
+    </div>`;
+  }
 
   // 路由到步骤3-6
   if (S.extractStep === 3 || S.extractStep === 'tts_gen') return tCloneStep3(sb);
@@ -2411,11 +2421,11 @@ function tCloneStep3(sb) {
           <div style="font-size:17px;font-weight:700;color:#1A1614;margin-bottom:5px">正在合成语音</div>
         </div>
         <div style="height:6px;background:#F0EDE8;border-radius:6px;overflow:hidden;margin-bottom:8px">
-          <div style="height:100%;width:${ttsPct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:6px;transition:width 0.3s ease"></div>
+          <div data-tts-pct style="height:100%;width:${ttsPct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:6px;transition:width 0.3s ease"></div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <div style="font-size:12px;color:#B0AA9F">正在处理中…</div>
-          <div style="font-size:13px;font-weight:700;color:#F5762A">${ttsPct}%</div>
+          <div data-tts-pct-text style="font-size:13px;font-weight:700;color:#F5762A">${ttsPct}%</div>
         </div>
         <div class="gen-bg-divider"></div>
         <div class="gen-bg-block">
@@ -4485,7 +4495,8 @@ async function handleTTSGenerate() {
       const audioMime = audioFmt === 'wav' ? 'audio/wav' : audioFmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
       const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
       _stopTTSProgressTimer();
-      setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
+      setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3,
+        avatarDoneTaskId: null, avatarVideoUrl: null, avatarVideoB64: null }); // ★ 新音频→清除旧数字人数据
       saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
     } else {
       _stopTTSProgressTimer();
@@ -4516,7 +4527,8 @@ async function _pollIndexTTSTask(taskId) {
         const audioFmt = (r.data.format || 'wav').toLowerCase();
         const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
         const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
-        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
+        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3,
+          avatarDoneTaskId: null, avatarVideoUrl: null, avatarVideoB64: null }); // ★ 新音频→清除旧数字人数据
         saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
         return;
       }
@@ -5552,6 +5564,10 @@ function _startTTSProgressTimer() {
     if (pct < 88) {
       pct = Math.min(88, pct + (Math.random() * 3 + 0.5));
       S.ttsProgressPct = Math.round(pct);  // 直接写，避免触发完整 render
+      // 同步更新首页小卡 + 语音页进度条 DOM（两处都加了 data-tts-pct 属性）
+      const pctStr = Math.round(pct) + '%';
+      document.querySelectorAll('[data-tts-pct]').forEach(el => { el.style.width = pctStr; });
+      document.querySelectorAll('[data-tts-pct-text]').forEach(el => { el.textContent = pctStr; });
     }
   }, 700);
   _ttsElapsedTimer = setInterval(() => {
@@ -5788,11 +5804,12 @@ async function openExtractWithTask(taskId, fromHistory) {
   })();
   setState({
     currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null,
-    extractStep: _initStep,
+    extractStep: 'task_loading',   // ★ 先进 loading 态，等 session 恢复后再跳到正确步骤
     extractErr: '', extractFromHistory: !!fromHistory,
     avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null,
     avatarVideoUrl: null, avatarVideoB64: null, avatarErr: '',
     avatarProgressPct: 0, avatarProgressMsg: '',
+    avatarDoneTaskId: null,        // ★ 清除旧 avatarDoneTaskId，session 恢复后按需设置
     ttsAudioUrl: null, ttsAudioB64: null, ttsGenerating: false, ttsErr: '',
     postProcessedVideoUrl: null, postProcessedB64: null, postProcessing: false,
     coverFrameUrl: null, rewrittenScript: '', extractedScript: '', rewriteSourceExpanded: false,
