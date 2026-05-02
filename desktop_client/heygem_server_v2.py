@@ -80,6 +80,8 @@ class GenerateReq(BaseModel):
     enhancer:   bool = False
     oss_config: Optional[OssConfig] = None   # 提供时本地直传 OSS，跳过 Zeabur 中转
     user_id:    Optional[str] = None         # 用于 OSS 路径和 avatar_key 目录
+    save_as_avatar: bool = False             # 同时把源视频存为形象库
+    avatar_name: str = ''                    # 形象名称（供上层写 DB 用）
 
 
 @app.get("/health")
@@ -118,14 +120,32 @@ async def generate(req: GenerateReq):
     audio_path = TEMP_DIR / f"{task_id}.{req.audio_fmt}"
     video_path = TEMP_DIR / f"{task_id}_src.{video_fmt}"
 
+    # 如果需要保存为形象，提前确定目标路径（此时还未解码）
+    saved_avatar_key = None
+    if req.save_as_avatar and video_b64 and req.user_id:
+        uid = req.user_id
+        _aid = uuid.uuid4().hex[:12]
+        _ext = video_fmt or "mp4"
+        _avatar_dir = AVATARS_DIR / f"u{uid}"
+        _avatar_dir.mkdir(exist_ok=True)
+        _avatar_save_path = _avatar_dir / f"{_aid}.{_ext}"
+        saved_avatar_key = f"u{uid}/{_aid}.{_ext}"
+    else:
+        _avatar_save_path = None
+
     # 用线程执行所有磁盘 I/O，避免阻塞 uvicorn 事件循环
     def _write_files():
         audio_path.write_bytes(base64.b64decode(req.audio_b64))
         if avatar_path:
             import shutil
-            shutil.copy2(str(avatar_path), str(video_path))   # 直接复制，省去 base64 来回转换
+            shutil.copy2(str(avatar_path), str(video_path))
         else:
-            video_path.write_bytes(base64.b64decode(video_b64))
+            video_data = base64.b64decode(video_b64)
+            video_path.write_bytes(video_data)
+            # 顺手存一份到形象库（本地 IO，和推理无关）
+            if _avatar_save_path:
+                _avatar_save_path.write_bytes(video_data)
+                print(f"[HeyGem] 形象已保存: {_avatar_save_path}")
 
     try:
         await asyncio.to_thread(_write_files)
@@ -136,7 +156,7 @@ async def generate(req: GenerateReq):
         task_id, str(audio_path), str(video_path),
         oss_config=req.oss_config, user_id=req.user_id or "unknown",
     ))
-    return {"task_id": task_id}
+    return {"task_id": task_id, "avatar_key": saved_avatar_key}
 
 
 @app.get("/video/task/{task_id}")

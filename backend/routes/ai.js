@@ -795,7 +795,7 @@ router.post('/voices/clone-id', requireAuth, async (req, res) => {
 
 // ==================== 数字人视频生成 ====================
 router.post('/video/generate', requireAuth, async (req, res) => {
-  const { audio_b64, video_b64, avatar_key, audio_fmt, video_fmt, enhancer } = req.body;
+  const { audio_b64, video_b64, avatar_key, audio_fmt, video_fmt, enhancer, save_avatar_name } = req.body;
   if (!audio_b64) return res.json({ code: 400, msg: '请先完成语音合成' });
   if (!video_b64 && !avatar_key) return res.json({ code: 400, msg: '请上传或选择数字人视频' });
   if (audio_b64.length > 6 * 1024 * 1024) return res.json({ code: 400, msg: '音频过大（>4.5MB），请缩短语音' });
@@ -828,6 +828,7 @@ router.post('/video/generate', requireAuth, async (req, res) => {
       enhancer: !!enhancer,
       ...(avatar_key ? { avatar_key } : { video_b64, video_fmt: video_fmt || 'mp4' }),
       ...(ossPayload ? { oss_config: ossPayload, user_id: String(req.userId) } : {}),
+      ...(save_avatar_name && video_b64 ? { save_as_avatar: true, avatar_name: save_avatar_name, user_id: String(req.userId) } : {}),
     };
     console.log(`[video/generate] audio_b64 len=${(audio_b64||'').length} video_b64 len=${(video_b64||'').length} avatar_key=${avatar_key} videoUrl=${videoUrl}`);
     const resp = await fetch(`${videoUrl}/video/generate`, {
@@ -846,6 +847,20 @@ router.post('/video/generate', requireAuth, async (req, res) => {
       data = JSON.parse(text);
     } catch {
       return res.json({ code: 500, msg: htmlServiceError(videoUrl, text) });
+    }
+    // HeyGem 顺手保存了形象，写 DB + 触发压缩
+    if (data.avatar_key && save_avatar_name) {
+      const asrUrl = await getAsrUrl();
+      try {
+        const { rows: existing } = await db.query('SELECT id FROM avatar_library WHERE user_id=? ORDER BY created_at ASC', [req.userId]);
+        if (existing.length >= 5) {
+          for (const row of existing.slice(0, existing.length - 4))
+            await db.query('DELETE FROM avatar_library WHERE id=?', [row.id]);
+        }
+        await db.query('INSERT INTO avatar_library (user_id, name, avatar_key) VALUES (?,?,?)',
+          [req.userId, save_avatar_name.slice(0, 100), data.avatar_key]);
+      } catch(e) { console.warn('[video/generate] avatar DB写入失败:', e.message); }
+      if (asrUrl) _triggerAvatarCompress(asrUrl, data.avatar_key.split('/').pop().replace(/\.[^.]+$/,''), String(req.userId)).catch(() => {});
     }
     return res.json({ code: 200, data });
   } catch (e) {

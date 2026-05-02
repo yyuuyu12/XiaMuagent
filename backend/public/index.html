@@ -4983,9 +4983,12 @@ async function handleAvatarGenerate() {
   const _submitTimeout = setTimeout(() => _submitAbort.abort(), 60000);
 
   try {
+    const saveAvatarName = !S.avatarLibKey && S._pendingAvatarSaveName;
+    if (saveAvatarName) setState({ _pendingAvatarSaveName: null });
     const videoPayload = S.avatarLibKey
       ? { avatar_key: S.avatarLibKey, user_id: String(S.userInfo?.id || '') }
-      : { video_b64: S.avatarSrcVideoB64, video_fmt: S.avatarSrcVideoFmt || 'mp4' };
+      : { video_b64: S.avatarSrcVideoB64, video_fmt: S.avatarSrcVideoFmt || 'mp4',
+          ...(saveAvatarName ? { save_avatar_name: saveAvatarName } : {}) };
     const r = await api.post('/ai/video/generate', {
       audio_b64: audioB64,
       audio_fmt: 'wav',
@@ -6325,10 +6328,9 @@ async function handleAvatarDirectUse() {
 async function handleAvatarSaveAndUse() {
   const file = _avatarPendingFile;
   const name = (S.avatarSavePromptName || '').trim() || (file?.name?.replace(/\.[^.]+$/,'') || '我的数字人');
-  // 立即加载视频供本次使用
   await handleAvatarDirectUse();
-  // 后台异步保存到形象库（不阻塞生成）
-  _saveAvatarToLib(file, name);
+  // 只记名字，生成时随 video_b64 一起带过去，HeyGem 顺手存，零额外传输
+  setState({ _pendingAvatarSaveName: name });
 }
 
 async function _saveAvatarToLib(file, name) {
