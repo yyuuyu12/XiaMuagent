@@ -510,6 +510,43 @@ ${script.slice(0, 800)}
   }
 });
 
+// ==================== 数字人形象库代理（浏览器不能直访 HTTP 本地服务）====================
+async function getAsrUrl() {
+  const { rows } = await db.query("SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','video_url')");
+  const cfg = {};
+  rows.forEach(r => { cfg[r.config_key] = (r.value || '').trim().replace(/\/$/, '').replace(/^https:\/\//i, 'http://'); });
+  return cfg.asr_url || cfg.video_url || '';
+}
+
+router.get('/avatar/list', requireAuth, async (req, res) => {
+  try {
+    const asrUrl = await getAsrUrl();
+    if (!asrUrl) return res.json({ code: 500, msg: '未配置服务地址' });
+    const r = await fetch(`${asrUrl}/avatar/list/${req.userId}`, { signal: AbortSignal.timeout(8000) });
+    const data = await r.json();
+    res.json({ code: 200, data: data.avatars || [] });
+  } catch (e) {
+    res.json({ code: 500, msg: e.message });
+  }
+});
+
+router.delete('/avatar/:key(*)', requireAuth, async (req, res) => {
+  try {
+    const asrUrl = await getAsrUrl();
+    if (!asrUrl) return res.json({ code: 500, msg: '未配置服务地址' });
+    const r = await fetch(`${asrUrl}/avatar/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: String(req.userId), key: req.params.key }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await r.json();
+    res.json({ code: 200, data });
+  } catch (e) {
+    res.json({ code: 500, msg: e.message });
+  }
+});
+
 // 返回数字人视频服务地址（video_url 优先，无则降级到 asr_url）
 router.get('/asr-url', requireAuth, async (req, res) => {
   const { rows } = await db.query("SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','video_url')");

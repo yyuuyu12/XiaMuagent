@@ -6164,12 +6164,9 @@ async function loadAvatarList() {
   if (!u) return;
   setState({ avatarMgmtLoading: true, avatarMgmtErr: '' });
   try {
-    const urlR = await api.get('/ai/asr-url');
-    if (urlR.code !== 200) { setState({ avatarMgmtLoading: false, avatarMgmtErr: '获取服务地址失败' }); return; }
-    const asrUrl = urlR.data.url.replace(/\/$/, '');
-    const r = await fetch(`${asrUrl}/avatar/list/${u.id}`);
-    const data = await r.json();
-    setState({ avatarMgmtList: data.avatars || [], avatarMgmtLoading: false });
+    const r = await api.get('/ai/avatar/list');
+    if (r.code !== 200) { setState({ avatarMgmtLoading: false, avatarMgmtErr: '加载失败：' + r.msg }); return; }
+    setState({ avatarMgmtList: r.data || [], avatarMgmtLoading: false });
   } catch(e) {
     setState({ avatarMgmtLoading: false, avatarMgmtErr: '加载失败：' + e.message });
   }
