@@ -374,9 +374,7 @@ def _do_work_v2(task_id, audio_path, video_path):
     normalized_paths: list[str] = []
     try:
         _validate_audio(audio_path)
-        # 注意：不在此处预校验原始视频帧率，因为 _normalize_video 会在转码后做验后校验。
-        # 部分视频 ffprobe 读原始帧率返回 0/0（变帧率/HEVC/手机录制等），
-        # 预校验会误拦截，但四级降级转码可以修复这类视频。
+        _validate_video(video_path)
         with _task_lock:
             tasks[task_id].update({"progress": 18, "msg": "正在整理视频格式..."})
 
