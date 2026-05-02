@@ -4932,7 +4932,7 @@ async function handleAvatarGenerate() {
   const runSeq = ++_avatarRunSeq;
 
   // 直接使用已有的 base64（跳过多余的 blob URL → fetch → re-encode 流程）
-  const audioB64 = S.ttsAudioB64 || null;
+  let audioB64 = S.ttsAudioB64 || null;
   if (!audioB64) {
     // 极少情况：只有 blob URL 没有 b64，做一次转换兜底
     try {
@@ -4941,11 +4941,15 @@ async function handleAvatarGenerate() {
       const bytes = new Uint8Array(buf);
       let bin = '';
       for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
-      // 兜底路径不赋值给 audioB64（let 已声明），直接走下面逻辑
+      audioB64 = btoa(bin);
     } catch (e) {
       if (runSeq === _avatarRunSeq) setState({ avatarErr: '音频读取失败: ' + e.message });
       return;
     }
+  }
+  if (!audioB64) {
+    setState({ avatarErr: '音频数据为空，请重新生成语音后再试' });
+    return;
   }
 
   // ── 预检：5s 内 ping 一下数字人服务，失败立即报错，不等 90s 超时 ──
@@ -5001,7 +5005,7 @@ async function handleAvatarGenerate() {
       setState({
         avatarGenerating: false,
         avatarErr: isTimeout
-          ? '提交超时（90秒）：数字人服务无响应，请检查服务是否正常运行后重试'
+          ? '提交超时（60秒）：数字人服务无响应，请检查服务是否正常运行后重试'
           : ('数字人生成任务提交失败：' + (e?.message || '未知错误')),
         extractStep: 4,
       });

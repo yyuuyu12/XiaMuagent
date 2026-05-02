@@ -89,6 +89,7 @@ def health():
 
 @app.post("/video/generate")
 async def generate(req: GenerateReq):
+    print(f"[generate] audio_b64 len={len(req.audio_b64) if req.audio_b64 else 0} video_b64 len={len(req.video_b64) if req.video_b64 else 0} avatar_key={req.avatar_key}")
     if _hd_processor is None:
         raise HTTPException(503, "V2模型尚未初始化")
 
@@ -285,7 +286,11 @@ def _normalize_audio(task_id: str, audio_path: str) -> str:
 def _try_ffmpeg_video(cmd: list, out_path, timeout=180) -> bool:
     """运行 ffmpeg 命令，返回是否成功输出有效视频文件。"""
     proc = _run_cmd(cmd, timeout=timeout)
-    return proc.returncode == 0 and out_path.exists() and out_path.stat().st_size >= 1000
+    ok = proc.returncode == 0 and out_path.exists() and out_path.stat().st_size >= 1000
+    if not ok:
+        print(f"[ffmpeg FAIL] rc={proc.returncode} size={out_path.stat().st_size if out_path.exists() else 'N/A'}")
+        print(f"[ffmpeg STDERR] {proc.stderr[-600:]}")
+    return ok
 
 
 def _normalize_video(task_id: str, video_path: str) -> str:
