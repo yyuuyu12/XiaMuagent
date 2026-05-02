@@ -6204,15 +6204,14 @@ async function submitAvatarUpload() {
   if (S.avatarMgmtUploading) return;
   setState({ avatarMgmtUploading: true, avatarMgmtErr: '' });
   try {
-    const urlR = await api.get('/ai/asr-url');
-    if (urlR.code !== 200) throw new Error('获取服务地址失败');
-    const asrUrl = urlR.data.url.replace(/\/$/, '');
     const fd = new FormData();
     fd.append('user_id', String(u.id));
     fd.append('name', S.avatarMgmtUploadName.trim() || file.name.replace(/\.[^.]+$/, ''));
     fd.append('video', file);
-    const r = await fetch(`${asrUrl}/avatar/upload`, { method: 'POST', body: fd });
-    if (!r.ok) { const t = await r.json(); throw new Error(t.detail || r.statusText); }
+    const r = await fetch('/api/ai/avatar/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` }, body: fd });
+    if (!r.ok) { const t = await r.json().catch(()=>({})); throw new Error(t.msg || r.statusText); }
+    const resp = await r.json();
+    if (resp.code !== 200) throw new Error(resp.msg || '上传失败');
     setState({
       avatarMgmtUploading: false,
       avatarMgmtUploadName: '',
@@ -6329,17 +6328,15 @@ async function _saveAvatarToLib(file, name) {
   try {
     const u = S.userInfo;
     if (!u) return;
-    const urlR = await api.get('/ai/asr-url');
-    if (urlR.code !== 200) return;
-    const asrUrl = urlR.data.url.replace(/\/$/, '');
     const fd = new FormData();
     fd.append('user_id', String(u.id));
     fd.append('name', name);
     fd.append('video', file);
-    const r = await fetch(`${asrUrl}/avatar/upload`, { method: 'POST', body: fd });
-    if (r.ok) {
+    const r = await fetch('/api/ai/avatar/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` }, body: fd });
+    const resp = await r.json().catch(() => ({}));
+    if (r.ok && resp.code === 200) {
       showToast(`"${name}" 已保存到数字人库 ✓`);
-      setState({ _step4AvatarLoaded: false }); // 触发重新加载，新形象排在最前
+      setState({ _step4AvatarLoaded: false });
       loadAvatarList();
     }
   } catch(e) {

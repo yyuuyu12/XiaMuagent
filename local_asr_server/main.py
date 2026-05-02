@@ -905,6 +905,26 @@ async def _extract_thumbnail(video_path: str) -> str:
     return ""
 
 
+AVATAR_MAX_PER_USER = 5
+
+def _list_avatars_asc(user_dir: Path) -> list:
+    """按 mtime 升序返回 [(json_path, meta), ...]，只包含视频文件存在的条目"""
+    result = []
+    for mf in sorted(user_dir.glob("*.json"), key=lambda x: x.stat().st_mtime):
+        try:
+            meta = json.loads(mf.read_text(encoding="utf-8"))
+            if (user_dir / meta["filename"]).exists():
+                result.append((mf, meta))
+        except Exception:
+            pass
+    return result
+
+def _delete_avatar_files(user_dir: Path, avatar_id: str):
+    for p in user_dir.glob(f"{avatar_id}.*"):
+        try: p.unlink()
+        except: pass
+
+
 @app.post("/avatar/upload")
 async def avatar_upload(
     user_id: str = Form(...),
@@ -915,6 +935,15 @@ async def avatar_upload(
         raise HTTPException(400, "user_id 不能为空")
     user_dir = AVATARS_DIR / f"u{user_id}"
     user_dir.mkdir(exist_ok=True)
+
+    # 超出 5 个上限时删除最旧的
+    existing = _list_avatars_asc(user_dir)
+    while len(existing) >= AVATAR_MAX_PER_USER:
+        oldest_json, oldest_meta = existing.pop(0)
+        _delete_avatar_files(user_dir, oldest_meta["id"])
+        try: oldest_json.unlink()
+        except: pass
+        print(f"[Avatar] 超出上限，删除最旧形象: {oldest_meta['id']}")
 
     avatar_id = uuid.uuid4().hex[:12]
     ext = "mp4"
@@ -943,6 +972,95 @@ async def avatar_upload(
     )
     return {"ok": True, "avatar_id": avatar_id, "name": meta["name"],
             "key": meta["key"], "thumbnail": thumbnail}
+
+
+class AvatarCompressReq(BaseModel):
+    avatar_id: str
+    user_id: str
+    oss_config: dict = None
+
+@app.post("/avatar/bg-compress")
+async def avatar_bg_compress(req: AvatarCompressReq):
+    """后台异步压缩形象视频到 1080p H264，完成后上传 OSS（如有配置）"""
+    asyncio.create_task(_compress_avatar_task(req.avatar_id, req.user_id, req.oss_config))
+    return {"ok": True}
+
+async def _compress_avatar_task(avatar_id: str, user_id: str, oss_config: dict):
+    user_dir = AVATARS_DIR / f"u{user_id}"
+    json_path = user_dir / f"{avatar_id}.json"
+
+    orig_path = None
+    for ext in ["mp4", "mov", "avi", "mkv", "webm"]:
+        p = user_dir / f"{avatar_id}.{ext}"
+        if p.exists():
+            orig_path = p
+            break
+    if not orig_path:
+        print(f"[Avatar] 压缩失败：找不到文件 {avatar_id}")
+        return
+
+    compressed_path = user_dir / f"{avatar_id}_c.mp4"
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-i", str(orig_path),
+            "-vf", "scale=-2:'min(ih,1080)',format=yuv420p",
+            "-c:v", "libx264", "-crf", "22", "-preset", "fast",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(compressed_path),
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        if proc.returncode != 0 or not compressed_path.exists() or compressed_path.stat().st_size < 1000:
+            print(f"[Avatar] 压缩失败 rc={proc.returncode}: {stderr.decode()[-300:]}")
+            if compressed_path.exists(): compressed_path.unlink()
+            return
+
+        # 删除原始文件，压缩版重命名为 {avatar_id}.mp4
+        if orig_path != compressed_path:
+            orig_path.unlink()
+        final_path = user_dir / f"{avatar_id}.mp4"
+        compressed_path.rename(final_path)
+        print(f"[Avatar] 压缩完成: {avatar_id} → {final_path.stat().st_size // 1024}KB")
+
+        # 更新 meta
+        if json_path.exists():
+            meta = json.loads(json_path.read_text(encoding="utf-8"))
+            meta["filename"] = f"{avatar_id}.mp4"
+            meta["key"] = f"u{user_id}/{avatar_id}.mp4"
+            meta["size"] = final_path.stat().st_size
+        else:
+            meta = None
+    except Exception as e:
+        print(f"[Avatar] 压缩异常: {e}")
+        if compressed_path.exists(): compressed_path.unlink()
+        return
+
+    # OSS 上传（可选）
+    oss_url = None
+    if oss_config:
+        try:
+            import oss2
+            auth = oss2.Auth(oss_config["access_key"], oss_config["secret_key"])
+            bkt  = oss2.Bucket(auth, oss_config["endpoint"], oss_config["bucket"])
+            oss_key = f"{oss_config.get('prefix', 'avatars')}/{user_id}/{avatar_id}.mp4"
+            bkt.put_object(oss_key, final_path.read_bytes(),
+                           headers={"Content-Type": "video/mp4",
+                                    "Cache-Control": "public, max-age=2592000"})
+            cdn = (oss_config.get("cdn_domain") or "").rstrip("/")
+            if cdn:
+                oss_url = f"{cdn}/{oss_key}"
+            else:
+                ep = oss_config["endpoint"].replace("https://","").replace("http://","")
+                oss_url = f"https://{oss_config['bucket']}.{ep}/{oss_key}"
+            print(f"[Avatar] OSS 上传完成: {oss_url}")
+        except Exception as e:
+            print(f"[Avatar] OSS 上传失败（可继续用本地）: {e}")
+
+    if meta:
+        if oss_url:
+            meta["oss_url"] = oss_url
+        json_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 
 
 @app.get("/avatar/list/{user_id}")

@@ -518,6 +518,53 @@ async function getAsrUrl() {
   return cfg.asr_url || cfg.video_url || '';
 }
 
+router.post('/avatar/upload', requireAuth, require('express').raw({ type: '*/*', limit: '200mb' }), async (req, res) => {
+  try {
+    const asrUrl = await getAsrUrl();
+    if (!asrUrl) return res.json({ code: 500, msg: '未配置服务地址' });
+    const r = await fetch(`${asrUrl}/avatar/upload`, {
+      method: 'POST',
+      body: req.body,
+      headers: { 'content-type': req.headers['content-type'] },
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!r.ok) {
+      const t = await r.json().catch(() => ({}));
+      return res.json({ code: 500, msg: t.detail || `上传失败 HTTP ${r.status}` });
+    }
+    const data = await r.json();
+    // 后台异步：压缩 + OSS 上传，不阻塞返回
+    if (data.ok && data.avatar_id) {
+      _triggerAvatarCompress(asrUrl, data.avatar_id, String(req.userId)).catch(() => {});
+    }
+    res.json({ code: 200, data });
+  } catch (e) {
+    res.json({ code: 500, msg: e.message });
+  }
+});
+
+async function _triggerAvatarCompress(asrUrl, avatarId, userId) {
+  const ossConfigured = await oss.isConfigured().catch(() => false);
+  let ossPayload = null;
+  if (ossConfigured) {
+    const cfg = await oss.getOssConfig();
+    ossPayload = {
+      endpoint:   `https://${cfg.oss_region}.aliyuncs.com`,
+      bucket:     cfg.oss_bucket,
+      access_key: cfg.oss_access_key_id,
+      secret_key: cfg.oss_access_key_secret,
+      prefix:     'avatars',
+      cdn_domain: cfg.oss_cdn_domain || null,
+    };
+  }
+  await fetch(`${asrUrl}/avatar/bg-compress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ avatar_id: avatarId, user_id: userId, oss_config: ossPayload }),
+    signal: AbortSignal.timeout(10000),
+  });
+}
+
 router.get('/avatar/list', requireAuth, async (req, res) => {
   try {
     const asrUrl = await getAsrUrl();
