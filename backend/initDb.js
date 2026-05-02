@@ -290,6 +290,43 @@ async function initDb() {
     ) CHARACTER SET utf8mb4
   `);
 
+  // avatar_library 表（数字人形象库：OSS存储，跨设备持久）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS avatar_library (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      user_id     INT NOT NULL,
+      name        VARCHAR(100) NOT NULL,
+      oss_key     VARCHAR(512) NOT NULL,
+      oss_url     VARCHAR(1024) NOT NULL,
+      thumb_url   VARCHAR(1024) DEFAULT NULL,
+      created_at  TIMESTAMP DEFAULT NOW(),
+      INDEX idx_user_created (user_id, created_at)
+    ) CHARACTER SET utf8mb4
+  `);
+
+  // user_voices 表（声音库，跨设备持久）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS user_voices (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      user_id    INT NOT NULL,
+      voice_key  VARCHAR(100) NOT NULL,
+      name       VARCHAR(100) NOT NULL,
+      emotion    VARCHAR(50) DEFAULT 'neutral',
+      audio_b64  MEDIUMTEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      INDEX idx_user (user_id)
+    ) CHARACTER SET utf8mb4
+  `);
+
+  // avatar_library 表：补 avatar_key / thumbnail 列，oss 列改可空
+  try { await db.query('ALTER TABLE avatar_library ADD COLUMN avatar_key VARCHAR(512) DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] avatar_key:', e.message||e); }
+  try { await db.query('ALTER TABLE avatar_library ADD COLUMN thumbnail MEDIUMTEXT DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] thumbnail:', e.message||e); }
+  try { await db.query('ALTER TABLE avatar_library MODIFY COLUMN oss_key VARCHAR(512) DEFAULT NULL'); } catch(e) { console.warn('[initDb] oss_key nullable:', e.message||e); }
+  try { await db.query('ALTER TABLE avatar_library MODIFY COLUMN oss_url VARCHAR(1024) DEFAULT NULL'); } catch(e) { console.warn('[initDb] oss_url nullable:', e.message||e); }
+
+  // users 表：补 clone_voice_id 列
+  try { await db.query('ALTER TABLE users ADD COLUMN clone_voice_id VARCHAR(255) DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] clone_voice_id:', e.message||e); }
+
   console.log('✅ 数据库初始化完成');
 }
 

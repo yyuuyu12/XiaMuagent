@@ -533,8 +533,24 @@ router.post('/avatar/upload', requireAuth, require('express').raw({ type: '*/*',
       return res.json({ code: 500, msg: t.detail || `上传失败 HTTP ${r.status}` });
     }
     const data = await r.json();
-    // 后台异步：压缩 + OSS 上传，不阻塞返回
     if (data.ok && data.avatar_id) {
+      // 写入 DB（元数据持久化，换浏览器也能看到）
+      try {
+        // 超出 5 个时删最旧
+        const { rows: existing } = await db.query(
+          'SELECT id FROM avatar_library WHERE user_id=? ORDER BY created_at ASC', [req.userId]
+        );
+        if (existing.length >= 5) {
+          for (const row of existing.slice(0, existing.length - 4)) {
+            await db.query('DELETE FROM avatar_library WHERE id=?', [row.id]);
+          }
+        }
+        await db.query(
+          'INSERT INTO avatar_library (user_id, name, avatar_key, thumbnail) VALUES (?,?,?,?)',
+          [req.userId, data.name, data.key, data.thumbnail || null]
+        );
+      } catch(e) { console.warn('[avatar/upload] DB写入失败:', e.message); }
+      // 后台异步压缩
       _triggerAvatarCompress(asrUrl, data.avatar_id, String(req.userId)).catch(() => {});
     }
     res.json({ code: 200, data });
@@ -567,11 +583,19 @@ async function _triggerAvatarCompress(asrUrl, avatarId, userId) {
 
 router.get('/avatar/list', requireAuth, async (req, res) => {
   try {
-    const asrUrl = await getAsrUrl();
-    if (!asrUrl) return res.json({ code: 500, msg: '未配置服务地址' });
-    const r = await fetch(`${asrUrl}/avatar/list/${req.userId}`, { signal: AbortSignal.timeout(8000) });
-    const data = await r.json();
-    res.json({ code: 200, data: data.avatars || [] });
+    const { rows } = await db.query(
+      'SELECT id, name, avatar_key, thumbnail, created_at FROM avatar_library WHERE user_id=? ORDER BY created_at DESC',
+      [req.userId]
+    );
+    const avatars = rows.map(r => ({
+      id:        r.avatar_key ? r.avatar_key.split('/').pop().replace(/\.[^.]+$/, '') : String(r.id),
+      name:      r.name,
+      key:       r.avatar_key,
+      filename:  r.avatar_key ? r.avatar_key.split('/').pop() : '',
+      thumbnail: r.thumbnail || '',
+      created_at: r.created_at,
+    }));
+    res.json({ code: 200, data: avatars });
   } catch (e) {
     res.json({ code: 500, msg: e.message });
   }
@@ -579,16 +603,20 @@ router.get('/avatar/list', requireAuth, async (req, res) => {
 
 router.delete('/avatar/:key(*)', requireAuth, async (req, res) => {
   try {
+    const avatarKey = req.params.key;
+    // 删 DB 记录
+    await db.query('DELETE FROM avatar_library WHERE user_id=? AND avatar_key=?', [req.userId, avatarKey]);
+    // 删本机磁盘文件（忽略失败）
     const asrUrl = await getAsrUrl();
-    if (!asrUrl) return res.json({ code: 500, msg: '未配置服务地址' });
-    const r = await fetch(`${asrUrl}/avatar/delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: String(req.userId), key: req.params.key }),
-      signal: AbortSignal.timeout(8000),
-    });
-    const data = await r.json();
-    res.json({ code: 200, data });
+    if (asrUrl) {
+      fetch(`${asrUrl}/avatar/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: String(req.userId), key: avatarKey }),
+        signal: AbortSignal.timeout(8000),
+      }).catch(() => {});
+    }
+    res.json({ code: 200 });
   } catch (e) {
     res.json({ code: 500, msg: e.message });
   }
@@ -714,6 +742,55 @@ router.get('/video/health', requireAuth, async (req, res) => {
     if (msg.includes('ECONNREFUSED') || msg.includes('503')) return res.json({ code: 503, msg: '数字人服务未启动' });
     res.json({ code: 504, msg: '数字人服务连接超时，请检查 frp 穿透是否正常' });
   }
+});
+
+// ==================== 声音库 ====================
+router.get('/voices', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT voice_key, name, emotion, audio_b64 FROM user_voices WHERE user_id=? ORDER BY created_at ASC',
+      [req.userId]
+    );
+    res.json({ code: 200, data: rows.map(r => ({ id: r.voice_key, name: r.name, emotion: r.emotion, audio_b64: r.audio_b64 })) });
+  } catch(e) { res.json({ code: 500, msg: e.message }); }
+});
+
+router.post('/voices', requireAuth, async (req, res) => {
+  try {
+    const { voice_key, name, emotion, audio_b64 } = req.body;
+    if (!voice_key || !name || !audio_b64) return res.json({ code: 400, msg: '缺少参数' });
+    const { rows } = await db.query('SELECT id FROM user_voices WHERE user_id=? ORDER BY created_at ASC', [req.userId]);
+    if (rows.length >= 8) {
+      await db.query('DELETE FROM user_voices WHERE id=?', [rows[0].id]); // 删最旧
+    }
+    await db.query(
+      'INSERT INTO user_voices (user_id, voice_key, name, emotion, audio_b64) VALUES (?,?,?,?,?)',
+      [req.userId, voice_key, name.slice(0,100), emotion || 'neutral', audio_b64]
+    );
+    res.json({ code: 200 });
+  } catch(e) { res.json({ code: 500, msg: e.message }); }
+});
+
+router.delete('/voices/:key', requireAuth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM user_voices WHERE user_id=? AND voice_key=?', [req.userId, req.params.key]);
+    res.json({ code: 200 });
+  } catch(e) { res.json({ code: 500, msg: e.message }); }
+});
+
+router.get('/voices/clone-id', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT clone_voice_id FROM users WHERE id=?', [req.userId]);
+    res.json({ code: 200, data: rows[0]?.clone_voice_id || null });
+  } catch(e) { res.json({ code: 500, msg: e.message }); }
+});
+
+router.post('/voices/clone-id', requireAuth, async (req, res) => {
+  try {
+    const { clone_voice_id } = req.body;
+    await db.query('UPDATE users SET clone_voice_id=? WHERE id=?', [clone_voice_id || null, req.userId]);
+    res.json({ code: 200 });
+  } catch(e) { res.json({ code: 500, msg: e.message }); }
 });
 
 // ==================== 数字人视频生成 ====================

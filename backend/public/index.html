@@ -1247,11 +1247,11 @@ const S = {
   dismissedFromHomeIds: [],
   // 步骤3：语音合成
   ttsVoice: 'xiaoxiao', ttsSpeed: 1.0, ttsGenerating: false, ttsAudioUrl: null, ttsErr: '',
-  ttsCloneVoiceId: localStorage.getItem('ttsCloneVoiceId') || null, ttsCloning: false, ttsCloneErr: '',
+  ttsCloneVoiceId: null, ttsCloning: false, ttsCloneErr: '',
   ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral', ttsEmoIntensity: 5,
   // 声音库
-  myVoices: JSON.parse(localStorage.getItem('myVoices') || '[]'),
-  selectedMyVoiceId: localStorage.getItem('selectedMyVoiceId') || '',
+  myVoices: [],
+  selectedMyVoiceId: '',
   recordingState: 'idle', // idle | recording
   recordingSeconds: 0,
   vmPlayingId: '',
@@ -4283,6 +4283,8 @@ async function fetchMe() {
   } catch {}
   if (!S.recentHistoryLoaded) loadRecentHistory();
   if (!S.homeHistoryLoaded) loadHomeHistory();
+  loadMyVoices();
+  api.get('/ai/voices/clone-id').then(r => { if (r.code === 200 && r.data) setState({ ttsCloneVoiceId: r.data }); }).catch(() => {});
 }
 async function loadIndustries() {
   try {
@@ -4612,8 +4614,8 @@ async function handleCloneAudioSelect(event) {
         const r = await api.post('/ai/tts/clone', { audio: base64, audioName: file.name.replace(/\.[^.]+$/, '') || '我的音色' });
         if (r.code === 200) {
           const voiceId = r.data.voice_id;
-          localStorage.setItem('ttsCloneVoiceId', voiceId);
           setState({ ttsCloning: false, ttsCloneVoiceId: voiceId, ttsVoice: 'cloned', ttsCloneErr: '' });
+          api.post('/ai/voices/clone-id', { clone_voice_id: voiceId }).catch(() => {});
           showToast('音色克隆成功，已自动切换');
         } else {
           setState({ ttsCloning: false, ttsCloneErr: r.msg || '克隆失败，请重试' });
@@ -4646,8 +4648,14 @@ function formatRecTime(s) {
 }
 
 function saveMyVoices(arr) {
-  localStorage.setItem('myVoices', JSON.stringify(arr));
   setState({ myVoices: arr });
+}
+
+async function loadMyVoices() {
+  try {
+    const r = await api.get('/ai/voices');
+    if (r.code === 200) setState({ myVoices: r.data || [] });
+  } catch(e) { console.warn('loadMyVoices:', e.message); }
 }
 
 // 检查 base64 音频时长，返回 Promise<{ok, seconds, msg}>
@@ -4690,6 +4698,8 @@ async function addToMyVoiceLibrary(name, audio_b64, emotion) {
   const id = Date.now().toString(36);
   arr.push({ id, name, audio_b64, emotion: emotion || 'neutral' });
   saveMyVoices(arr);
+  // 持久化到 DB
+  api.post('/ai/voices', { voice_key: id, name, emotion: emotion || 'neutral', audio_b64 }).catch(() => {});
   showToast(`声音已添加（${durCheck.seconds > 0 ? durCheck.seconds.toFixed(1)+'s' : ''}）`);
 }
 
@@ -4734,10 +4744,8 @@ function playMyVoice(id) {
 function deleteMyVoice(id) {
   const arr = (S.myVoices || []).filter(v => v.id !== id);
   saveMyVoices(arr);
-  // 如果当前选的是这个声音，重置为默认
-  if (S.ttsVoice === 'my_' + id) {
-    setState({ ttsVoice: 'xiaoxiao' });
-  }
+  if (S.ttsVoice === 'my_' + id) setState({ ttsVoice: 'xiaoxiao' });
+  fetch(`/api/ai/voices/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` } }).catch(() => {});
 }
 
 async function handleVMUpload(event) {
