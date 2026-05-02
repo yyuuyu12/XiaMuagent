@@ -661,19 +661,22 @@ router.post('/video/generate', requireAuth, async (req, res) => {
   } catch {}
 
   try {
+    const payload = {
+      audio_b64,
+      audio_fmt: audio_fmt || 'wav',
+      enhancer: !!enhancer,
+      ...(avatar_key ? { avatar_key } : { video_b64, video_fmt: video_fmt || 'mp4' }),
+      ...(ossPayload ? { oss_config: ossPayload, user_id: String(req.userId) } : {}),
+    };
+    console.log(`[video/generate] audio_b64 len=${(audio_b64||'').length} video_b64 len=${(video_b64||'').length} avatar_key=${avatar_key} videoUrl=${videoUrl}`);
     const resp = await fetch(`${videoUrl}/video/generate`, {
       method: 'POST',
       headers: { ...VIDEO_FETCH_HEADERS, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        audio_b64,
-        audio_fmt: audio_fmt || 'wav',
-        enhancer: !!enhancer,
-        ...(avatar_key ? { avatar_key } : { video_b64, video_fmt: video_fmt || 'mp4' }),
-        ...(ossPayload ? { oss_config: ossPayload, user_id: String(req.userId) } : {}),
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(120000),
     });
     const text = await resp.text();
+    console.log(`[video/generate] resp status=${resp.status} body=${text.slice(0,200)}`);
     if (!resp.ok) {
       return res.json({ code: 500, msg: text.includes('<!DOCTYPE') ? htmlServiceError(videoUrl, text) : `视频服务出错: ${text.slice(0, 200)}` });
     }
