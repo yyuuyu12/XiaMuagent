@@ -579,20 +579,23 @@ async function getVideoUrl() {
   if (!candidates.length) return '';
 
   let picked = '';
+  // 探活时强制用 http://，frpc 隧道是 HTTP 类型，HTTPS 会返回 Zeabur 的 H5 页面
+  const toHttp = u => u.replace(/^https:\/\//i, 'http://');
   for (const url of candidates) {
+    const httpUrl = toHttp(url);
     try {
-      const resp = await fetch(`${url}/health`, {
+      const resp = await fetch(`${httpUrl}/health`, {
         headers: VIDEO_FETCH_HEADERS,
         signal: AbortSignal.timeout(10000),
       });
       const ct = resp.headers.get('content-type') || '';
       if (!resp.ok || !ct.includes('application/json')) continue;
       const data = await resp.json();
-      if (data && data.status === 'ok') { picked = url; break; }
+      if (data && data.status === 'ok') { picked = httpUrl; break; }
     } catch {}
   }
 
-  if (!picked) picked = candidates[0];
+  if (!picked) picked = toHttp(candidates[0]);
   _videoUrlCache = { url: picked, expires: now + VIDEO_URL_CACHE_TTL };
   return picked;
 }
