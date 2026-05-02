@@ -471,9 +471,9 @@ router.post('/cover-title', requireAuth, async (req, res) => {
   const { script } = req.body;
   if (!script?.trim()) return res.json({ code: 400, msg: '文案不能为空' });
   try {
-    const prompt = `根据以下短视频文案，生成一句封面标题。要求：不超过8个字，无标点符号，吸引眼球，直击核心价值点，适合放在视频封面上。只输出标题文字本身，不要引号和解释。\n\n文案：${script.slice(0, 400)}`;
+    const prompt = `根据以下短视频文案，生成一句封面标题。要求：不超过18个字，无标点符号，吸引眼球，直击核心价值点，适合放在视频封面上。只输出标题文字本身，不要引号和解释。\n\n文案：${script.slice(0, 400)}`;
     const raw = await callAI(prompt);
-    const title = raw.trim().replace(/["""''《》【】「」\n\r]/g, '').slice(0, 8);
+    const title = raw.trim().replace(/["""''《》【】「」\n\r]/g, '').slice(0, 18);
     return res.json({ code: 200, data: { title } });
   } catch (e) {
     return res.json({ code: 500, msg: e.message });
@@ -487,13 +487,14 @@ router.post('/publish-info', requireAuth, async (req, res) => {
   try {
     const prompt = `根据以下短视频文案，生成：
 1. 一个吸引人的发布标题（15-28字，不加引号）
-2. 4-6个相关话题标签（不带#号，每个2-6字）
+2. 一段视频简介（10-30字，口语化，吸引人点击观看，不加引号）
+3. 4-6个相关话题标签（不带#号，每个2-6字）
 
 文案内容：
 ${script.slice(0, 800)}
 
 严格按JSON格式返回，不要其他内容：
-{"title": "...", "tags": ["标签1", "标签2", "标签3", "标签4"]}`;
+{"title": "...", "description": "...", "tags": ["标签1", "标签2", "标签3", "标签4"]}`;
 
     const raw = await callAI(prompt);
     let result = {};
@@ -501,9 +502,9 @@ ${script.slice(0, 800)}
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       result = JSON.parse(cleaned);
     } catch {
-      result = { title: script.slice(0, 25) + '...', tags: [] };
+      result = { title: script.slice(0, 25) + '...', description: '', tags: [] };
     }
-    return res.json({ code: 200, data: { title: result.title || '', tags: result.tags || [] } });
+    return res.json({ code: 200, data: { title: result.title || '', description: result.description || '', tags: result.tags || [] } });
   } catch (e) {
     return res.json({ code: 500, msg: e.message });
   }

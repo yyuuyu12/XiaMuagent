@@ -1271,7 +1271,7 @@ const S = {
   // 步骤5：后期制作
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
   // 步骤6：发布
-  publishTitle: '', publishTags: [], publishTitleLoading: false, publishCoverIdx: 0, publishCopied: false,
+  publishTitle: '', publishDesc: '', publishTags: [], publishTitleLoading: false, publishCoverIdx: 0, publishCopied: false,
 };
 let inspireController = null;
 let extractController = null;
@@ -2978,90 +2978,72 @@ function tCloneStep5(sb) {
 function tCloneStep6(sb) {
   const tagsHtml = S.publishTags.length
     ? S.publishTags.map(t=>`<span class="publish-tag">#${esc(t)}</span>`).join('')
-    : `<span style="font-size:12px;color:#C4C0B8">点击「AI生成」自动生成话题标签</span>`;
-
-  const coverColors = ['#FAECE7','#EEF4FF','#EDFAF4','#F7F6F2'];
-  const coversHtml = [0,1,2].map(i=>`
-    <div class="pub-cover ${S.publishCoverIdx===i?'pub-cover-active':''}" style="background:${coverColors[i]}"
-      onclick="setState({publishCoverIdx:${i}})"></div>`).join('') +
-    `<div class="pub-cover" style="border:2px dashed #D4D0C8;display:flex;align-items:center;justify-content:center;cursor:pointer"
-      onclick="showToast('自定义封面即将上线')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </div>`;
-
-  const badges = [
-    S.selectedAvatarId==='self' && '数字人',
-    S.videoColorStyle!=='none' && '调色',
-    S.videoSubtitle && '字幕',
-    S.ttsAudioUrl && '语音',
-  ].filter(Boolean).map(b=>`<span style="font-size:11px;color:#9A3412;background:#FFF1E8;padding:4px 8px;border-radius:6px">${b}</span>`).join('');
+    : `<span style="font-size:12px;color:#C4C0B8">点击「AI生成」自动生成</span>`;
 
   return `${sb}<div class="tab-page">
-    <div style="display:flex;gap:12px;margin-bottom:14px">
-      <div style="width:72px;aspect-ratio:9/16;background:#F0EDE8;border-radius:10px;position:relative;overflow:hidden;flex-shrink:0">
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
-          <div style="width:26px;height:26px;background:#FF6B35;border-radius:50%;display:flex;align-items:center;justify-content:center">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
+
+    <!-- 封面 -->
+    <div class="section-card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-label" style="margin-bottom:0">封面</div>
+        <div style="display:flex;gap:12px;align-items:center">
+          ${S.coverGenerating
+            ? `<span style="font-size:12px;color:#F5762A">生成中...</span>`
+            : `<span style="font-size:12px;color:#F97316;cursor:pointer;font-weight:500" onclick="generateCover(S.coverSeekTime+2)">换一帧</span>
+               <span style="font-size:12px;color:#6B6860;cursor:pointer" onclick="generateCover(S.coverSeekTime,true)">换文案</span>`
+          }
         </div>
       </div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:#1A1814;margin-bottom:6px">视频信息</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${badges||'<span style="font-size:12px;color:#A8A49C">无特效</span>'}</div>
-      </div>
+      ${S.coverGenerating
+        ? `<div style="width:100%;aspect-ratio:9/16;max-height:380px;background:#F0EDE8;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px">
+             <div style="width:36px;height:36px;border:3px solid #F5762A;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div>
+             <span style="font-size:13px;color:#F5762A">正在截取封面...</span>
+           </div>`
+        : S.coverFrameUrl
+          ? `<img src="${S.coverFrameUrl}" style="width:100%;border-radius:14px;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.12)"/>`
+          : `<div style="width:100%;aspect-ratio:9/16;max-height:380px;background:#F7F6F2;border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px dashed #E4E2DA" onclick="generateCover(1)">
+               <div style="text-align:center">
+                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="1.5" style="display:block;margin:0 auto 10px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                 <span style="font-size:14px;color:#A8A49C">点击生成封面</span>
+               </div>
+             </div>`
+      }
     </div>
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="section-label" style="margin-bottom:0">标题 & 话题标签</div>
+
+    <!-- 标题 & 描述 & 话题标签 -->
+    <div class="section-card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-label" style="margin-bottom:0">标题 & 描述 & 标签</div>
         <div style="background:${S.publishTitleLoading?'#F0EDE8':'#FF6B35'};color:${S.publishTitleLoading?'#9A9690':'#fff'};border-radius:50px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer"
           onclick="${S.publishTitleLoading?'':'handlePublishTitleGen()'}">
           ${S.publishTitleLoading?'生成中...':'AI生成'}
         </div>
       </div>
-      <div style="background:#F7F6F2;border-radius:8px;padding:12px;margin-bottom:10px">
+      <!-- 标题 -->
+      <div style="font-size:12px;color:#9A9690;margin-bottom:4px;font-weight:500">标题</div>
+      <div style="background:#F7F6F2;border-radius:8px;padding:10px 12px;margin-bottom:10px">
         <div contenteditable="true" id="pub-title-el"
           style="font-size:14px;color:#1A1814;line-height:1.6;outline:none;min-height:22px"
           oninput="S.publishTitle=this.innerText">${esc(S.publishTitle||(S.rewrittenScript||S.extractedScript||'').slice(0,28))}</div>
       </div>
+      <!-- 描述 -->
+      <div style="font-size:12px;color:#9A9690;margin-bottom:4px;font-weight:500">简介</div>
+      <div style="background:#F7F6F2;border-radius:8px;padding:10px 12px;margin-bottom:10px">
+        <div contenteditable="true" id="pub-desc-el"
+          style="font-size:13px;color:#1A1814;line-height:1.6;outline:none;min-height:20px"
+          oninput="S.publishDesc=this.innerText">${esc(S.publishDesc||'')}</div>
+      </div>
+      <!-- 标签 -->
+      <div style="font-size:12px;color:#9A9690;margin-bottom:8px;font-weight:500">话题标签</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;min-height:28px">${tagsHtml}</div>
     </div>
-    <div class="section-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="section-label" style="margin-bottom:0">封面</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          ${S.coverGenerating
-            ? `<span style="font-size:12px;color:#F5762A">生成中...</span>`
-            : `<span style="font-size:12px;color:#F97316;cursor:pointer" onclick="generateCover(S.coverSeekTime+2)">换一帧</span>
-               <span style="font-size:12px;color:#6B6860;cursor:pointer" onclick="generateCover(S.coverSeekTime,true)">换标题</span>`
-          }
-        </div>
-      </div>
-      ${S.coverGenerating
-        ? `<div style="aspect-ratio:9/16;max-height:300px;background:#F0EDE8;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px">
-             <div style="width:32px;height:32px;border:3px solid #F5762A;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div>
-             <span style="font-size:12px;color:#F5762A">AI分析文案中...</span>
-           </div>`
-        : S.coverFrameUrl
-          ? `<div style="position:relative;display:inline-block;width:100%">
-               <img src="${S.coverFrameUrl}" style="width:100%;border-radius:10px;display:block;max-height:320px;object-fit:cover"/>
-             </div>
-             <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-               <span style="font-size:12px;color:#6B6860;flex-shrink:0">标题：</span>
-               <input value="${esc(S.coverTitle)}" oninput="setState({coverTitle:this.value})"
-                 style="flex:1;border:1px solid #E8E4DC;border-radius:6px;padding:5px 8px;font-size:13px;color:#1A1814;outline:none"/>
-             </div>`
-          : `<div style="aspect-ratio:9/16;max-height:300px;background:#F7F6F2;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px dashed #E4E2DA" onclick="generateCover(1)">
-               <div style="text-align:center">
-                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="1.5" style="display:block;margin:0 auto 8px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                 <span style="font-size:13px;color:#A8A49C">点击生成封面</span>
-               </div>
-             </div>`
-      }
-    </div>
+
+    <!-- 法务提示 -->
     <div style="background:#ECFDF5;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
       <span style="font-size:13px;color:#065F46;font-weight:500">AI法务审查通过，未检测到违规词</span>
     </div>
+
     ${tCloneActions(
       { text: S.publishCopied ? '✓ 已复制，去发布！' : '复制信息去发布', onclick: 'handlePublishCopy()' },
       [
@@ -5201,22 +5183,59 @@ function _drawCoverText(frameDataUrl, title, w, h) {
       c.width = w; c.height = h;
       const ctx = c.getContext('2d');
       ctx.drawImage(img, 0, 0);
-      // 顶部暗渐变
-      const grad = ctx.createLinearGradient(0, 0, 0, h * 0.38);
-      grad.addColorStop(0, 'rgba(0,0,0,0.75)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h * 0.38);
-      // 文字
-      const fs = Math.max(28, Math.round(w * 0.1));
-      ctx.font = `bold ${fs}px "Microsoft YaHei",sans-serif`;
+
+      // 字号：宽度的 13%，不低于 44px（确保 >40px 要求）
+      const fs = Math.max(44, Math.round(w * 0.13));
+      const fontFace = '"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+      ctx.font = `900 ${fs}px ${fontFace}`;
       ctx.textAlign = 'center';
+
+      // 自动换行：每行不超过 7 个字
+      const maxCharsPerLine = 7;
+      const lines = [];
+      for (let i = 0; i < title.length; i += maxCharsPerLine) {
+        lines.push(title.slice(i, i + maxCharsPerLine));
+      }
+
+      const lineH = fs * 1.35;
+      const totalH = lines.length * lineH;
+      // 垂直居中偏下一点（黄金比例 0.55）
+      const startY = h * 0.55 - totalH / 2 + fs;
+
+      // 中间区域半透明暗底，让文字更易读
+      const padV = fs * 0.6, padH = w * 0.08;
+      const boxX = padH;
+      const boxY = startY - fs - padV;
+      const boxW = w - padH * 2;
+      const boxH = totalH + padV * 2;
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      const r = 16;
+      ctx.beginPath();
+      ctx.moveTo(boxX + r, boxY);
+      ctx.lineTo(boxX + boxW - r, boxY);
+      ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + r);
+      ctx.lineTo(boxX + boxW, boxY + boxH - r);
+      ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - r, boxY + boxH);
+      ctx.lineTo(boxX + r, boxY + boxH);
+      ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - r);
+      ctx.lineTo(boxX, boxY + r);
+      ctx.quadraticCurveTo(boxX, boxY, boxX + r, boxY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // 描边 + 填充文字（每行）
       ctx.lineJoin = 'round';
-      ctx.lineWidth = fs * 0.14;
-      ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-      ctx.strokeText(title, w / 2, h * 0.17);
+      ctx.lineWidth = fs * 0.12;
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(title, w / 2, h * 0.17);
+      lines.forEach((line, i) => {
+        const y = startY + i * lineH;
+        ctx.strokeText(line, w / 2, y);
+        ctx.fillText(line, w / 2, y);
+      });
+
       resolve(c.toDataURL('image/jpeg', 0.92));
     };
     img.src = frameDataUrl;
@@ -5269,10 +5288,12 @@ async function handlePublishTitleGen() {
   try {
     const r = await api.post('/ai/publish-info', { script: script.slice(0, 800) });
     if (r.code === 200) {
-      setState({ publishTitleLoading: false, publishTitle: r.data.title || '', publishTags: r.data.tags || [] });
+      setState({ publishTitleLoading: false, publishTitle: r.data.title || '', publishDesc: r.data.description || '', publishTags: r.data.tags || [] });
       // 同步到 contenteditable
       const el = document.getElementById('pub-title-el');
       if (el) el.innerText = r.data.title || '';
+      const descEl = document.getElementById('pub-desc-el');
+      if (descEl) descEl.innerText = r.data.description || '';
     } else {
       setState({ publishTitleLoading: false });
       showToast(r.msg || '生成失败，请重试');
@@ -5285,8 +5306,9 @@ async function handlePublishTitleGen() {
 
 function handlePublishCopy() {
   const title = S.publishTitle || (S.rewrittenScript || S.extractedScript || '').slice(0, 28);
+  const desc  = S.publishDesc || '';
   const tags  = S.publishTags.map(t => '#' + t).join(' ');
-  const text  = [title, tags].filter(Boolean).join('\n\n');
+  const text  = [title, desc, tags].filter(Boolean).join('\n\n');
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(() => {
       setState({ publishCopied: true });
@@ -5362,6 +5384,7 @@ async function saveCloneSession(cloneStep) {
     coverFrameUrl:    S.coverFrameUrl    || null,   // 封面（dataURL，不大）
     coverTitle:       S.coverTitle       || '',
     publishTitle:     S.publishTitle     || '',
+    publishDesc:      S.publishDesc      || '',
     publishTags:      S.publishTags      || [],
   };
   try {
@@ -5474,6 +5497,7 @@ async function restoreCloneSession(taskId) {
       subStyle:             s.subStyle        || 'bilingual_douyin',
       coverTitle:           s.coverTitle      || '',
       publishTitle:         s.publishTitle    || '',
+      publishDesc:          s.publishDesc     || '',
       publishTags:          s.publishTags     || [],
       // ★ clone_step=4 表示"音频已完成"，但若还没进入数字人流程，应停在语音预览页(step3)
       // clone_step=5+ 表示数字人/后期已完成，才真正跳到对应步骤
@@ -5725,7 +5749,7 @@ function resetExtract() {
     ttsIndexRefAudio: null, ttsIndexRefName: '', ttsIndexEmotion: 'neutral', ttsEmoIntensity: 5,
     selectedAvatarId: 'self', avatarBeauty: true, avatarClipBreath: true,
     videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
-    publishTitle: '', publishTags: [], publishTitleLoading: false, publishCoverIdx: 0, publishCopied: false });
+    publishTitle: '', publishDesc: '', publishTags: [], publishTitleLoading: false, publishCoverIdx: 0, publishCopied: false });
 }
 function selectStyle(s) { setState({ rewriteStyle: S.rewriteStyle === s ? '' : s }); }
 async function pasteFromClipboard() {
