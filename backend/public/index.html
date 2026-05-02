@@ -2675,12 +2675,16 @@ function tCloneStep4(sb) {
         </div>`;
       }).join('');
 
-  // 直接使用本地视频时的已选提示条
+  // 直接使用本地视频时的预览区
   const localSelectedBanner = (!S.avatarLibKey && S.avatarSrcVideoB64)
-    ? `<div style="display:flex;align-items:center;gap:10px;background:#FFF8F3;border:1.5px solid #FFE0CC;border-radius:12px;padding:10px 14px;margin-top:10px">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3V10z"/></svg>
-        <span style="flex:1;font-size:13px;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(S.avatarSrcVideoName||'本地视频')}</span>
-        <span style="font-size:12px;color:#F5762A;font-weight:600;cursor:pointer;flex-shrink:0" onclick="setState({avatarSrcVideoB64:null,avatarSrcVideoName:''})">移除</span>
+    ? `<div style="margin-top:12px">
+        <video src="${S._avatarSrcBlobUrl||''}" controls playsinline
+          style="width:100%;max-height:200px;border-radius:14px;background:#000;display:block;object-fit:contain"></video>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:0 2px">
+          <span style="font-size:12px;color:#A8A49C;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.avatarSrcVideoName||'本地视频')}</span>
+          <span style="font-size:12px;color:#F5762A;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:12px"
+            onclick="setState({avatarSrcVideoB64:null,avatarSrcVideoName:'',_avatarSrcBlobUrl:null})">重新选择</span>
+        </div>
       </div>`
     : '';
 
