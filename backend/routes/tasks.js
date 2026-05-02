@@ -202,11 +202,14 @@ router.post('/:id/session', requireAuth, async (req, res) => {
       });
     }
     const sessionJson = JSON.stringify(mergedSession);
-    // MySQL UPSERT：存在则更新，不存在则插入
+    // PostgreSQL UPSERT
     await db.query(
       `INSERT INTO task_sessions (task_id, user_id, clone_step, session_json)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE clone_step = VALUES(clone_step), session_json = VALUES(session_json), updated_at = NOW()`,
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (task_id, user_id) DO UPDATE
+         SET clone_step = EXCLUDED.clone_step,
+             session_json = EXCLUDED.session_json,
+             updated_at = NOW()`,
       [req.params.id, req.userId, nextStep, sessionJson]
     );
     await db.query(
