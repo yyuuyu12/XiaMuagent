@@ -2693,16 +2693,18 @@ function tCloneStep4(sb) {
 
   let avatarPickSection;
   if (!S.avatarMgmtLoading && list.length === 0) {
-    // 无形象：居中大按钮
+    // 无形象：已选视频时显示预览，未选时显示大按钮
     avatarPickSection = `${addLocalBtn}
-      <div onclick="document.getElementById('avatarVidInput2').click()"
-        style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 16px 20px;cursor:pointer;-webkit-tap-highlight-color:transparent">
-        <div style="width:54px;height:54px;border-radius:50%;border:2px dashed #D4D0C8;display:flex;align-items:center;justify-content:center;background:#FAFAF8">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B0AAA0" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </div>
-        <div style="font-size:14px;font-weight:600;color:#6B6560">新增数字人形象</div>
-        <div style="font-size:12px;color:#C4C0B8;text-align:center;line-height:1.6">建议 3~10 秒不说话正脸视频<br/>MP4 / MOV，正脸居中清晰</div>
-      </div>`;
+      ${localSelectedBanner ||
+        `<div onclick="document.getElementById('avatarVidInput2').click()"
+          style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 16px 20px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+          <div style="width:54px;height:54px;border-radius:50%;border:2px dashed #D4D0C8;display:flex;align-items:center;justify-content:center;background:#FAFAF8">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B0AAA0" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+          <div style="font-size:14px;font-weight:600;color:#6B6560">新增数字人形象</div>
+          <div style="font-size:12px;color:#C4C0B8;text-align:center;line-height:1.6">建议 3~10 秒不说话正脸视频<br/>MP4 / MOV，正脸居中清晰</div>
+        </div>`
+      }`;
   } else {
     // 有形象：横排卡片 + 添加按钮
     avatarPickSection = `
