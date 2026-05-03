@@ -4846,9 +4846,8 @@ function setTTSSpeedPreset(v) {
 
 function goToCloneStep2() {
   stopTTSAudio();
-  // 回退到改写步骤时清除 TTS 音频，服务端 saveCloneSession(2) 会同步清除 session 里的 ttsAudioB64
-  setState({ extractStep: 2, ttsAudioUrl: null, ttsAudioB64: null, ttsErr: '' });
-  saveCloneSession(2); // ← 清除下游数据，防止旧音频干扰下次恢复
+  // 仅导航回改写页，不清除音频 session —— 音频在用户主动"重新改写"时才清除
+  setState({ extractStep: 2, ttsErr: '' });
 }
 
 function goToCloneStep4() {
@@ -5668,7 +5667,7 @@ async function restoreCloneSession(taskId) {
       extractStep: (() => {
         if (s.postProcessDone || s.postProcessedVideoUrl || s.postProcessedB64) return 5;
         if (s.avatarDoneTaskId || s.avatarVideoUrl || s.avatarVideoB64 || s.avatarTaskId) return 4;
-        if ((clone_step || 0) >= 3 || s.ttsAudioB64) return 3;
+        if (s.ttsAudioB64) return 3;   // 有音频 → 语音页；无音频时不因 clone_step≥3 强跳语音
         return clone_step || 2;
       })(),
       // ★ 显式重置所有"进行中"状态，防止旧 session 脏数据残留
