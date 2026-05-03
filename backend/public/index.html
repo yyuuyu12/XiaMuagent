@@ -2067,8 +2067,8 @@ function tHomeTaskSection() {
       const isPending = t.status === 'pending' || (isClone && (clonePhaseOf(t).phase === 'pending' || clonePhaseOf(t).phase === 'rewrite_pending'));
       const isDone = t.status === 'done' || (isClone && clonePhaseOf(t).phase === 'published');
       const isFailed = t.status === 'failed' || (isClone && clonePhaseOf(t).phase === 'failed');
-      const bdgColor = isFailed ? '#E5534B' : isDone ? '#22C55E' : isPending ? '#6B6FE0' : '#F5762A';
-      const bdgBg = isFailed ? '#FFF0F0' : isDone ? '#F0FDF4' : isPending ? '#EEF0FF' : '#FFF3E8';
+      const bdgColor = '#A8A49C';
+      const bdgBg = '#F0EDE8';
       const showPulse = isRunning || isPending;
       return `<div style="background:#FFF8F3;border-radius:18px;padding:14px 16px;border:1.5px solid rgba(245,118,42,0.2);box-shadow:0 4px 16px rgba(245,96,42,0.08);cursor:pointer;transition:transform 0.15s;-webkit-tap-highlight-color:transparent;margin-bottom:0" onclick="${openTaskAction(t)}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
@@ -6676,8 +6676,8 @@ function tHistory() {
     const isFailed = t.status === 'failed';
     const isPending = t.status === 'pending';
     const isRunning = t.status === 'running';
-    const bdgColor = isFailed ? '#E5534B' : isDone ? '#22C55E' : isPending ? '#6B6FE0' : '#F5762A';
-    const bdgBg = isFailed ? '#FFF0F0' : isDone ? '#F0FDF4' : isPending ? '#EEF0FF' : '#FFF3E8';
+    const bdgColor = '#A8A49C';
+    const bdgBg = '#F0EDE8';
     const showPulse = isRunning || isPending;
     return `<div style="background:#FFF8F3;border-radius:18px;padding:14px 16px;border:1.5px solid rgba(245,118,42,0.2);box-shadow:0 4px 16px rgba(245,96,42,0.08);cursor:pointer" onclick="${openTaskActionH(t)}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
