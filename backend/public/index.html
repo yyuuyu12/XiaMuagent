@@ -5804,7 +5804,7 @@ async function openExtractWithTask(taskId, fromHistory) {
   })();
   setState({
     currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null,
-    extractStep: 'task_loading',   // ★ 先进 loading 态，等 session 恢复后再跳到正确步骤
+    extractStep: _initStep,        // ★ 先跳到缓存步骤，session 恢复后再精确定位
     extractErr: '', extractFromHistory: !!fromHistory,
     avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null,
     avatarVideoUrl: null, avatarVideoB64: null, avatarErr: '',
@@ -5837,7 +5837,10 @@ async function openExtractWithTask(taskId, fromHistory) {
       // 先恢复 session（有步骤3-6的进度），再设基础字段
       const restored = await restoreCloneSession(taskId);
       if (!restored) {
-        setState({ extractStep: 2, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
+        // session 不存在时：用缓存的 _initStep 作为基准（至少不会比缓存的步骤更差），
+        // 但不低于 2（改写页是最低有意义的步骤）
+        const fallbackStep = (typeof _initStep === 'number' && _initStep >= 2) ? _initStep : 2;
+        setState({ extractStep: fallbackStep, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
       }
       // 如果 session 恢复成功，extractStep 已被 session 覆盖，但保证 rewrittenScript 最新
       if (restored) setState({ rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
