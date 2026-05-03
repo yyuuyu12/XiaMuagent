@@ -2082,8 +2082,8 @@ function tHomeTaskSection() {
           <div style="font-size:11px;color:#9E9890;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">${esc(thinking)}</div>
           ${(pct != null && pct > 0 && pct < 100) ? `<div style="font-size:12px;font-weight:700;color:#F5762A;flex-shrink:0">${pct}%</div>` : ''}
         </div>
-        <div style="height:4px;background:${(pct != null && pct>0)?'rgba(245,118,42,0.15)':'#F0EDE8'};border-radius:4px;overflow:hidden;margin-bottom:12px">
-          <div style="height:100%;width:${pct != null ? pct : 0}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
+        <div style="height:4px;background:${(pct === null || pct > 0)?'rgba(245,118,42,0.15)':'#F0EDE8'};border-radius:4px;overflow:hidden;margin-bottom:12px">
+          <div style="height:100%;width:${pct === null ? 100 : (pct || 0)}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
         </div>
         <div style="margin-bottom:12px">${stepsWithLabels(cloneStep)}</div>
         <div style="display:flex;gap:8px">
@@ -6691,8 +6691,8 @@ function tHistory() {
         <div style="font-size:11px;color:#9E9890;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">${esc(formatDisplayTime(t.activity_at || t.updated_at || t.created_at))}</div>
         ${(pct != null && pct > 0 && pct < 100) ? `<div style="font-size:12px;font-weight:700;color:#F5762A;flex-shrink:0">${pct}%</div>` : ''}
       </div>
-      <div style="height:4px;background:${(pct != null && pct > 0) ? 'rgba(245,118,42,0.15)' : '#F0EDE8'};border-radius:4px;overflow:hidden;margin-bottom:12px">
-        <div style="height:100%;width:${pct != null ? pct : 0}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
+      <div style="height:4px;background:${(pct === null || pct > 0)?'rgba(245,118,42,0.15)':'#F0EDE8'};border-radius:4px;overflow:hidden;margin-bottom:12px">
+        <div style="height:100%;width:${pct === null ? 100 : (pct || 0)}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.4s"></div>
       </div>
       <div style="margin-bottom:12px">${stepsWithLabelsH(cloneStep)}</div>
       <div style="display:flex;gap:8px">
