@@ -4364,7 +4364,9 @@ async function handleCloneRewrite() {
   if (!text) { showToast('请先填写原始文案'); return; }
 
   const wasRewriteStep = S.extractStep === 2;
-  setState({ extractStep: 'rewriting', rewriteSourceExpanded: false, extractErr: '' });
+  // 清空旧 cloneTaskData 的 progress/thinking，避免重写进度条闪烁满格（旧 done 状态 progress=100）
+  const resetTaskData = S.cloneTaskData ? { ...S.cloneTaskData, progress: 0, thinking: '' } : null;
+  setState({ extractStep: 'rewriting', rewriteSourceExpanded: false, extractErr: '', cloneTaskData: resetTaskData });
   saveCloneSession(2);
   if (S.cloneTaskId) {
     try {
@@ -5488,7 +5490,8 @@ function patchLocalCloneTaskStep(taskId, cloneStep, extraFields) {
     return {
       ...t,
       clone_step: cloneStep,           // 直接写当前步骤，允许回退
-      progress: Math.max(t.progress || 0, pct),
+      // 步骤前进时取大值（防倒退），步骤回退时直接用新步骤对应的进度（避免满进度条残留）
+      progress: cloneStep >= (parseInt(t.clone_step) || 1) ? Math.max(t.progress || 0, pct) : pct,
       activity_at: nowIso,
       updated_at: nowIso,
       ...(extraFields || {}),
