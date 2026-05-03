@@ -6931,6 +6931,7 @@ async function loadTasks() {
   } catch {}
 }
 
+let _lastTasksJson = '';
 function startTasksPolling() {
   if (tasksPollerTimer) return;
   tasksPollerTimer = setInterval(async () => {
@@ -6938,25 +6939,24 @@ function startTasksPolling() {
       const r = await api.get('/tasks');
       if (r.code === 200) {
         const tasks = mergeActiveCloneTaskStep(r.data);
-        // 直接写内存，不走 setState（避免 render），防止在 extract 页每2.5秒整页重绘导致抖动
+        // 用 JSON 摘要判断数据是否真的变化，没变化就不触发 render，避免手机滚动时被打断
+        const newJson = JSON.stringify(tasks.map(t => `${t.id}:${t.status}:${t.stage}:${t.clone_step}:${t.progress}:${t.error_msg||''}`));
+        const changed = newJson !== _lastTasksJson;
+        _lastTasksJson = newJson;
         S.tasksList = tasks;
         updateHomeDoneSeen();
-        // 只在 home/history 页触发渲染（用户能看到任务卡片的地方）
-        if (S.currentTab === 'home' || S.currentTab === 'history') render();
+        // 只在 home/history 页、且数据真正变化时才渲染
+        if (changed && (S.currentTab === 'home' || S.currentTab === 'history')) render();
         const hasRunning = tasks.some(t => t.status === 'pending' || t.status === 'running');
-        if (!hasRunning) { stopTasksPolling(); stopTasksTickTimer(); }
+        if (!hasRunning) stopTasksPolling();
       }
     } catch {}
   }, 2500);
 }
 
-function startTasksTickTimer() {
-  if (tasksTickTimer) return;
-  tasksTickTimer = setInterval(() => {
-    if (S.currentTab === 'home' || (S.currentTab === 'history' && S.historyTab === 'inspire')) render();
-  }, 1000);
-}
-
+// tasksTickTimer：原用于每秒刷新"相对时间"，但时间格式是固定时间戳（非"X分钟前"），
+// 每秒整页 render 对手机滚动性能伤害极大且无任何收益，直接废弃。
+function startTasksTickTimer() { /* 已废弃，保留空函数避免调用报错 */ }
 function stopTasksTickTimer() {
   if (tasksTickTimer) { clearInterval(tasksTickTimer); tasksTickTimer = null; }
 }
