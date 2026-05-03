@@ -2387,12 +2387,22 @@ function tExtract() {
 function tCloneStep3(sb) {
   // 音频已存在 → 改写文案曾经有值（当前可能是 session 恢复途中临时为空），跳过拦截
   const hasAudio = !!(S.ttsAudioUrl || S.ttsAudioB64);
-  if (!(S.rewrittenScript || '').trim() && !hasAudio) {
+  // ★ cloneTaskLoading=true 时正在恢复 session，数据还没到位，不显示"请先改写"错误
+  if (!(S.rewrittenScript || '').trim() && !hasAudio && !S.cloneTaskLoading) {
     return `${sb}<div class="tab-page">
       <div class="input-card" style="text-align:center;padding:26px 18px;margin-top:4px">
         <div style="font-size:15px;font-weight:700;color:#1A1814;margin-bottom:8px">请先完成文案改写</div>
         <div style="font-size:12px;color:#A8A49C;line-height:1.7;margin-bottom:16px">语音合成必须使用改写后的文案，避免直接拿提取原文进入后续流程。</div>
         <div class="btn-primary" onclick="setState({extractStep:2})">回到改写步骤</div>
+      </div>
+    </div>`;
+  }
+  // session 恢复中：显示轻量加载态，防止空白闪烁
+  if (S.cloneTaskLoading && !hasAudio && !(S.rewrittenScript || '').trim()) {
+    return `${sb}<div class="tab-page">
+      <div style="text-align:center;padding:80px 20px;color:#9E9890;font-size:14px">
+        <div style="width:32px;height:32px;border:3px solid rgba(245,118,42,0.2);border-top-color:#F5762A;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 14px"></div>
+        <div>加载中…</div>
       </div>
     </div>`;
   }
@@ -5799,6 +5809,7 @@ async function openExtractWithTask(taskId, fromHistory) {
   setState({
     currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null,
     extractStep: _initStep,
+    cloneTaskLoading: true,        // ★ 恢复 session 期间禁止步骤3的"请先改写"拦截
     extractErr: '', extractFromHistory: !!fromHistory,
     avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null,
     avatarVideoUrl: null, avatarVideoB64: null, avatarErr: '',
@@ -5809,35 +5820,35 @@ async function openExtractWithTask(taskId, fromHistory) {
   });
   try {
     const r = await api.get(`/tasks/${taskId}`);
-    if (r.code !== 200) { setState({ extractStep: 0 }); return; }
+    if (r.code !== 200) { setState({ cloneTaskLoading: false, extractStep: 0 }); return; }
     const task = r.data;
     setState({ cloneTaskData: task });
     if (task.status === 'extracted') {
-      // 先尝试恢复 session（用户可能已经推进到步骤3+）
       const restoredEx = await restoreCloneSession(taskId);
       if (!restoredEx) {
-        // 没有 session，从头开始（文案审核）
-        setState({ extractStep: 'review', extractedScript: task.result?.transcript || '' });
+        setState({ cloneTaskLoading: false, extractStep: 'review', extractedScript: task.result?.transcript || '' });
       } else {
-        // session 恢复成功，保证 extractedScript 也有值
-        setState({ extractedScript: task.result?.transcript || '' });
+        setState({ cloneTaskLoading: false, extractedScript: task.result?.transcript || '' });
       }
     } else if (task.status === 'pending' || task.status === 'running') {
-      setState({ extractStep: (task.stage === 'rewrite' || task.stage === 'extracted') ? 'rewriting' : 'cloning' });
+      setState({ cloneTaskLoading: false, extractStep: (task.stage === 'rewrite' || task.stage === 'extracted') ? 'rewriting' : 'cloning' });
       startClonePoller(taskId);
     } else if (task.status === 'done') {
       const rewritten = task.result?.rewritten || task.result?.scripts?.[0]?.content || '';
-      // 先恢复 session（有步骤3-6的进度），再设基础字段
       const restored = await restoreCloneSession(taskId);
       if (!restored) {
-        setState({ extractStep: 2, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
+        // session 不存在时：根据服务端 clone_step 给出最合理的落点
+        // clone_step>=3 → 语音页（有改写文案，可以重新合成音频）；否则 → 改写页
+        const apiStep = Number(task.clone_step) || 2;
+        const fallbackStep = apiStep >= 3 ? 3 : 2;
+        setState({ cloneTaskLoading: false, extractStep: fallbackStep, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
+      } else {
+        setState({ cloneTaskLoading: false, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
       }
-      // 如果 session 恢复成功，extractStep 已被 session 覆盖，但保证 rewrittenScript 最新
-      if (restored) setState({ rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
     } else {
-      setState({ extractStep: 0 });
+      setState({ cloneTaskLoading: false, extractStep: 0 });
     }
-  } catch { setState({ extractStep: 0 }); }
+  } catch { setState({ cloneTaskLoading: false, extractStep: 0 }); }
 }
 async function startCloneRewrite(taskId) {
   try {
