@@ -487,11 +487,11 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 .htc-status-running { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #F5762A; flex-shrink: 0; padding-top: 2px; }
 .htc-live-dot { width: 6px; height: 6px; background: #F5762A; border-radius: 50%; animation: live-pulse 1.4s ease-in-out infinite; flex-shrink: 0; }
 .htc-badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 500; border-radius: 50px; padding: 3px 10px; flex-shrink: 0; white-space: nowrap; }
-.htc-badge-running { background: #F0EDE8; color: #A8A49C; }
-.htc-badge-extracted { background: #F0EDE8; color: #A8A49C; }
-.htc-badge-done { background: #F0EDE8; color: #A8A49C; }
-.htc-badge-failed { background: #F0EDE8; color: #A8A49C; }
-.htc-badge-pending { background: #F0EDE8; color: #A8A49C; }
+.htc-badge-running { background: rgba(245,118,42,0.12); color: #F5762A; }
+.htc-badge-extracted { background: rgba(245,118,42,0.12); color: #F5762A; }
+.htc-badge-done { background: rgba(245,118,42,0.12); color: #F5762A; }
+.htc-badge-failed { background: rgba(245,118,42,0.12); color: #F5762A; }
+.htc-badge-pending { background: rgba(245,118,42,0.12); color: #F5762A; }
 .htc-progress-wrap { background: #F0EDE8; border-radius: 50px; height: 5px; overflow: hidden; margin-bottom: 6px; }
 .htc-progress-fill { height: 100%; background: linear-gradient(90deg, #FF8040, #F5602A); border-radius: 50px; transition: width 0.8s ease; }
 .htc-progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -1928,7 +1928,7 @@ function tHomeTaskSection() {
     if (info.phase === 'extracting' || info.phase === 'rewrite_pending' || info.phase === 'rewriting' || info.phase === 'extracted') return 'htc-badge-extracted';
     return 'htc-badge-done';
   };
-  const openTaskAction = t => t.type === 'clone_video' ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
+  const openTaskAction = t => (t.type === 'clone_video' && t.status !== 'failed') ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
   const bigActionText = t => {
     if (t.type === 'clone_video') {
       const info = clonePhaseOf(t);
@@ -2067,8 +2067,8 @@ function tHomeTaskSection() {
       const isPending = t.status === 'pending' || (isClone && (clonePhaseOf(t).phase === 'pending' || clonePhaseOf(t).phase === 'rewrite_pending'));
       const isDone = t.status === 'done' || (isClone && clonePhaseOf(t).phase === 'published');
       const isFailed = t.status === 'failed' || (isClone && clonePhaseOf(t).phase === 'failed');
-      const bdgColor = '#A8A49C';
-      const bdgBg = '#F0EDE8';
+      const bdgColor = '#F5762A';
+      const bdgBg = 'rgba(245,118,42,0.12)';
       const showPulse = isRunning || isPending;
       return `<div style="background:#FFF8F3;border-radius:18px;padding:14px 16px;border:1.5px solid rgba(245,118,42,0.2);box-shadow:0 4px 16px rgba(245,96,42,0.08);cursor:pointer;transition:transform 0.15s;-webkit-tap-highlight-color:transparent;margin-bottom:0" onclick="${openTaskAction(t)}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
@@ -6637,7 +6637,7 @@ function tHistory() {
   };
   // 历史页徽章：只展示任务类型
   const statusTextH = t => taskKindLabel(t);
-  const openTaskActionH = t => t.type === 'clone_video' ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
+  const openTaskActionH = t => (t.type === 'clone_video' && t.status !== 'failed') ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
   const stepsWithLabelsH = currentStep => {
     const labels = ['提取','改写','语音','数字人','后期','发布'];
     const svgCheck = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -6676,8 +6676,8 @@ function tHistory() {
     const isFailed = t.status === 'failed';
     const isPending = t.status === 'pending';
     const isRunning = t.status === 'running';
-    const bdgColor = '#A8A49C';
-    const bdgBg = '#F0EDE8';
+    const bdgColor = '#F5762A';
+    const bdgBg = 'rgba(245,118,42,0.12)';
     const showPulse = isRunning || isPending;
     return `<div style="background:#FFF8F3;border-radius:18px;padding:14px 16px;border:1.5px solid rgba(245,118,42,0.2);box-shadow:0 4px 16px rgba(245,96,42,0.08);cursor:pointer" onclick="${openTaskActionH(t)}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
@@ -6844,8 +6844,20 @@ function tTaskDetail() {
   const scripts = result.scripts || [];
   const analysis = result.analysis || null;
   const transcript = result.transcript || null;
+  const backFn = S.tasksDetailFromHome ? `switchTab('home')` : `setState({tasksView:'list',viewingTask:null})`;
 
   return `<div class="tab-page">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <div onclick="${backFn}" style="display:flex;align-items:center;gap:4px;font-size:13px;color:#F5762A;cursor:pointer;-webkit-tap-highlight-color:transparent">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>返回
+      </div>
+      <div style="flex:1;font-size:14px;font-weight:700;color:#1A1814;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title||'任务详情')}</div>
+    </div>
+    ${t.status === 'failed' ? `
+      <div style="background:#FEF2F2;border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:6px">任务失败</div>
+        <div style="font-size:13px;color:#7F1D1D;line-height:1.6">${esc(friendlyError(t.error_msg))}</div>
+      </div>` : ''}
     ${analysis ? `
       <div class="analysis-card">
         <div class="analysis-title">对标账号分析</div>
@@ -6859,15 +6871,16 @@ function tTaskDetail() {
         <div style="font-size:11px;color:#A8A49C;margin-bottom:6px">口播原文</div>
         <div style="font-size:13px;color:#3A3A3A;line-height:1.7;white-space:pre-wrap;word-break:break-all">${esc(transcript)}</div>
       </div>` : ''}
-    <div style="font-size:14px;font-weight:700;color:#1A1814;margin-bottom:10px">生成文案（${scripts.length}条）</div>
-    ${scripts.map((s,i) => `
-      <div class="script-result-card">
-        <div class="script-hook-badge">${esc(s.hook_type||'文案')}</div>
-        <div class="script-content">${esc(s.content)}</div>
-        <div class="script-actions">
-          <div class="copy-btn" onclick="cpTaskScript(event,'${t.id}',${i})">${S.tasksCopiedId===t.id+'_'+i?'✓ 已复制':'复制'}</div>
-        </div>
-      </div>`).join('')}
+    ${scripts.length > 0 ? `
+      <div style="font-size:14px;font-weight:700;color:#1A1814;margin-bottom:10px">生成文案（${scripts.length}条）</div>
+      ${scripts.map((s,i) => `
+        <div class="script-result-card">
+          <div class="script-hook-badge">${esc(s.hook_type||'文案')}</div>
+          <div class="script-content">${esc(s.content)}</div>
+          <div class="script-actions">
+            <div class="copy-btn" onclick="cpTaskScript(event,'${t.id}',${i})">${S.tasksCopiedId===t.id+'_'+i?'✓ 已复制':'复制'}</div>
+          </div>
+        </div>`).join('')}` : (t.status !== 'failed' ? `<div class="empty-tip">暂无生成内容</div>` : '')}
   </div>`;
 }
 
