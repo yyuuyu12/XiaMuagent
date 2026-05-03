@@ -4496,7 +4496,7 @@ async function handleTTSGenerate() {
       const audioMime = audioFmt === 'wav' ? 'audio/wav' : audioFmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
       const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
       _stopTTSProgressTimer();
-      setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
+      setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, ttsAudioFmt: audioFmt, extractStep: 3 });
       saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
     } else {
       _stopTTSProgressTimer();
@@ -4527,7 +4527,7 @@ async function _pollIndexTTSTask(taskId) {
         const audioFmt = (r.data.format || 'wav').toLowerCase();
         const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
         const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
-        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
+        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, ttsAudioFmt: audioFmt, extractStep: 3 });
         saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
         return;
       }
@@ -5517,6 +5517,7 @@ async function saveCloneSession(cloneStep) {
     ttsVoice:         S.ttsVoice,
     ttsSpeed:         S.ttsSpeed,
     ttsAudioB64:      S.ttsAudioB64      || null,   // 步骤3完成后有值
+    ttsAudioFmt:      S.ttsAudioFmt      || 'mp3',  // 音频格式，恢复时用正确 MIME
     ttsIndexEmotion:  S.ttsIndexEmotion  || 'neutral',
     avatarVideoB64:   S.avatarVideoB64   || null,   // 步骤4完成后有值（旧流程）
     avatarDoneTaskId: S.avatarDoneTaskId || null,   // 步骤4完成后有值（新流程，用于恢复视频）
@@ -5690,8 +5691,11 @@ async function restoreCloneSession(taskId) {
     };
     // 音频 base64 → Blob URL 恢复
     if (s.ttsAudioB64) {
+      const _fmt = (s.ttsAudioFmt || 'mp3').toLowerCase();
+      const _mime = _fmt === 'wav' ? 'audio/wav' : _fmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
       patch.ttsAudioB64 = s.ttsAudioB64;
-      patch.ttsAudioUrl = _b64ToBlobUrl(s.ttsAudioB64, 'audio/mp3');
+      patch.ttsAudioFmt = _fmt;
+      patch.ttsAudioUrl = _b64ToBlobUrl(s.ttsAudioB64, _mime);
     }
     // 数字人视频恢复：优先用 base64，其次用已保存的 OSS URL，最后异步拉取
     if (s.avatarVideoB64) {
@@ -5815,8 +5819,9 @@ async function openExtractWithTask(taskId, fromHistory) {
     // 后期完成 → step5，数字人完成 → step4，TTS/改写完成 → step3，仅提取完成 → step2
     if (st === 'extracted' || st === 'done') {
       if (_cachedTask.post_process_done) return 5;
-      if (s >= 5) return 4;
-      if (s >= 3) return 3;
+      if (s >= 5) return 4;   // 数字人完成 → 数字人页
+      if (s >= 4) return 3;   // TTS 完成（有音频）→ 语音页
+      if (s >= 3) return 2;   // 仅改写完成（无 TTS）→ 改写页，不跳到语音
       if (st === 'extracted' && s <= 1) return 'review';
       return s >= 2 ? 2 : 0;
     }
