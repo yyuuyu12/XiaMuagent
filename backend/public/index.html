@@ -5800,7 +5800,8 @@ async function openExtractWithTask(taskId, fromHistory) {
     _startBgAvatarPoller(S.avatarTaskId);
     showToast('数字人生成中，已转至后台，回到该任务可继续查看进度');
   }
-  // ★ 停掉前台 poller，避免继续写入当前页面状态
+  // ★ 停掉所有前台 poller，避免旧任务的 poller 继续写入新任务的步骤状态
+  stopClonePoller();  // 防止重新打开任务时旧 clonePoller 和新流程竞争覆盖 extractStep
   if (_avatarPoller) { clearInterval(_avatarPoller); _avatarPoller = null; }
   _avatarRunSeq++;
 

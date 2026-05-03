@@ -294,6 +294,11 @@ async function processCloneVideo(taskId) {
   const task = rows[0];
   if (!task) throw new Error(`任务 ${taskId} 不存在`);
 
+  // ★ 防止重复入队：任务已完成/失败时直接跳过，避免重新触发文案提取
+  // 场景：用户快速点击"重新改写"多次，同一 taskId 入队多次，
+  // 第1个 job 改写完成 status='done'，第2个 job 不应再跑提取阶段
+  if (task.status === 'done' || task.status === 'failed') return;
+
   // 阶段2：已提取，继续改写
   if (task.stage === 'extracted') {
     const existing = typeof task.result === 'string' ? JSON.parse(task.result) : (task.result || {});
@@ -301,7 +306,8 @@ async function processCloneVideo(taskId) {
     return;
   }
 
-  // 阶段1：提取文案
+  // 阶段1：提取文案（只有 pending/running 时才执行，防止 stage='done' 等异常状态误触发）
+  if (task.status !== 'pending' && task.status !== 'running') return;
   await processCloneExtractPhase(taskId, task);
 }
 
