@@ -5857,11 +5857,15 @@ async function openExtractWithTask(taskId, fromHistory) {
       const rewritten = task.result?.rewritten || task.result?.scripts?.[0]?.content || '';
       const restored = await restoreCloneSession(taskId);
       if (!restored) {
-        // session 不存在时：根据服务端 clone_step / post_process_done 落到对应步骤
+        // session 不存在时：必须与 _initStep 的映射一致，避免出现"先 step2 → 再跳 step3"的闪烁
         // 注意：单任务接口的 task.clone_step 为 null（tasks 表无此列），需用列表缓存值
-        // 后期完成 → 5；数字人完成 → 4；改写/TTS 完成 → 3；仅提取 → 2
+        // 后期完成 → 5；数字人完成 → 4；TTS 完成（s>=4）→ 3；仅改写完成（s=3）→ 2；仅提取 → 2
         const apiStep = Number(_cachedTask?.clone_step || task.clone_step) || 2;
-        const fallbackStep = (_cachedTask?.post_process_done || task.post_process_done) ? 5 : apiStep >= 5 ? 4 : apiStep >= 3 ? 3 : 2;
+        const postDone = !!(_cachedTask?.post_process_done || task.post_process_done);
+        const fallbackStep = postDone ? 5
+                          : apiStep >= 5 ? 4
+                          : apiStep >= 4 ? 3
+                          : 2;
         setState({ cloneTaskLoading: false, extractStep: fallbackStep, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
       } else {
         setState({ cloneTaskLoading: false, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
