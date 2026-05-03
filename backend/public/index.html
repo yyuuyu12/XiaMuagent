@@ -2220,7 +2220,7 @@ function tHome() {
 // ===== 克隆流程步骤条 =====
 function cloneCurrentStep() {
   const s = S.extractStep;
-  if (s === 0 || s === 'task_loading' || s === 'cloning' || s === 'review') return 1;
+  if (s === 0 || s === 'cloning' || s === 'review') return 1;
   if (s === 'rewriting' || s === 2) return 2;
   if (s === 3 || s === 'tts_gen') return 3;
   if (s === 4 || s === 'avatar_gen') return 4;
@@ -2263,16 +2263,6 @@ function tCloneActions(primary, secondary = []) {
 // ===== EXTRACT =====
 function tExtract() {
   const sb = tCloneStepBar();
-
-  // 任务加载中（openExtractWithTask 等待 session 恢复时的过渡态）
-  if (S.extractStep === 'task_loading') {
-    return `${sb}<div class="tab-page">
-      <div style="text-align:center;padding:80px 20px;color:#9E9890;font-size:14px">
-        <div style="width:36px;height:36px;border:3px solid rgba(245,118,42,0.2);border-top-color:#F5762A;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
-        <div>加载任务中…</div>
-      </div>
-    </div>`;
-  }
 
   // 路由到步骤3-6
   if (S.extractStep === 3 || S.extractStep === 'tts_gen') return tCloneStep3(sb);
@@ -4495,8 +4485,7 @@ async function handleTTSGenerate() {
       const audioMime = audioFmt === 'wav' ? 'audio/wav' : audioFmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
       const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
       _stopTTSProgressTimer();
-      setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3,
-        avatarDoneTaskId: null, avatarVideoUrl: null, avatarVideoB64: null }); // ★ 新音频→清除旧数字人数据
+      setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
       saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
     } else {
       _stopTTSProgressTimer();
@@ -4527,8 +4516,7 @@ async function _pollIndexTTSTask(taskId) {
         const audioFmt = (r.data.format || 'wav').toLowerCase();
         const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
         const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
-        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3,
-          avatarDoneTaskId: null, avatarVideoUrl: null, avatarVideoB64: null }); // ★ 新音频→清除旧数字人数据
+        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, extractStep: 3 });
         saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
         return;
       }
@@ -4847,7 +4835,8 @@ function setTTSSpeedPreset(v) {
 
 function goToCloneStep4() {
   stopTTSAudio();
-  setState({ extractStep: 4, avatarErr: '' });
+  // 进入数字人步骤时清除旧视频数据：新语音对应新视频，避免旧 avatarDoneTaskId 触发假加载
+  setState({ extractStep: 4, avatarErr: '', avatarDoneTaskId: null, avatarVideoUrl: null, avatarVideoB64: null });
   saveCloneSession(4); // 进入步骤4时立刻保存，防止离开后恢复回步骤3
 }
 
@@ -5799,17 +5788,21 @@ async function openExtractWithTask(taskId, fromHistory) {
     const st = _cachedTask.status;
     if (st === 'pending' || st === 'running') return ((_cachedTask.stage === 'rewrite' || _cachedTask.stage === 'extracted') ? 'rewriting' : 'cloning');
     if (st === 'extracted') return s >= 3 ? s : 'review';
-    if (st === 'done') return s >= 2 ? s : 2;
+    if (st === 'done') {
+      // clone_step>=3 的任务先停在步骤3（语音页），session 恢复后再精确跳到正确步骤。
+      // 避免步骤4/5因数据未就绪而出现"无音频/无视频"的错误界面闪烁。
+      if (s >= 3) return 3;
+      return s >= 2 ? s : 2;
+    }
     return 0;
   })();
   setState({
     currentTab: 'extract', cloneTaskId: taskId, cloneTaskData: null,
-    extractStep: _initStep,        // ★ 先跳到缓存步骤，session 恢复后再精确定位
+    extractStep: _initStep,
     extractErr: '', extractFromHistory: !!fromHistory,
     avatarGenerating: false, avatarTaskId: null, avatarAsrUrl: null,
     avatarVideoUrl: null, avatarVideoB64: null, avatarErr: '',
     avatarProgressPct: 0, avatarProgressMsg: '',
-    avatarDoneTaskId: null,        // ★ 清除旧 avatarDoneTaskId，session 恢复后按需设置
     ttsAudioUrl: null, ttsAudioB64: null, ttsGenerating: false, ttsErr: '',
     postProcessedVideoUrl: null, postProcessedB64: null, postProcessing: false,
     coverFrameUrl: null, rewrittenScript: '', extractedScript: '', rewriteSourceExpanded: false,
@@ -5837,10 +5830,7 @@ async function openExtractWithTask(taskId, fromHistory) {
       // 先恢复 session（有步骤3-6的进度），再设基础字段
       const restored = await restoreCloneSession(taskId);
       if (!restored) {
-        // session 不存在时：用缓存的 _initStep 作为基准（至少不会比缓存的步骤更差），
-        // 但不低于 2（改写页是最低有意义的步骤）
-        const fallbackStep = (typeof _initStep === 'number' && _initStep >= 2) ? _initStep : 2;
-        setState({ extractStep: fallbackStep, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
+        setState({ extractStep: 2, rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
       }
       // 如果 session 恢复成功，extractStep 已被 session 覆盖，但保证 rewrittenScript 最新
       if (restored) setState({ rewrittenScript: rewritten, extractedScript: task.result?.transcript || '' });
