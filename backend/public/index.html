@@ -1240,7 +1240,6 @@ const S = {
   avatarCropScale: 100,
   avatarCropX: 0,
   avatarCropY: 0,
-  extractController: null,
   extractTranscribeController: null,
   rewriteGenerating: false,
   homeDoneSeenIds: [],
@@ -1279,7 +1278,6 @@ let extractController = null;
 let extractTranscribeController = null;
 let tasksPollerTimer = null;
 let pathAPollerTimer = null;
-let tasksTickTimer = null;
 let clonePollerTimer = null;
 
 // ===== UTILS =====
@@ -1839,9 +1837,6 @@ function tHomeTaskSection() {
     html += '</div>';
     return html;
   }
-  // legacy alias
-  function cloneStepBar(currentStep) { return stepsWithLabels(currentStep); }
-
   // Clone task icon SVG
   const iconClone = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B6FE0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`;
   const iconInspire = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
@@ -5890,41 +5885,6 @@ function stopExtractTranscribe() {
     S.extractTranscribeController = null;
   }
   setState({ extractLoading: false, extractErr: '' });
-}
-async function handleRewrite() {
-  if (!ensureLoggedIn()) return;
-  if (!S.extractedScript || S.extractLoading) return;
-  extractController = new AbortController();
-  S.extractController = extractController;
-  setState({ extractLoading: true, extractErr: '', rewriteGenerating: true });
-  try {
-    const body = { text: S.extractedScript };
-    if (S.rewriteStyle) body.style = S.rewriteStyle;
-    const r = await api.post('/ai/rewrite', body, extractController.signal);
-    extractController = null;
-    S.extractController = null;
-    if (apiUnauthorized(r)) setState({ extractLoading: false, rewriteGenerating: false });
-    else if (r.code === 200) { setState({ rewrittenScript: r.data.result, extractStep: 2, extractLoading: false, rewriteGenerating: false }); fetchMe(); refreshHistory(); }
-    else setState({ extractErr: r.msg || 'AI改写失败', extractLoading: false, rewriteGenerating: false });
-  } catch (e) {
-    extractController = null;
-    S.extractController = null;
-    if (e && e.name === 'AbortError') setState({ extractErr: '', extractLoading: false, rewriteGenerating: false });
-    else setState({ extractErr: '网络错误，请稍后重试', extractLoading: false, rewriteGenerating: false });
-  }
-}
-function stopExtractRewrite() {
-  if (extractController) {
-    extractController.abort();
-    extractController = null;
-    S.extractController = null;
-  }
-  setState({ extractLoading: false, rewriteGenerating: false });
-}
-function rewriteAgain() {
-  // 重新基于原始文案（可编辑后的最新值）改写：保持当前文案可视，但进入灰态不可编辑与波纹生成态
-  setState({ extractErr: '', rewriteGenerating: true });
-  handleRewrite();
 }
 function resetExtract() {
   if (extractController) {
