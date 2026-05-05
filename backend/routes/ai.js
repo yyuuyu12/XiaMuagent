@@ -718,6 +718,12 @@ function invalidateVideoUrlCache() {
 }
 router.invalidateVideoUrlCache = invalidateVideoUrlCache;
 
+// OSS URL 统一升级为 HTTPS（阿里云 OSS 原生支持 HTTPS，运营商对 HTTPS 流量限速概率更低）
+function toHttpsOssUrl(url) {
+  if (!url) return url;
+  return url.replace(/^http:\/\//i, 'https://');
+}
+
 function htmlServiceError(url, text) {
   const hint = text && text.includes('<!DOCTYPE')
     ? '当前数字人地址返回的是网页，不是本地视频接口。请检查后台 video_url/asr_url，必须指向 frp/heygem 穿透地址（如 http://heygem.yyagent.top），并能打开 /health 返回 JSON。'
@@ -891,7 +897,7 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
       if (ossConfigured) {
         // ① HeyGem 本地已直传 OSS（最快路径）
         if (data.oss_url) {
-          data.video_url = data.oss_url;
+          data.video_url = toHttpsOssUrl(data.oss_url);
           // 写入 DB 供后续恢复使用（IGNORE 避免重复写）
           db.query(
             `INSERT IGNORE INTO user_videos (user_id, task_id, oss_key, oss_url) VALUES (?, ?, ?, ?)`,
@@ -903,7 +909,7 @@ router.get('/video/task/:taskId', requireAuth, async (req, res) => {
             `SELECT oss_url FROM user_videos WHERE task_id = ?`, [taskId]
           );
           if (existingRows.length > 0 && existingRows[0].oss_url) {
-            data.video_url = existingRows[0].oss_url;
+            data.video_url = toHttpsOssUrl(existingRows[0].oss_url);
           } else if (_ossUploading.has(taskId)) {
             const elapsed = Date.now() - (_ossUploadStart.get(taskId) || Date.now());
             if (elapsed < OSS_UPLOAD_TIMEOUT_MS) {
@@ -1017,7 +1023,7 @@ router.post('/video/postprocess', requireAuth, async (req, res) => {
         const taskId = req.body.task_id || ('pp_' + Date.now());
         const ossKey = `postprocess/${req.userId}/${taskId}.mp4`;
         const ossUrl = await oss.uploadBuffer(ossKey, buf);
-        data.oss_url = ossUrl; // 附加到响应，前端直接存
+        data.oss_url = toHttpsOssUrl(ossUrl); // 附加到响应，前端直接存
         console.log(`[postprocess] OSS 上传完成 url=${ossUrl}`);
       } catch (ossErr) {
         console.warn('[postprocess] OSS 上传失败（不影响主流程）:', ossErr.message);
