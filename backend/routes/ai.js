@@ -1050,7 +1050,20 @@ router.get('/tts/indextts/task/:taskId', requireAuth, async (req, res) => {
     });
     const data = await resp.json();
     if (data.status === 'done') {
-      return res.json({ code: 200, data: { audio: data.audio, format: data.format || 'wav' } });
+      const fmt = data.format || 'wav';
+      // 尝试上传到 OSS，成功则返回 URL（省去 base64 经 frp 回传）
+      try {
+        const ossConfigured = await oss.isConfigured().catch(() => false);
+        if (ossConfigured && data.audio) {
+          const audioBuf = Buffer.from(data.audio, 'base64');
+          const ossKey = `tts/${req.userId}/${taskId}.${fmt}`;
+          const ossUrl = toHttpsOssUrl(await oss.uploadBuffer(ossKey, audioBuf));
+          return res.json({ code: 200, data: { audio_url: ossUrl, format: fmt } });
+        }
+      } catch (ossErr) {
+        console.warn('[TTS] OSS 上传失败，降级返回 base64:', ossErr.message);
+      }
+      return res.json({ code: 200, data: { audio: data.audio, format: fmt } });
     }
     if (data.status === 'error') {
       return res.json({ code: 500, msg: `IndexTTS 推理失败: ${data.error || '未知错误'}` });

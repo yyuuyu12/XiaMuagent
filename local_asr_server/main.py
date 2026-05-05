@@ -767,24 +767,31 @@ async def _ffmpeg_burn_subtitles(video_path: str, ass_path: str, output_path: st
     if len(ass_esc) >= 2 and ass_esc[1] == ":":
         ass_esc = ass_esc[0] + "\\:" + ass_esc[2:]
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", video_path,
-        "-vf", f"ass='{ass_esc}'",
-        "-c:a", "aac",
-        "-c:v", "libx264",
-        "-preset", "faster",
-        "-crf", "18",
-        output_path,
+    # 优先 GPU 编码（h264_nvenc，ASS滤镜CPU过滤+GPU编码），失败降级 CPU
+    codec_options_list = [
+        ["-c:v", "h264_nvenc", "-cq", "23"],
+        ["-c:v", "libx264", "-preset", "faster", "-crf", "23"],
     ]
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
-    if proc.returncode != 0:
-        raise RuntimeError(f"FFmpeg字幕烧录失败: {stderr.decode(errors='replace')[-400:]}")
+    last_stderr = b""
+    for codec_opts in codec_options_list:
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-vf", f"ass='{ass_esc}'",
+            "-c:a", "aac",
+            *codec_opts,
+            output_path,
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, last_stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        if proc.returncode == 0:
+            return
+        print(f"[subtitle] {codec_opts[1]} 失败，尝试下一个编码器")
+    raise RuntimeError(f"FFmpeg字幕烧录失败: {last_stderr.decode(errors='replace')[-400:]}")
 
 
 @app.post("/video/postprocess")

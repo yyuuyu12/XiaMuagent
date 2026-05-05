@@ -4488,12 +4488,17 @@ async function handleTTSGenerate() {
       return;
     }
     if (r.code === 200) {
-      // 转成 Blob URL，移动端大 base64 直接用 new Audio() 会静默失败
       const audioFmt = (r.data.format || 'mp3').toLowerCase();
-      const audioMime = audioFmt === 'wav' ? 'audio/wav' : audioFmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
-      const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
       _stopTTSProgressTimer();
-      setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, ttsAudioFmt: audioFmt, extractStep: 3 });
+      if (r.data.audio_url) {
+        // OSS URL：直接用，不走 frp 传输
+        setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: r.data.audio_url, ttsAudioB64: null, ttsAudioFmt: audioFmt, extractStep: 3 });
+      } else {
+        // base64 降级：转成 Blob URL
+        const audioMime = audioFmt === 'wav' ? 'audio/wav' : audioFmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
+        const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
+        setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, ttsAudioFmt: audioFmt, extractStep: 3 });
+      }
       saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
     } else {
       _stopTTSProgressTimer();
@@ -4522,9 +4527,13 @@ async function _pollIndexTTSTask(taskId) {
       if (S.cloneTaskId !== ownerTaskId) return; // ★ 请求返回期间可能已切换
       if (r.code === 200 && r.data) {
         const audioFmt = (r.data.format || 'wav').toLowerCase();
-        const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
-        const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
-        setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, ttsAudioFmt: audioFmt, extractStep: 3 });
+        if (r.data.audio_url) {
+          setState({ ttsGenerating: false, ttsAudioUrl: r.data.audio_url, ttsAudioB64: null, ttsAudioFmt: audioFmt, extractStep: 3 });
+        } else {
+          const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
+          const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
+          setState({ ttsGenerating: false, ttsAudioUrl: audioUrl, ttsAudioB64: r.data.audio, ttsAudioFmt: audioFmt, extractStep: 3 });
+        }
         saveCloneSession(4); // ★ 步骤4：语音已完成，卡片显示"语音已生成"
         return;
       }
@@ -4932,7 +4941,10 @@ function _startBgTTSPoller(ttsJobId, ownerTaskId) {
       if (r.code === 200 && r.data) {
         const ownerId = _bgTTSOwnerId;
         _bgTTSJobId = null; _bgTTSOwnerId = null;
-        await _savePartialSessionForTask(ownerId, 3, { ttsAudioB64: r.data.audio });
+        const sessPatch = r.data.audio_url
+          ? { ttsAudioB64: '__oss__', ttsOssUrl: r.data.audio_url, ttsAudioFmt: r.data.format || 'wav' }
+          : { ttsAudioB64: r.data.audio, ttsAudioFmt: r.data.format || 'wav' };
+        await _savePartialSessionForTask(ownerId, 3, sessPatch);
         loadTasks();
         showToast('语音已生成完成，请回到对应任务查看');
         return;
@@ -5513,8 +5525,10 @@ async function saveCloneSession(cloneStep) {
     rewrittenScript:  S.rewrittenScript  || '',
     ttsVoice:         S.ttsVoice,
     ttsSpeed:         S.ttsSpeed,
-    ttsAudioB64:      S.ttsAudioB64      || null,   // 步骤3完成后有值
-    ttsAudioFmt:      S.ttsAudioFmt      || 'mp3',  // 音频格式，恢复时用正确 MIME
+    // 音频：OSS URL 时用 '__oss__' 标记，让 tasks.js 步骤判断仍正常工作
+    ttsAudioB64:      S.ttsAudioB64 || (S.ttsAudioUrl && !S.ttsAudioUrl.startsWith('blob:') ? '__oss__' : null),
+    ttsOssUrl:        (S.ttsAudioUrl && !S.ttsAudioUrl.startsWith('blob:')) ? S.ttsAudioUrl : null,
+    ttsAudioFmt:      S.ttsAudioFmt      || 'wav',  // 音频格式，恢复时用正确 MIME
     ttsIndexEmotion:  S.ttsIndexEmotion  || 'neutral',
     avatarVideoB64:   S.avatarVideoB64   || null,   // 步骤4完成后有值（旧流程）
     avatarDoneTaskId: S.avatarDoneTaskId || null,   // 步骤4完成后有值（新流程，用于恢复视频）
@@ -5665,7 +5679,7 @@ async function restoreCloneSession(taskId) {
       extractStep: (() => {
         if (s.postProcessDone || s.postProcessedVideoUrl || s.postProcessedB64) return 5;
         if (s.avatarDoneTaskId || s.avatarVideoUrl || s.avatarVideoB64 || s.avatarTaskId) return 4;
-        if (s.ttsAudioB64) return 3;   // 有音频 → 语音页；无音频时不因 clone_step≥3 强跳语音
+        if (s.ttsAudioB64 || s.ttsOssUrl) return 3;   // 有音频（B64或OSS）→ 语音页
         return clone_step || 2;
       })(),
       // ★ 显式重置所有"进行中"状态，防止旧 session 脏数据残留
@@ -5686,8 +5700,12 @@ async function restoreCloneSession(taskId) {
       postProcessing:       false,
       coverFrameUrl:        null,
     };
-    // 音频 base64 → Blob URL 恢复
-    if (s.ttsAudioB64) {
+    // 音频恢复：OSS URL 直接用；base64 转 Blob URL
+    if (s.ttsAudioB64 === '__oss__' && s.ttsOssUrl) {
+      patch.ttsAudioUrl = s.ttsOssUrl;
+      patch.ttsAudioB64 = null;
+      patch.ttsAudioFmt = s.ttsAudioFmt || 'wav';
+    } else if (s.ttsAudioB64) {
       const _fmt = (s.ttsAudioFmt || 'mp3').toLowerCase();
       const _mime = _fmt === 'wav' ? 'audio/wav' : _fmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
       patch.ttsAudioB64 = s.ttsAudioB64;
