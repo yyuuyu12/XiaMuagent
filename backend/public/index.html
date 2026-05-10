@@ -5672,11 +5672,13 @@ async function restoreCloneSession(taskId) {
       publishDesc:          s.publishDesc     || '',
       publishTags:          s.publishTags     || [],
       // ★ 阶段 → UI 步骤精确映射：
+      //   发布页（有封面或发布标题）→ step6
       //   后期视频已就绪 → step5（后期预览）
       //   数字人视频已就绪 / 生成中 → step4（视频预览/生成态）
       //   音频已就绪 / 改写完成 → step3（语音页）
       //   仅提取完成 → step2（改写页）
       extractStep: (() => {
+        if (s.coverFrameUrl || s.publishTitle) return 6;  // 曾到发布页 → 恢复到发布页
         if (s.postProcessDone || s.postProcessedVideoUrl || s.postProcessedB64) return 5;
         if (s.avatarDoneTaskId || s.avatarVideoUrl || s.avatarVideoB64 || s.avatarTaskId) return 4;
         if (s.ttsAudioB64 || s.ttsOssUrl) return 3;   // 有音频（B64或OSS）→ 语音页
@@ -5834,6 +5836,7 @@ async function openExtractWithTask(taskId, fromHistory) {
     // 阶段 → UI 步骤精确映射（done / extracted 共享）：
     // 后期完成 → step5，数字人完成 → step4，TTS/改写完成 → step3，仅提取完成 → step2
     if (st === 'extracted' || st === 'done') {
+      if (s >= 6) return 6;   // 发布页（曾到发布步骤）→ 直接恢复到发布页
       if (_cachedTask.post_process_done) return 5;
       if (s >= 5) return 4;   // 数字人完成 → 数字人页
       if (s >= 4) return 3;   // TTS 完成（有音频）→ 语音页
@@ -6905,6 +6908,10 @@ function tTaskDetail() {
 // ===== 任务 API 函数 =====
 function mergeActiveCloneTaskStep(list) {
   if (!S.cloneTaskId || !Array.isArray(list)) return list;
+  // 只在主动生成中（语音/数字人/后期）时才用本地UI步骤覆盖服务端步骤，
+  // 避免 S.extractStep 的旧值（如之前到过步骤6）在首页把卡片错误地抬高
+  const isActiveGen = S.ttsGenerating || S.avatarGenerating || S.postProcessing;
+  if (!isActiveGen) return list;
   const activeStep = currentCloneStepFromState();
   return list.map(t => String(t.id) === String(S.cloneTaskId)
     ? { ...t, clone_step: Math.max(parseInt(t.clone_step) || 1, activeStep) }
