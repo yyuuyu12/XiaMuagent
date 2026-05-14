@@ -1058,7 +1058,7 @@ router.get('/tts/indextts/task/:taskId', requireAuth, async (req, res) => {
           const audioBuf = Buffer.from(data.audio, 'base64');
           const ossKey = `tts/${req.userId}/${taskId}.${fmt}`;
           const ossUrl = toHttpsOssUrl(await oss.uploadBuffer(ossKey, audioBuf));
-          return res.json({ code: 200, data: { audio_url: ossUrl, format: fmt } });
+          return res.json({ code: 200, data: { audio_url: ossUrl, audio: data.audio, format: fmt } });
         }
       } catch (ossErr) {
         console.warn('[TTS] OSS 上传失败，降级返回 base64:', ossErr.message);

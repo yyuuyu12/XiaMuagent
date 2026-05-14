@@ -4492,7 +4492,7 @@ async function handleTTSGenerate() {
       _stopTTSProgressTimer();
       if (r.data.audio_url) {
         // OSS URL：直接用，不走 frp 传输
-        setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: r.data.audio_url, ttsAudioB64: null, ttsAudioFmt: audioFmt, extractStep: 3 });
+        setState({ ttsGenerating: false, ttsProgressPct: 100, ttsAudioUrl: r.data.audio_url, ttsAudioB64: r.data.audio || null, ttsAudioFmt: audioFmt, extractStep: 3 });
       } else {
         // base64 降级：转成 Blob URL
         const audioMime = audioFmt === 'wav' ? 'audio/wav' : audioFmt === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
@@ -4528,7 +4528,7 @@ async function _pollIndexTTSTask(taskId) {
       if (r.code === 200 && r.data) {
         const audioFmt = (r.data.format || 'wav').toLowerCase();
         if (r.data.audio_url) {
-          setState({ ttsGenerating: false, ttsAudioUrl: r.data.audio_url, ttsAudioB64: null, ttsAudioFmt: audioFmt, extractStep: 3 });
+          setState({ ttsGenerating: false, ttsAudioUrl: r.data.audio_url, ttsAudioB64: r.data.audio || null, ttsAudioFmt: audioFmt, extractStep: 3 });
         } else {
           const audioMime = audioFmt === 'wav' ? 'audio/wav' : 'audio/mpeg';
           const audioUrl = _b64ToBlobUrl(r.data.audio, audioMime);
