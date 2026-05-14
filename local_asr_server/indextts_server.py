@@ -1,7 +1,7 @@
-"""
+﻿"""
 IndexTTS2 语音克隆服务 - 端口 8766
 运行方式:
-  C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe indextts_server.py
+  F:\qingyuAI\python-modules\voiceV2Module\venv\python.exe indextts_server.py
 
 使用竞品的 Python 3.11 venv + 模型文件，无需额外安装。
 """
@@ -9,7 +9,18 @@ import os
 import sys
 
 # ===== 必须在导入 torch 之前设置，顺序不能变 =====
-VOICE_MODULE_DIR = r"C:\ChaojiIP\aigc-human\python-modules\voiceV2Module"
+# 优先用环境变量（整合包场景），否则用硬编码路径（自用场景）
+def _resolve_voice_module_dir():
+    # 1. 环境变量（买家整合包启动时注入）
+    if os.environ.get("VOICE_MODULE_DIR", ""):
+        return os.environ["VOICE_MODULE_DIR"]
+    # 2. 相对路径（整合包场景：脚本在 ai_services/，模型在 ai_services/voiceV2Module/）
+    _rel = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "voiceV2Module"))
+    if os.path.exists(_rel):
+        return _rel
+    # 3. 硬编码（自用场景兜底）
+    return r"F:\qingyuAI\python-modules\voiceV2Module"
+VOICE_MODULE_DIR = _resolve_voice_module_dir()
 VENV_DIR         = os.path.join(VOICE_MODULE_DIR, "venv")
 HF_CACHE         = os.path.join(VOICE_MODULE_DIR, "hf_cache")
 SVML_DIR         = r"C:\ProgramData\Waves Audio\Modules\AdditionalDLLs_x64"

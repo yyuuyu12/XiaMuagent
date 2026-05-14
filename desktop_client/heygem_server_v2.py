@@ -1,8 +1,8 @@
-"""
+﻿"""
 HeyGem V2 数字人视频生成服务（hdModule - 高清模型V2）
 端口: 7861
 使用 hdModule venv 启动:
-  C:\ChaojiIP\aigc-human\python-modules\hdModule\venv\python.exe heygem_server_v2.py
+  F:\qingyuAI\python-modules\hdModule\venv\python.exe heygem_server_v2.py
 """
 import multiprocessing
 multiprocessing.freeze_support()
@@ -29,7 +29,17 @@ except ImportError:
     _OSS2_AVAILABLE = False
 
 # ===== 路径配置（V2 = hdModule）=====
-HEYGEM_DIR = Path(r"C:\ChaojiIP\aigc-human\python-modules\hdModule")
+def _resolve_heygem_dir():
+    # 1. 环境变量（买家整合包启动时注入）
+    if os.environ.get("HEYGEM_DIR", ""):
+        return Path(os.environ["HEYGEM_DIR"])
+    # 2. 相对路径（整合包场景：脚本在 ai_services/，模型在 ai_services/hdModule/）
+    _rel = Path(__file__).resolve().parent / "hdModule"
+    if _rel.exists():
+        return _rel
+    # 3. 硬编码（自用场景兜底）
+    return Path(r"F:\qingyuAI\python-modules\hdModule")
+HEYGEM_DIR = _resolve_heygem_dir()
 OUTPUT_DIR = Path(__file__).parent / "heygem_outputs"
 TEMP_DIR   = Path(__file__).parent / "heygem_temp"
 OUTPUT_DIR.mkdir(exist_ok=True)

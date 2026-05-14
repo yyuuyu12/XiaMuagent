@@ -4,6 +4,37 @@
 - GitHub: yyuuyu12/XiaMuagent
 - 部署平台: Zeabur（push 到 master 自动部署）
 - 本地路径: C:\AIClaudecode
+- 独立打包版: F:\Projects\XiaMuDesktop
+
+---
+
+## ⚠️ 三个产品形态边界（必读）
+
+| | 手机版 H5 | 网页桌面版 | 独立打包版 |
+|---|---|---|---|
+| **前端文件** | `backend/public/index.html` | `backend/public/desktop.html` | `XiaMuDesktop/frontend/index.html`（从 desktop.html 同步） |
+| **后端** | Zeabur | Zeabur | 本地 FastAPI 9101 |
+| **TTS/ASR** | frp穿透 asr.yyagent.top | frp穿透 asr.yyagent.top | 直连 127.0.0.1:8765/8766 |
+| **数字人** | frp穿透 heygem.yyagent.top | frp穿透 heygem.yyagent.top | 直连 127.0.0.1:7861 |
+
+**详细规范见 `docs/` 目录：**
+- `docs/架构总览.md`
+- `docs/规范-手机版H5.md`
+- `docs/规范-网页桌面版.md`
+- `docs/规范-独立打包版.md`
+
+### 改代码前必须确认：我在改哪个形态？
+
+| 要改什么 | 改哪个文件 |
+|---|---|
+| 手机版页面 | `backend/public/index.html` |
+| 网页桌面版页面 | `backend/public/desktop.html` |
+| 独立打包版页面 | 先改 desktop.html → 再同步到 `XiaMuDesktop/frontend/index.html` |
+| 云端 API 接口 | `backend/routes/对应文件.js` |
+| 独立打包版本地后端 | `XiaMuDesktop/backend_local/main.py` |
+| 本地 ASR/TTS | `local_asr_server/main.py` |
+| IndexTTS 推理 | `local_asr_server/indextts_server.py` |
+| 数字人服务 | `desktop_client/heygem_server_v2.py` |
 
 ---
 
