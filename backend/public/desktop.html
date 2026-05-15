@@ -808,18 +808,32 @@ function dCardTTS() {
         </select>
         ${myVoices.length===0?`<div style="font-size:11px;color:#B0AA9F;margin-top:4px">在「声音管理」可添加自定义克隆声音</div>`:''}
       </div>
-      <!-- 语速 -->
-      <div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <div class="d-label" style="margin:0">语速</div>
-          <div style="font-size:12px;font-weight:700;color:#F5762A" id="dSpeedVal">${dS.ttsSpeed.toFixed(1)}x</div>
+      <!-- 情绪 + 语速 同行 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
+        <div>
+          <div class="d-label">情绪</div>
+          <select class="d-select" style="width:100%" onchange="dS.ttsEmotion=this.value">
+            <option value="neutral"  ${dS.ttsEmotion==='neutral'  ?'selected':''}>😐 中性</option>
+            <option value="happy"    ${dS.ttsEmotion==='happy'    ?'selected':''}>😊 愉快</option>
+            <option value="sad"      ${dS.ttsEmotion==='sad'      ?'selected':''}>😢 悲伤</option>
+            <option value="angry"    ${dS.ttsEmotion==='angry'    ?'selected':''}>😠 愤怒</option>
+            <option value="fearful"  ${dS.ttsEmotion==='fearful'  ?'selected':''}>😨 恐惧</option>
+            <option value="surprise" ${dS.ttsEmotion==='surprise' ?'selected':''}>😲 惊喜</option>
+          </select>
         </div>
-        <div class="d-slider-wrap">
-          <div class="d-slider-track"><div class="d-slider-fill" id="dSpeedFill" style="width:${speedPct}%"></div></div>
-          <div class="d-slider-thumb" id="dSpeedThumb" style="left:${speedPct}%"></div>
-          <input type="range" class="d-slider-input" min="50" max="200" value="${Math.round(dS.ttsSpeed*100)}" oninput="dOnSpeed(this.value)">
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <div class="d-label" style="margin:0">语速</div>
+            <div style="font-size:12px;font-weight:700;color:#F5762A" id="dSpeedVal">${dS.ttsSpeed.toFixed(1)}x</div>
+          </div>
+          <div class="d-slider-wrap">
+            <div class="d-slider-track"><div class="d-slider-fill" id="dSpeedFill" style="width:${speedPct}%"></div></div>
+            <div class="d-slider-thumb" id="dSpeedThumb" style="left:${speedPct}%"></div>
+            <input type="range" class="d-slider-input" min="50" max="200" value="${Math.round(dS.ttsSpeed*100)}" oninput="dOnSpeed(this.value)">
+          </div>
         </div>
       </div>
+      ${!dS.myVoices.find(v=>v.id===dS.ttsVoiceId)?`<div style="font-size:11px;color:#B0AA9F">💡 情绪调节对「我的声音（克隆）」效果最佳</div>`:''}
       <!-- 合成进度 / 音频预览 / 按钮 -->
       ${dS.ttsLoading?`
         <div style="background:#FFF8F3;border:1.5px solid #FFD5B8;border-radius:12px;padding:14px 16px">
@@ -1502,8 +1516,9 @@ async function dHandleTTS() {
 
   const myVoice = dS.myVoices.find(v => v.id === voiceId);
   const payload = myVoice
-    ? { text, voice: 'indextts', speed: dS.ttsSpeed, indexRefAudio: myVoice.audio_b64 }
-    : { text, voice: voiceId, speed: dS.ttsSpeed };
+    ? { text, voice: 'indextts', speed: dS.ttsSpeed, indexRefAudio: myVoice.audio_b64,
+        indexEmotion: dS.ttsEmotion || 'neutral' }
+    : { text, voice: voiceId, speed: dS.ttsSpeed, indexEmotion: dS.ttsEmotion || 'neutral' };
 
   const r = await dHttp.post('/ai/tts', payload);
 
