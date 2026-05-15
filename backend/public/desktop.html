@@ -397,6 +397,7 @@ html, body {
 .hint { display:flex; align-items:flex-start; gap:8px; padding:9px 12px; border-radius:9px; background:#FFF8F3; border:1px solid #FFE4CC; font-size:11px; color:#A55817; line-height:1.5; }
 .hint-green { background:#F0FDF4; border-color:#BBF7D0; color:#16A34A; }
 .hint-gray { background:#F7F5F1; border-color:#EDE9E3; color:#6E6860; }
+.hint-err  { background:#FFF2F2; border-color:#FFCDD2; color:#C62828; }
 </style>
 </head>
 <body>
@@ -583,6 +584,7 @@ const dS = {
   coverTitle: '', coverSeekTime: 1.0,
   coverFrameUrl: null, coverGenerating: false, coverDownloaded: false,
   publishCopied: null, postProcessedVideoUrl: null,
+  postProcessing: false, postProgressPct: 0, postProcessErr: '',
   // 任务列表
   tasks: [], tasksLoaded: false,
 };
@@ -1202,12 +1204,32 @@ function dCardPostProcess() {
       </div>
 
       ${!hasVideo?`<div class="hint"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>需要先完成步骤④数字人生成</div>`:''}
+      ${dS.postProcessErr?`<div class="hint hint-err"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${dS.postProcessErr}</div>`:''}
     </div>
-    <div class="scard-foot">
-      <button class="b b-md b-primary b-full" onclick="dToast('后期合成（烧字幕）功能即将上线')" ${!hasVideo?'disabled':''}>
-        开始后期合成（烧字幕）
+    ${dS.postProcessing?`
+    <div class="scard-foot" style="flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:2px">
+        <span style="font-size:12px;color:#6E6860">烧录字幕中，请稍候…</span>
+        <span style="font-size:12px;font-weight:600;color:#F5762A" data-d-post-pct>${dS.postProgressPct}%</span>
+      </div>
+      <div style="height:6px;background:#F0EDE8;border-radius:4px;overflow:hidden;width:100%">
+        <div data-d-post-bar style="height:100%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;transition:width 0.8s ease;width:${dS.postProgressPct}%"></div>
+      </div>
+    </div>`:`
+    <div class="scard-foot" style="flex-direction:column;gap:8px">
+      ${dS.postProcessedVideoUrl?`
+      <video controls playsinline style="width:100%;border-radius:10px;background:#000;max-height:200px"
+        src="${dS.postProcessedVideoUrl}"></video>
+      <div style="display:flex;gap:8px">
+        <a href="${dS.postProcessedVideoUrl}" download="后期视频_${Date.now()}.mp4" class="b b-sm b-outline" style="flex:1;text-align:center;text-decoration:none">
+          下载视频
+        </a>
+        <button class="b b-sm b-primary" style="flex:1" onclick="dHandlePostProcess()">重新合成</button>
+      </div>`:''}
+      <button class="b b-md b-primary b-full" onclick="dHandlePostProcess()" ${!hasVideo?'disabled':''}>
+        ${dS.postProcessedVideoUrl?'重新合成（更新字幕）':'开始后期合成（烧字幕）'}
       </button>
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -1350,6 +1372,90 @@ function dSetSubOlDot(c) {
     el.className = 'sw' + (active ? ' is-active' : '');
     const span = el.parentElement?.querySelector('div:last-child'); if (span) span.style.color = active ? '#F5762A' : '#B0AA9F';
   });
+}
+
+/* ─── 后期烧录进度计时器 ─── */
+let _dPostProgressTimer = null;
+function _dStartPostProgressTimer() {
+  _dStopPostProgressTimer();
+  dS.postProgressPct = 5;
+  let pct = 5;
+  _dPostProgressTimer = setInterval(() => {
+    if (!dS.postProcessing) { _dStopPostProgressTimer(); return; }
+    if (pct < 85) {
+      pct = Math.min(85, pct + (Math.random() * 2 + 0.3));
+      dS.postProgressPct = Math.round(pct);
+      // 更新进度条（不触发全量 dRender）
+      const bar = document.querySelector('[data-d-post-bar]');
+      const txt = document.querySelector('[data-d-post-pct]');
+      if (bar) bar.style.width = dS.postProgressPct + '%';
+      if (txt) txt.textContent = dS.postProgressPct + '%';
+    }
+  }, 1200);
+}
+function _dStopPostProgressTimer() {
+  if (_dPostProgressTimer) { clearInterval(_dPostProgressTimer); _dPostProgressTimer = null; }
+}
+
+/* ─── 后期制作（烧字幕）─── */
+async function dHandlePostProcess() {
+  if (dS.postProcessing) return;
+  if (!dS.avatarVideoUrl) { dToast('请先生成数字人视频'); return; }
+
+  // 确保有音频 b64（edge-tts 可能只有 URL）
+  let audioB64 = dS.ttsAudioB64;
+  if (!audioB64 && dS.ttsAudioUrl) {
+    try {
+      const resp = await fetch(dS.ttsAudioUrl);
+      const ab = await resp.arrayBuffer();
+      const bytes = new Uint8Array(ab);
+      let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+      audioB64 = btoa(bin); dS.ttsAudioB64 = audioB64;
+    } catch (e) { dToast('获取音频数据失败: ' + e.message); return; }
+  }
+  if (!audioB64) { dToast('未找到语音数据，请返回步骤③重新合成'); return; }
+
+  dS.postProcessing = true; dS.postProcessErr = ''; dS.postProgressPct = 5;
+  dRender();
+  _dStartPostProgressTimer();
+
+  try {
+    const r = await dHttp.post('/ai/video/postprocess', {
+      video_task_id: dS.avatarTaskId || null,
+      video_b64:     null,
+      audio_b64:     audioB64,
+      audio_fmt:     'mp3',
+      sub_color:     dS.subColor,
+      outline_color: dS.subOutlineColor,
+      outline_width: dS.subOutlineWidth,
+      fontsize:      dS.subFontsize,
+      sub_style:     dS.subStyle || 'default',
+      source_text:   dS.rewrittenScript || dS.extractedScript || '',
+      task_id:       dS.cloneTaskId || null,
+    });
+    if (r.code !== 200) throw new Error(r.msg || '后期处理失败');
+    const data = r.data;
+
+    let url;
+    if (data.oss_url) {
+      url = data.oss_url;
+    } else if (data.video_b64) {
+      const raw = atob(data.video_b64);
+      const buf = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+      url = URL.createObjectURL(new Blob([buf], { type: 'video/mp4' }));
+    } else {
+      throw new Error('后期处理未返回视频');
+    }
+    _dStopPostProgressTimer();
+    dS.postProcessing = false; dS.postProgressPct = 100; dS.postProcessedVideoUrl = url;
+    dRender();
+    dToast('后期合成完成！');
+  } catch (e) {
+    _dStopPostProgressTimer();
+    dS.postProcessing = false; dS.postProgressPct = 0; dS.postProcessErr = e.message;
+    dRender();
+  }
 }
 
 /* ─── 封面生成 ─── */
