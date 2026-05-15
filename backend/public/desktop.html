@@ -1068,7 +1068,7 @@ function dCardAvatar() {
             </div>
           </div>
           ${active?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12l6 6L20 6" stroke="#F5762A" stroke-width="2.5" stroke-linecap="round"/></svg>`:''}
-          <button onclick="dDeleteAvatar('${a.id}',event)" style="width:20px;height:20px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#C4BEB8;flex-shrink:0"
+          <button onclick="dAvatarPickerDelete('${a.id}',event)" style="width:20px;height:20px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#C4BEB8;flex-shrink:0"
             onmouseover="this.style.background='#F0EDE8';this.style.color='#E5534B'" onmouseout="this.style.background='transparent';this.style.color='#C4BEB8'">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
           </button>
@@ -1102,7 +1102,7 @@ function dCardAvatar() {
       </div>
     </div>` : ''}
   </div>
-  <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dHandleAvatarAdd(event)">`;
+  <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dAvatarPickerAdd(event)">`;
 
   return `
   <div class="${dScardCls(st)}">
@@ -1936,8 +1936,8 @@ function _dSaveAvatarMeta() {
   } catch {}
 }
 
-// 上传新形象
-async function dHandleAvatarAdd(event) {
+// 上传新形象（供④卡片下拉使用，与管理页 dHandleAvatarAdd 区分）
+async function dAvatarPickerAdd(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   event.target.value = '';
@@ -2000,8 +2000,8 @@ function dSelectAvatar(id) {
   dRender();
 }
 
-// 删除形象
-function dDeleteAvatar(id, e) {
+// 删除④卡片形象列表中的条目（与管理页 dDeleteAvatar(idx) 区分）
+function dAvatarPickerDelete(id, e) {
   e.stopPropagation();
   if (!confirm('删除这个形象吗？')) return;
   try { const a = dS.avatarList.find(x=>x.id===id); if(a?.blobUrl) URL.revokeObjectURL(a.blobUrl); } catch {}
