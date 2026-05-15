@@ -480,7 +480,7 @@ const dS = {
   voiceCloneLoading: false, voiceCloneErr: '', voiceCloneName: '',
   avatarAddLoading: false, avatarAddName: '',
   // 数字人
-  avatarSrcVideoB64: null, avatarSrcVideoFmt: 'mp4', avatarSrcVideoName: '',
+  avatarSrcVideoB64: null, avatarSrcVideoFmt: 'mp4', avatarSrcVideoName: '', avatarSrcBlobUrl: null,
   avatarTaskId: null, avatarGenerating: false,
   avatarProgressMsg: '初始化中...', avatarProgressPct: 0,
   avatarVideoUrl: null, avatarErr: '',
@@ -638,7 +638,7 @@ function dStepCircle(step, current) {
 
 function dRenderHome() {
   const cur = dCurrentStep();
-  const steps = ['提取','改写','语音','数字人','后期'];
+  const steps = ['提取','改写','语音','数字人','后期','发布'];
   const stepBar = `
   <div class="d-step-bar">
     ${steps.map((s,i) => `
@@ -670,11 +670,14 @@ function dRenderHome() {
       ${dCardTTS()}
     </div>
 
-    <!-- 第二行：数字人（窄，竖版视频）+ 后期（宽，功能完整） -->
-    <div style="display:grid;grid-template-columns:0.75fr 1.25fr;gap:14px">
+    <!-- 第二行：数字人（窄，竖版视频）+ 后期（宽，字幕模板） -->
+    <div style="display:grid;grid-template-columns:0.75fr 1.25fr;gap:14px;margin-bottom:14px">
       ${dCardAvatar()}
       ${dCardPostProcess()}
     </div>
+
+    <!-- 第三行：发布准备（全宽） -->
+    ${dCardPublish()}
   </div>`;
 }
 
@@ -684,7 +687,8 @@ function dCurrentStep() {
   if (dS.extractStep === 2) return 2;
   if (dS.extractStep === 3 || dS.extractStep === 'tts_gen') return 3;
   if (dS.extractStep === 4 || dS.extractStep === 'avatar_gen') return 4;
-  if (dS.extractStep === 5) return 4;
+  if (dS.extractStep === 5) return 5;
+  if (dS.extractStep === 6) return 5;
   return 0;
 }
 
@@ -878,27 +882,24 @@ function dCardAvatar() {
           <!-- 参考视频上传 -->
           <div>
             <div class="d-label">参考视频（真人说话短视频，MP4，建议 5~30 秒）</div>
-            <div style="border:2px dashed #D4D0C8;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color 0.15s;min-height:90px;display:flex;align-items:center;justify-content:center"
-              onclick="document.getElementById('dAvatarVideoInput').click()"
-              onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor=dS.avatarSrcVideoB64?'#22C55E':'#D4D0C8'"
-              style="border-color:${dS.avatarSrcVideoB64?'#22C55E':'#D4D0C8'}">
-              ${dS.avatarSrcVideoB64
-                ? `<div style="width:100%;padding:10px 14px;display:flex;align-items:center;gap:10px">
-                    <div style="width:40px;height:40px;background:linear-gradient(135deg,#22C55E,#16A34A);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>
-                    </div>
-                    <div>
-                      <div style="font-size:12px;font-weight:600;color:#1A1614">${esc(dS.avatarSrcVideoName||'视频已上传')}</div>
-                      <div style="font-size:11px;color:#22C55E;margin-top:2px">✓ 点击可重新选择</div>
-                    </div>
-                  </div>`
-                : `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="#C4C0B8" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="#C4C0B8"/></svg>
-                    <div style="font-size:12px;color:#B0AA9F">点击上传参考视频</div>
-                    <div style="font-size:10px;color:#C8C3BC">MP4 / MOV / AVI · 建议 5~30 秒</div>
-                  </div>`
-              }
-            </div>
+            ${dS.avatarSrcBlobUrl
+              ? `<!-- 已选：显示视频预览 -->
+                <video src="${dS.avatarSrcBlobUrl}" controls playsinline muted
+                  style="width:100%;border-radius:10px;background:#000;display:block;max-height:200px;object-fit:contain;margin-bottom:6px"></video>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
+                  <span style="font-size:11px;color:#A8A49C;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(dS.avatarSrcVideoName||'参考视频')}</span>
+                  <span onclick="dS.avatarSrcBlobUrl=null;dS.avatarSrcVideoB64=null;dS.avatarSrcVideoName='';dRender()"
+                    style="font-size:11px;color:#F5762A;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:10px">重新选择</span>
+                </div>`
+              : `<!-- 未选：上传入口 -->
+                <div style="border:2px dashed #D4D0C8;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color 0.15s;display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px"
+                  onclick="document.getElementById('dAvatarVideoInput').click()"
+                  onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="#C4C0B8" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="#C4C0B8"/></svg>
+                  <div style="font-size:12px;color:#B0AA9F">点击上传参考视频</div>
+                  <div style="font-size:10px;color:#C8C3BC">MP4 / MOV / AVI · 建议 5~30 秒</div>
+                </div>`
+            }
             <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dHandleAvatarVideo(event)">
           </div>
           <!-- 面部增强开关 -->
@@ -907,8 +908,8 @@ function dCardAvatar() {
             <div class="d-toggle ${dS.avatarBeauty?'on':'off'}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"><div class="d-toggle-ball"></div></div>
           </div>
           ${!dS.ttsAudioUrl?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px">⚠ 需要先完成步骤③语音合成</div>':''}
-          <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcVideoB64||!dS.ttsAudioB64)?'disabled':''} style="padding:10px;font-size:13px">
-            开始生成数字人视频
+          <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcBlobUrl||!dS.ttsAudioB64)?'disabled':''} style="padding:10px;font-size:13px">
+            ${dS.avatarSrcBlobUrl && !dS.avatarSrcVideoB64 ? '⏳ 视频加载中...' : '开始生成数字人视频'}
           </button>
           ${dS.avatarErr?`<div class="d-err">${esc(dS.avatarErr)}</div>`:''}
         </div>
@@ -976,72 +977,6 @@ function dCardPostProcess() {
     </div>`;
   }).join('');
 
-  // 封面区
-  const coverSection = `
-    <div style="border-top:1px solid #EDE9E3;padding-top:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="d-label" style="margin:0">封面生成 · 9:16</div>
-      </div>
-      ${dS.coverGenerating?`
-        <div style="display:flex;align-items:center;gap:8px;background:#FFF8F3;border-radius:10px;padding:10px">
-          <div style="width:18px;height:18px;border:2px solid #F5762A;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div>
-          <span style="font-size:12px;color:#F5762A">正在截取封面...</span>
-        </div>
-      `:dS.coverFrameUrl?`
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <img src="${dS.coverFrameUrl}" style="height:90px;width:auto;border-radius:8px;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,0.15)"/>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <button onclick="dGenerateCover(dS.coverSeekTime+2)" class="d-btn d-btn-ghost" style="padding:5px 10px;font-size:11px">换一帧</button>
-            <button onclick="dDownloadCover()" class="d-btn d-btn-ghost" style="padding:5px 10px;font-size:11px">${dS.coverDownloaded?'✓ 已下载':'⬇ 下载封面'}</button>
-          </div>
-        </div>
-      `:`
-        <button onclick="dGenerateCover(1.0)" class="d-btn d-btn-ghost" style="width:100%;padding:8px;font-size:12px" ${!hasVideo?'disabled':''}>
-          ${!hasVideo?'⚠ 需先生成数字人视频':'📸 一键生成封面'}
-        </button>
-      `}
-    </div>`;
-
-  // 发布内容区
-  const titleVal = dS.publishTitle || '';
-  const descVal  = dS.publishDesc  || '';
-  const tagsText = (dS.publishTags||[]).map(t=>'#'+t).join(' ');
-  const publishSection = `
-    <div style="border-top:1px solid #EDE9E3;padding-top:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div class="d-label" style="margin:0">发布内容</div>
-        <button onclick="dHandlePublishGen('all')" class="d-btn" style="padding:5px 12px;font-size:11px"
-          ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishTitleLoading?'disabled':''}>
-          ${dS.publishTitleLoading?'生成中...':'✨ 一键生成标题+简介'}
-        </button>
-      </div>
-      <div style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;color:#9E9890;font-weight:600">标题</span>
-          <button onclick="dHandlePublishCopy('title')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
-            ${dS.publishCopied==='title'?'✓ 已复制':'复制'}
-          </button>
-        </div>
-        <div contenteditable="true" id="dPubTitleEl" oninput="dS.publishTitle=this.innerText"
-          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:13px;color:#1A1814;line-height:1.6;min-height:22px;outline:none;border:1px solid #EDE9E3"
-        >${esc(titleVal)}</div>
-      </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;color:#9E9890;font-weight:600">简介 + 标签</span>
-          <button onclick="dHandlePublishCopy('desc')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
-            ${dS.publishCopied==='desc'?'✓ 已复制':'复制'}
-          </button>
-        </div>
-        <div contenteditable="true" id="dPubDescEl" oninput="dS.publishDesc=this.innerText"
-          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:12px;color:#1A1814;line-height:1.7;min-height:40px;outline:none;border:1px solid #EDE9E3"
-        >${esc(descVal)}</div>
-        ${tagsText
-          ? `<div style="margin-top:6px;font-size:12px;color:#F5762A;word-break:break-all">${esc(tagsText)}</div>`
-          : `<div style="margin-top:4px;font-size:11px;color:#C4C0B8">AI生成后自动填入话题标签</div>`}
-      </div>
-    </div>`;
-
   return `
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
@@ -1051,7 +986,7 @@ function dCardPostProcess() {
       </div>
       <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
-    <div class="d-card-body" style="overflow-y:auto;max-height:560px;display:flex;flex-direction:column;gap:12px">
+    <div class="d-card-body" style="display:flex;flex-direction:column;gap:12px">
 
       <!-- 字幕模板横向滚动 -->
       <div>
@@ -1099,12 +1034,124 @@ function dCardPostProcess() {
         开始后期合成（烧字幕）
       </button>
 
-      <!-- 封面生成 -->
-      ${coverSection}
+    </div>
+  </div>`;
+}
 
-      <!-- 发布内容 -->
-      ${publishSection}
+/* ⑥ 发布准备卡片（全宽，横向三列：封面 / 标题+简介 / 标签） */
+function dCardPublish() {
+  const st = dStepState(5);
+  const hasVideo = !!dS.avatarVideoUrl;
+  const titleVal = dS.publishTitle || '';
+  const descVal  = dS.publishDesc  || '';
+  const tagsText = (dS.publishTags||[]).map(t=>'#'+t).join(' ');
 
+  // 封面区
+  const coverCol = `
+    <div>
+      <div class="d-label">封面 · 9:16</div>
+      ${dS.coverGenerating
+        ? `<div style="aspect-ratio:9/16;max-height:200px;background:#F7F5F1;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+             <div style="width:24px;height:24px;border:2.5px solid #F5762A;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div>
+             <span style="font-size:11px;color:#F5762A">截取中...</span>
+           </div>`
+        : dS.coverFrameUrl
+          ? `<img src="${dS.coverFrameUrl}" style="width:100%;border-radius:12px;display:block;box-shadow:0 4px 16px rgba(0,0,0,0.12);margin-bottom:8px"/>`
+          : `<div onclick="${hasVideo?'dGenerateCover(1.0)':''}"
+               style="aspect-ratio:9/16;max-height:200px;background:#F7F6F2;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:${hasVideo?'pointer':'default'};border:2px dashed #E4E2DA">
+               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+               <span style="font-size:11px;color:${hasVideo?'#A8A49C':'#C8C3BC'}">${hasVideo?'点击生成封面':'需先完成数字人'}</span>
+             </div>`
+      }
+      ${dS.coverFrameUrl?`
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button onclick="dGenerateCover(dS.coverSeekTime+2)" class="d-btn d-btn-ghost" style="flex:1;padding:6px;font-size:11px">换一帧</button>
+          <button onclick="dDownloadCover()" class="d-btn d-btn-ghost" style="flex:1;padding:6px;font-size:11px">${dS.coverDownloaded?'✓ 已下载':'⬇ 下载'}</button>
+        </div>`:''}
+      ${hasVideo&&!dS.coverFrameUrl&&!dS.coverGenerating?`
+        <button onclick="dGenerateCover(1.0)" class="d-btn-lg" style="width:100%;margin-top:8px;padding:8px;font-size:12px">📸 一键生成封面</button>`:''}
+    </div>`;
+
+  // 标题+简介区
+  const contentCol = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="d-label" style="margin:0">视频标题 / 简介</div>
+        <button onclick="dHandlePublishGen('all')" class="d-btn" style="padding:5px 12px;font-size:11px"
+          ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishTitleLoading?'disabled':''}>
+          ${dS.publishTitleLoading?'生成中...':'✨ 一键生成'}
+        </button>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:#9E9890;font-weight:600">标题 <span style="color:#C4C0B8;font-weight:400">${titleVal.length}/30</span></span>
+          <button onclick="dHandlePublishCopy('title')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
+            ${dS.publishCopied==='title'?'✓ 已复制':'复制'}
+          </button>
+        </div>
+        <div contenteditable="true" id="dPubTitleEl" oninput="dS.publishTitle=this.innerText"
+          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:13px;color:#1A1814;line-height:1.6;min-height:24px;outline:none;border:1px solid #EDE9E3;font-family:inherit"
+        >${esc(titleVal)}</div>
+      </div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:#9E9890;font-weight:600">简介</span>
+          <button onclick="dHandlePublishCopy('desc')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
+            ${dS.publishCopied==='desc'?'✓ 已复制':'复制'}
+          </button>
+        </div>
+        <div contenteditable="true" id="dPubDescEl" oninput="dS.publishDesc=this.innerText"
+          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:12px;color:#1A1814;line-height:1.7;min-height:60px;outline:none;border:1px solid #EDE9E3;font-family:inherit"
+        >${esc(descVal)}</div>
+      </div>
+    </div>`;
+
+  // 标签区
+  const tagsCol = `
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="d-label" style="margin:0">话题标签</div>
+        <button onclick="dHandlePublishGen('desc')" class="d-btn d-btn-ghost" style="padding:4px 10px;font-size:11px"
+          ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishDescLoading?'disabled':''}>
+          ${dS.publishDescLoading?'生成中...':'重新生成'}
+        </button>
+      </div>
+      ${(dS.publishTags||[]).length
+        ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+             ${(dS.publishTags||[]).map(t=>`
+               <span style="padding:4px 10px;background:#FFF3E8;border-radius:20px;font-size:12px;color:#F5762A;font-weight:600">#${esc(t)}</span>
+             `).join('')}
+           </div>`
+        : `<div style="background:#F7F5F1;border-radius:10px;padding:14px;text-align:center;margin-bottom:10px">
+             <div style="font-size:12px;color:#C4C0B8">点击「一键生成」自动生成话题标签</div>
+           </div>`
+      }
+      ${tagsText?`
+        <button onclick="dHandlePublishCopy('tags')" class="d-btn d-btn-ghost" style="width:100%;padding:7px;font-size:12px">
+          ${dS.publishCopied==='tags'?'✓ 已复制':'复制全部标签'}
+        </button>`:''}
+      <div style="margin-top:12px;background:#ECFDF5;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        <span style="font-size:11px;color:#065F46">AI法务审查通过，未检测到违规词</span>
+      </div>
+    </div>`;
+
+  return `
+  <div class="d-card ${st==='active'?'active-card':''}">
+    <div class="d-card-header ${st==='active'?'active-header':''}">
+      <div class="d-card-title-row">
+        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'6'}</div>
+        <span class="d-card-title">⑥ 发布准备</span>
+      </div>
+      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+    </div>
+    <div class="d-card-body">
+      ${!hasVideo?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:8px 12px;margin-bottom:12px">⚠ 需要先完成步骤④数字人生成，才能生成封面和发布内容</div>':''}
+      <div style="display:grid;grid-template-columns:180px 1fr 1fr;gap:16px;align-items:start">
+        ${coverCol}
+        ${contentCol}
+        ${tagsCol}
+      </div>
     </div>
   </div>`;
 }
@@ -1526,12 +1573,18 @@ function _dApplyTTSAudio(data) {
 function dHandleAvatarVideo(event) {
   const file = event.target.files[0];
   if (!file) return;
+  // 释放旧 blob URL
+  if (dS.avatarSrcBlobUrl) try { URL.revokeObjectURL(dS.avatarSrcBlobUrl); } catch {}
+  const fmt = file.name.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
   dS.avatarSrcVideoName = file.name;
-  dS.avatarSrcVideoFmt = (file.name.split('.').pop() || 'mp4').toLowerCase();
+  dS.avatarSrcVideoFmt  = fmt;
+  dS.avatarSrcBlobUrl   = URL.createObjectURL(file);  // 立即预览
+  dS.avatarSrcVideoB64  = null;                        // base64 异步读取
+  dRender(); // 先渲染视频预览
   const reader = new FileReader();
   reader.onload = e => {
     dS.avatarSrcVideoB64 = e.target.result.split(',')[1];
-    dRender();
+    dToast('视频已就绪 ✓');
   };
   reader.readAsDataURL(file);
 }
@@ -1541,7 +1594,8 @@ let _dAvatarPoller = null;
 let _dAvatarRunSeq = 0;
 
 async function dHandleAvatarGenerate() {
-  if (!dS.avatarSrcVideoB64) { dToast('请先上传参考视频'); return; }
+  if (!dS.avatarSrcBlobUrl) { dToast('请先上传参考视频'); return; }
+  if (!dS.avatarSrcVideoB64) { dToast('视频正在加载中，请稍等…'); return; }
   if (!dS.ttsAudioB64) { dToast('请先完成语音合成（步骤③）'); return; }
   dS.avatarGenerating = true; dS.avatarErr = '';
   dS.avatarProgressMsg = '正在提交任务...'; dS.avatarProgressPct = 10;
