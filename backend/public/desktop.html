@@ -307,6 +307,96 @@ html, body {
 }
 .d-toggle.on .d-toggle-ball { left:18px; }
 .d-toggle.off .d-toggle-ball { left:2px; }
+
+/* ============================================================
+   CSS · 设计稿 Tokens & 新组件系统
+   ============================================================ */
+:root {
+  --orange-50:#FFF8F3; --orange-100:#FFF3E8; --orange-200:#FFE4CC;
+  --orange-300:#FFD4B8; --orange-500:#F5762A; --orange-600:#E06420;
+  --ink-900:#1A1614; --ink-700:#3D362F; --ink-500:#6E6860;
+  --ink-400:#9E9890; --ink-300:#B0AA9F; --ink-200:#C8C3BC;
+  --ink-100:#EDE9E3; --ink-50:#F7F5F1;
+  --green-50:#F0FDF4; --green-500:#22C55E; --green-600:#16A34A;
+}
+
+/* scard — 新卡片 */
+.scard { background:#fff; border-radius:16px; border:1px solid #EFEAE2; box-shadow:0 1px 2px rgba(28,22,16,0.04),0 6px 18px rgba(28,22,16,0.04); display:flex; flex-direction:column; min-width:0; transition:box-shadow 0.2s,border-color 0.2s; }
+.scard.is-active { border-color:rgba(245,118,42,0.35); box-shadow:0 1px 2px rgba(245,118,42,0.08),0 8px 24px rgba(245,118,42,0.12); }
+.scard.is-pending { background:#FBFAF7; }
+.scard-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px 12px; }
+.scard-head-left { display:flex; align-items:center; gap:10px; }
+.scard-num { width:24px; height:24px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+.scard-num.done { background:#F5762A; color:#fff; }
+.scard-num.active { background:linear-gradient(135deg,#FF8040,#F5602A); color:#fff; box-shadow:0 2px 6px rgba(245,118,42,0.4); }
+.scard-num.pending,.scard-num.idle { background:#F0EDE8; color:#B0AA9F; }
+.scard-title { font-size:14px; font-weight:700; color:#1A1614; letter-spacing:-0.2px; }
+.scard-body { padding:0 18px 14px; flex:1; display:flex; flex-direction:column; gap:10px; }
+.scard-foot { padding:0 18px 16px; }
+
+/* sb — 状态徽章 */
+.sb { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 9px; border-radius:11px; font-size:11px; font-weight:600; line-height:1; }
+.sb-done { background:#F0FDF4; color:#16A34A; }
+.sb-active { background:#FFF3E8; color:#F5762A; }
+.sb-pending { background:#F7F5F1; color:#B0AA9F; }
+.sb-active .dot { width:6px; height:6px; border-radius:50%; background:#F5762A; animation:dotpulse 1.4s ease-in-out infinite; }
+@keyframes dotpulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.55;transform:scale(1.15);} }
+
+/* b — 新按钮系统 */
+.b { display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid transparent; font-family:inherit; font-weight:600; cursor:pointer; transition:all 0.15s; white-space:nowrap; user-select:none; }
+.b:active:not(:disabled) { transform:scale(0.97); }
+.b:disabled { cursor:not-allowed; }
+.b-sm { height:30px; padding:0 12px; font-size:12px; border-radius:8px; }
+.b-md { height:36px; padding:0 16px; font-size:13px; border-radius:10px; }
+.b-lg { height:42px; padding:0 18px; font-size:14px; border-radius:11px; }
+.b-primary { background:#F5762A; color:#fff; box-shadow:0 1px 2px rgba(245,118,42,0.25); }
+.b-primary:hover:not(:disabled) { background:#E06420; box-shadow:0 4px 12px rgba(245,118,42,0.35); }
+.b-primary:disabled { background:#EDE9E3; color:#B0AA9F; box-shadow:none; }
+.b-secondary { background:#fff; color:#3D362F; border-color:#EDE9E3; }
+.b-secondary:hover:not(:disabled) { background:#F7F5F1; border-color:#D8D2CA; }
+.b-ghost { background:transparent; color:#6E6860; }
+.b-ghost:hover:not(:disabled) { background:#F0EDE8; color:#1A1614; }
+.b-full { width:100%; }
+
+/* flbl — 表单标签 */
+.flbl { font-size:11px; color:#9E9890; font-weight:500; margin-bottom:5px; display:flex; align-items:center; justify-content:space-between; }
+.flbl .meta { color:#F5762A; font-weight:600; font-size:11px; }
+
+/* inp/txa/sel — 表单元素 */
+.inp { width:100%; height:36px; padding:0 12px; background:#FBFAF7; border:1px solid #EDE9E3; border-radius:9px; font-size:12px; color:#1A1614; font-family:inherit; outline:none; transition:all 0.15s; box-sizing:border-box; }
+.inp:focus { border-color:#F5762A; background:#fff; box-shadow:0 0 0 3px rgba(245,118,42,0.1); }
+.txa { width:100%; padding:10px 12px; background:#FBFAF7; border:1px solid #EDE9E3; border-radius:9px; font-size:12px; color:#3D362F; font-family:inherit; line-height:1.65; outline:none; resize:none; transition:all 0.15s; box-sizing:border-box; }
+.txa:focus { border-color:#F5762A; background:#fff; box-shadow:0 0 0 3px rgba(245,118,42,0.1); }
+.sel { width:100%; height:36px; padding:0 32px 0 12px; background:#FBFAF7; border:1px solid #EDE9E3; border-radius:9px; font-size:12px; color:#1A1614; font-family:inherit; outline:none; cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9L12 15L18 9' stroke='%239E9890' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; box-sizing:border-box; }
+.sel:focus { border-color:#F5762A; background-color:#fff; }
+
+/* chip — 标签选择 */
+.chip { display:inline-flex; align-items:center; height:26px; padding:0 12px; border-radius:7px; font-size:11px; font-weight:600; background:#F7F5F1; color:#6E6860; cursor:pointer; transition:all 0.15s; border:1px solid transparent; }
+.chip:hover { background:#EDE9E3; }
+.chip.is-active { background:#FFF3E8; color:#F5762A; border-color:#FFD4B8; }
+
+/* sw — 颜色色板 */
+.sw { width:22px; height:22px; border-radius:50%; cursor:pointer; transition:transform 0.12s; border:2px solid #EDE9E3; box-sizing:border-box; }
+.sw:hover { transform:scale(1.08); }
+.sw.is-active { border-color:#F5762A; transform:scale(1.1); box-shadow:0 2px 8px rgba(245,118,42,0.25); }
+
+/* sld — 滑块 v2 */
+.sld { position:relative; height:18px; display:flex; align-items:center; }
+.sld-track { position:absolute; left:0; right:0; height:4px; background:#F0EDE8; border-radius:4px; }
+.sld-fill { position:absolute; left:0; height:4px; background:linear-gradient(90deg,#FF8040,#F5602A); border-radius:4px; }
+.sld-thumb { position:absolute; width:16px; height:16px; border-radius:50%; background:#fff; border:2px solid #F5762A; box-shadow:0 2px 6px rgba(245,118,42,0.35); transform:translateX(-50%); pointer-events:none; }
+.sld-input { position:absolute; inset:0; width:100%; opacity:0; cursor:pointer; margin:0; }
+
+/* tg — Toggle v2 */
+.tg { width:34px; height:20px; border-radius:10px; background:#E8E4DF; position:relative; cursor:pointer; transition:background 0.2s; flex-shrink:0; }
+.tg.on { background:#F5762A; }
+.tg::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.2); transition:left 0.2s; }
+.tg.on::after { left:16px; }
+
+/* hint — 提示块 */
+.hint { display:flex; align-items:flex-start; gap:8px; padding:9px 12px; border-radius:9px; background:#FFF8F3; border:1px solid #FFE4CC; font-size:11px; color:#A55817; line-height:1.5; }
+.hint-green { background:#F0FDF4; border-color:#BBF7D0; color:#16A34A; }
+.hint-gray { background:#F7F5F1; border-color:#EDE9E3; color:#6E6860; }
 </style>
 </head>
 <body>
@@ -461,12 +551,12 @@ const dS = {
   authMode: 'sms',
   // 克隆流程
   extractStep: 0,
-  videoUrl: '',
+  videoUrl: '', extractPlatform: 'douyin',
   extractedScript: '', extractLoading: false, extractErr: '',
   rewrittenScript: '', rewriteStyle: '', rewriteLoading: false, rewriteErr: '',
   // TTS —— 系统声音硬编码，不调 voices 接口
   ttsAudioUrl: null, ttsAudioB64: null,
-  ttsVoiceId: 'xiaoxiao', ttsEmotion: 'neutral',
+  ttsVoiceId: 'xiaoxiao', ttsEmotion: 'neutral', ttsIntensity: 0.7,
   ttsSpeed: 1.0, ttsVolume: 1.0,
   ttsLoading: false, ttsErr: '', ttsProgressMsg: '',
   systemVoices: [
@@ -640,7 +730,7 @@ function dRenderHome() {
   const cur = dCurrentStep();
   const steps = ['提取','改写','语音','数字人','后期','发布'];
   const stepBar = `
-  <div class="d-step-bar">
+  <div class="d-step-bar" style="margin-bottom:16px">
     ${steps.map((s,i) => `
       <div class="d-step-item">
         ${dStepCircle(i, cur)}
@@ -650,34 +740,39 @@ function dRenderHome() {
     `).join('')}
   </div>`;
 
+  const expireAt = dS.userInfo?.memberExpire || dS.userInfo?.member_expire || '—';
+
   return `
   <div>
     <!-- 顶部信息栏 -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div style="font-size:18px;font-weight:700;color:#1A1614">克隆流程</div>
-      <button class="d-btn d-btn-ghost" onclick="dResetFlow()" style="font-size:12px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M3 12C3 7.03 7.03 3 12 3C15.4 3 18.35 4.85 20 7.6M21 12C21 16.97 16.97 21 12 21C8.6 21 5.65 19.15 4 16.4" stroke="#6E6860" stroke-width="2" stroke-linecap="round"/><path d="M20 3V8H15" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 21V16H9" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        清空流程
-      </button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">克隆流程</div>
+        <div style="font-size:12px;color:#9E9890;margin-top:3px">从一条爆款视频，6 步生成你的版本</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid #EDE9E3;font-size:12px;color:#6E6860;font-weight:500">
+          <div style="width:6px;height:6px;border-radius:50%;background:#F5762A"></div>
+          次数无限制 · 会员到期 <span style="color:#1A1614;font-weight:600">${esc(expireAt)}</span>
+        </div>
+        <button class="b b-sm b-secondary" onclick="dResetFlow()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 12C3 7.03 7.03 3 12 3C15.4 3 18.35 4.85 20 7.6M21 12C21 16.97 16.97 21 12 21C8.6 21 5.65 19.15 4 16.4" stroke="#6E6860" stroke-width="2" stroke-linecap="round"/><path d="M20 3V8H15" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 21V16H9" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          清空流程
+        </button>
+      </div>
     </div>
 
     ${stepBar}
 
-    <!-- 第一行：提取 + 改写 + 语音（3列） -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;margin-bottom:14px">
+    <!-- 2列网格，3行各2个卡片 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       ${dCardExtract()}
       ${dCardRewrite()}
       ${dCardTTS()}
-    </div>
-
-    <!-- 第二行：数字人（窄，竖版视频）+ 后期（宽，字幕模板） -->
-    <div style="display:grid;grid-template-columns:0.75fr 1.25fr;gap:14px;margin-bottom:14px">
       ${dCardAvatar()}
       ${dCardPostProcess()}
+      ${dCardPublish()}
     </div>
-
-    <!-- 第三行：发布准备（全宽） -->
-    ${dCardPublish()}
   </div>`;
 }
 
@@ -704,101 +799,138 @@ function dCheckIcon() {
   return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
 
+/* 新状态徽章 */
+function dSB(state) {
+  if (state === 'done')   return '<span class="sb sb-done">已完成</span>';
+  if (state === 'active') return '<span class="sb sb-active"><span class="dot"></span>进行中</span>';
+  return '<span class="sb sb-pending">待处理</span>';
+}
+
+/* 新卡片状态 class */
+function dScardCls(st) {
+  if (st === 'active') return 'scard is-active';
+  if (st === 'idle' || st === 'pending') return 'scard is-pending';
+  return 'scard';
+}
+
 /* ① 提取卡片 */
 function dCardExtract() {
   const st = dStepState(0);
+  const platforms = [
+    { id:'douyin', label:'抖音' },
+    { id:'kuaishou', label:'快手' },
+    { id:'xiaohongshu', label:'小红书' },
+  ];
   return `
-  <div class="d-card ${st==='active'?'active-card':''}">
-    <div class="d-card-header ${st==='active'?'active-header':''}">
-      <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'1'}</div>
-        <span class="d-card-title">① 提取文案</span>
+  <div class="${dScardCls(st)}">
+    <div class="scard-head">
+      <div class="scard-head-left">
+        <div class="scard-num ${st}">${st==='done'?dCheckIcon():'1'}</div>
+        <div class="scard-title">提取文案</div>
       </div>
-      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+      ${dSB(st)}
     </div>
-    <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
+    <div class="scard-body">
+      <!-- 平台选择 -->
       <div>
-        <div class="d-label">视频链接（抖音）</div>
-        <input class="d-input" id="dVideoUrl" placeholder="粘贴抖音视频链接" value="${esc(dS.videoUrl)}" oninput="dS.videoUrl=this.value">
-      </div>
-      ${dS.extractedScript ? `
-        <div>
-          <div class="d-label">提取的文案</div>
-          <textarea class="d-textarea" id="dExtractedScript" style="height:90px" oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>
-          <div style="font-size:11px;color:#22C55E;margin-top:4px">✓ 共 ${dS.extractedScript.length} 字</div>
+        <div class="flbl">视频平台</div>
+        <div style="display:flex;gap:6px">
+          ${platforms.map(p=>`<div class="chip ${dS.extractPlatform===p.id?'is-active':''}" onclick="dS.extractPlatform='${p.id}';dRender()">${p.label}</div>`).join('')}
         </div>
-      ` : ''}
-      <button class="d-btn-lg" onclick="dHandleExtract()" ${dS.extractLoading?'disabled':''} style="padding:10px;font-size:13px">
-        ${dS.extractLoading?'提取中...':dS.extractedScript?'重新提取':'提取文案'}
+      </div>
+      <!-- 链接输入 -->
+      <div>
+        <div class="flbl">视频链接</div>
+        <div style="position:relative">
+          <input class="inp" id="dVideoUrl" placeholder="粘贴视频链接..." value="${esc(dS.videoUrl)}" oninput="dS.videoUrl=this.value" style="padding-right:36px">
+          <button onclick="navigator.clipboard.readText().then(t=>{dS.videoUrl=t;document.getElementById('dVideoUrl').value=t}).catch(()=>{})" style="position:absolute;right:4px;top:4px;width:28px;height:28px;border-radius:6px;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#9E9890" title="粘贴">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="8" y="2" width="13" height="17" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="5" width="13" height="17" rx="2" stroke="currentColor" stroke-width="1.8" fill="white"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- 提取结果 -->
+      ${dS.extractedScript ? `<div>
+        <div class="flbl">提取的文案 <span class="meta">共 ${dS.extractedScript.length} 字</span></div>
+        <textarea class="txa" id="dExtractedScript" rows="4" oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>
+      </div>` : ''}
+      ${dS.extractErr ? `<div class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.extractErr)}</div>` : ''}
+      ${dS.extractLoading ? `<div class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;animation:spin 1s linear infinite"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> 正在提取...</div>` : ''}
+    </div>
+    <div class="scard-foot">
+      <button class="b b-md ${dS.extractedScript?'b-secondary':'b-primary'} b-full" onclick="dHandleExtract()" ${dS.extractLoading?'disabled':''}>
+        ${dS.extractLoading?'提取中...':dS.extractedScript?'重新提取':'开始提取'}
       </button>
-      ${dS.extractErr?`<div class="d-err">${esc(dS.extractErr)}</div>`:''}
     </div>
   </div>`;
 }
 
 /* ② 改写卡片 */
 function dCardRewrite() {
-  const st = dStepState(1);
+  const st = dS.rewriteLoading ? 'active' : dStepState(1);
   return `
-  <div class="d-card ${st==='active'?'active-card':''}">
-    <div class="d-card-header ${st==='active'?'active-header':''}">
-      <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'2'}</div>
-        <span class="d-card-title">② AI 改写</span>
+  <div class="${dScardCls(st)}">
+    <div class="scard-head">
+      <div class="scard-head-left">
+        <div class="scard-num ${st}">${st==='done'?dCheckIcon():'2'}</div>
+        <div class="scard-title">AI 改写</div>
       </div>
-      <span class="d-step-badge ${st}">${dS.rewriteLoading?'● 改写中':st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+      ${dS.rewriteLoading ? '<span class="sb sb-active"><span class="dot"></span>改写中</span>' : dSB(dStepState(1))}
     </div>
-    <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
-      <select class="d-select" style="width:100%" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
-        <option value="">智能匹配</option>
-        <option value="hook">强钩子开头</option>
-        <option value="emotion">情感共鸣</option>
-        <option value="problem">问题解决</option>
-        <option value="list">干货列表</option>
-      </select>
-      <button class="d-btn-lg" onclick="dHandleRewrite()"
-        ${dS.rewriteLoading||!dS.extractedScript?'disabled':''}
-        style="width:100%;padding:10px;font-size:13px">
-        ${dS.rewriteLoading?'⏳ 改写中...':dS.rewrittenScript?'🔄 重新改写':'✨ AI 改写'}
+    <div class="scard-body">
+      <div>
+        <div class="flbl">改写风格</div>
+        <select class="sel" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
+          <option value="" ${dS.rewriteStyle===''?'selected':''}>智能匹配（推荐）</option>
+          <option value="hook" ${dS.rewriteStyle==='hook'?'selected':''}>强钩子开头</option>
+          <option value="emotion" ${dS.rewriteStyle==='emotion'?'selected':''}>情感共鸣</option>
+          <option value="problem" ${dS.rewriteStyle==='problem'?'selected':''}>问题解决</option>
+          <option value="list" ${dS.rewriteStyle==='list'?'selected':''}>干货列表</option>
+        </select>
+      </div>
+      ${!dS.extractedScript ? `<div style="font-size:12px;color:#9CA3AF;text-align:center;padding:4px 0">请先完成第①步文案提取</div>` : ''}
+      ${dS.rewrittenScript ? `<div>
+        <div class="flbl">改写结果 <span class="meta">共 ${dS.rewrittenScript.length} 字</span></div>
+        <textarea class="txa" rows="5" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
+      </div>` : ''}
+      ${dS.rewriteErr ? `<div class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.rewriteErr)}</div>` : ''}
+    </div>
+    <div class="scard-foot">
+      <button class="b b-md ${dS.rewrittenScript?'b-secondary':'b-primary'} b-full" onclick="dHandleRewrite()" ${dS.rewriteLoading||!dS.extractedScript?'disabled':''}>
+        ${dS.rewriteLoading?'改写中...':dS.rewrittenScript?'重新改写':'✨ AI 改写'}
       </button>
-      ${!dS.extractedScript ? `<div style="font-size:12px;color:#9CA3AF;text-align:center">请先完成第①步文案提取</div>` : ''}
-      ${dS.rewriteErr?`<div class="d-err">${esc(dS.rewriteErr)}</div>`:''}
-      ${dS.rewrittenScript ? `
-        <div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <span class="d-label" style="margin:0">改写结果</span>
-            <span style="font-size:11px;color:#22C55E">✓ 共 ${dS.rewrittenScript.length} 字</span>
-          </div>
-          <textarea class="d-textarea" style="height:90px" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
-        </div>
-      ` : ''}
     </div>
   </div>`;
 }
 
 /* ③ 语音合成卡片 */
 function dCardTTS() {
-  const st = dStepState(2);
+  const st = dS.ttsLoading ? 'active' : dStepState(2);
   const speedPct = ((dS.ttsSpeed - 0.5) / 1.5) * 100;
+  const intensityPct = ((dS.ttsIntensity - 0.1) / 0.9) * 100;
 
-  // 声音列表：系统声音 + 我的声音（IndexTTS）
   const sysVoices = dS.systemVoices;
   const myVoices  = dS.myVoices;
 
+  const emotions = [
+    { id:'neutral',  label:'自然' }, { id:'warm', label:'温暖' },
+    { id:'excited',  label:'激动' }, { id:'serious', label:'严肃' },
+    { id:'story',    label:'故事' },
+  ];
+
   return `
-  <div class="d-card ${st==='active'?'active-card':''}">
-    <div class="d-card-header ${st==='active'?'active-header':''}">
-      <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'3'}</div>
-        <span class="d-card-title">③ 语音合成</span>
+  <div class="${dScardCls(st)}">
+    <div class="scard-head">
+      <div class="scard-head-left">
+        <div class="scard-num ${st}">${st==='done'?dCheckIcon():'3'}</div>
+        <div class="scard-title">语音合成</div>
       </div>
-      <span class="d-step-badge ${st}">${dS.ttsLoading?'● 合成中':st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+      ${dS.ttsLoading ? '<span class="sb sb-active"><span class="dot"></span>合成中</span>' : dSB(dStepState(2))}
     </div>
-    <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
-      <!-- 声音选择（下拉单选） -->
+    <div class="scard-body">
+      <!-- 声音选择 -->
       <div>
-        <div class="d-label">选择声音</div>
-        <select class="d-select" id="dTtsVoice" onchange="dS.ttsVoiceId=this.value">
+        <div class="flbl">选择声音</div>
+        <select class="sel" id="dTtsVoice" onchange="dS.ttsVoiceId=this.value">
           <optgroup label="── 系统声音 ──">
             ${sysVoices.map(v=>`<option value="${v.id}" ${dS.ttsVoiceId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
           </optgroup>
@@ -806,124 +938,142 @@ function dCardTTS() {
             ${myVoices.map(v=>`<option value="${v.id}" ${dS.ttsVoiceId===v.id?'selected':''}>${esc(v.name)}（我的）</option>`).join('')}
           </optgroup>`:''}
         </select>
-        ${myVoices.length===0?`<div style="font-size:11px;color:#B0AA9F;margin-top:4px">在「声音管理」可添加自定义克隆声音</div>`:''}
       </div>
-      <!-- 情绪 + 语速 同行 -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
-        <div>
-          <div class="d-label">情绪</div>
-          <select class="d-select" style="width:100%" onchange="dS.ttsEmotion=this.value">
-            <option value="neutral"  ${dS.ttsEmotion==='neutral'  ?'selected':''}>😐 中性</option>
-            <option value="happy"    ${dS.ttsEmotion==='happy'    ?'selected':''}>😊 愉快</option>
-            <option value="sad"      ${dS.ttsEmotion==='sad'      ?'selected':''}>😢 悲伤</option>
-            <option value="angry"    ${dS.ttsEmotion==='angry'    ?'selected':''}>😠 愤怒</option>
-            <option value="fearful"  ${dS.ttsEmotion==='fearful'  ?'selected':''}>😨 恐惧</option>
-            <option value="surprise" ${dS.ttsEmotion==='surprise' ?'selected':''}>😲 惊喜</option>
-          </select>
-        </div>
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <div class="d-label" style="margin:0">语速</div>
-            <div style="font-size:12px;font-weight:700;color:#F5762A" id="dSpeedVal">${dS.ttsSpeed.toFixed(1)}x</div>
-          </div>
-          <div class="d-slider-wrap">
-            <div class="d-slider-track"><div class="d-slider-fill" id="dSpeedFill" style="width:${speedPct}%"></div></div>
-            <div class="d-slider-thumb" id="dSpeedThumb" style="left:${speedPct}%"></div>
-            <input type="range" class="d-slider-input" min="50" max="200" value="${Math.round(dS.ttsSpeed*100)}" oninput="dOnSpeed(this.value)">
-          </div>
+      <!-- 情绪风格 chips -->
+      <div>
+        <div class="flbl">情绪风格</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${emotions.map(e=>`<div class="chip ${dS.ttsEmotion===e.id?'is-active':''}" style="height:24px;padding:0 10px" onclick="dS.ttsEmotion='${e.id}';dRender()">${e.label}</div>`).join('')}
         </div>
       </div>
-      ${!dS.myVoices.find(v=>v.id===dS.ttsVoiceId)?`<div style="font-size:11px;color:#B0AA9F">💡 情绪调节对「我的声音（克隆）」效果最佳</div>`:''}
-      <!-- 合成进度 / 音频预览 / 按钮 -->
+      <!-- 情绪强度 -->
+      <div>
+        <div class="flbl">情绪强度 <span style="color:#B0AA9F;font-weight:500">系数 0.1–1.0</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="sld" style="flex:1">
+            <div class="sld-track"><div class="sld-fill" id="dIntensityFill" style="width:${intensityPct}%"></div></div>
+            <div class="sld-thumb" id="dIntensityThumb" style="left:${intensityPct}%"></div>
+            <input type="range" class="sld-input" min="0.1" max="1.0" step="0.1" value="${dS.ttsIntensity}" oninput="dS.ttsIntensity=parseFloat(this.value);document.getElementById('dIntensityNumVal').value=parseFloat(this.value).toFixed(1);var p=((parseFloat(this.value)-0.1)/0.9*100);document.getElementById('dIntensityFill').style.width=p+'%';document.getElementById('dIntensityThumb').style.left=p+'%'">
+          </div>
+          <input type="number" id="dIntensityNumVal" value="${(dS.ttsIntensity||0.7).toFixed(1)}" min="0.1" max="1.0" step="0.1" style="width:54px;height:28px;border:1px solid #EDE9E3;border-radius:7px;text-align:center;font-size:12px;font-family:inherit;outline:none;color:#1A1614" oninput="var v=Math.min(1,Math.max(0.1,parseFloat(this.value)||0.7));dS.ttsIntensity=v">
+        </div>
+      </div>
+      <!-- 语速 -->
+      <div>
+        <div class="flbl">语速 <span class="meta">${dS.ttsSpeed.toFixed(1)}x</span></div>
+        <div class="sld">
+          <div class="sld-track"><div class="sld-fill" id="dSpeedFill" style="width:${speedPct}%"></div></div>
+          <div class="sld-thumb" id="dSpeedThumb" style="left:${speedPct}%"></div>
+          <input type="range" class="sld-input" min="50" max="200" value="${Math.round(dS.ttsSpeed*100)}" oninput="dOnSpeed(this.value)">
+        </div>
+      </div>
+      <!-- 合成结果 / 进度 -->
       ${dS.ttsLoading?`
-        <div style="background:#FFF8F3;border:1.5px solid #FFD5B8;border-radius:12px;padding:14px 16px">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite;flex-shrink:0"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="#F5762A" stroke-width="2" stroke-linecap="round"/></svg>
-            <span style="font-size:13px;font-weight:600;color:#1A1614">语音合成中</span>
-          </div>
-          <div id="dTtsProgressMsg" style="font-size:12px;color:#9A3412;margin-bottom:10px">${esc(dS.ttsProgressMsg||'正在提交...')}</div>
-          <div style="height:4px;background:#F0EDE8;border-radius:4px;overflow:hidden">
-            <div style="height:100%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px;width:100%;animation:progress-indeterminate 1.5s ease-in-out infinite"></div>
-          </div>
-          ${dS.myVoices.find(v=>v.id===dS.ttsVoiceId)?`<div style="font-size:11px;color:#B0AA9F;margin-top:8px">💡 自定义声音使用本地 IndexTTS 推理，通常需要 30~120 秒</div>`:''}
+        <div class="hint">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;animation:spin 1s linear infinite;margin-top:1px"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span id="dTtsProgressMsg">${esc(dS.ttsProgressMsg||'正在提交...')}</span>
         </div>
       `:dS.ttsAudioUrl?`
-        <div style="background:#F7F5F1;border-radius:12px;padding:10px 14px;border:1px solid #EDE9E3">
-          <div style="font-size:11px;color:#22C55E;margin-bottom:6px;font-weight:600">✓ 语音合成完成</div>
-          <audio controls src="${dS.ttsAudioUrl}" style="width:100%;height:36px"></audio>
+        <div style="background:#F7F5F1;border-radius:9px;padding:10px 12px;border:1px solid #EDE9E3">
+          <div style="font-size:11px;color:#16A34A;margin-bottom:6px;font-weight:600">✓ 语音合成完成</div>
+          <audio controls src="${dS.ttsAudioUrl}" style="width:100%;height:32px"></audio>
         </div>
-        <button class="d-btn d-btn-ghost" onclick="dHandleTTS()" style="width:100%;padding:8px;font-size:12px">重新合成</button>
+      `:''}
+      ${dS.ttsErr?`<div class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.ttsErr)}</div>`:''}
+    </div>
+    <div class="scard-foot">
+      ${dS.ttsAudioUrl?`
+        <button class="b b-md b-secondary b-full" onclick="dHandleTTS()">重新合成</button>
       `:`
-        <button class="d-btn-lg" onclick="dHandleTTS()" style="padding:10px;font-size:13px">开始语音合成</button>
+        <button class="b b-md b-primary b-full" onclick="dHandleTTS()" ${dS.ttsLoading?'disabled':''}>
+          ${dS.ttsLoading?'合成中...':'开始语音合成'}
+        </button>
       `}
-      ${dS.ttsErr?`<div class="d-err">${esc(dS.ttsErr)}</div>`:''}
     </div>
   </div>`;
 }
 /* ④ 数字人卡片 */
 function dCardAvatar() {
-  const st = dStepState(3);
   const generating = dS.extractStep==='avatar_gen' || dS.avatarGenerating;
+  const st = generating ? 'active' : dStepState(3);
+
+  // 左侧 9:16 视频预览
+  const videoPreview = dS.avatarVideoUrl
+    ? `<video src="${dS.avatarVideoUrl}" style="width:100%;height:100%;object-fit:cover" controls playsinline></video>`
+    : dS.avatarSrcBlobUrl
+      ? `<video src="${dS.avatarSrcBlobUrl}" style="width:100%;height:100%;object-fit:cover" muted autoplay loop playsinline></video>`
+      : `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" opacity="0.4"><circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/><path d="M4 20C4 16.69 7.58 14 12 14C16.42 14 20 16.69 20 20" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div style="font-size:9px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.4">选择<br>参考视频</div>
+        </div>`;
+
   return `
-  <div class="d-card ${st==='active'?'active-card':''}">
-    <div class="d-card-header ${st==='active'?'active-header':''}">
-      <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'4'}</div>
-        <span class="d-card-title">④ 数字人生成</span>
+  <div class="${dScardCls(st)}">
+    <div class="scard-head">
+      <div class="scard-head-left">
+        <div class="scard-num ${st}">${st==='done'?dCheckIcon():'4'}</div>
+        <div class="scard-title">数字人生成</div>
       </div>
-      <span class="d-step-badge ${st}">${st==='done'?'已完成':generating?'● 生成中':st==='active'?'● 进行中':'待处理'}</span>
+      ${generating ? '<span class="sb sb-active"><span class="dot"></span>生成中</span>' : dSB(dStepState(3))}
     </div>
-    <div class="d-card-body">
+    <div class="scard-body">
       ${generating?`
-        <div style="text-align:center;padding:16px 0">
-          <div style="font-size:13px;font-weight:600;color:#1A1614;margin-bottom:8px">${esc(dS.avatarProgressMsg)}</div>
-          <div class="d-progress-bar" style="margin-bottom:8px"><div class="d-progress-fill" style="width:${dS.avatarProgressPct}%"></div></div>
-          <div style="font-size:12px;color:#B0AA9F">GPU 渲染中，通常 1~3 分钟</div>
-        </div>
-      `:dS.avatarVideoUrl?`
-        <div style="display:flex;justify-content:center;margin-bottom:10px">
-          <video src="${dS.avatarVideoUrl}" id="dAvatarPlayer" controls playsinline
-            style="height:280px;width:auto;max-width:100%;border-radius:10px;background:#000;display:block"></video>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="d-btn d-btn-ghost" onclick="dResetAvatar()" style="flex:1">重新生成</button>
+        <!-- 生成中进度 -->
+        <div style="text-align:center;padding:8px 0">
+          <div style="font-size:12px;font-weight:600;color:#1A1614;margin-bottom:8px">${esc(dS.avatarProgressMsg)}</div>
+          <div class="d-progress-bar" style="margin-bottom:6px"><div class="d-progress-fill" style="width:${dS.avatarProgressPct}%"></div></div>
+          <div style="font-size:11px;color:#B0AA9F">GPU 渲染中，通常 1~3 分钟</div>
         </div>
       `:`
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <!-- 参考视频上传 -->
-          <div>
-            <div class="d-label">参考视频（真人说话短视频，MP4，建议 5~30 秒）</div>
-            ${dS.avatarSrcBlobUrl
-              ? `<!-- 已选：显示视频预览 -->
-                <video src="${dS.avatarSrcBlobUrl}" controls playsinline muted
-                  style="width:100%;border-radius:10px;background:#000;display:block;max-height:200px;object-fit:contain;margin-bottom:6px"></video>
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
-                  <span style="font-size:11px;color:#A8A49C;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(dS.avatarSrcVideoName||'参考视频')}</span>
-                  <span onclick="dS.avatarSrcBlobUrl=null;dS.avatarSrcVideoB64=null;dS.avatarSrcVideoName='';dRender()"
-                    style="font-size:11px;color:#F5762A;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:10px">重新选择</span>
-                </div>`
-              : `<!-- 未选：上传入口 -->
-                <div style="border:2px dashed #D4D0C8;border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color 0.15s;display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px"
-                  onclick="document.getElementById('dAvatarVideoInput').click()"
-                  onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="#C4C0B8" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="#C4C0B8"/></svg>
-                  <div style="font-size:12px;color:#B0AA9F">点击上传参考视频</div>
-                  <div style="font-size:10px;color:#C8C3BC">MP4 / MOV / AVI · 建议 5~30 秒</div>
-                </div>`
-            }
-            <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dHandleAvatarVideo(event)">
+        <!-- 左右布局 -->
+        <div style="display:flex;gap:14px;align-items:stretch">
+          <!-- 左：9:16 视频预览 -->
+          <div style="width:120px;flex-shrink:0;border-radius:10px;overflow:hidden;background:#2A2620;position:relative;box-shadow:0 4px 14px rgba(0,0,0,0.18);cursor:pointer" onclick="${dS.avatarVideoUrl||dS.avatarSrcBlobUrl?'':'document.getElementById(\'dAvatarVideoInput\').click()'}" style="aspect-ratio:9/16">
+            <div style="width:120px;height:213px;position:relative;overflow:hidden;border-radius:10px;background:#2A2620">
+              ${videoPreview}
+              <div style="position:absolute;top:6px;left:6px;font-size:8px;font-weight:700;background:rgba(245,118,42,0.92);color:#fff;padding:2px 6px;border-radius:4px">9:16</div>
+              ${!dS.avatarVideoUrl&&!dS.avatarSrcBlobUrl?`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center" onclick="document.getElementById('dAvatarVideoInput').click()"></div>`:''}
+            </div>
           </div>
-          <!-- 面部增强开关 -->
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:12px;color:#6E6860">面部增强</span>
-            <div class="d-toggle ${dS.avatarBeauty?'on':'off'}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"><div class="d-toggle-ball"></div></div>
+          <!-- 右：控件 -->
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
+            <!-- 参考视频 -->
+            <div>
+              <div class="flbl">参考视频</div>
+              ${dS.avatarSrcBlobUrl
+                ? `<div style="display:flex;align-items:center;gap:8px">
+                    <div style="flex:1;font-size:11px;color:#6E6860;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(dS.avatarSrcVideoName||'已选视频')}</div>
+                    <button class="b b-sm b-ghost" onclick="dS.avatarSrcBlobUrl=null;dS.avatarSrcVideoB64=null;dS.avatarSrcVideoName='';dRender()" style="flex-shrink:0;font-size:11px">重选</button>
+                  </div>`
+                : `<button class="b b-sm b-secondary b-full" onclick="document.getElementById('dAvatarVideoInput').click()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="currentColor"/></svg>
+                    上传参考视频
+                  </button>`
+              }
+              <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dHandleAvatarVideo(event)">
+            </div>
+            <div style="height:1px;background:#F0EDE8"></div>
+            <!-- 面部增强 toggle -->
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:12px;color:#1A1614;font-weight:600">面部增强</div>
+                <div style="font-size:10px;color:#B0AA9F;margin-top:2px">提升清晰度与细节</div>
+              </div>
+              <div class="tg ${dS.avatarBeauty?'on':''}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"></div>
+            </div>
+            ${!dS.ttsAudioUrl?`<div class="hint hint-gray"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>需要先完成步骤③语音合成</div>`:''}
           </div>
-          ${!dS.ttsAudioUrl?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px">⚠ 需要先完成步骤③语音合成</div>':''}
-          <button class="d-btn-lg" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcBlobUrl||!dS.ttsAudioB64)?'disabled':''} style="padding:10px;font-size:13px">
-            ${dS.avatarSrcBlobUrl && !dS.avatarSrcVideoB64 ? '⏳ 视频加载中...' : '开始生成数字人视频'}
-          </button>
-          ${dS.avatarErr?`<div class="d-err">${esc(dS.avatarErr)}</div>`:''}
         </div>
+      `}
+      ${dS.avatarErr?`<div class="hint">${esc(dS.avatarErr)}</div>`:''}
+    </div>
+    <div class="scard-foot">
+      ${dS.avatarVideoUrl?`
+        <button class="b b-md b-secondary b-full" onclick="dResetAvatar()">重新生成</button>
+      `:generating?'':`
+        <button class="b b-md b-primary b-full" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcBlobUrl||!dS.ttsAudioB64)?'disabled':''}>
+          ${dS.avatarSrcBlobUrl && !dS.avatarSrcVideoB64 ? '视频加载中...' : '开始生成数字人'}
+        </button>
       `}
     </div>
   </div>`;
@@ -931,14 +1081,14 @@ function dCardAvatar() {
 
 /* ─── 字幕模板数据 ─── */
 const D_SUBTITLE_TEMPLATES = [
-  { id:'bilingual_douyin', name:'爆款大字', desc:'双层中文',   color:'#FFD700', ol:'#000000', size:46, ow:3,   type:'bilingual_douyin' },
-  { id:'douyin',   name:'双层抖音', desc:'爆款高级感', color:'#FFD700', ol:'#000000', size:44, ow:3   },
-  { id:'classic',  name:'经典白字', desc:'百搭首选',   color:'#FFFFFF', ol:'#000000', size:44, ow:2.5 },
-  { id:'variety',  name:'综艺黄字', desc:'活泼抢眼',   color:'#FFEE00', ol:'#000000', size:40, ow:3   },
-  { id:'movie',    name:'电影字幕', desc:'沉稳专业',   color:'#F0F0F0', ol:'#111111', size:30, ow:1.5 },
-  { id:'fresh',    name:'清新绿字', desc:'知识科普',   color:'#00E87A', ol:'#000000', size:34, ow:2   },
-  { id:'vibrant',  name:'活力橙字', desc:'带货推荐',   color:'#FF6B35', ol:'#FFFFFF', size:38, ow:2   },
-  { id:'minimal',  name:'极简白字', desc:'无描边简洁', color:'#FFFFFF', ol:'none',    size:34, ow:0   },
+  { id:'bold',     name:'爆款大字', label:'爆款大字', desc:'双层中文',   sub:'双层中文',   preview:'好好过日子', bg:'#1A1614', textColor:'#FFD93D', accent:'#FF8040', color:'#FFD93D', ol:'#000000', size:46, ow:3,   type:'bilingual_douyin' },
+  { id:'douyin',   name:'双层抖音', label:'双层抖音', desc:'爆款高级感', sub:'爆款高级感', preview:'字幕示例',   bg:'#1A1614', textColor:'#FFFFFF', accent:'#FFD93D', color:'#FFFFFF', ol:'#000000', size:44, ow:3   },
+  { id:'classic',  name:'经典白字', label:'经典白字', desc:'百搭首选',   sub:'百搭首选',   preview:'字幕示例',   bg:'#1A1614', textColor:'#FFFFFF', accent:'#FFFFFF', color:'#FFFFFF', ol:'#000000', size:44, ow:2.5 },
+  { id:'yellow',   name:'综艺黄字', label:'综艺黄字', desc:'活泼抢眼',   sub:'活泼抢眼',   preview:'字幕示例',   bg:'#1A1614', textColor:'#FFD700', accent:'#FFD700', color:'#FFD700', ol:'#000000', size:40, ow:3   },
+  { id:'movie',    name:'电影字幕', label:'电影字幕', desc:'沉稳专业',   sub:'沉稳专业',   preview:'字幕示例',   bg:'#000000', textColor:'#FFFFFF', accent:'#9CA3AF', color:'#F0F0F0', ol:'#111111', size:30, ow:1.5 },
+  { id:'green',    name:'清新绿字', label:'清新绿字', desc:'知识科普',   sub:'知识科普',   preview:'字幕示例',   bg:'#1A2A1A', textColor:'#7EF09F', accent:'#7EF09F', color:'#00E87A', ol:'#000000', size:34, ow:2   },
+  { id:'orange',   name:'活力橙字', label:'活力橙字', desc:'带货推荐',   sub:'带货推荐',   preview:'字幕示例',   bg:'#1A1614', textColor:'#FF8040', accent:'#FF8040', color:'#FF8040', ol:'#FFFFFF', size:38, ow:2   },
+  { id:'minimal',  name:'极简白字', label:'极简白字', desc:'无描边简洁', sub:'无描边简洁', preview:'字幕示例',   bg:'#1A1614', textColor:'#FFFFFF', accent:'#FFFFFF', color:'#FFFFFF', ol:'none',    size:34, ow:0   },
 ];
 
 /* ⑤ 后期卡片 */
@@ -946,222 +1096,205 @@ function dCardPostProcess() {
   const st = dStepState(4);
   const hasVideo = !!dS.avatarVideoUrl;
 
-  // 模板卡片
+  // 模板卡片（新样式，使用 label/sub/preview/bg/textColor/accent）
   const tplCards = D_SUBTITLE_TEMPLATES.map(t => {
     const active = dS.subTemplate === t.id;
     let previewHtml;
-    if (t.type === 'bilingual_douyin') {
-      previewHtml = `<div style="font-size:9px;font-weight:900;color:#fff;text-shadow:1px 1px 0 #000,-1px 1px 0 #000;line-height:1.1">能够</div>
-        <div style="font-size:13px;font-weight:900;color:#FFD700;text-shadow:1px 1px 0 #000,-1px 1px 0 #000;line-height:1.1">好好过日子</div>`;
+    if (t.type === 'bilingual_douyin' || t.id === 'bold') {
+      previewHtml = `<div style="font-size:8px;font-weight:700;color:#fff;text-shadow:1px 1px 0 #000,-1px 1px 0 #000;line-height:1.1;text-align:center;opacity:0.7">能够</div>
+        <div style="font-size:11px;font-weight:900;color:${t.textColor};text-shadow:1px 1px 0 #000,-1px 1px 0 #000;line-height:1.1;text-align:center">${t.preview||'好好过日子'}</div>`;
     } else {
       const shadow = t.ol === 'none' ? 'none' : `1px 1px 0 ${t.ol},-1px 1px 0 ${t.ol}`;
-      previewHtml = `<div style="font-size:12px;font-weight:800;color:${t.color};text-shadow:${shadow}">字幕示例</div>`;
+      previewHtml = `<div style="font-size:11px;font-weight:800;color:${t.textColor};text-shadow:${shadow};text-align:center">${t.preview||'字幕示例'}</div>`;
     }
     return `<div data-d-tpl-id="${t.id}" onclick="dApplySubTemplate('${t.id}')"
-      style="flex-shrink:0;width:82px;background:#2C2820;border-radius:8px;padding:7px 6px;cursor:pointer;
-             border:2px solid ${active?'#F5762A':'#3A3630'};position:relative;box-sizing:border-box">
-      ${active?`<div data-d-tpl-check style="position:absolute;top:4px;right:4px;width:14px;height:14px;background:#F5762A;border-radius:50%;display:flex;align-items:center;justify-content:center">
-        <svg width="8" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>`
+      style="flex-shrink:0;width:74px;background:${t.bg};border-radius:8px;padding:9px 6px 8px;cursor:pointer;
+             border:2px solid ${active?'#F5762A':'transparent'};position:relative;box-sizing:border-box;
+             box-shadow:${active?'0 3px 10px rgba(245,118,42,0.3)':'0 1px 3px rgba(0,0,0,0.1)'};transition:all 0.15s">
+      ${active?`<div data-d-tpl-check style="position:absolute;top:-5px;right:-5px;width:14px;height:14px;border-radius:50%;background:#F5762A;border:2px solid #fff;display:flex;align-items:center;justify-content:center">
+        <svg width="7" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>`
        :`<div data-d-tpl-check style="display:none"></div>`}
-      <div style="margin-bottom:4px;min-height:30px;display:flex;flex-direction:column;justify-content:flex-end">${previewHtml}</div>
-      <div style="font-size:9px;color:${active?'#F5762A':'#A8A49C'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-      <div style="font-size:8px;color:#6B6860;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.desc}</div>
+      <div style="font-size:8px;color:${t.accent};font-weight:600;margin-bottom:2px;opacity:0.85;text-align:center">${t.label}</div>
+      <div style="min-height:28px;display:flex;flex-direction:column;justify-content:center;margin-bottom:3px">${previewHtml}</div>
+      <div style="font-size:7.5px;color:rgba(255,255,255,0.45);text-align:center;line-height:1.2">${t.sub}</div>
     </div>`;
   }).join('');
 
-  // 颜色 dots
-  const COLORS = ['#FFFFFF','#FFEE00','#FF6B35','#00E87A','#FF3B3B','#00BFFF'];
-  const colorDots = COLORS.map(c => {
+  // 字幕颜色 sw
+  const COLORS = ['#FFFFFF','#FFD700','#FF8040','#7EF09F','#FF4444','#60B4FF'];
+  const colorSwatches = COLORS.map(c => {
     const active = dS.subColor === c;
-    return `<div data-d-color-dot="${c}" onclick="dSetSubColorDot('${c}')"
-      style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;flex-shrink:0;
-             box-shadow:0 0 0 ${active?'3px #F5762A':'2px #D4D0C8'};border:2px solid ${c==='#FFFFFF'?'#E0DDD8':'transparent'};transition:.15s"></div>`;
+    return `<div class="sw ${active?'is-active':''}" data-d-color-dot="${c}" style="background:${c}${c==='#FFFFFF'?';border-color:#D8D2CA':''}" onclick="dSetSubColorDot('${c}')"></div>`;
   }).join('');
 
-  const OL_COLORS = [['#000000','黑'],['#FFFFFF','白'],['none','无']];
-  const olDots = OL_COLORS.map(([c, label]) => {
-    const active = dS.subOutlineColor === c;
-    const bg = c === 'none' ? 'repeating-linear-gradient(45deg,#ddd 0,#ddd 3px,#fff 3px,#fff 6px)' : c;
-    return `<div data-d-ol-dot="${c}" onclick="dSetSubOlDot('${c}')" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer">
-      <div style="width:22px;height:22px;border-radius:50%;background:${bg};box-shadow:0 0 0 ${active?'3px #F5762A':'2px #D4D0C8'};border:2px solid #fff"></div>
-      <span style="font-size:9px;color:${active?'#F5762A':'#A8A49C'}">${label}</span>
+  // 描边颜色
+  const OL_COLORS = [{c:'#1A1614',l:'黑'},{c:'#FFFFFF',l:'白'},{c:'transparent',l:'无'}];
+  const olSwatches = OL_COLORS.map(sc => {
+    const active = dS.subOutlineColor === sc.c;
+    const bg = sc.c === 'transparent' ? 'linear-gradient(135deg,#fff 49%,#E5534B 49%,#E5534B 51%,#fff 51%)' : sc.c;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer" onclick="dSetSubOlDot('${sc.c}')">
+      <div class="sw ${active?'is-active':''}" data-d-ol-dot="${sc.c}" style="background:${bg}${sc.c==='#FFFFFF'?';border-color:#D8D2CA':''}"></div>
+      <div style="font-size:9px;color:${active?'#F5762A':'#B0AA9F'};font-weight:600">${sc.l}</div>
     </div>`;
   }).join('');
+
+  const fsPct = ((dS.subFontsize - 20) / 40) * 100;
+  const owPct = (dS.subOutlineWidth / 10) * 100;
 
   return `
-  <div class="d-card ${st==='active'?'active-card':''}">
-    <div class="d-card-header ${st==='active'?'active-header':''}">
-      <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'5'}</div>
-        <span class="d-card-title">⑤ 后期制作</span>
+  <div class="${dScardCls(st)}">
+    <div class="scard-head">
+      <div class="scard-head-left">
+        <div class="scard-num ${st}">${st==='done'?dCheckIcon():'5'}</div>
+        <div class="scard-title">后期制作</div>
       </div>
-      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+      ${dSB(st)}
     </div>
-    <div class="d-card-body" style="display:flex;flex-direction:column;gap:12px">
+    <div class="scard-body">
 
-      <!-- 字幕模板横向滚动 -->
+      <!-- 字幕模板：水平滚动 -->
       <div>
-        <div class="d-label">字幕模板</div>
-        <div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+        <div class="flbl">字幕模板</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
           ${tplCards}
         </div>
       </div>
 
-      <!-- 颜色微调 -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <!-- 字幕颜色 + 描边颜色 两列 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
-          <div class="d-label">字幕颜色</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">${colorDots}</div>
+          <div class="flbl">字幕颜色</div>
+          <div style="display:flex;gap:5px">${colorSwatches}</div>
         </div>
         <div>
-          <div class="d-label">描边颜色</div>
-          <div style="display:flex;gap:8px">${olDots}</div>
-        </div>
-      </div>
-
-      <!-- 字号 + 描边粗细 -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <div class="d-label" style="margin:0">字体大小</div>
-            <span data-d-fs-val style="font-size:11px;color:#F5762A;font-weight:700">${dS.subFontsize}像素</span>
-          </div>
-          <input type="range" data-d-fs-range class="d-slider-input" min="20" max="80" value="${dS.subFontsize}"
-            oninput="dS.subFontsize=+this.value;document.querySelector('[data-d-fs-val]').textContent=this.value+'像素'" style="width:100%">
-        </div>
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <div class="d-label" style="margin:0">描边粗细</div>
-            <span data-d-ow-val style="font-size:11px;color:#F5762A;font-weight:700">${dS.subOutlineWidth}</span>
-          </div>
-          <input type="range" data-d-ow-range class="d-slider-input" min="0" max="10" step="0.5" value="${dS.subOutlineWidth}"
-            oninput="dS.subOutlineWidth=+this.value;document.querySelector('[data-d-ow-val]').textContent=this.value" style="width:100%">
+          <div class="flbl">描边颜色</div>
+          <div style="display:flex;gap:10px">${olSwatches}</div>
         </div>
       </div>
 
-      <!-- 合成按钮 -->
-      ${!hasVideo?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px">⚠ 需要先完成步骤④数字人生成</div>':''}
-      <button class="d-btn-lg" onclick="dToast('后期合成（烧字幕）功能即将上线')" ${!hasVideo?'disabled':''} style="padding:10px;font-size:13px">
+      <!-- 字体大小滑块 -->
+      <div>
+        <div class="flbl">字体大小 <span class="meta">${dS.subFontsize}px</span></div>
+        <div class="sld">
+          <div class="sld-track"><div class="sld-fill" data-d-fs-fill style="width:${fsPct}%"></div></div>
+          <div class="sld-thumb" data-d-fs-thumb style="left:${fsPct}%"></div>
+          <input type="range" class="sld-input" data-d-fs-range min="20" max="60" value="${dS.subFontsize}"
+            oninput="dS.subFontsize=+this.value;document.querySelector('[data-d-fs-val]').textContent=this.value+'px';var p=((+this.value-20)/40*100);document.querySelector('[data-d-fs-fill]').style.width=p+'%';document.querySelector('[data-d-fs-thumb]').style.left=p+'%'">
+        </div>
+        <span data-d-fs-val style="display:none">${dS.subFontsize}px</span>
+      </div>
+
+      <!-- 描边粗细滑块 -->
+      <div>
+        <div class="flbl">描边粗细 <span class="meta">${dS.subOutlineWidth}</span></div>
+        <div class="sld">
+          <div class="sld-track"><div class="sld-fill" data-d-ow-fill style="width:${owPct}%"></div></div>
+          <div class="sld-thumb" data-d-ow-thumb style="left:${owPct}%"></div>
+          <input type="range" class="sld-input" data-d-ow-range min="0" max="10" step="0.5" value="${dS.subOutlineWidth}"
+            oninput="dS.subOutlineWidth=+this.value;document.querySelector('[data-d-ow-val]').textContent=this.value;var p=(+this.value/10*100);document.querySelector('[data-d-ow-fill]').style.width=p+'%';document.querySelector('[data-d-ow-thumb]').style.left=p+'%'">
+        </div>
+        <span data-d-ow-val style="display:none">${dS.subOutlineWidth}</span>
+      </div>
+
+      ${!hasVideo?`<div class="hint"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>需要先完成步骤④数字人生成</div>`:''}
+    </div>
+    <div class="scard-foot">
+      <button class="b b-md b-primary b-full" onclick="dToast('后期合成（烧字幕）功能即将上线')" ${!hasVideo?'disabled':''}>
         开始后期合成（烧字幕）
       </button>
-
     </div>
   </div>`;
 }
 
-/* ⑥ 发布准备卡片（全宽，横向三列：封面 / 标题+简介 / 标签） */
+/* ⑥ 发布准备卡片 */
 function dCardPublish() {
   const st = dStepState(5);
   const hasVideo = !!dS.avatarVideoUrl;
   const titleVal = dS.publishTitle || '';
   const descVal  = dS.publishDesc  || '';
-  const tagsText = (dS.publishTags||[]).map(t=>'#'+t).join(' ');
 
-  // 封面区
-  const coverCol = `
-    <div>
-      <div class="d-label">封面 · 9:16</div>
-      ${dS.coverGenerating
-        ? `<div style="aspect-ratio:9/16;max-height:200px;background:#F7F5F1;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
-             <div style="width:24px;height:24px;border:2.5px solid #F5762A;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div>
-             <span style="font-size:11px;color:#F5762A">截取中...</span>
-           </div>`
-        : dS.coverFrameUrl
-          ? `<img src="${dS.coverFrameUrl}" style="width:100%;border-radius:12px;display:block;box-shadow:0 4px 16px rgba(0,0,0,0.12);margin-bottom:8px"/>`
-          : `<div onclick="${hasVideo?'dGenerateCover(1.0)':''}"
-               style="aspect-ratio:9/16;max-height:200px;background:#F7F6F2;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:${hasVideo?'pointer':'default'};border:2px dashed #E4E2DA">
-               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C4C0B8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-               <span style="font-size:11px;color:${hasVideo?'#A8A49C':'#C8C3BC'}">${hasVideo?'点击生成封面':'需先完成数字人'}</span>
-             </div>`
-      }
-      ${dS.coverFrameUrl?`
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button onclick="dGenerateCover(dS.coverSeekTime+2)" class="d-btn d-btn-ghost" style="flex:1;padding:6px;font-size:11px">换一帧</button>
-          <button onclick="dDownloadCover()" class="d-btn d-btn-ghost" style="flex:1;padding:6px;font-size:11px">${dS.coverDownloaded?'✓ 已下载':'⬇ 下载'}</button>
-        </div>`:''}
-      ${hasVideo&&!dS.coverFrameUrl&&!dS.coverGenerating?`
-        <button onclick="dGenerateCover(1.0)" class="d-btn-lg" style="width:100%;margin-top:8px;padding:8px;font-size:12px">📸 一键生成封面</button>`:''}
-    </div>`;
-
-  // 标题+简介区
-  const contentCol = `
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="d-label" style="margin:0">视频标题 / 简介</div>
-        <button onclick="dHandlePublishGen('all')" class="d-btn" style="padding:5px 12px;font-size:11px"
-          ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishTitleLoading?'disabled':''}>
-          ${dS.publishTitleLoading?'生成中...':'✨ 一键生成'}
-        </button>
-      </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;color:#9E9890;font-weight:600">标题 <span style="color:#C4C0B8;font-weight:400">${titleVal.length}/30</span></span>
-          <button onclick="dHandlePublishCopy('title')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
-            ${dS.publishCopied==='title'?'✓ 已复制':'复制'}
-          </button>
-        </div>
-        <div contenteditable="true" id="dPubTitleEl" oninput="dS.publishTitle=this.innerText"
-          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:13px;color:#1A1814;line-height:1.6;min-height:24px;outline:none;border:1px solid #EDE9E3;font-family:inherit"
-        >${esc(titleVal)}</div>
-      </div>
-      <div style="flex:1">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;color:#9E9890;font-weight:600">简介</span>
-          <button onclick="dHandlePublishCopy('desc')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
-            ${dS.publishCopied==='desc'?'✓ 已复制':'复制'}
-          </button>
-        </div>
-        <div contenteditable="true" id="dPubDescEl" oninput="dS.publishDesc=this.innerText"
-          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:12px;color:#1A1814;line-height:1.7;min-height:60px;outline:none;border:1px solid #EDE9E3;font-family:inherit"
-        >${esc(descVal)}</div>
-      </div>
-    </div>`;
-
-  // 标签区
-  const tagsCol = `
-    <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="d-label" style="margin:0">话题标签</div>
-        <button onclick="dHandlePublishGen('desc')" class="d-btn d-btn-ghost" style="padding:4px 10px;font-size:11px"
-          ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishDescLoading?'disabled':''}>
-          ${dS.publishDescLoading?'生成中...':'重新生成'}
-        </button>
-      </div>
-      ${(dS.publishTags||[]).length
-        ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-             ${(dS.publishTags||[]).map(t=>`
-               <span style="padding:4px 10px;background:#FFF3E8;border-radius:20px;font-size:12px;color:#F5762A;font-weight:600">#${esc(t)}</span>
-             `).join('')}
-           </div>`
-        : `<div style="background:#F7F5F1;border-radius:10px;padding:14px;text-align:center;margin-bottom:10px">
-             <div style="font-size:12px;color:#C4C0B8">点击「一键生成」自动生成话题标签</div>
-           </div>`
-      }
-      ${tagsText?`
-        <button onclick="dHandlePublishCopy('tags')" class="d-btn d-btn-ghost" style="width:100%;padding:7px;font-size:12px">
-          ${dS.publishCopied==='tags'?'✓ 已复制':'复制全部标签'}
-        </button>`:''}
-      <div style="margin-top:12px;background:#ECFDF5;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-        <span style="font-size:11px;color:#065F46">AI法务审查通过，未检测到违规词</span>
-      </div>
-    </div>`;
+  // 小封面占位（9:16）
+  const coverBlock = dS.coverGenerating
+    ? `<div style="width:90px;height:160px;border-radius:8px;background:#F7F5F1;border:1.5px dashed #D8D2CA;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+        <div style="width:20px;height:20px;border:2px solid #F5762A;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div>
+        <div style="font-size:9px;color:#F5762A">截取中</div>
+       </div>`
+    : dS.coverFrameUrl
+      ? `<div style="width:90px;height:160px;border-radius:8px;overflow:hidden;position:relative;flex-shrink:0">
+          <img src="${dS.coverFrameUrl}" style="width:100%;height:100%;object-fit:cover;display:block"/>
+          <div style="position:absolute;bottom:4px;right:4px;display:flex;gap:3px">
+            <button onclick="dGenerateCover(dS.coverSeekTime+2)" class="b b-sm" style="height:22px;padding:0 6px;font-size:9px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:4px">换帧</button>
+          </div>
+         </div>`
+      : `<div onclick="${hasVideo?'dGenerateCover(1.0)':''}" style="width:90px;height:160px;flex-shrink:0;border-radius:8px;background:#FBFAF7;border:1.5px dashed #D8D2CA;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#B0AA9F;cursor:${hasVideo?'pointer':'default'}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <div style="font-size:9px;text-align:center;line-height:1.4;font-weight:500">封面 9:16<br>${hasVideo?'点击生成':'等待生成'}</div>
+         </div>`;
 
   return `
-  <div class="d-card ${st==='active'?'active-card':''}">
-    <div class="d-card-header ${st==='active'?'active-header':''}">
-      <div class="d-card-title-row">
-        <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'6'}</div>
-        <span class="d-card-title">⑥ 发布准备</span>
+  <div class="${dScardCls(st)}">
+    <div class="scard-head">
+      <div class="scard-head-left">
+        <div class="scard-num ${st}">${st==='done'?dCheckIcon():'6'}</div>
+        <div class="scard-title">发布准备</div>
       </div>
-      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+      ${dSB(st)}
     </div>
-    <div class="d-card-body">
-      ${!hasVideo?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:8px 12px;margin-bottom:12px">⚠ 需要先完成步骤④数字人生成，才能生成封面和发布内容</div>':''}
-      <div style="display:grid;grid-template-columns:180px 1fr 1fr;gap:16px;align-items:start">
-        ${coverCol}
-        ${contentCol}
-        ${tagsCol}
+    <div class="scard-body">
+      <!-- 封面 + 标题/简介 并排 -->
+      <div style="display:flex;gap:12px;align-items:stretch">
+        ${coverBlock}
+        <!-- 标题+简介 -->
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:flex-end">
+            <button onclick="dHandlePublishGen('all')" class="b b-sm b-primary" ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishTitleLoading?'disabled':''}>
+              ${dS.publishTitleLoading?'生成中...':'✨ 一键生成'}
+            </button>
+          </div>
+          <div>
+            <div class="flbl">视频标题 <span style="color:#B0AA9F;font-weight:500">${titleVal.length}/30</span></div>
+            <div contenteditable="true" id="dPubTitleEl" oninput="dS.publishTitle=this.innerText"
+              style="background:#FBFAF7;border:1px solid #EDE9E3;border-radius:9px;padding:7px 10px;font-size:12px;color:#1A1614;line-height:1.6;min-height:28px;outline:none;font-family:inherit;transition:all 0.15s"
+              onfocus="this.style.borderColor='#F5762A';this.style.background='#fff'"
+              onblur="this.style.borderColor='#EDE9E3';this.style.background='#FBFAF7'"
+            >${esc(titleVal)}</div>
+          </div>
+          <div>
+            <div class="flbl">视频简介</div>
+            <div contenteditable="true" id="dPubDescEl" oninput="dS.publishDesc=this.innerText"
+              style="background:#FBFAF7;border:1px solid #EDE9E3;border-radius:9px;padding:7px 10px;font-size:11.5px;color:#3D362F;line-height:1.65;min-height:44px;outline:none;font-family:inherit;transition:all 0.15s"
+              onfocus="this.style.borderColor='#F5762A';this.style.background='#fff'"
+              onblur="this.style.borderColor='#EDE9E3';this.style.background='#FBFAF7'"
+            >${esc(descVal)}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 话题标签 -->
+      ${(dS.publishTags||[]).length ? `
+        <div>
+          <div class="flbl">话题标签 <span style="color:#B0AA9F;font-weight:500">预设 ${dS.publishTags.length} 个</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${(dS.publishTags||[]).map(t=>`<div style="font-size:11px;font-weight:600;color:#F5762A;background:#FFF3E8;padding:4px 9px;border-radius:6px">#${esc(t)}</div>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- AI 法务审查 hint -->
+      <div class="hint hint-green">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        AI 法务审查通过 · 未检测到违规词
+      </div>
+    </div>
+    <div class="scard-foot">
+      <div style="display:flex;gap:8px">
+        <button onclick="dHandlePublishCopy('title')" class="b b-sm b-secondary" style="flex:1">
+          ${dS.publishCopied==='title'?'✓ 已复制':'复制标题'}
+        </button>
+        <button onclick="dHandlePublishCopy('desc')" class="b b-sm b-secondary" style="flex:1">
+          ${dS.publishCopied==='desc'?'✓ 已复制':'复制简介'}
+        </button>
+        ${dS.coverFrameUrl?`<button onclick="dDownloadCover()" class="b b-sm b-secondary">${dS.coverDownloaded?'✓ 已下载':'下载封面'}</button>`:''}
       </div>
     </div>
   </div>`;
@@ -1175,33 +1308,33 @@ function dBindHome() {
 function dApplySubTemplate(id) {
   const t = D_SUBTITLE_TEMPLATES.find(x => x.id === id);
   if (!t) return;
-  dS.subTemplate = id; dS.subColor = t.color; dS.subOutlineColor = t.ol;
+  dS.subTemplate = id; dS.subColor = t.color || t.textColor; dS.subOutlineColor = t.ol;
   dS.subFontsize = t.size; dS.subOutlineWidth = t.ow; dS.subStyle = t.type || 'default';
   // DOM-only 更新，避免整页重渲
   document.querySelectorAll('[data-d-tpl-id]').forEach(el => {
     const active = el.dataset.dTplId === id;
-    el.style.border = `2px solid ${active ? '#F5762A' : '#3A3630'}`;
+    el.style.border = `2px solid ${active ? '#F5762A' : 'transparent'}`;
+    el.style.boxShadow = active ? '0 3px 10px rgba(245,118,42,0.3)' : '0 1px 3px rgba(0,0,0,0.1)';
     const chk = el.querySelector('[data-d-tpl-check]');
     if (chk) chk.style.display = active ? 'flex' : 'none';
   });
   document.querySelectorAll('[data-d-color-dot]').forEach(el => {
-    el.style.boxShadow = `0 0 0 ${el.dataset.dColorDot === t.color ? '3px #F5762A' : '2px #D4D0C8'}`;
+    const isActive = el.dataset.dColorDot === (t.color || t.textColor);
+    el.className = 'sw' + (isActive ? ' is-active' : '');
   });
   document.querySelectorAll('[data-d-ol-dot]').forEach(el => {
     const active = el.dataset.dOlDot === t.ol;
-    const div = el.querySelector('div'); if (div) div.style.boxShadow = `0 0 0 ${active ? '3px #F5762A' : '2px #D4D0C8'}`;
-    const span = el.querySelector('span'); if (span) span.style.color = active ? '#F5762A' : '#A8A49C';
+    el.className = 'sw' + (active ? ' is-active' : '');
+    const span = el.parentElement?.querySelector('div:last-child'); if (span) span.style.color = active ? '#F5762A' : '#B0AA9F';
   });
-  const fsRange = document.querySelector('[data-d-fs-range]'); if (fsRange) fsRange.value = t.size;
-  const fsVal   = document.querySelector('[data-d-fs-val]');   if (fsVal)   fsVal.textContent = t.size + '像素';
-  const owRange = document.querySelector('[data-d-ow-range]'); if (owRange) owRange.value = t.ow;
-  const owVal   = document.querySelector('[data-d-ow-val]');   if (owVal)   owVal.textContent = t.ow;
+  const fsRange = document.querySelector('[data-d-fs-range]'); if (fsRange) { fsRange.value = t.size; const p=((t.size-20)/40*100); const fill=document.querySelector('[data-d-fs-fill]'); const thumb=document.querySelector('[data-d-fs-thumb]'); if(fill)fill.style.width=p+'%'; if(thumb)thumb.style.left=p+'%'; }
+  const owRange = document.querySelector('[data-d-ow-range]'); if (owRange) { owRange.value = t.ow; const p=(t.ow/10*100); const fill=document.querySelector('[data-d-ow-fill]'); const thumb=document.querySelector('[data-d-ow-thumb]'); if(fill)fill.style.width=p+'%'; if(thumb)thumb.style.left=p+'%'; }
 }
 
 function dSetSubColorDot(c) {
   dS.subColor = c; dS.subTemplate = 'custom';
   document.querySelectorAll('[data-d-color-dot]').forEach(el => {
-    el.style.boxShadow = `0 0 0 ${el.dataset.dColorDot === c ? '3px #F5762A' : '2px #D4D0C8'}`;
+    el.className = 'sw' + (el.dataset.dColorDot === c ? ' is-active' : '');
   });
 }
 
@@ -1209,8 +1342,8 @@ function dSetSubOlDot(c) {
   dS.subOutlineColor = c; dS.subTemplate = 'custom';
   document.querySelectorAll('[data-d-ol-dot]').forEach(el => {
     const active = el.dataset.dOlDot === c;
-    const div = el.querySelector('div'); if (div) div.style.boxShadow = `0 0 0 ${active ? '3px #F5762A' : '2px #D4D0C8'}`;
-    const span = el.querySelector('span'); if (span) span.style.color = active ? '#F5762A' : '#A8A49C';
+    el.className = 'sw' + (active ? ' is-active' : '');
+    const span = el.parentElement?.querySelector('div:last-child'); if (span) span.style.color = active ? '#F5762A' : '#B0AA9F';
   });
 }
 
