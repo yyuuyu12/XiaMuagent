@@ -2493,12 +2493,21 @@ function dRenderAvatars() {
           </div>
           <div>
             <div class="d-label">参考视频（说话短视频，MP4，建议 5~30 秒）</div>
-            <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F7F5F1;border:1.5px dashed #D4D0C8;border-radius:10px;cursor:pointer;font-size:12px;color:#9E9890;transition:border-color 0.15s"
+            <label id="dAvatarAddLabel" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F7F5F1;border:1.5px dashed #D4D0C8;border-radius:10px;cursor:pointer;font-size:12px;color:#9E9890;transition:border-color 0.15s"
               onmouseenter="this.style.borderColor='#F5762A'" onmouseleave="this.style.borderColor='#D4D0C8'">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="#C4C0B8" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="#C4C0B8"/></svg>
               <span id="dAvatarAddVideoLabel">选择参考视频</span>
               <input type="file" id="dAvatarAddInput" accept="video/*" style="display:none" onchange="dOnAvatarAddSelect(event)">
             </label>
+            <!-- 视频预览（选文件后动态注入） -->
+            <div id="dAvatarAddPreview" style="display:none;margin-top:8px;position:relative;border-radius:10px;overflow:hidden;background:#1E1C1A;aspect-ratio:9/16;max-height:200px">
+              <video id="dAvatarAddPreviewVideo" muted playsinline controls
+                style="width:100%;height:100%;object-fit:cover;display:block"></video>
+              <button onclick="_dClearAvatarAddPreview()"
+                style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.55);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+              </button>
+            </div>
           </div>
           <button class="d-btn d-btn-primary" onclick="dHandleAvatarAdd()" style="width:100%;padding:9px 18px">
             保存形象
@@ -2524,17 +2533,53 @@ function dRenderAvatars() {
 let _dAddAvatarB64 = null;
 let _dAddAvatarFmt = 'mp4';
 let _dAddAvatarName = '';
+let _dAddAvatarBlobUrl = null;
 
 function dOnAvatarAddSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
   _dAddAvatarFmt = (file.name.split('.').pop() || 'mp4').toLowerCase();
   _dAddAvatarName = file.name;
+
+  // 更新选择标签文字
   const label = document.getElementById('dAvatarAddVideoLabel');
   if (label) label.textContent = file.name;
+
+  // 释放旧 blob
+  if (_dAddAvatarBlobUrl) { try { URL.revokeObjectURL(_dAddAvatarBlobUrl); } catch {} }
+  _dAddAvatarBlobUrl = URL.createObjectURL(file);
+
+  // 显示视频预览（不触发 dRender 以保留文件输入状态）
+  const preview  = document.getElementById('dAvatarAddPreview');
+  const videoEl  = document.getElementById('dAvatarAddPreviewVideo');
+  const labelBox = document.getElementById('dAvatarAddLabel');
+  if (preview && videoEl) {
+    videoEl.src = _dAddAvatarBlobUrl;
+    preview.style.display = 'block';
+    // 选中状态：边框变实线橙色
+    if (labelBox) { labelBox.style.borderStyle = 'solid'; labelBox.style.borderColor = '#F5762A'; }
+  }
+
+  // 异步读 base64
+  _dAddAvatarB64 = null;
   const reader = new FileReader();
   reader.onload = e => { _dAddAvatarB64 = e.target.result.split(',')[1]; };
   reader.readAsDataURL(file);
+}
+
+function _dClearAvatarAddPreview() {
+  if (_dAddAvatarBlobUrl) { try { URL.revokeObjectURL(_dAddAvatarBlobUrl); } catch {} _dAddAvatarBlobUrl = null; }
+  _dAddAvatarB64 = null; _dAddAvatarName = '';
+  const preview  = document.getElementById('dAvatarAddPreview');
+  const videoEl  = document.getElementById('dAvatarAddPreviewVideo');
+  const label    = document.getElementById('dAvatarAddVideoLabel');
+  const labelBox = document.getElementById('dAvatarAddLabel');
+  const input    = document.getElementById('dAvatarAddInput');
+  if (preview)  preview.style.display = 'none';
+  if (videoEl)  videoEl.src = '';
+  if (label)    label.textContent = '选择参考视频';
+  if (labelBox) { labelBox.style.borderStyle = 'dashed'; labelBox.style.borderColor = '#D4D0C8'; }
+  if (input)    input.value = '';
 }
 
 function dHandleAvatarAdd() {
@@ -2551,7 +2596,8 @@ function dHandleAvatarAdd() {
   };
   dS.myAvatars = [...dS.myAvatars, newAvatar];
   localStorage.setItem('myAvatars', JSON.stringify(dS.myAvatars));
-  _dAddAvatarB64 = null; _dAddAvatarName = ''; dS.avatarAddName = '';
+  _dClearAvatarAddPreview();
+  dS.avatarAddName = '';
   dToast('形象已保存！');
   dRender();
 }
