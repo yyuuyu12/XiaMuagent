@@ -999,7 +999,9 @@ function dCardAvatar() {
 
   // 左侧 9:16 视频预览
   const videoPreview = dS.avatarVideoUrl
-    ? `<video src="${dS.avatarVideoUrl}" style="width:100%;height:100%;object-fit:cover" controls playsinline></video>`
+    ? `<video src="${dS.avatarVideoUrl}" style="width:100%;height:100%;object-fit:cover" controls playsinline crossorigin="anonymous"
+         onerror="this.onerror=null;this.src='';this.parentNode.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,0.5)\\'>加载失败，请稍后刷新</div>'">
+       </video>`
     : dS.avatarSrcBlobUrl
       ? `<video src="${dS.avatarSrcBlobUrl}" style="width:100%;height:100%;object-fit:cover" muted autoplay loop playsinline></video>`
       : `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
@@ -1019,10 +1021,13 @@ function dCardAvatar() {
     <div class="scard-body">
       ${generating?`
         <!-- 生成中进度 -->
-        <div style="text-align:center;padding:8px 0">
-          <div style="font-size:12px;font-weight:600;color:#1A1614;margin-bottom:8px">${esc(dS.avatarProgressMsg)}</div>
+        <div style="padding:8px 0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite;flex-shrink:0"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="#F5762A" stroke-width="2" stroke-linecap="round"/></svg>
+            <div data-avatar-msg style="font-size:12px;font-weight:600;color:#1A1614">${esc(dS.avatarProgressMsg)}</div>
+          </div>
           <div class="d-progress-bar" style="margin-bottom:6px"><div class="d-progress-fill" style="width:${dS.avatarProgressPct}%"></div></div>
-          <div style="font-size:11px;color:#B0AA9F">GPU 渲染中，通常 1~3 分钟</div>
+          <div style="font-size:11px;color:#B0AA9F;text-align:center">GPU 渲染中，通常 1~3 分钟</div>
         </div>
       `:`
         <!-- 左右布局 -->
@@ -1071,8 +1076,8 @@ function dCardAvatar() {
       ${dS.avatarVideoUrl?`
         <button class="b b-md b-secondary b-full" onclick="dResetAvatar()">重新生成</button>
       `:generating?'':`
-        <button class="b b-md b-primary b-full" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcBlobUrl||!dS.ttsAudioB64)?'disabled':''}>
-          ${dS.avatarSrcBlobUrl && !dS.avatarSrcVideoB64 ? '视频加载中...' : '开始生成数字人'}
+        <button class="b b-md b-primary b-full" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcBlobUrl || !(dS.ttsAudioB64||dS.ttsAudioUrl))?'disabled':''}>
+          ${dS.avatarSrcBlobUrl && !dS.avatarSrcVideoB64 ? '⏳ 视频加载中...' : '开始生成数字人'}
         </button>
       `}
     </div>
@@ -1741,7 +1746,25 @@ let _dAvatarRunSeq = 0;
 async function dHandleAvatarGenerate() {
   if (!dS.avatarSrcBlobUrl) { dToast('请先上传参考视频'); return; }
   if (!dS.avatarSrcVideoB64) { dToast('视频正在加载中，请稍等…'); return; }
-  if (!dS.ttsAudioB64) { dToast('请先完成语音合成（步骤③）'); return; }
+  if (!dS.ttsAudioB64 && !dS.ttsAudioUrl) { dToast('请先完成语音合成（步骤③）'); return; }
+
+  // 若 TTS 只有 blob/URL 没有 b64，先抓取转换
+  let audioB64 = dS.ttsAudioB64;
+  if (!audioB64 && dS.ttsAudioUrl) {
+    try {
+      dToast('正在准备音频数据...', 3000);
+      const resp = await fetch(dS.ttsAudioUrl);
+      const ab = await resp.arrayBuffer();
+      const bytes = new Uint8Array(ab);
+      let bin = '';
+      bytes.forEach(b => bin += String.fromCharCode(b));
+      audioB64 = btoa(bin);
+      dS.ttsAudioB64 = audioB64; // 缓存
+    } catch(e) {
+      dToast('音频准备失败，请重新合成语音'); return;
+    }
+  }
+
   dS.avatarGenerating = true; dS.avatarErr = '';
   dS.avatarProgressMsg = '正在提交任务...'; dS.avatarProgressPct = 10;
   dS.extractStep = 'avatar_gen';
@@ -1750,7 +1773,7 @@ async function dHandleAvatarGenerate() {
   const body = {
     video_b64: dS.avatarSrcVideoB64,
     video_fmt: dS.avatarSrcVideoFmt || 'mp4',
-    audio_b64: dS.ttsAudioB64,
+    audio_b64: audioB64,
     audio_fmt: 'mp3',
     enhancer: dS.avatarBeauty,
   };
@@ -1785,30 +1808,15 @@ function _dStartAvatarPoller(taskId, runSeq) {
       dS.avatarProgressPct = pct;
       dS.avatarProgressMsg = t.msg || '处理中...';
       _dUpdateAvatarProgress();
-      if (t.status === 'done' && t.video_direct_url) {
+      if (t.status === 'done') {
         clearInterval(_dAvatarPoller); _dAvatarPoller = null;
-        dS.avatarProgressMsg = '生成完成，正在加载视频...'; dS.avatarProgressPct = 95;
+        dS.avatarProgressMsg = '生成完成！'; dS.avatarProgressPct = 100;
         _dUpdateAvatarProgress();
-        try {
-          // 桌面 PC 可直接访问 frp 穿透地址，绕过 Zeabur 代理（避免大视频被截断）
-          const directUrl = t.video_direct_url;
-          const fallbackUrl = `/ai/video/stream/${taskId}?t=${encodeURIComponent(dGetToken())}`;
-          let resp;
-          try {
-            resp = await fetch(directUrl);
-            if (!resp.ok) throw new Error(`direct ${resp.status}`);
-          } catch (_) {
-            resp = await fetch(fallbackUrl);
-            if (!resp.ok) throw new Error(`proxy ${resp.status}`);
-          }
-          const blob = await resp.blob();
-          if (blob.size < 1000) throw new Error('视频文件异常（过小）');
-          const mp4Blob = blob.type.includes('video') ? blob : new Blob([blob], { type:'video/mp4' });
-          if (dS.avatarVideoUrl?.startsWith('blob:')) { try { URL.revokeObjectURL(dS.avatarVideoUrl); } catch {} }
-          dS.avatarVideoUrl = URL.createObjectURL(mp4Blob);
-        } catch (e) {
-          dS.avatarErr = `视频加载失败: ${e.message}`;
-        }
+        // 使用本地后端代理流式地址（避免 CORS 问题，不直连 HeyGem）
+        // location.origin 在桌面 exe 里是 http://127.0.0.1:9101，Zeabur 是 https://...
+        const proxyVideoUrl = `${location.origin}/api/ai/video/stream/${taskId}`;
+        if (dS.avatarVideoUrl?.startsWith('blob:')) { try { URL.revokeObjectURL(dS.avatarVideoUrl); } catch {} }
+        dS.avatarVideoUrl = proxyVideoUrl;  // 直接用代理 URL，video 标签支持流式
         dS.avatarGenerating = false; dS.extractStep = 4;
         dRender();
       } else if (t.status === 'error') {
@@ -1823,10 +1831,12 @@ function _dStartAvatarPoller(taskId, runSeq) {
 }
 
 function _dUpdateAvatarProgress() {
-  const msgEl = document.querySelector('#dMainContent .d-progress-fill');
-  const txtEl = document.querySelector('#dMainContent .d-card-body div[style*="text-align:center"] div:first-child');
-  if (msgEl) msgEl.style.width = dS.avatarProgressPct + '%';
-  if (txtEl) txtEl.textContent = dS.avatarProgressMsg;
+  // 兼容新 scard 结构
+  const fillEl = document.querySelector('#dMainContent .d-progress-fill');
+  if (fillEl) fillEl.style.width = dS.avatarProgressPct + '%';
+  // 更新进度文字
+  const msgEls = document.querySelectorAll('#dMainContent .scard-body [data-avatar-msg]');
+  msgEls.forEach(el => el.textContent = dS.avatarProgressMsg);
 }
 
 /* ============================================================
