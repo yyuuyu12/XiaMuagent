@@ -850,13 +850,17 @@ function dCardExtract() {
           </button>
         </div>
       </div>
-      <!-- 提取结果 -->
-      ${dS.extractedScript ? `<div>
-        <div class="flbl">提取的文案 <span class="meta">共 ${dS.extractedScript.length} 字</span></div>
-        <textarea class="txa" id="dExtractedScript" rows="4" oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>
-      </div>` : ''}
-      ${dS.extractErr ? `<div class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.extractErr)}</div>` : ''}
-      ${dS.extractLoading ? `<div class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;animation:spin 1s linear infinite"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> 正在提取...</div>` : ''}
+      <!-- 提取结果（始终展示，空时显示占位） -->
+      <div>
+        <div class="flbl">提取的文案 ${dS.extractedScript?`<span class="meta">共 ${dS.extractedScript.length} 字</span>`:''}</div>
+        ${dS.extractLoading ? `
+        <div style="min-height:90px;border-radius:10px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;gap:8px;color:#9E9890;font-size:12px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite;flex-shrink:0"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          正在提取文案…
+        </div>` : `
+        <textarea class="txa" id="dExtractedScript" rows="4" placeholder="提取的视频文案将显示在这里，可手动编辑后继续…" oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>`}
+      </div>
+      ${dS.extractErr ? `<div class="hint hint-err"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.extractErr)}</div>` : ''}
     </div>
     <div class="scard-foot">
       <button class="b b-md ${dS.extractedScript?'b-secondary':'b-primary'} b-full" onclick="dHandleExtract()" ${dS.extractLoading?'disabled':''}>
@@ -889,12 +893,17 @@ function dCardRewrite() {
           <option value="list" ${dS.rewriteStyle==='list'?'selected':''}>干货列表</option>
         </select>
       </div>
-      ${!dS.extractedScript ? `<div style="font-size:12px;color:#9CA3AF;text-align:center;padding:4px 0">请先完成第①步文案提取</div>` : ''}
-      ${dS.rewrittenScript ? `<div>
-        <div class="flbl">改写结果 <span class="meta">共 ${dS.rewrittenScript.length} 字</span></div>
-        <textarea class="txa" rows="5" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
-      </div>` : ''}
-      ${dS.rewriteErr ? `<div class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.rewriteErr)}</div>` : ''}
+      <!-- 改写结果（始终展示，空时显示占位） -->
+      <div>
+        <div class="flbl">改写结果 ${dS.rewrittenScript?`<span class="meta">共 ${dS.rewrittenScript.length} 字</span>`:''}</div>
+        ${dS.rewriteLoading ? `
+        <div style="min-height:100px;border-radius:10px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;gap:8px;color:#9E9890;font-size:12px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite;flex-shrink:0"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          AI 改写中，请稍候…
+        </div>` : `
+        <textarea class="txa" rows="5" placeholder="${!dS.extractedScript?'请先完成第①步文案提取…':'AI 改写结果将显示在这里，可手动编辑后继续…'}" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>`}
+      </div>
+      ${dS.rewriteErr ? `<div class="hint hint-err"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.rewriteErr)}</div>` : ''}
     </div>
     <div class="scard-foot">
       <button class="b b-md ${dS.rewrittenScript?'b-secondary':'b-primary'} b-full" onclick="dHandleRewrite()" ${dS.rewriteLoading||!dS.extractedScript?'disabled':''}>
