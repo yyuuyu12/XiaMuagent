@@ -571,6 +571,9 @@ const dS = {
   voiceCloneLoading: false, voiceCloneErr: '', voiceCloneName: '',
   avatarAddLoading: false, avatarAddName: '',
   // 数字人
+  avatarList: JSON.parse(localStorage.getItem('xm_avatar_list_meta') || '[]').map(m=>({...m,blobUrl:null,b64:null,thumb:null,needsReupload:true})),
+  avatarPickerOpen: false,
+  avatarSelectedId: null,
   avatarSrcVideoB64: null, avatarSrcVideoFmt: 'mp4', avatarSrcVideoName: '', avatarSrcBlobUrl: null,
   avatarTaskId: null, avatarGenerating: false,
   avatarProgressMsg: '初始化中...', avatarProgressPct: 0,
@@ -1007,18 +1010,99 @@ function dCardTTS() {
 function dCardAvatar() {
   const generating = dS.extractStep==='avatar_gen' || dS.avatarGenerating;
   const st = generating ? 'active' : dStepState(3);
+  const selected = dS.avatarList.find(a => a.id === dS.avatarSelectedId);
+  const hasAudio  = !!(dS.ttsAudioB64 || dS.ttsAudioUrl);
 
-  // 左侧 9:16 视频预览
-  const videoPreview = dS.avatarVideoUrl
-    ? `<video src="${dS.avatarVideoUrl}" style="width:100%;height:100%;object-fit:cover" controls playsinline crossorigin="anonymous"
-         onerror="this.onerror=null;this.src='';this.parentNode.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,0.5)\\'>加载失败，请稍后刷新</div>'">
+  // ── 左侧：只显示生成结果 ──
+  const leftPanel = dS.avatarVideoUrl
+    ? `<video src="${dS.avatarVideoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" controls playsinline crossorigin="anonymous"
+         onerror="this.onerror=null;this.src='';this.parentNode.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,0.5)\\'>加载失败</div>'">
        </video>`
-    : dS.avatarSrcBlobUrl
-      ? `<video src="${dS.avatarSrcBlobUrl}" style="width:100%;height:100%;object-fit:cover" muted autoplay loop playsinline></video>`
+    : generating
+      ? `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px">
+           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="rgba(255,128,64,0.8)" stroke-width="2" stroke-linecap="round"/></svg>
+           <div style="font-size:8px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.5">渲染中…</div>
+         </div>`
       : `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" opacity="0.4"><circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/><path d="M4 20C4 16.69 7.58 14 12 14C16.42 14 20 16.69 20 20" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-          <div style="font-size:9px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.4">选择<br>参考视频</div>
+           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" opacity="0.3"><polygon points="5,3 19,12 5,21" fill="white"/></svg>
+           <div style="font-size:9px;color:rgba(255,255,255,0.35);text-align:center;line-height:1.5">生成后<br>预览</div>
+         </div>`;
+
+  // ── 右侧：形象选择下拉 ──
+  const triggerInner = selected
+    ? `<div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0">
+         <div style="width:34px;height:60px;border-radius:5px;overflow:hidden;background:#1A1614;flex-shrink:0;border:1px solid rgba(255,255,255,0.08)">
+           ${selected.thumb
+             ? `<img src="${selected.thumb}" style="width:100%;height:100%;object-fit:cover">`
+             : selected.needsReupload
+               ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 2v10m0 0-3-3m3 3 3-3M3 15v4h18v-4" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round"/></svg></div>`
+               : `<div style="width:100%;height:100%;background:#2A2620"></div>`}
+         </div>
+         <div style="flex:1;min-width:0">
+           <div style="font-size:11px;font-weight:600;color:${selected.needsReupload?'#9E9890':'#1A1614'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(selected.name)}</div>
+           <div style="font-size:10px;color:#B0AA9F;margin-top:2px">
+             ${selected.needsReupload
+               ? '<span style="color:#E88C3A">需重新上传</span>'
+               : `${selected.w&&selected.h?selected.w+'×'+selected.h+' · ':''}${selected.dur?selected.dur+'s · ':''}${selected.size}`}
+           </div>
+         </div>
+       </div>`
+    : `<div style="flex:1;font-size:11px;color:#9E9890">点击选择数字人形象…</div>`;
+
+  // 下拉列表项
+  const listItems = dS.avatarList.length
+    ? dS.avatarList.map(a => {
+        const active = a.id === dS.avatarSelectedId;
+        return `<div onclick="${a.needsReupload?`dToast('请重新上传该形象视频文件')`:''};dSelectAvatar('${a.id}')"
+          style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;background:${active?'#FFF5EE':'transparent'};transition:background 0.12s"
+          onmouseover="if(!${active})this.style.background='#F9F7F4'" onmouseout="this.style.background='${active?'#FFF5EE':'transparent'}'">
+          <div style="width:34px;height:60px;border-radius:5px;overflow:hidden;background:#1A1614;flex-shrink:0;border:1px solid rgba(0,0,0,0.06)">
+            ${a.thumb
+              ? `<img src="${a.thumb}" style="width:100%;height:100%;object-fit:cover">`
+              : `<div style="width:100%;height:100%;background:#2A2620;display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><polygon points="5,4 17,12 5,20" fill="rgba(255,255,255,0.3)"/></svg></div>`}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;color:${active?'#F5762A':a.needsReupload?'#9E9890':'#1A1614'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</div>
+            <div style="font-size:10px;color:#B0AA9F;margin-top:2px">
+              ${a.needsReupload ? '<span style="color:#E88C3A;font-size:9px">需重新上传</span>' : `${a.w&&a.h?a.w+'×'+a.h+' · ':''}${a.dur?a.dur+'s · ':''}${a.size}`}
+            </div>
+          </div>
+          ${active?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12l6 6L20 6" stroke="#F5762A" stroke-width="2.5" stroke-linecap="round"/></svg>`:''}
+          <button onclick="dDeleteAvatar('${a.id}',event)" style="width:20px;height:20px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#C4BEB8;flex-shrink:0"
+            onmouseover="this.style.background='#F0EDE8';this.style.color='#E5534B'" onmouseout="this.style.background='transparent';this.style.color='#C4BEB8'">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          </button>
         </div>`;
+      }).join('')
+    : `<div style="padding:16px;text-align:center;font-size:11px;color:#B0AA9F">暂无形象，请上传视频</div>`;
+
+  const pickerHtml = `
+  <div data-avatar-picker style="position:relative">
+    <div onclick="dToggleAvatarPicker()"
+      style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;
+             border:1.5px solid ${dS.avatarPickerOpen?'#F5762A':selected&&!selected.needsReupload?'#F0EDE8':'#EDE9E3'};
+             background:${dS.avatarPickerOpen?'#FFFAF6':'#FAFAF8'};cursor:pointer;transition:all 0.15s;
+             box-shadow:${dS.avatarPickerOpen?'0 0 0 3px rgba(245,118,42,0.1)':'none'}">
+      ${triggerInner}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;transition:transform 0.2s;transform:rotate(${dS.avatarPickerOpen?'180':'0'}deg)">
+        <path d="M6 9l6 6 6-6" stroke="#9E9890" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    ${dS.avatarPickerOpen ? `
+    <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border-radius:12px;
+                box-shadow:0 8px 32px rgba(0,0,0,0.14);border:1px solid #F0EDE8;z-index:200;
+                max-height:260px;overflow-y:auto;scrollbar-width:thin">
+      ${listItems}
+      <div style="height:1px;background:#F0EDE8;margin:0 12px"></div>
+      <div onclick="document.getElementById('dAvatarVideoInput').click()"
+        style="display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer;color:#F5762A;font-size:12px;font-weight:600"
+        onmouseover="this.style.background='#FFF5EE'" onmouseout="this.style.background='transparent'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        上传新的参考视频
+      </div>
+    </div>` : ''}
+  </div>
+  <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dHandleAvatarAdd(event)">`;
 
   return `
   <div class="${dScardCls(st)}">
@@ -1030,65 +1114,52 @@ function dCardAvatar() {
       ${generating ? '<span class="sb sb-active"><span class="dot"></span>生成中</span>' : dSB(dStepState(3))}
     </div>
     <div class="scard-body">
-      ${generating?`
-        <!-- 生成中进度 -->
-        <div style="padding:8px 0">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite;flex-shrink:0"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="#F5762A" stroke-width="2" stroke-linecap="round"/></svg>
-            <div data-avatar-msg style="font-size:12px;font-weight:600;color:#1A1614">${esc(dS.avatarProgressMsg)}</div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <!-- 左：生成结果预览（9:16） -->
+        <div style="width:110px;flex-shrink:0">
+          <div style="width:110px;height:196px;border-radius:10px;overflow:hidden;background:#1E1C1A;position:relative;box-shadow:0 4px 14px rgba(0,0,0,0.2)">
+            ${leftPanel}
+            <div style="position:absolute;top:6px;left:6px;font-size:8px;font-weight:700;background:rgba(245,118,42,0.88);color:#fff;padding:2px 5px;border-radius:4px;pointer-events:none">9:16</div>
+            ${dS.avatarVideoUrl?`<div style="position:absolute;bottom:5px;right:6px;font-size:8px;color:rgba(255,255,255,0.6);background:rgba(0,0,0,0.4);padding:1px 4px;border-radius:3px">生成结果</div>`:''}
           </div>
-          <div class="d-progress-bar" style="margin-bottom:6px"><div class="d-progress-fill" style="width:${dS.avatarProgressPct}%"></div></div>
-          <div style="font-size:11px;color:#B0AA9F;text-align:center">GPU 渲染中，通常 1~3 分钟</div>
         </div>
-      `:`
-        <!-- 左右布局 -->
-        <div style="display:flex;gap:14px;align-items:stretch">
-          <!-- 左：9:16 视频预览 -->
-          <div style="width:120px;flex-shrink:0;border-radius:10px;overflow:hidden;background:#2A2620;position:relative;box-shadow:0 4px 14px rgba(0,0,0,0.18);cursor:pointer" onclick="${dS.avatarVideoUrl||dS.avatarSrcBlobUrl?'':'document.getElementById(\'dAvatarVideoInput\').click()'}" style="aspect-ratio:9/16">
-            <div style="width:120px;height:213px;position:relative;overflow:hidden;border-radius:10px;background:#2A2620">
-              ${videoPreview}
-              <div style="position:absolute;top:6px;left:6px;font-size:8px;font-weight:700;background:rgba(245,118,42,0.92);color:#fff;padding:2px 6px;border-radius:4px">9:16</div>
-              ${!dS.avatarVideoUrl&&!dS.avatarSrcBlobUrl?`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center" onclick="document.getElementById('dAvatarVideoInput').click()"></div>`:''}
-            </div>
+        <!-- 右：控件 -->
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
+          <!-- 形象选择下拉 -->
+          <div>
+            <div class="flbl">数字人形象</div>
+            ${pickerHtml}
           </div>
-          <!-- 右：控件 -->
-          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
-            <!-- 参考视频 -->
+          <div style="height:1px;background:#F0EDE8"></div>
+          <!-- 进度（生成中） -->
+          ${generating?`
+          <div>
+            <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite;flex-shrink:0"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="#F5762A" stroke-width="2" stroke-linecap="round"/></svg>
+              <div data-avatar-msg style="font-size:11px;font-weight:600;color:#1A1614">${esc(dS.avatarProgressMsg)}</div>
+            </div>
+            <div class="d-progress-bar"><div class="d-progress-fill" style="width:${dS.avatarProgressPct}%"></div></div>
+            <div style="font-size:10px;color:#B0AA9F;text-align:center;margin-top:5px">GPU 渲染中，通常 1~3 分钟</div>
+          </div>`:
+          /* 面部增强 toggle */`
+          <div style="display:flex;align-items:center;justify-content:space-between">
             <div>
-              <div class="flbl">参考视频</div>
-              ${dS.avatarSrcBlobUrl
-                ? `<div style="display:flex;align-items:center;gap:8px">
-                    <div style="flex:1;font-size:11px;color:#6E6860;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(dS.avatarSrcVideoName||'已选视频')}</div>
-                    <button class="b b-sm b-ghost" onclick="dS.avatarSrcBlobUrl=null;dS.avatarSrcVideoB64=null;dS.avatarSrcVideoName='';dRender()" style="flex-shrink:0;font-size:11px">重选</button>
-                  </div>`
-                : `<button class="b b-sm b-secondary b-full" onclick="document.getElementById('dAvatarVideoInput').click()">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/><polygon points="9,9 17,12 9,15" fill="currentColor"/></svg>
-                    上传参考视频
-                  </button>`
-              }
-              <input type="file" id="dAvatarVideoInput" accept="video/*" style="display:none" onchange="dHandleAvatarVideo(event)">
+              <div style="font-size:12px;color:#1A1614;font-weight:600">面部增强</div>
+              <div style="font-size:10px;color:#B0AA9F;margin-top:2px">提升清晰度与细节</div>
             </div>
-            <div style="height:1px;background:#F0EDE8"></div>
-            <!-- 面部增强 toggle -->
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <div>
-                <div style="font-size:12px;color:#1A1614;font-weight:600">面部增强</div>
-                <div style="font-size:10px;color:#B0AA9F;margin-top:2px">提升清晰度与细节</div>
-              </div>
-              <div class="tg ${dS.avatarBeauty?'on':''}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"></div>
-            </div>
-            ${!dS.ttsAudioUrl?`<div class="hint hint-gray"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>需要先完成步骤③语音合成</div>`:''}
-          </div>
+            <div class="tg ${dS.avatarBeauty?'on':''}" onclick="dS.avatarBeauty=!dS.avatarBeauty;dRender()"></div>
+          </div>`}
+          ${!hasAudio&&!generating?`<div class="hint hint-gray"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>需要先完成步骤③语音合成</div>`:''}
         </div>
-      `}
-      ${dS.avatarErr?`<div class="hint">${esc(dS.avatarErr)}</div>`:''}
+      </div>
+      ${dS.avatarErr?`<div class="hint hint-err" style="margin-top:8px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${esc(dS.avatarErr)}</div>`:''}
     </div>
     <div class="scard-foot">
       ${dS.avatarVideoUrl?`
         <button class="b b-md b-secondary b-full" onclick="dResetAvatar()">重新生成</button>
       `:generating?'':`
-        <button class="b b-md b-primary b-full" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcBlobUrl || !(dS.ttsAudioB64||dS.ttsAudioUrl))?'disabled':''}>
-          ${dS.avatarSrcBlobUrl && !dS.avatarSrcVideoB64 ? '⏳ 视频加载中...' : '开始生成数字人'}
+        <button class="b b-md b-primary b-full" onclick="dHandleAvatarGenerate()" ${(!dS.avatarSrcBlobUrl||!dS.avatarSrcVideoB64||!hasAudio)?'disabled':''}>
+          开始生成数字人
         </button>
       `}
     </div>
@@ -1834,24 +1905,131 @@ function _dApplyTTSAudio(data) {
   dRender();
 }
 
-/* ④ 数字人 · 上传参考视频 */
-function dHandleAvatarVideo(event) {
-  const file = event.target.files[0];
+/* ④ 数字人 · 形象库管理 */
+
+// 生成缩略图（canvas 抓首帧）
+async function _dGenAvatarThumb(blobUrl) {
+  return new Promise(resolve => {
+    const v = document.createElement('video');
+    v.muted = true; v.preload = 'auto'; v.src = blobUrl;
+    const done = u => { try { v.src = ''; } catch {} resolve(u); };
+    const tid = setTimeout(() => done(null), 5000);
+    v.addEventListener('seeked', () => {
+      clearTimeout(tid);
+      try {
+        const c = document.createElement('canvas'); c.width = 60; c.height = 107;
+        c.getContext('2d').drawImage(v, 0, 0, 60, 107);
+        done(c.toDataURL('image/jpeg', 0.7));
+      } catch { done(null); }
+    }, {once: true});
+    v.addEventListener('loadeddata', () => { try { v.currentTime = 0.1; } catch {} }, {once: true});
+    v.addEventListener('error', () => { clearTimeout(tid); done(null); }, {once: true});
+    v.load();
+  });
+}
+
+// 保存形象库元数据到 localStorage（不含 b64/blob）
+function _dSaveAvatarMeta() {
+  try {
+    const meta = dS.avatarList.map(a => ({ id:a.id, name:a.name, size:a.size, dur:a.dur, w:a.w, h:a.h }));
+    localStorage.setItem('xm_avatar_list_meta', JSON.stringify(meta));
+  } catch {}
+}
+
+// 上传新形象
+async function dHandleAvatarAdd(event) {
+  const file = event.target.files?.[0];
   if (!file) return;
-  // 释放旧 blob URL
-  if (dS.avatarSrcBlobUrl) try { URL.revokeObjectURL(dS.avatarSrcBlobUrl); } catch {}
+  event.target.value = '';
+
+  const id = 'av_' + Date.now();
+  const blobUrl = URL.createObjectURL(file);
   const fmt = file.name.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
-  dS.avatarSrcVideoName = file.name;
-  dS.avatarSrcVideoFmt  = fmt;
-  dS.avatarSrcBlobUrl   = URL.createObjectURL(file);  // 立即预览
-  dS.avatarSrcVideoB64  = null;                        // base64 异步读取
-  dRender(); // 先渲染视频预览
-  const reader = new FileReader();
-  reader.onload = e => {
-    dS.avatarSrcVideoB64 = e.target.result.split(',')[1];
-    dToast('视频已就绪 ✓');
+
+  // 读取视频元数据
+  const meta = await new Promise(resolve => {
+    const v = document.createElement('video');
+    v.muted = true; v.preload = 'metadata'; v.src = blobUrl;
+    const tid = setTimeout(() => resolve({dur:0,w:0,h:0}), 4000);
+    v.addEventListener('loadedmetadata', () => {
+      clearTimeout(tid);
+      resolve({ dur: Math.round(v.duration||0), w: v.videoWidth||0, h: v.videoHeight||0 });
+    }, {once:true});
+    v.addEventListener('error', () => { clearTimeout(tid); resolve({dur:0,w:0,h:0}); }, {once:true});
+    v.load();
+  });
+
+  // 生成缩略图
+  const thumb = await _dGenAvatarThumb(blobUrl);
+
+  // 读取 base64
+  const b64 = await new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const arr = new Uint8Array(e.target.result);
+      let bin = ''; arr.forEach(b => bin += String.fromCharCode(b));
+      resolve(btoa(bin));
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  const entry = {
+    id, name: file.name, fmt, blobUrl, b64, thumb,
+    size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
+    dur: meta.dur, w: meta.w, h: meta.h, needsReupload: false
   };
-  reader.readAsDataURL(file);
+  dS.avatarList = [...dS.avatarList.filter(a => a.id !== id), entry];
+  _dSaveAvatarMeta();
+  dSelectAvatar(id);
+  dS.avatarPickerOpen = false;
+  dRender();
+  dToast('形象已添加 ✓');
+}
+
+// 选择形象
+function dSelectAvatar(id) {
+  const entry = dS.avatarList.find(a => a.id === id);
+  if (!entry) return;
+  if (entry.needsReupload) { dToast('该形象需要重新上传视频文件'); return; }
+  dS.avatarSelectedId  = id;
+  dS.avatarSrcBlobUrl  = entry.blobUrl;
+  dS.avatarSrcVideoB64 = entry.b64;
+  dS.avatarSrcVideoFmt = entry.fmt;
+  dS.avatarSrcVideoName= entry.name;
+  dS.avatarPickerOpen  = false;
+  dRender();
+}
+
+// 删除形象
+function dDeleteAvatar(id, e) {
+  e.stopPropagation();
+  if (!confirm('删除这个形象吗？')) return;
+  try { const a = dS.avatarList.find(x=>x.id===id); if(a?.blobUrl) URL.revokeObjectURL(a.blobUrl); } catch {}
+  dS.avatarList = dS.avatarList.filter(a => a.id !== id);
+  _dSaveAvatarMeta();
+  if (dS.avatarSelectedId === id) {
+    const first = dS.avatarList.find(a => !a.needsReupload);
+    if (first) dSelectAvatar(first.id);
+    else { dS.avatarSelectedId=null; dS.avatarSrcBlobUrl=null; dS.avatarSrcVideoB64=null; dS.avatarSrcVideoName=''; }
+  }
+  dRender();
+}
+
+// 切换下拉开关
+function dToggleAvatarPicker() {
+  dS.avatarPickerOpen = !dS.avatarPickerOpen;
+  dRender();
+  if (dS.avatarPickerOpen) {
+    setTimeout(() => {
+      const handler = e => {
+        if (!document.querySelector('[data-avatar-picker]')?.contains(e.target)) {
+          dS.avatarPickerOpen = false; dRender();
+          document.removeEventListener('click', handler);
+        }
+      };
+      document.addEventListener('click', handler);
+    }, 0);
+  }
 }
 
 /* ④ 数字人 · 提交生成 */
