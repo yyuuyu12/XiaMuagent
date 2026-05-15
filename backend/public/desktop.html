@@ -746,35 +746,35 @@ function dCardRewrite() {
         <div class="d-step-num ${st}">${st==='done'?dCheckIcon():'2'}</div>
         <span class="d-card-title">② AI 改写</span>
       </div>
-      <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
+      <span class="d-step-badge ${st}">${dS.rewriteLoading?'● 改写中':st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
     <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
-      <div>
-        <div class="d-label">改写风格</div>
-        <select class="d-select" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
+      <!-- 风格 + 按钮 同行 -->
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="d-select" style="flex:1" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
           <option value="">智能匹配</option>
           <option value="hook">强钩子开头</option>
           <option value="emotion">情感共鸣</option>
           <option value="problem">问题解决</option>
           <option value="list">干货列表</option>
         </select>
+        <button class="d-btn-lg" onclick="dHandleRewrite()"
+          ${dS.rewriteLoading||!dS.extractedScript?'disabled':''}
+          style="padding:9px 18px;font-size:13px;white-space:nowrap;flex-shrink:0">
+          ${dS.rewriteLoading?'改写中...':dS.rewrittenScript?'重新改写':'AI 改写'}
+        </button>
       </div>
-      <div>
-        <div class="d-label">文案内容${!dS.extractedScript?'（先提取文案）':''}</div>
-        <textarea class="d-textarea" id="dRewriteSource" style="height:70px" placeholder="或直接粘贴文案内容..."
-          oninput="dS.extractedScript=this.value">${esc(dS.extractedScript)}</textarea>
-      </div>
+      ${!dS.extractedScript ? `<div style="font-size:12px;color:#9CA3AF">请先完成第①步文案提取</div>` : ''}
+      ${dS.rewriteErr?`<div class="d-err">${esc(dS.rewriteErr)}</div>`:''}
       ${dS.rewrittenScript ? `
         <div>
-          <div class="d-label">改写结果</div>
-          <textarea class="d-textarea" id="dRewrittenScript" style="height:80px" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
-          <div style="font-size:11px;color:#22C55E;margin-top:4px">✓ 共 ${dS.rewrittenScript.length} 字</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span class="d-label" style="margin:0">改写结果</span>
+            <span style="font-size:11px;color:#22C55E">✓ 共 ${dS.rewrittenScript.length} 字</span>
+          </div>
+          <textarea class="d-textarea" style="height:90px" oninput="dS.rewrittenScript=this.value">${esc(dS.rewrittenScript)}</textarea>
         </div>
       ` : ''}
-      <button class="d-btn-lg" onclick="dHandleRewrite()" ${dS.rewriteLoading?'disabled':''} style="padding:10px;font-size:13px">
-        ${dS.rewriteLoading?'改写中...':dS.rewrittenScript?'重新改写':'AI 改写'}
-      </button>
-      ${dS.rewriteErr?`<div class="d-err">${esc(dS.rewriteErr)}</div>`:''}
     </div>
   </div>`;
 }
@@ -1441,10 +1441,10 @@ function _dStartExtractPoller(taskId) {
 
 /* ② 改写 */
 async function dHandleRewrite() {
-  // 优先从 DOM 读最新内容
-  const scriptEl = document.getElementById('dRewriteSource') || document.getElementById('dExtractedScript');
+  // 从提取卡 textarea 读最新内容（用户可能手动编辑过）
+  const scriptEl = document.getElementById('dExtractedScript');
   const script = scriptEl?.value?.trim() || dS.extractedScript;
-  if (!script) { dToast('没有文案可改写'); return; }
+  if (!script) { dToast('请先完成文案提取'); return; }
   dS.extractedScript = script;
   dS.rewriteLoading = true; dS.rewriteErr = '';
   dRender();
