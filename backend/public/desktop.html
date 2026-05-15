@@ -485,7 +485,14 @@ const dS = {
   avatarProgressMsg: '初始化中...', avatarProgressPct: 0,
   avatarVideoUrl: null, avatarErr: '',
   avatarBeauty: true,
-  subColor: '#FFFFFF',
+  // 后期制作 & 发布
+  subTemplate: 'classic', subColor: '#FFFFFF', subOutlineColor: '#000000',
+  subFontsize: 44, subOutlineWidth: 2.5, subStyle: 'default',
+  publishTitle: '', publishDesc: '', publishTags: [],
+  publishTitleLoading: false, publishDescLoading: false,
+  coverTitle: '', coverSeekTime: 1.0,
+  coverFrameUrl: null, coverGenerating: false, coverDownloaded: false,
+  publishCopied: null, postProcessedVideoUrl: null,
   // 任务列表
   tasks: [], tasksLoaded: false,
 };
@@ -663,8 +670,8 @@ function dRenderHome() {
       ${dCardTTS()}
     </div>
 
-    <!-- 第二行：数字人 + 后期（2列） -->
-    <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px">
+    <!-- 第二行：数字人（窄，竖版视频）+ 后期（宽，功能完整） -->
+    <div style="display:grid;grid-template-columns:0.75fr 1.25fr;gap:14px">
       ${dCardAvatar()}
       ${dCardPostProcess()}
     </div>
@@ -777,30 +784,6 @@ function dCardTTS() {
   const sysVoices = dS.systemVoices;
   const myVoices  = dS.myVoices;
 
-  const voiceGrid = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      ${sysVoices.map(v => {
-        const on = dS.ttsVoiceId === v.id;
-        return `<div onclick="dS.ttsVoiceId='${v.id}';dRender()" style="padding:8px 10px;border-radius:10px;border:1.5px solid ${on?'#F5762A':'#EDE9E3'};background:${on?'#FFF3E8':'#F7F5F1'};cursor:pointer;display:flex;align-items:center;gap:7px;transition:all 0.15s">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 3C10.34 3 9 4.34 9 6V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V6C15 4.34 13.66 3 12 3Z" fill="${on?'#F5762A':'#C4C0B8'}"/></svg>
-          <span style="font-size:12px;font-weight:600;color:${on?'#F5762A':'#6E6860'}">${esc(v.name)}</span>
-        </div>`;
-      }).join('')}
-      ${myVoices.map(v => {
-        const on = dS.ttsVoiceId === v.id;
-        return `<div onclick="dS.ttsVoiceId='${v.id}';dRender()" style="padding:8px 10px;border-radius:10px;border:1.5px solid ${on?'#F5762A':'#EDE9E3'};background:${on?'#FFF3E8':'#F7F5F1'};cursor:pointer;display:flex;align-items:center;gap:7px;transition:all 0.15s">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" fill="${on?'#F5762A':'#C4C0B8'}"/><path d="M5 20C5 17.24 8.13 15 12 15C15.87 15 19 17.24 19 20" stroke="${on?'#F5762A':'#C4C0B8'}" stroke-width="2" stroke-linecap="round"/></svg>
-          <div style="min-width:0">
-            <div style="font-size:11px;font-weight:600;color:${on?'#F5762A':'#6E6860'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.name)}</div>
-            <div style="font-size:10px;color:#B0AA9F">我的</div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>
-    ${myVoices.length===0?`<div style="font-size:11px;color:#B0AA9F;text-align:center;padding:6px 0">
-      在「声音管理」上传音频样本可添加自定义声音
-    </div>`:''}`;
-
   return `
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
@@ -811,10 +794,18 @@ function dCardTTS() {
       <span class="d-step-badge ${st}">${dS.ttsLoading?'● 合成中':st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
     <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
-      <!-- 声音选择 -->
+      <!-- 声音选择（下拉单选） -->
       <div>
         <div class="d-label">选择声音</div>
-        ${voiceGrid}
+        <select class="d-select" id="dTtsVoice" onchange="dS.ttsVoiceId=this.value">
+          <optgroup label="── 系统声音 ──">
+            ${sysVoices.map(v=>`<option value="${v.id}" ${dS.ttsVoiceId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
+          </optgroup>
+          ${myVoices.length?`<optgroup label="── 我的声音（声音克隆）──">
+            ${myVoices.map(v=>`<option value="${v.id}" ${dS.ttsVoiceId===v.id?'selected':''}>${esc(v.name)}（我的）</option>`).join('')}
+          </optgroup>`:''}
+        </select>
+        ${myVoices.length===0?`<div style="font-size:11px;color:#B0AA9F;margin-top:4px">在「声音管理」可添加自定义克隆声音</div>`:''}
       </div>
       <!-- 语速 -->
       <div>
@@ -875,7 +866,10 @@ function dCardAvatar() {
           <div style="font-size:12px;color:#B0AA9F">GPU 渲染中，通常 1~3 分钟</div>
         </div>
       `:dS.avatarVideoUrl?`
-        <video src="${dS.avatarVideoUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:220px;margin-bottom:10px"></video>
+        <div style="display:flex;justify-content:center;margin-bottom:10px">
+          <video src="${dS.avatarVideoUrl}" id="dAvatarPlayer" controls playsinline
+            style="height:280px;width:auto;max-width:100%;border-radius:10px;background:#000;display:block"></video>
+        </div>
         <div style="display:flex;gap:8px">
           <button class="d-btn d-btn-ghost" onclick="dResetAvatar()" style="flex:1">重新生成</button>
         </div>
@@ -923,9 +917,131 @@ function dCardAvatar() {
   </div>`;
 }
 
+/* ─── 字幕模板数据 ─── */
+const D_SUBTITLE_TEMPLATES = [
+  { id:'bilingual_douyin', name:'爆款大字', desc:'双层中文',   color:'#FFD700', ol:'#000000', size:46, ow:3,   type:'bilingual_douyin' },
+  { id:'douyin',   name:'双层抖音', desc:'爆款高级感', color:'#FFD700', ol:'#000000', size:44, ow:3   },
+  { id:'classic',  name:'经典白字', desc:'百搭首选',   color:'#FFFFFF', ol:'#000000', size:44, ow:2.5 },
+  { id:'variety',  name:'综艺黄字', desc:'活泼抢眼',   color:'#FFEE00', ol:'#000000', size:40, ow:3   },
+  { id:'movie',    name:'电影字幕', desc:'沉稳专业',   color:'#F0F0F0', ol:'#111111', size:30, ow:1.5 },
+  { id:'fresh',    name:'清新绿字', desc:'知识科普',   color:'#00E87A', ol:'#000000', size:34, ow:2   },
+  { id:'vibrant',  name:'活力橙字', desc:'带货推荐',   color:'#FF6B35', ol:'#FFFFFF', size:38, ow:2   },
+  { id:'minimal',  name:'极简白字', desc:'无描边简洁', color:'#FFFFFF', ol:'none',    size:34, ow:0   },
+];
+
 /* ⑤ 后期卡片 */
 function dCardPostProcess() {
   const st = dStepState(4);
+  const hasVideo = !!dS.avatarVideoUrl;
+
+  // 模板卡片
+  const tplCards = D_SUBTITLE_TEMPLATES.map(t => {
+    const active = dS.subTemplate === t.id;
+    let previewHtml;
+    if (t.type === 'bilingual_douyin') {
+      previewHtml = `<div style="font-size:9px;font-weight:900;color:#fff;text-shadow:1px 1px 0 #000,-1px 1px 0 #000;line-height:1.1">能够</div>
+        <div style="font-size:13px;font-weight:900;color:#FFD700;text-shadow:1px 1px 0 #000,-1px 1px 0 #000;line-height:1.1">好好过日子</div>`;
+    } else {
+      const shadow = t.ol === 'none' ? 'none' : `1px 1px 0 ${t.ol},-1px 1px 0 ${t.ol}`;
+      previewHtml = `<div style="font-size:12px;font-weight:800;color:${t.color};text-shadow:${shadow}">字幕示例</div>`;
+    }
+    return `<div data-d-tpl-id="${t.id}" onclick="dApplySubTemplate('${t.id}')"
+      style="flex-shrink:0;width:82px;background:#2C2820;border-radius:8px;padding:7px 6px;cursor:pointer;
+             border:2px solid ${active?'#F5762A':'#3A3630'};position:relative;box-sizing:border-box">
+      ${active?`<div data-d-tpl-check style="position:absolute;top:4px;right:4px;width:14px;height:14px;background:#F5762A;border-radius:50%;display:flex;align-items:center;justify-content:center">
+        <svg width="8" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></div>`
+       :`<div data-d-tpl-check style="display:none"></div>`}
+      <div style="margin-bottom:4px;min-height:30px;display:flex;flex-direction:column;justify-content:flex-end">${previewHtml}</div>
+      <div style="font-size:9px;color:${active?'#F5762A':'#A8A49C'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+      <div style="font-size:8px;color:#6B6860;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.desc}</div>
+    </div>`;
+  }).join('');
+
+  // 颜色 dots
+  const COLORS = ['#FFFFFF','#FFEE00','#FF6B35','#00E87A','#FF3B3B','#00BFFF'];
+  const colorDots = COLORS.map(c => {
+    const active = dS.subColor === c;
+    return `<div data-d-color-dot="${c}" onclick="dSetSubColorDot('${c}')"
+      style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;flex-shrink:0;
+             box-shadow:0 0 0 ${active?'3px #F5762A':'2px #D4D0C8'};border:2px solid ${c==='#FFFFFF'?'#E0DDD8':'transparent'};transition:.15s"></div>`;
+  }).join('');
+
+  const OL_COLORS = [['#000000','黑'],['#FFFFFF','白'],['none','无']];
+  const olDots = OL_COLORS.map(([c, label]) => {
+    const active = dS.subOutlineColor === c;
+    const bg = c === 'none' ? 'repeating-linear-gradient(45deg,#ddd 0,#ddd 3px,#fff 3px,#fff 6px)' : c;
+    return `<div data-d-ol-dot="${c}" onclick="dSetSubOlDot('${c}')" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer">
+      <div style="width:22px;height:22px;border-radius:50%;background:${bg};box-shadow:0 0 0 ${active?'3px #F5762A':'2px #D4D0C8'};border:2px solid #fff"></div>
+      <span style="font-size:9px;color:${active?'#F5762A':'#A8A49C'}">${label}</span>
+    </div>`;
+  }).join('');
+
+  // 封面区
+  const coverSection = `
+    <div style="border-top:1px solid #EDE9E3;padding-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="d-label" style="margin:0">封面生成 · 9:16</div>
+      </div>
+      ${dS.coverGenerating?`
+        <div style="display:flex;align-items:center;gap:8px;background:#FFF8F3;border-radius:10px;padding:10px">
+          <div style="width:18px;height:18px;border:2px solid #F5762A;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div>
+          <span style="font-size:12px;color:#F5762A">正在截取封面...</span>
+        </div>
+      `:dS.coverFrameUrl?`
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <img src="${dS.coverFrameUrl}" style="height:90px;width:auto;border-radius:8px;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,0.15)"/>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button onclick="dGenerateCover(dS.coverSeekTime+2)" class="d-btn d-btn-ghost" style="padding:5px 10px;font-size:11px">换一帧</button>
+            <button onclick="dDownloadCover()" class="d-btn d-btn-ghost" style="padding:5px 10px;font-size:11px">${dS.coverDownloaded?'✓ 已下载':'⬇ 下载封面'}</button>
+          </div>
+        </div>
+      `:`
+        <button onclick="dGenerateCover(1.0)" class="d-btn d-btn-ghost" style="width:100%;padding:8px;font-size:12px" ${!hasVideo?'disabled':''}>
+          ${!hasVideo?'⚠ 需先生成数字人视频':'📸 一键生成封面'}
+        </button>
+      `}
+    </div>`;
+
+  // 发布内容区
+  const titleVal = dS.publishTitle || '';
+  const descVal  = dS.publishDesc  || '';
+  const tagsText = (dS.publishTags||[]).map(t=>'#'+t).join(' ');
+  const publishSection = `
+    <div style="border-top:1px solid #EDE9E3;padding-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="d-label" style="margin:0">发布内容</div>
+        <button onclick="dHandlePublishGen('all')" class="d-btn" style="padding:5px 12px;font-size:11px"
+          ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishTitleLoading?'disabled':''}>
+          ${dS.publishTitleLoading?'生成中...':'✨ 一键生成标题+简介'}
+        </button>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:#9E9890;font-weight:600">标题</span>
+          <button onclick="dHandlePublishCopy('title')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
+            ${dS.publishCopied==='title'?'✓ 已复制':'复制'}
+          </button>
+        </div>
+        <div contenteditable="true" id="dPubTitleEl" oninput="dS.publishTitle=this.innerText"
+          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:13px;color:#1A1814;line-height:1.6;min-height:22px;outline:none;border:1px solid #EDE9E3"
+        >${esc(titleVal)}</div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:#9E9890;font-weight:600">简介 + 标签</span>
+          <button onclick="dHandlePublishCopy('desc')" style="font-size:10px;color:#6E6860;background:none;border:none;cursor:pointer;padding:2px 6px;font-family:inherit">
+            ${dS.publishCopied==='desc'?'✓ 已复制':'复制'}
+          </button>
+        </div>
+        <div contenteditable="true" id="dPubDescEl" oninput="dS.publishDesc=this.innerText"
+          style="background:#F7F5F1;border-radius:8px;padding:8px 10px;font-size:12px;color:#1A1814;line-height:1.7;min-height:40px;outline:none;border:1px solid #EDE9E3"
+        >${esc(descVal)}</div>
+        ${tagsText
+          ? `<div style="margin-top:6px;font-size:12px;color:#F5762A;word-break:break-all">${esc(tagsText)}</div>`
+          : `<div style="margin-top:4px;font-size:11px;color:#C4C0B8">AI生成后自动填入话题标签</div>`}
+      </div>
+    </div>`;
+
   return `
   <div class="d-card ${st==='active'?'active-card':''}">
     <div class="d-card-header ${st==='active'?'active-header':''}">
@@ -935,55 +1051,230 @@ function dCardPostProcess() {
       </div>
       <span class="d-step-badge ${st}">${st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
-    <div class="d-card-body">
-      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px">
+    <div class="d-card-body" style="overflow-y:auto;max-height:560px;display:flex;flex-direction:column;gap:12px">
+
+      <!-- 字幕模板横向滚动 -->
+      <div>
+        <div class="d-label">字幕模板</div>
+        <div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+          ${tplCards}
+        </div>
+      </div>
+
+      <!-- 颜色微调 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          ${dS.avatarVideoUrl?`<video src="${dS.avatarVideoUrl}" style="width:100%;border-radius:10px;max-height:110px;margin-bottom:10px" controls></video>`
-            :`<div style="background:#2A2620;border-radius:10px;height:110px;display:flex;align-items:center;justify-content:center;margin-bottom:10px"><div style="font-size:11px;color:rgba(255,255,255,0.25)">完成数字人后显示</div></div>`}
           <div class="d-label">字幕颜色</div>
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            ${['#FFFFFF','#FF6B35','#FFD700','#7EF09F'].map((c,i)=>`
-              <div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${dS.subColor===c?'#F5762A':'#E8E4DF'};cursor:pointer" onclick="dS.subColor='${c}';dRender()"></div>
-            `).join('')}
-          </div>
-          <div class="d-label">字体大小</div>
-          <div class="d-slider-wrap">
-            <div class="d-slider-track"><div class="d-slider-fill" style="width:50%"></div></div>
-            <div class="d-slider-thumb" style="left:50%"></div>
-            <input type="range" class="d-slider-input" min="20" max="80" value="44">
-          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${colorDots}</div>
         </div>
         <div>
           <div class="d-label">描边颜色</div>
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            ${['#1A1614','#F5762A','#ffffff'].map((c,i)=>`
-              <div style="width:22px;height:22px;border-radius:50%;background:${c};border:2px solid ${i===0?'#F5762A':'#E8E4DF'};cursor:pointer"></div>
-            `).join('')}
-          </div>
-          <div class="d-label">边框样式</div>
-          <div style="display:flex;gap:5px;margin-bottom:10px">
-            ${['无','圆角','矩形'].map((v,i)=>`
-              <div style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:${i===0?'#F5762A':'#F7F5F1'};color:${i===0?'#fff':'#9E9890'};cursor:pointer">${v}</div>
-            `).join('')}
-          </div>
-          <div class="d-label">描边粗细</div>
-          <div class="d-slider-wrap">
-            <div class="d-slider-track"><div class="d-slider-fill" style="width:40%"></div></div>
-            <div class="d-slider-thumb" style="left:40%"></div>
-            <input type="range" class="d-slider-input" min="0" max="10" value="2">
-          </div>
+          <div style="display:flex;gap:8px">${olDots}</div>
         </div>
       </div>
-      ${!dS.avatarVideoUrl?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px;margin:10px 0">⚠ 需要先完成步骤④数字人生成</div>':''}
-      <button class="d-btn-lg" onclick="dToast('后期制作功能即将完善')" ${!dS.avatarVideoUrl?'disabled':''} style="margin-top:10px;padding:10px;font-size:13px">
-        开始后期合成
+
+      <!-- 字号 + 描边粗细 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <div class="d-label" style="margin:0">字体大小</div>
+            <span data-d-fs-val style="font-size:11px;color:#F5762A;font-weight:700">${dS.subFontsize}像素</span>
+          </div>
+          <input type="range" data-d-fs-range class="d-slider-input" min="20" max="80" value="${dS.subFontsize}"
+            oninput="dS.subFontsize=+this.value;document.querySelector('[data-d-fs-val]').textContent=this.value+'像素'" style="width:100%">
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <div class="d-label" style="margin:0">描边粗细</div>
+            <span data-d-ow-val style="font-size:11px;color:#F5762A;font-weight:700">${dS.subOutlineWidth}</span>
+          </div>
+          <input type="range" data-d-ow-range class="d-slider-input" min="0" max="10" step="0.5" value="${dS.subOutlineWidth}"
+            oninput="dS.subOutlineWidth=+this.value;document.querySelector('[data-d-ow-val]').textContent=this.value" style="width:100%">
+        </div>
+      </div>
+
+      <!-- 合成按钮 -->
+      ${!hasVideo?'<div style="font-size:11px;color:#92400E;background:#FFF7ED;border-radius:8px;padding:7px 10px">⚠ 需要先完成步骤④数字人生成</div>':''}
+      <button class="d-btn-lg" onclick="dToast('后期合成（烧字幕）功能即将上线')" ${!hasVideo?'disabled':''} style="padding:10px;font-size:13px">
+        开始后期合成（烧字幕）
       </button>
+
+      <!-- 封面生成 -->
+      ${coverSection}
+
+      <!-- 发布内容 -->
+      ${publishSection}
+
     </div>
   </div>`;
 }
 
 function dBindHome() {
   // 滑块绑定由 oninput 行内处理
+}
+
+/* ─── 字幕模板 ─── */
+function dApplySubTemplate(id) {
+  const t = D_SUBTITLE_TEMPLATES.find(x => x.id === id);
+  if (!t) return;
+  dS.subTemplate = id; dS.subColor = t.color; dS.subOutlineColor = t.ol;
+  dS.subFontsize = t.size; dS.subOutlineWidth = t.ow; dS.subStyle = t.type || 'default';
+  // DOM-only 更新，避免整页重渲
+  document.querySelectorAll('[data-d-tpl-id]').forEach(el => {
+    const active = el.dataset.dTplId === id;
+    el.style.border = `2px solid ${active ? '#F5762A' : '#3A3630'}`;
+    const chk = el.querySelector('[data-d-tpl-check]');
+    if (chk) chk.style.display = active ? 'flex' : 'none';
+  });
+  document.querySelectorAll('[data-d-color-dot]').forEach(el => {
+    el.style.boxShadow = `0 0 0 ${el.dataset.dColorDot === t.color ? '3px #F5762A' : '2px #D4D0C8'}`;
+  });
+  document.querySelectorAll('[data-d-ol-dot]').forEach(el => {
+    const active = el.dataset.dOlDot === t.ol;
+    const div = el.querySelector('div'); if (div) div.style.boxShadow = `0 0 0 ${active ? '3px #F5762A' : '2px #D4D0C8'}`;
+    const span = el.querySelector('span'); if (span) span.style.color = active ? '#F5762A' : '#A8A49C';
+  });
+  const fsRange = document.querySelector('[data-d-fs-range]'); if (fsRange) fsRange.value = t.size;
+  const fsVal   = document.querySelector('[data-d-fs-val]');   if (fsVal)   fsVal.textContent = t.size + '像素';
+  const owRange = document.querySelector('[data-d-ow-range]'); if (owRange) owRange.value = t.ow;
+  const owVal   = document.querySelector('[data-d-ow-val]');   if (owVal)   owVal.textContent = t.ow;
+}
+
+function dSetSubColorDot(c) {
+  dS.subColor = c; dS.subTemplate = 'custom';
+  document.querySelectorAll('[data-d-color-dot]').forEach(el => {
+    el.style.boxShadow = `0 0 0 ${el.dataset.dColorDot === c ? '3px #F5762A' : '2px #D4D0C8'}`;
+  });
+}
+
+function dSetSubOlDot(c) {
+  dS.subOutlineColor = c; dS.subTemplate = 'custom';
+  document.querySelectorAll('[data-d-ol-dot]').forEach(el => {
+    const active = el.dataset.dOlDot === c;
+    const div = el.querySelector('div'); if (div) div.style.boxShadow = `0 0 0 ${active ? '3px #F5762A' : '2px #D4D0C8'}`;
+    const span = el.querySelector('span'); if (span) span.style.color = active ? '#F5762A' : '#A8A49C';
+  });
+}
+
+/* ─── 封面生成 ─── */
+async function _dExtractFrame(videoUrl, seekSec) {
+  let srcUrl = videoUrl; let blobCreated = false;
+  if (videoUrl && !videoUrl.startsWith('blob:') && !videoUrl.startsWith('data:')) {
+    try {
+      const resp = await fetch(videoUrl);
+      if (resp.ok) { const blob = await resp.blob(); srcUrl = URL.createObjectURL(blob); blobCreated = true; }
+    } catch {}
+  }
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video');
+    v.muted = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.src = srcUrl;
+    const cleanup = () => { if (blobCreated) try { URL.revokeObjectURL(srcUrl); } catch {} };
+    v.addEventListener('loadeddata', () => { v.currentTime = Math.min(seekSec, Math.max(0.1, (v.duration||10) - 0.5)); }, { once:true });
+    v.addEventListener('seeked', () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = v.videoWidth||720; c.height = v.videoHeight||1280;
+        c.getContext('2d').drawImage(v, 0, 0);
+        cleanup(); resolve({ dataUrl: c.toDataURL('image/jpeg', 0.9), w: c.width, h: c.height });
+      } catch(e) { cleanup(); reject(e); }
+    }, { once:true });
+    v.addEventListener('error', () => { cleanup(); reject(new Error('视频加载失败')); }, { once:true });
+    v.load();
+  });
+}
+
+function _dDrawCoverText(frameDataUrl, title, w, h) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+      const fs = Math.max(44, Math.round(w * 0.13));
+      ctx.font = `900 ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.textAlign = 'center';
+      const lines = []; for (let i=0; i<title.length; i+=7) lines.push(title.slice(i,i+7));
+      const lineH = fs * 1.35; const totalH = lines.length * lineH;
+      const startY = h * 0.55 - totalH/2 + fs;
+      const padV = fs*0.6, padH = w*0.08;
+      const boxX = padH, boxY = startY-fs-padV, boxW = w-padH*2, boxH = totalH+padV*2;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      const r = 16; ctx.beginPath();
+      ctx.moveTo(boxX+r,boxY); ctx.lineTo(boxX+boxW-r,boxY); ctx.quadraticCurveTo(boxX+boxW,boxY,boxX+boxW,boxY+r);
+      ctx.lineTo(boxX+boxW,boxY+boxH-r); ctx.quadraticCurveTo(boxX+boxW,boxY+boxH,boxX+boxW-r,boxY+boxH);
+      ctx.lineTo(boxX+r,boxY+boxH); ctx.quadraticCurveTo(boxX,boxY+boxH,boxX,boxY+boxH-r);
+      ctx.lineTo(boxX,boxY+r); ctx.quadraticCurveTo(boxX,boxY,boxX+r,boxY);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.lineJoin = 'round'; ctx.lineWidth = fs*0.12;
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.fillStyle = '#FFFFFF';
+      lines.forEach((line,i) => { const y = startY+i*lineH; ctx.strokeText(line,w/2,y); ctx.fillText(line,w/2,y); });
+      resolve(c.toDataURL('image/jpeg', 0.92));
+    };
+    img.src = frameDataUrl;
+  });
+}
+
+async function dGenerateCover(seekSec, retitleOnly) {
+  if (!dS.avatarVideoUrl) { dToast('请先生成数字人视频'); return; }
+  const t = isNaN(seekSec) ? 1.0 : Math.max(0.5, seekSec);
+  dS.coverGenerating = true; dRender();
+  try {
+    let title = dS.coverTitle;
+    if (!title || retitleOnly) {
+      const script = (dS.rewrittenScript || dS.extractedScript || '').trim();
+      if (script) {
+        const r = await dHttp.post('/ai/cover-title', { script });
+        title = (r.code === 200 && r.data?.title) ? r.data.title : script.slice(0, 7);
+      } else { title = '精彩内容'; }
+    }
+    const { dataUrl, w, h } = await _dExtractFrame(dS.avatarVideoUrl, t);
+    const coverUrl = await _dDrawCoverText(dataUrl, title, w, h);
+    dS.coverGenerating = false; dS.coverFrameUrl = coverUrl; dS.coverTitle = title; dS.coverSeekTime = t;
+    dRender();
+  } catch(e) { dS.coverGenerating = false; dRender(); dToast('封面生成失败: ' + e.message); }
+}
+
+function dDownloadCover() {
+  if (!dS.coverFrameUrl) { dToast('请先生成封面'); return; }
+  const a = document.createElement('a');
+  a.href = dS.coverFrameUrl; a.download = '封面_' + Date.now() + '.jpg';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  dS.coverDownloaded = true; dRender();
+  setTimeout(() => { dS.coverDownloaded = false; dRender(); }, 1800);
+}
+
+/* ─── 发布内容（标题/简介/标签）─── */
+async function dHandlePublishGen(mode = 'all') {
+  const script = (dS.rewrittenScript || dS.extractedScript || '').trim();
+  if (!script) { dToast('请先完成文案提取或改写'); return; }
+  if (mode !== 'desc') dS.publishTitleLoading = true;
+  if (mode !== 'title') dS.publishDescLoading = true;
+  dRender();
+  try {
+    const r = await dHttp.post('/ai/publish-info', { script: script.slice(0, 800) });
+    if (r.code === 200) {
+      if (mode !== 'desc') { dS.publishTitle = r.data.title || ''; dS.publishTags = r.data.tags || []; }
+      if (mode !== 'title') { dS.publishDesc = r.data.description || ''; dS.publishTags = r.data.tags || []; }
+    } else { dToast(r.msg || '生成失败，请重试'); }
+  } catch { dToast('网络错误，请重试'); }
+  finally {
+    dS.publishTitleLoading = false; dS.publishDescLoading = false; dRender();
+    const te = document.getElementById('dPubTitleEl'); if (te) te.innerText = dS.publishTitle;
+    const de = document.getElementById('dPubDescEl');  if (de) de.innerText = dS.publishDesc;
+  }
+}
+
+function dHandlePublishCopy(what) {
+  let text = '';
+  if (what === 'title') { text = dS.publishTitle || ''; }
+  else if (what === 'desc') {
+    const tags = (dS.publishTags||[]).map(t=>'#'+t).join(' ');
+    text = [dS.publishDesc, tags].filter(Boolean).join('\n');
+  }
+  if (!text) { dToast('内容为空，请先生成'); return; }
+  navigator.clipboard?.writeText(text).then(() => {
+    dS.publishCopied = what; dRender();
+    setTimeout(() => { dS.publishCopied = null; dRender(); }, 1800);
+  }).catch(() => dToast('复制失败，请手动复制'));
 }
 
 function dOnSpeed(val) {
