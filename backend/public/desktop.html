@@ -749,22 +749,19 @@ function dCardRewrite() {
       <span class="d-step-badge ${st}">${dS.rewriteLoading?'● 改写中':st==='done'?'已完成':st==='active'?'● 进行中':'待处理'}</span>
     </div>
     <div class="d-card-body" style="display:flex;flex-direction:column;gap:10px">
-      <!-- 风格 + 按钮 同行 -->
-      <div style="display:flex;gap:8px;align-items:center">
-        <select class="d-select" style="flex:1" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
-          <option value="">智能匹配</option>
-          <option value="hook">强钩子开头</option>
-          <option value="emotion">情感共鸣</option>
-          <option value="problem">问题解决</option>
-          <option value="list">干货列表</option>
-        </select>
-        <button class="d-btn-lg" onclick="dHandleRewrite()"
-          ${dS.rewriteLoading||!dS.extractedScript?'disabled':''}
-          style="padding:9px 18px;font-size:13px;white-space:nowrap;flex-shrink:0">
-          ${dS.rewriteLoading?'改写中...':dS.rewrittenScript?'重新改写':'AI 改写'}
-        </button>
-      </div>
-      ${!dS.extractedScript ? `<div style="font-size:12px;color:#9CA3AF">请先完成第①步文案提取</div>` : ''}
+      <select class="d-select" style="width:100%" id="dRewriteStyle" onchange="dS.rewriteStyle=this.value">
+        <option value="">智能匹配</option>
+        <option value="hook">强钩子开头</option>
+        <option value="emotion">情感共鸣</option>
+        <option value="problem">问题解决</option>
+        <option value="list">干货列表</option>
+      </select>
+      <button class="d-btn-lg" onclick="dHandleRewrite()"
+        ${dS.rewriteLoading||!dS.extractedScript?'disabled':''}
+        style="width:100%;padding:10px;font-size:13px">
+        ${dS.rewriteLoading?'⏳ 改写中...':dS.rewrittenScript?'🔄 重新改写':'✨ AI 改写'}
+      </button>
+      ${!dS.extractedScript ? `<div style="font-size:12px;color:#9CA3AF;text-align:center">请先完成第①步文案提取</div>` : ''}
       ${dS.rewriteErr?`<div class="d-err">${esc(dS.rewriteErr)}</div>`:''}
       ${dS.rewrittenScript ? `
         <div>
