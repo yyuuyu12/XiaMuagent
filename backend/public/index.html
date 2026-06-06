@@ -2472,7 +2472,7 @@ function tExtract() {
       </div>
       ${S.extractErr?`<span class="err-text">${esc(S.extractErr)}</span>`:''}
       ${tCloneActions(
-        { id: 'clone-step3-btn', text: S.premium ? '下一步：语音合成 →' : '🔒 进入口播工坊', onclick: 'goToCloneStep3()', disabled: !hasRewrite },
+        { id: 'clone-step3-btn', text: S.premium ? '下一步：语音合成 →' : '进入口播工坊', onclick: 'goToCloneStep3()', disabled: !hasRewrite },
         [{ id: 'clone-rerewrite-btn', text: '重新改写', onclick: 'handleCloneRewrite()', disabled: !hasSource }]
       )}
       ${!S.premium && hasRewrite ? `<div style="text-align:center;font-size:12px;color:#9E9890;margin-top:8px">语音合成·数字人·字幕成片需<span onclick="showPremiumGate()" style="color:#F5762A;font-weight:600;cursor:pointer">开通进阶版</span></div>` : ''}
@@ -4008,7 +4008,7 @@ function tVoiceManager() {
     }).join('');
 
   const addTip = `<div style="background:#FFF7ED;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12px;color:#92400E;line-height:1.6">
-    💡 <b>最佳效果：</b>录制 10~30 秒，语速自然、环境安静、普通话清晰。过短或过长都会影响克隆质量和合成速度。
+    <b>最佳效果：</b>录制 10~30 秒，语速自然、环境安静、普通话清晰。过短或过长都会影响克隆质量和合成速度。
   </div>`;
 
   const addUI = isRecording ? `
@@ -4634,7 +4634,7 @@ async function handleWorkshopActivateGate() {
       setState({ wsCodeLoading: false, wsCodeInput: '', wsCodeOk: true, wsCodeMsg: r.msg || '开通成功' });
       await loadPremiumStatus();
       if (ok || S.premium) {
-        showToast('进阶版已解锁 🎉');
+        showToast('进阶版已解锁');
         closePremiumGate();
         goToCloneStep3();
       } else {
