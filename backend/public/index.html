@@ -819,6 +819,14 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .home-page .feat-clone-card { margin-bottom: 12px; padding: 22px 20px 18px; }
 .home-page .feat-sub-grid { gap: 12px; margin-bottom: 4px; }
 .home-page .feat-sub-card { min-height: 130px; padding: 18px 16px; }
+/* 原创工坊入口卡（白色，与爆款克隆同款） */
+.orig-home-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); cursor: pointer; user-select: none; margin-bottom: 10px; position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: transform 0.18s, box-shadow 0.18s; }
+.orig-home-card:active { transform: scale(0.98); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+.orig-home-icon { width: 52px; height: 52px; background: #FFF0E5; border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-bottom: 14px; }
+.orig-home-title { font-size: 17px; font-weight: 600; color: #1A1614; margin-bottom: 6px; }
+.orig-home-desc { font-size: 13px; color: #9E9890; line-height: 1.5; margin-bottom: 14px; }
+.orig-home-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.orig-home-tag { font-size: 11px; font-weight: 500; color: #F5602A; background: #FFF0E5; border-radius: 8px; padding: 5px 12px; }
 .home-tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
 .home-tool-card { background: #fff; border-radius: 20px; padding: 18px 16px; min-height: 132px; cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; }
 .home-tool-card:active { transform: scale(0.96); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
@@ -1180,6 +1188,7 @@ const api = {
   get: (path, signal) => apiFetch('GET', path, null, signal),
   post: (path, data, signal) => apiFetch('POST', path, data, signal),
   put: (path, data) => apiFetch('PUT', path, data),
+  patch: (path, data) => apiFetch('PATCH', path, data),
   del: (path) => apiFetch('DELETE', path),
 };
 
@@ -1272,6 +1281,22 @@ const S = {
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
   // 步骤6：发布
   publishTitle: '', publishDesc: '', publishTags: [], publishTitleLoading: false, publishDescLoading: false, coverDownloaded: false, publishCopied: false,
+  // ===== 原创工坊 =====
+  originalView: 'home',      // 'home'|'skill'|'learning'|'new'|'chat'
+  originalProject: null,     // 当前项目 {id,title,status,turns,doc}
+  originalSkill: null,       // 当前 skill 对象
+  originalProjects: [],      // 项目列表
+  originalMessages: [],      // 当前项目消息列表
+  originalChatTab: 'chat',   // 'chat'|'doc'
+  originalInput: '',
+  originalLoading: false,
+  originalLearningUrl: '',
+  originalLearningType: 'account',  // 'account'|'video'
+  originalLearningScope: 'global',  // 'global'|'project'
+  originalLearningResult: null,     // [{label,text,source,checked}]
+  originalLearningLoading: false,
+  originalNewTitle: '',
+  originalNewBrief: '',
 };
 let inspireController = null;
 let extractController = null;
@@ -1720,6 +1745,28 @@ function tTopBar() {
   } else if (t === 'vip') {
     title = '开通会员';
     backAction = `setState({currentTab:S.prevTab||'home'});render()`;
+  } else if (t === 'original') {
+    // 原创工坊：统一的子页头
+    const v = S.originalView;
+    const ver = (S.originalSkill && S.originalSkill.version) ? S.originalSkill.version : 'v1.0';
+    if (v === 'chat' && S.originalProject) {
+      const p = S.originalProject;
+      return `<div class="top-bar top-bar-sub">
+        <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div style="text-align:center;overflow:hidden">
+          <div style="font-size:15px;font-weight:700;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">${esc(p.title)}</div>
+          <div style="font-size:11px;color:#9E9890;margin-top:1px">Skill ${esc(ver)} · ${p.turns||0} 轮</div>
+        </div>
+        <div style="width:36px;flex-shrink:0"></div>
+      </div>`;
+    }
+    const titles = { skill: '我的 Skill', learning: '学习中心', new: '新建项目', home: '原创工坊' };
+    const back = v === 'home' ? "setState({currentTab:'home'});render()" : "setState({originalView:'home'});render()";
+    return `<div class="top-bar top-bar-sub">
+      <button type="button" class="back-btn" onclick="${back}" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="sub-page-title">${titles[v] || '原创工坊'}</span>
+      <div style="width:36px;flex-shrink:0"></div>
+    </div>`;
   }
 
   const isDeepSub = !!(S.inspireMode || (t === 'history' && S.tasksView === 'detail'));
@@ -1743,11 +1790,14 @@ function tTabContent() {
     case 'profile': return tProfile();
     case 'vip':     return tVip();
     case 'history': return tHistory();
+    case 'original': return tOriginal();
     default:        return tHome();
   }
 }
 
 function tBottomTab() {
+  // 原创工坊对话页：隐藏底部导航，给输入框让出空间
+  if (S.currentTab === 'original' && S.originalView === 'chat') return '';
   const tabDef = [
     { key: 'home',    label: '首页', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
     { key: 'profile', label: '我的', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>` },
@@ -2206,6 +2256,20 @@ function tHome() {
         <div class="feat-sub-icon" style="background:#F0FDF4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11"/><path d="M4 12h9"/><path d="M4 17h6"/><path d="M17 10l3 3-3 3"/><path d="M13 13h7"/></svg></div>
         <div class="feat-sub-title">行业精选</div>
         <div class="feat-sub-desc">按赛道浏览爆款文案合集</div>
+      </div>
+    </div>
+    <!-- 原创工坊入口 -->
+    <div class="orig-home-card" onclick="enterOriginal()">
+      <div class="feat-clone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+      <div class="orig-home-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </div>
+      <div class="orig-home-title">原创工坊</div>
+      <div class="orig-home-desc">打造专属风格，项目制深度创作——做自己，而不是抄别人</div>
+      <div class="orig-home-tags">
+        <span class="orig-home-tag">Skill 系统</span>
+        <span class="orig-home-tag">项目对话</span>
+        <span class="orig-home-tag">同步学习</span>
       </div>
     </div>
     ${tHomeTaskSection()}
@@ -4967,16 +5031,23 @@ async function handleAvatarGenerate() {
   const runSeq = ++_avatarRunSeq;
 
   // 直接使用已有的 base64（跳过多余的 blob URL → fetch → re-encode 流程）
-  let audioB64 = S.ttsAudioB64 || null;
-  if (!audioB64) {
-    // 极少情况：只有 blob URL 没有 b64，做一次转换兜底
+  let audioB64 = (S.ttsAudioB64 && S.ttsAudioB64 !== '__oss__') ? S.ttsAudioB64 : null;
+  if (!audioB64 && S.ttsAudioUrl) {
     try {
-      const resp = await fetch(S.ttsAudioUrl);
-      const buf = await resp.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let bin = '';
-      for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
-      audioB64 = btoa(bin);
+      if (S.ttsAudioUrl.startsWith('blob:')) {
+        // blob URL：浏览器本地读取
+        const resp = await fetch(S.ttsAudioUrl);
+        const buf = await resp.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+        audioB64 = btoa(bin);
+      } else {
+        // OSS/外部 URL：走 Zeabur 服务端代理，避免浏览器 CORS 限制
+        const r = await api.post('/ai/proxy-audio', { url: S.ttsAudioUrl });
+        if (r.code === 200) audioB64 = r.data.audio;
+        else throw new Error(r.msg || '代理下载失败');
+      }
     } catch (e) {
       if (runSeq === _avatarRunSeq) setState({ avatarErr: '音频读取失败: ' + e.message });
       return;
@@ -7172,6 +7243,688 @@ async function confirmNickname() {
 
 function dismissNicknamePrompt() {
   setState({ nicknamePrompt: false, nicknamePromptDismissed: true });
+}
+
+// ===== 原创工坊 =====
+
+async function enterOriginal() {
+  if (!getToken()) { setState({ showAuthSheet: true }); render(); return; }
+  setState({ currentTab: 'original', originalView: 'home', originalLoading: true });
+  render();
+  try {
+    const [rSkill, rProj] = await Promise.all([
+      api.get('/original/skill'),
+      api.get('/original/projects'),
+    ]);
+    setState({
+      originalSkill: rSkill.code === 200 ? rSkill.data : null,
+      originalProjects: rProj.code === 200 ? rProj.data : [],
+      originalLoading: false,
+    });
+  } catch { setState({ originalLoading: false }); }
+  render();
+}
+
+function tOriginal() {
+  const v = S.originalView;
+  if (v === 'skill')    return tOriginalSkill();
+  if (v === 'learning') return tOriginalLearning();
+  if (v === 'new')      return tOriginalNew();
+  if (v === 'chat')     return tOriginalChat();
+  return tOriginalHome();
+}
+
+function tOriginalHome() {
+  const skill = S.originalSkill;
+  const projects = S.originalProjects || [];
+  const ver = (skill && skill.version) ? skill.version : 'v1.0';
+  const ruleCount = skill ? Object.values(skill.rules||{}).reduce((n,arr)=>n+(arr||[]).length, 0) : 0;
+  const kwCount = skill ? (skill.keywords||[]).length : 0;
+  const fbCount = skill ? (skill.forbidden||[]).length : 0;
+
+  let lastNote = '开始对话或学习，逐步沉淀你的专属规律';
+  if (skill && ruleCount > 0) {
+    const allRules = Object.values(skill.rules||{}).flat();
+    const last = allRules[allRules.length - 1];
+    if (last && last.text) lastNote = `最近更新：${esc(last.source || '同步')} · 「${esc(last.text.slice(0,12))}${last.text.length>12?'…':''}」`;
+  }
+
+  const stat = (n, label) => `<div style="font-size:12px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:5px"><div style="width:4px;height:4px;border-radius:50%;background:#FFB877"></div>${n} ${label}</div>`;
+
+  const projectCards = projects.map(p => {
+    const isFinal = p.status === 'final';
+    return `<div class="card" onclick="openOriginalProject(${p.id})" style="padding:15px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:38px;height:38px;border-radius:11px;background:${isFinal?'#F0FDF4':'#FFF3E8'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${isFinal?'#059669':'#F5602A'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+            <span style="font-size:11px;color:#B0AA9F">${formatRelTime(p.updated_at)}</span>
+            <span style="font-size:11px;color:#B0AA9F">· ${p.turns||0} 轮</span>
+          </div>
+        </div>
+        <span style="flex-shrink:0;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${isFinal?'#F0FDF4':'#FFF3E8'};color:${isFinal?'#059669':'#F5602A'}">${isFinal?'已定稿':'草稿'}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 24px">
+    <!-- Skill 暗色卡 -->
+    <div onclick="setState({originalView:'skill'});render()" style="margin:0 16px 14px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:22px;padding:18px 20px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent">
+      <div style="position:absolute;top:-25px;right:-15px;width:120px;height:120px;border-radius:50%;background:rgba(255,184,119,0.06)"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;position:relative">
+        <div>
+          <div style="font-size:10.5px;color:rgba(255,255,255,0.45);letter-spacing:0.5px;margin-bottom:5px">全局唯一 · 蒸馏的你自己</div>
+          <div style="font-size:18px;font-weight:700;color:#fff">我的 Skill</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;font-weight:700;color:#FFB877;background:rgba(255,184,119,0.15);border:1px solid rgba(255,184,119,0.3);padding:3px 9px;border-radius:8px">${esc(ver)}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;margin-bottom:12px;position:relative">
+        ${stat(ruleCount,'条规则')}${stat(kwCount,'个高频词')}${stat(fbCount,'条禁区')}
+      </div>
+      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:11px;font-size:11.5px;color:rgba(255,255,255,0.38);position:relative">${lastNote}</div>
+    </div>
+
+    <!-- 学习中心入口 -->
+    <div onclick="setState({originalView:'learning',originalLearningResult:null});render()" style="margin:0 16px 18px;background:#FAF7F3;border:1.5px dashed #E8D8C4;border-radius:16px;padding:13px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;-webkit-tap-highlight-color:transparent">
+      <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFB877"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8L12 2z"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;color:#1A1614">学习中心</div>
+        <div style="font-size:12px;color:#9E9890;margin-top:2px">拆解账号或视频规律，写进 Skill 或仅用于本项目</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C0B8B0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+
+    <!-- 我的项目 -->
+    <div style="padding:0 22px 12px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:17px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">我的项目</span>
+      <span style="font-size:13px;color:#9E9890">${projects.length} 个</span>
+    </div>
+    <div style="padding:0 16px;display:flex;flex-direction:column;gap:10px">
+      <div onclick="setState({originalView:'new',originalNewTitle:'',originalNewBrief:''});render()" style="border:1.5px dashed #D8D2C9;border-radius:14px;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;-webkit-tap-highlight-color:transparent">
+        <div style="width:32px;height:32px;border-radius:10px;background:#FFF3E8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <span style="font-size:14px;font-weight:600;color:#F5602A">新建项目</span>
+      </div>
+      ${S.originalLoading
+        ? `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">加载中…</div>`
+        : projectCards}
+    </div>
+  </div>`;
+}
+
+function tOriginalSkill() {
+  const skill = S.originalSkill;
+  if (!skill) return `<div style="background:#FAF9F6;min-height:100%;padding:40px 16px;text-align:center;color:#B0AA9F;font-size:14px">暂无数据</div>`;
+
+  const rules = skill.rules || {};
+  const keywords = skill.keywords || [];
+  const forbidden = skill.forbidden || [];
+  const allRules = Object.values(rules).flat();
+
+  const sectionHeader = (label) => `
+    <div style="font-size:13px;font-weight:700;color:#6B5F55;letter-spacing:0.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <div style="height:1px;width:16px;background:#D8D2C9"></div>${esc(label)}<div style="flex:1;height:1px;background:#D8D2C9"></div>
+    </div>`;
+
+  const ruleGroups = Object.entries(rules).map(([group, items]) => {
+    if (!items || items.length === 0) return '';
+    return `<div style="margin-bottom:28px">
+      ${sectionHeader(group)}
+      <div style="display:flex;flex-direction:column;gap:16px">
+        ${items.map(r => {
+          const text = typeof r === 'string' ? r : (r.text || '');
+          const src = r.source || '';
+          const isProj = r.sourceType === 'project';
+          const uses = (r.uses != null) ? r.uses : 0;
+          return `<div style="display:flex;gap:12px">
+            <div style="font-size:14px;color:#C85A10;margin-top:2px;flex-shrink:0;font-weight:700">·</div>
+            <div style="flex:1">
+              <div style="font-size:14.5px;color:#1A1614;line-height:1.75;margin-bottom:6px">${esc(text)}</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                ${src ? `<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:${isProj?'#EEF0FF':'#F0FDF4'};color:${isProj?'#5B5FD9':'#059669'};font-weight:600">${isProj?'项目同步':'养料'} · ${esc(src)}</span>` : ''}
+                <span style="font-size:11px;color:#C0B8B0">使用 ${uses} 次</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="background:#FAF9F6;min-height:100%;padding:4px 0 32px">
+    <div style="padding:0 26px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12px;color:#B0AA9F">最后更新 ${formatRelTime(skill.updated_at) || '—'}</span>
+      <span style="color:#D8D2C9">·</span>
+      <span style="font-size:12px;color:#B0AA9F">${allRules.length} 条规则 · ${keywords.length} 个高频词 · ${forbidden.length} 条禁区</span>
+    </div>
+    <div style="padding:0 26px">
+      ${ruleGroups || `<div style="padding:24px 0;text-align:center;color:#B0AA9F;font-size:14px">还没有规律，开始创作并同步积累吧</div>`}
+      ${keywords.length > 0 ? `
+        <div style="margin-bottom:28px">
+          ${sectionHeader('高频词')}
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${keywords.map(k=>`<span style="font-size:14px;color:#1A1614;background:#FFF3E8;border:1px solid #FFD9B8;padding:5px 14px;border-radius:20px;font-weight:500">${esc(k)}</span>`).join('')}
+          </div>
+        </div>` : ''}
+      ${forbidden.length > 0 ? `
+        <div style="margin-bottom:12px">
+          ${sectionHeader('禁区')}
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${forbidden.map(f=>`<div style="display:flex;align-items:center;gap:10px">
+              <div style="width:18px;height:18px;border-radius:5px;background:#FFF0F0;border:1px solid #FECACA;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="9" height="9" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="#E5372A" stroke-width="2.2" stroke-linecap="round"/></svg>
+              </div>
+              <span style="font-size:14px;color:#4A3828;line-height:1.6">${esc(f)}</span>
+            </div>`).join('')}
+          </div>
+        </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function tOriginalLearning() {
+  const result = S.originalLearningResult;
+  const loading = S.originalLearningLoading;
+  const type = S.originalLearningType || 'account';
+  const scope = S.originalLearningScope || 'global';
+  const url = S.originalLearningUrl || '';
+
+  const seg = (active, label, action) => `<div onclick="${action}" style="flex:1;text-align:center;padding:9px 0;border-radius:11px;font-size:13px;font-weight:${active?700:500};cursor:pointer;transition:all .2s;background:${active?'#fff':'transparent'};color:${active?'#1A1614':'#9E9890'};box-shadow:${active?'0 2px 8px rgba(0,0,0,0.08)':'none'};-webkit-tap-highlight-color:transparent">${label}</div>`;
+
+  let resultBlock = '';
+  if (loading) {
+    resultBlock = `<div style="text-align:center;padding:28px 0;color:#B0AA9F;font-size:14px">正在读取真实内容并提炼规律…</div>`;
+  } else if (result === null) {
+    resultBlock = '';
+  } else if (type === 'video') {
+    const insight = (result && result[0]) ? result[0].text : '';
+    resultBlock = insight ? `
+      <div style="margin:0 0 24px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span style="font-size:14px;font-weight:700;color:#1A1614">单视频规律提取</span>
+        </div>
+        <div style="background:#FAF8F5;border-radius:12px;padding:14px;font-size:13.5px;color:#2A241E;line-height:1.75;border-left:2.5px solid #F5602A;margin-bottom:14px">${esc(insight)}</div>
+        <button type="button" onclick="writeOriginalLearning()" style="width:100%;padding:13px 0;border:none;border-radius:16px;background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff;font-size:15px;font-weight:700;cursor:pointer">${scope==='global'?'写入 Skill（全局生效）':'用于本项目'}</button>
+      </div>` : `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效规律</div>`;
+  } else {
+    if (!result || result.length === 0) {
+      resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效规律</div>`;
+    } else {
+      const checkedCount = result.filter(r=>r.checked).length;
+      const items = result.map((item, idx) => `
+        <div onclick="S.originalLearningResult[${idx}].checked=!S.originalLearningResult[${idx}].checked;render()" style="background:${item.checked?'#FFF8F3':'#fff'};border-radius:12px;padding:13px 14px;border:1.5px solid ${item.checked?'#F5602A':'#F0EDE8'};cursor:pointer;display:flex;align-items:flex-start;gap:11px;transition:all .15s;-webkit-tap-highlight-color:transparent">
+          <div style="width:20px;height:20px;border-radius:6px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .15s">
+            ${item.checked?'<svg width="11" height="9" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13.5px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
+            ${item.source?`<div style="font-size:11px;color:#B0AA9F;margin-top:4px">${esc(item.source)}</div>`:''}
+          </div>
+        </div>`).join('');
+      resultBlock = `
+        <div style="margin:0 0 24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span style="font-size:14px;font-weight:700;color:#1A1614">发现 ${result.length} 条规律</span>
+            </div>
+            <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">${items}</div>
+          <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()" style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">${scope==='global'?`写入 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}</button>
+        </div>`;
+    }
+  }
+
+  return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 28px">
+    <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 12px">
+      ${seg(scope==='global','写入全局 Skill',"setState({originalLearningScope:'global'});render()")}
+      ${seg(scope==='project','仅用于本项目',"setState({originalLearningScope:'project'});render()")}
+    </div>
+    <div style="margin:0 22px 16px;padding:9px 14px;background:${scope==='global'?'#FFF3E8':'#F0FDF4'};border-radius:12px;font-size:12px;color:${scope==='global'?'#9A3D0C':'#065F46'};line-height:1.6">
+      ${scope==='global'?'学到的规律将写入 Skill，对所有项目长期生效':'学到的规律仅用于当前项目，不改变全局 Skill'}
+    </div>
+    <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 14px">
+      ${seg(type==='account','账号主页',"setState({originalLearningType:'account',originalLearningResult:null});render()")}
+      ${seg(type==='video','单个视频',"setState({originalLearningType:'video',originalLearningResult:null});render()")}
+    </div>
+    <div style="margin:0 22px 16px">
+      <div style="font-size:13px;color:#6E6860;font-weight:600;margin-bottom:8px">${type==='account'?'输入账号主页链接（将分析最近多条视频）':'输入单个视频链接'}</div>
+      <div id="learning-url-wrap" style="background:#fff;border-radius:14px;border:1.5px solid ${url?'#F5602A':'#EDE9E3'};padding:12px 14px;transition:border-color .2s">
+        <textarea id="learning-url-input" oninput="S.originalLearningUrl=this.value;_origLearnInputState()"
+          placeholder="${type==='account'?'例如：https://www.douyin.com/user/xxx':'例如：https://v.douyin.com/xxx'}"
+          style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:52px;line-height:1.6;box-sizing:border-box">${esc(url)}</textarea>
+      </div>
+    </div>
+    <button type="button" id="learning-analyze-btn" onclick="analyzeOriginalLearning()"
+            style="width:calc(100% - 44px);margin:0 22px 16px;padding:14px 0;border:none;border-radius:16px;background:${(!url.trim()||loading)?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${(!url.trim()||loading)?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${(!url.trim()||loading)?'default':'pointer'}">
+      ${loading ? '分析中…' : (type==='account'?'分析账号文案规律':'提取视频规律')}
+    </button>
+    <div style="padding:0 22px">${resultBlock}</div>
+  </div>`;
+}
+
+function tOriginalNew() {
+  const skill = S.originalSkill;
+  const loading = S.originalLoading;
+  const ver = (skill && skill.version) ? skill.version : 'v1.0';
+  const ruleCount = skill ? Object.values(skill.rules || {}).flat().length : 0;
+  const title = S.originalNewTitle || '';
+  const brief = S.originalNewBrief || '';
+  const canCreate = !!title.trim() && !loading;
+
+  return `<div style="background:#F7F5F1;min-height:100%;padding:0 0 28px">
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 14px;padding:18px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">项目标题（这条视频在讲什么）</div>
+      <input type="text" id="orig-new-title" oninput="S.originalNewTitle=this.value;_origNewUnderline()"
+        value="${esc(title)}" placeholder="例如：我用3天做了个AI工具"
+        style="width:100%;border:none;outline:none;font-size:15.5px;font-weight:600;color:#1A1614;background:transparent;font-family:inherit;padding:4px 0;box-sizing:border-box" />
+      <div id="orig-new-title-line" style="height:2px;background:${title?'#F5602A':'#F0EDE8'};margin-top:8px;border-radius:1px;transition:background .2s"></div>
+    </div>
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 14px;padding:18px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">想传达什么（可选）</div>
+      <textarea id="orig-new-brief" oninput="S.originalNewBrief=this.value;_origNewUnderline()"
+        placeholder="例如：让普通上班族知道AI工具其实不难用…"
+        style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:60px;line-height:1.65;box-sizing:border-box">${esc(brief)}</textarea>
+      <div id="orig-new-brief-line" style="height:2px;background:${brief?'#F5602A':'#F0EDE8'};margin-top:8px;border-radius:1px;transition:background .2s"></div>
+    </div>
+    ${skill ? `
+      <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 24px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+        <div style="width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFB877" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13.5px;font-weight:600;color:#1A1614">自动加载 Skill ${esc(ver)}</div>
+          <div style="font-size:11.5px;color:#9E9890;margin-top:1px">${ruleCount} 条规则已就绪，开始对话即可</div>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>` : '<div style="height:10px"></div>'}
+    <button type="button" id="orig-new-btn" ${canCreate?'':'disabled'} onclick="createOriginalProject()"
+            style="width:calc(100% - 44px);margin:0 22px;padding:15px 0;border:none;border-radius:16px;background:${canCreate?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};color:${canCreate?'#fff':'#B0AA9F'};font-size:16px;font-weight:700;cursor:${canCreate?'pointer':'default'}">
+      ${loading ? '创建中…' : '开始创作'}
+    </button>
+  </div>`;
+}
+
+function _origNewUnderline() {
+  const t = (S.originalNewTitle || '').trim();
+  const b = (S.originalNewBrief || '').trim();
+  const tl = document.getElementById('orig-new-title-line');
+  const bl = document.getElementById('orig-new-brief-line');
+  const btn = document.getElementById('orig-new-btn');
+  if (tl) tl.style.background = t ? '#F5602A' : '#F0EDE8';
+  if (bl) bl.style.background = b ? '#F5602A' : '#F0EDE8';
+  if (btn) {
+    const ok = !!t;
+    btn.disabled = !ok;
+    btn.style.background = ok ? 'linear-gradient(135deg,#FF8040,#F5602A)' : '#E8E4DF';
+    btn.style.color = ok ? '#fff' : '#B0AA9F';
+    btn.style.cursor = ok ? 'pointer' : 'default';
+  }
+}
+
+function tOriginalChat() {
+  const proj = S.originalProject;
+  const messages = S.originalMessages || [];
+  const tab = S.originalChatTab || 'chat';
+  const loading = S.originalLoading;
+  if (!proj) return `<div style="background:#F4F1EC;min-height:100%;padding:80px 16px;text-align:center;color:#B0AA9F">项目数据加载中…</div>`;
+
+  const ver = (S.originalSkill && S.originalSkill.version) ? S.originalSkill.version : 'v1.0';
+  const ruleCount = S.originalSkill ? Object.values(S.originalSkill.rules || {}).flat().length : 0;
+  const aiAvatar = `<div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFB877" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+  </div>`;
+
+  const renderMsg = (msg) => {
+    if (msg.role === 'user') {
+      return `<div style="display:flex;justify-content:flex-end">
+        <div style="max-width:78%;background:#F5602A;border-radius:18px 4px 18px 18px;padding:10px 14px">
+          <div style="font-size:14px;color:#fff;line-height:1.7">${esc(msg.content)}</div>
+        </div>
+      </div>`;
+    }
+    const displayContent = (msg.content || '').replace(/【新文案】[\s\S]*?【\/新文案】/g, '').trim();
+    let syncCard = '';
+    if (msg.sync_done === 'synced') {
+      syncCard = `<div style="margin-top:8px;padding:8px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;display:flex;align-items:center;gap:7px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <span style="font-size:12px;color:#059669;font-weight:600">「${esc(msg.sync_label||'规律')}」已同步到 Skill</span>
+      </div>`;
+    } else if (msg.sync_done === 'skipped') {
+      syncCard = `<div style="margin-top:8px;padding:7px 12px;background:#F9F7F4;border-radius:10px"><span style="font-size:12px;color:#B0AA9F">仅用于本项目，未同步 Skill</span></div>`;
+    } else if (msg.sync_label) {
+      syncCard = `<div style="margin-top:8px;padding:12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px">
+        <div style="font-size:12px;color:#92400E;line-height:1.6;margin-bottom:10px">
+          <span style="font-weight:700">「${esc(msg.sync_label)}」效果不错</span>，要同步到 Skill 吗？
+          <div style="font-size:11px;color:#B45309;margin-top:1px">同步后所有项目自动应用这条规律</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" onclick="syncOriginalRule(${msg.id},'${esc(msg.sync_label)}')" style="flex:1;padding:8px;background:linear-gradient(135deg,#FF8040,#F5602A);border:none;border-radius:9px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">同步·全局通用</button>
+          <button type="button" onclick="skipOriginalRule(${msg.id})" style="flex:1;padding:8px;background:rgba(0,0,0,0.06);border:none;border-radius:9px;color:#7A6F65;font-size:12px;font-weight:600;cursor:pointer">不同步·仅本项目</button>
+        </div>
+      </div>`;
+    }
+    return `<div style="display:flex;flex-direction:column;align-items:flex-start">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+        ${aiAvatar}<span style="font-size:11px;color:#9E9890;font-weight:600">原创工坊 · Skill ${esc(ver)}</span>
+      </div>
+      <div style="max-width:88%;background:#fff;border-radius:4px 18px 18px 18px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div style="font-size:13.5px;color:#2A241E;line-height:1.7">${displayContent ? esc(displayContent) : '文案已更新，点下方查看'}</div>
+        ${msg.has_doc_update ? `<div onclick="setState({originalChatTab:'doc'});render()" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#F5602A;font-weight:600;cursor:pointer;background:#FFF3E8;padding:5px 10px;border-radius:8px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 查看当前文案 ›
+        </div>` : ''}
+        ${syncCard}
+      </div>
+    </div>`;
+  };
+
+  const banner = `<div style="display:flex;justify-content:center">
+    <span style="font-size:11px;color:#9E9890;background:rgba(0,0,0,0.05);padding:4px 13px;border-radius:20px">已加载 Skill ${esc(ver)} · ${ruleCount} 条规则生效</span>
+  </div>`;
+
+  const chatView = `<div id="orig-chat-scroll" style="flex:1;overflow-y:auto;min-height:0;padding:14px 16px;display:flex;flex-direction:column;gap:18px;-webkit-overflow-scrolling:touch">
+    ${banner}
+    ${messages.length === 0
+      ? `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:13.5px;line-height:1.7">告诉 AI 你想创作什么内容，<br>或直接提要求修改文案</div>`
+      : messages.map(renderMsg).join('')}
+    ${loading ? `<div style="display:flex;align-items:center;gap:8px">
+      ${aiAvatar}
+      <div style="background:#fff;border-radius:4px 18px 18px 18px;padding:11px 15px;box-shadow:0 2px 8px rgba(0,0,0,0.06);display:flex;gap:5px;align-items:center">
+        <div style="width:6px;height:6px;border-radius:50%;background:#C8C3BC;animation:pulse 1s 0s infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#C8C3BC;animation:pulse 1s 0.25s infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#C8C3BC;animation:pulse 1s 0.5s infinite"></div>
+      </div>
+    </div>` : ''}
+    <div style="height:4px"></div>
+  </div>`;
+
+  const inputActive = !!(S.originalInput && S.originalInput.trim()) && !loading;
+  const inputBar = `<div style="padding:10px 14px 22px;background:rgba(247,245,241,0.97);border-top:1px solid rgba(0,0,0,0.06);display:flex;gap:8px;align-items:center;flex-shrink:0">
+    <div style="flex:1;background:#fff;border-radius:22px;border:1.5px solid ${inputActive?'#F5602A':'#EDE9E3'};padding:10px 15px;transition:border-color .2s">
+      <input id="orig-chat-input" value="${esc(S.originalInput||'')}" oninput="S.originalInput=this.value;_origChatInputState()" onkeydown="if(event.key==='Enter'){event.preventDefault();sendOriginalMessage()}"
+        placeholder="告诉我想调整什么…" style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit" />
+    </div>
+    <div id="orig-chat-send" onclick="sendOriginalMessage()" style="width:44px;height:44px;border-radius:50%;background:${inputActive?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};display:flex;align-items:center;justify-content:center;cursor:${inputActive?'pointer':'default'};flex-shrink:0;transition:all .2s;box-shadow:${inputActive?'0 4px 12px rgba(245,96,42,0.35)':'none'}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${inputActive?'#fff':'#B0AA9F'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </div>
+  </div>`;
+
+  const docCopyBtnId = 'orig-doc-copy';
+  const docView = `<div style="flex:1;overflow-y:auto;min-height:0;padding:12px 22px 24px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid #F0EDE8">
+      <div>
+        <div style="font-size:11px;color:#B0AA9F;margin-bottom:2px">当前文案 · 活文档</div>
+        <div style="font-size:12.5px;color:#9E9890">每次对话调整后自动更新</div>
+      </div>
+      ${proj.doc ? `<button type="button" id="${docCopyBtnId}" onclick="copyOriginalDoc('${docCopyBtnId}')" style="padding:7px 13px;font-size:12px;display:flex;align-items:center;gap:5px;color:#6E6860;background:#fff;border:1px solid #F0EDE8;border-radius:12px;cursor:pointer">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>复制
+      </button>` : ''}
+    </div>
+    ${proj.doc
+      ? `<div style="font-size:15px;color:#1A1614;line-height:2;white-space:pre-line;letter-spacing:0.01em;padding:4px 0">${esc(proj.doc)}</div>
+         <div style="padding-top:12px;border-top:1px solid #F0EDE8;display:flex;align-items:center;gap:8px">
+           <span style="font-size:11px;color:#B0AA9F">最后更新：对话第 ${proj.turns||0} 轮</span>
+         </div>`
+      : `<div style="text-align:center;padding:48px 0;color:#B0AA9F;font-size:14px">文案还没生成，<br>开始对话让 AI 帮你写吧</div>`}
+  </div>`;
+
+  const pill = (id, label, badge) => `<div onclick="setState({originalChatTab:'${id}'});render()" style="padding:8px 18px;border-radius:22px;font-size:13px;font-weight:${tab===id?700:500};background:${tab===id?'#fff':'transparent'};color:${tab===id?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${tab===id?'0 2px 8px rgba(0,0,0,0.1)':'none'};transition:all .2s">${label}${badge||''}</div>`;
+
+  return `<div style="background:#F4F1EC;height:100%;display:flex;flex-direction:column">
+    <div style="display:flex;gap:6px;padding:6px 22px 10px;flex-shrink:0">
+      ${pill('doc','当前文案', proj.doc?` <span style="font-size:9px;background:#F5602A;color:#fff;border-radius:6px;padding:1px 5px;vertical-align:middle">新</span>`:'')}
+      ${pill('chat','对话调整')}
+    </div>
+    ${tab === 'doc' ? docView : chatView}
+    ${tab === 'chat' ? inputBar : ''}
+  </div>`;
+}
+
+function _origChatInputState() {
+  const active = !!(S.originalInput && S.originalInput.trim()) && !S.originalLoading;
+  const send = document.getElementById('orig-chat-send');
+  const inputEl = document.getElementById('orig-chat-input');
+  if (send) {
+    send.style.background = active ? 'linear-gradient(135deg,#FF8040,#F5602A)' : '#E8E4DF';
+    send.style.cursor = active ? 'pointer' : 'default';
+    send.style.boxShadow = active ? '0 4px 12px rgba(245,96,42,0.35)' : 'none';
+    const path = send.querySelector('svg');
+    if (path) path.setAttribute('stroke', active ? '#fff' : '#B0AA9F');
+  }
+  if (inputEl) {
+    const wrap = inputEl.parentElement;
+    if (wrap) wrap.style.borderColor = (S.originalInput && S.originalInput.trim()) ? '#F5602A' : '#EDE9E3';
+  }
+}
+
+function _origLearnInputState() {
+  const active = !!(S.originalLearningUrl && S.originalLearningUrl.trim()) && !S.originalLearningLoading;
+  const btn = document.getElementById('learning-analyze-btn');
+  if (btn) {
+    btn.style.background = active ? 'linear-gradient(135deg,#FF8040,#F5602A)' : '#E8E4DF';
+    btn.style.color = active ? '#fff' : '#B0AA9F';
+    btn.style.cursor = active ? 'pointer' : 'default';
+  }
+  const wrap = document.getElementById('learning-url-wrap');
+  if (wrap) wrap.style.borderColor = (S.originalLearningUrl && S.originalLearningUrl.trim()) ? '#F5602A' : '#EDE9E3';
+}
+
+async function copyOriginalDoc(btnId) {
+  const doc = (S.originalProject && S.originalProject.doc) || '';
+  if (!doc) return;
+  try {
+    await navigator.clipboard.writeText(doc);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = doc; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+  }
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>已复制';
+    btn.style.color = '#22C55E'; btn.style.borderColor = '#BBF0CC';
+    setTimeout(() => { const b = document.getElementById(btnId); if (b) render(); }, 1400);
+  }
+}
+
+async function openOriginalProject(id) {
+  setState({ originalLoading: true, originalView: 'chat', originalChatTab: 'chat', originalInput: '' });
+  render();
+  try {
+    const r = await api.get('/original/projects/' + id);
+    if (r.code === 200) {
+      setState({
+        originalProject: r.data.project,
+        originalMessages: r.data.messages || [],
+        originalLoading: false,
+      });
+    } else {
+      setState({ originalLoading: false });
+      showToast(r.msg || '加载失败');
+    }
+  } catch { setState({ originalLoading: false }); showToast('网络错误'); }
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('orig-chat-scroll');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 80);
+}
+
+async function createOriginalProject() {
+  const title = (document.getElementById('orig-new-title') ? document.getElementById('orig-new-title').value : S.originalNewTitle).trim();
+  const brief = (document.getElementById('orig-new-brief') ? document.getElementById('orig-new-brief').value : S.originalNewBrief).trim();
+  if (!title) { showToast('请填写视频主题'); return; }
+  if (S.originalLoading) return;
+  setState({ originalLoading: true, originalNewTitle: title, originalNewBrief: brief });
+  render();
+  try {
+    const r = await api.post('/original/projects', { title, brief });
+    if (r.code === 200) {
+      const rProj = await api.get('/original/projects');
+      setState({
+        originalProjects: rProj.code === 200 ? rProj.data : S.originalProjects,
+        originalProject: r.data,
+        originalMessages: [],
+        originalLoading: false,
+        originalView: 'chat',
+        originalChatTab: 'chat',
+        originalInput: '',
+      });
+      showToast('项目已创建 ✓');
+    } else {
+      setState({ originalLoading: false });
+      showToast(r.msg || '创建失败');
+    }
+  } catch { setState({ originalLoading: false }); showToast('网络错误'); }
+  render();
+}
+
+async function sendOriginalMessage() {
+  const inputEl = document.getElementById('orig-chat-input');
+  const input = (inputEl ? inputEl.value : S.originalInput).trim();
+  if (!input || S.originalLoading || !S.originalProject) return;
+  setState({
+    originalInput: '',
+    originalLoading: true,
+    originalMessages: [...S.originalMessages, { role: 'user', content: input }],
+  });
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('orig-chat-scroll');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 40);
+  try {
+    const r = await api.post('/original/projects/' + S.originalProject.id + '/chat', { message: input });
+    if (r.code === 200) {
+      setState({
+        originalMessages: [...S.originalMessages, r.data.message],
+        originalProject: { ...S.originalProject, doc: r.data.doc, turns: r.data.turns },
+        originalLoading: false,
+      });
+    } else {
+      setState({ originalLoading: false });
+      showToast(r.msg || '发送失败');
+    }
+  } catch { setState({ originalLoading: false }); showToast('网络错误'); }
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('orig-chat-scroll');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 80);
+}
+
+async function syncOriginalRule(msgId, label) {
+  try {
+    const r = await api.patch('/original/projects/' + S.originalProject.id, { msgId, syncDone: 'synced' });
+    if (r.code === 200) {
+      setState({
+        originalMessages: S.originalMessages.map(m => m.id === msgId ? { ...m, sync_done: 'synced' } : m),
+      });
+      const rSkill = await api.get('/original/skill');
+      if (rSkill.code === 200) setState({ originalSkill: rSkill.data });
+      showToast('已同步到 Skill ✓');
+    } else {
+      showToast(r.msg || '同步失败');
+    }
+  } catch { showToast('网络错误'); }
+  render();
+}
+
+async function skipOriginalRule(msgId) {
+  try {
+    await api.patch('/original/projects/' + S.originalProject.id, { msgId, syncDone: 'skipped' });
+    setState({
+      originalMessages: S.originalMessages.map(m => m.id === msgId ? { ...m, sync_done: 'skipped' } : m),
+    });
+  } catch {}
+  render();
+}
+
+async function analyzeOriginalLearning() {
+  const urlEl = document.getElementById('learning-url-input');
+  const url = (urlEl ? urlEl.value : S.originalLearningUrl).trim();
+  if (!url) { showToast('请粘贴链接'); return; }
+  if (S.originalLearningLoading) return;
+  setState({ originalLearningLoading: true, originalLearningUrl: url, originalLearningResult: null });
+  render();
+  try {
+    const projectId = S.originalLearningScope === 'project' && S.originalProject ? S.originalProject.id : null;
+    const r = await api.post('/original/learning/analyze', {
+      url,
+      type: S.originalLearningType,
+      scope: S.originalLearningScope,
+      projectId,
+    });
+    if (r.code === 200) {
+      let items = [];
+      if (r.data.type === 'account') {
+        items = (r.data.insights || []).map(item => ({
+          label: '账号规律',
+          text: item.text,
+          source: item.freq || '',
+          checked: true,
+        }));
+      } else {
+        if (r.data.insight) {
+          items = [{ label: '视频规律', text: r.data.insight, source: '', checked: true }];
+        }
+      }
+      setState({ originalLearningResult: items, originalLearningLoading: false });
+    } else {
+      setState({ originalLearningLoading: false });
+      showToast(r.msg || '分析失败');
+    }
+  } catch { setState({ originalLearningLoading: false }); showToast('网络错误'); }
+  render();
+}
+
+async function writeOriginalLearning() {
+  const selected = (S.originalLearningResult || []).filter(r => r.checked);
+  if (selected.length === 0) { showToast('请至少选择一条'); return; }
+  try {
+    const skill = S.originalSkill || { rules: {}, keywords: [], forbidden: [] };
+    const rules = { ...(skill.rules || {}) };
+    const groupName = '学习中心同步';
+    if (!rules[groupName]) rules[groupName] = [];
+    selected.forEach(item => {
+      rules[groupName].push({ text: item.text, source: item.source || S.originalLearningUrl, uses: 0 });
+    });
+    const r = await api.put('/original/skill', { rules, keywords: skill.keywords || [], forbidden: skill.forbidden || [] });
+    if (r.code === 200) {
+      const rSkill = await api.get('/original/skill');
+      if (rSkill.code === 200) setState({ originalSkill: rSkill.data });
+      setState({ originalLearningResult: null, originalLearningUrl: '' });
+      showToast(`已写入 ${selected.length} 条规律 ✓`);
+    } else {
+      showToast(r.msg || '写入失败');
+    }
+  } catch { showToast('网络错误'); }
+  render();
+}
+
+function formatRelTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const diff = Date.now() - d.getTime();
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff/60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff/3600000) + '小时前';
+    if (diff < 2592000000) return Math.floor(diff/86400000) + '天前';
+    return d.toLocaleDateString('zh-CN', { month:'numeric', day:'numeric' });
+  } catch { return ''; }
 }
 
 // ===== INIT =====
