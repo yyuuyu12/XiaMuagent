@@ -5,6 +5,7 @@ async function getAIConfig() {
     'ai_provider', 'openai_api_key', 'openai_base_url', 'openai_model',
     'claude_api_key', 'claude_model', 'qwen_api_key', 'qwen_model',
     'zhipu_api_key', 'zhipu_model', 'deepseek_api_key', 'deepseek_model',
+    'max_tokens_cap',  // 各服务商的输出 token 上限，0 = 不限制
   ];
   const cfg = {};
   for (const k of keys) {
@@ -17,7 +18,11 @@ async function getAIConfig() {
 async function callAI(prompt, opts = {}) {
   const cfg = await getAIConfig();
   const provider = cfg.ai_provider || 'openai';
-  const maxTokens = opts.maxTokens || 2000;
+  // max_tokens_cap: 管理后台可配置各服务商上限（如 xcode.best gpt-5.5 限制 1200）
+  // 0 或不填 = 不限制；设置了就强制不超过该值
+  const configCap = parseInt(cfg.max_tokens_cap || '0') || 0;
+  const rawMax = opts.maxTokens || 2000;
+  const maxTokens = configCap > 0 ? Math.min(rawMax, configCap) : rawMax;
 
   if (provider === 'openai' || provider === 'qwen') {
     const apiKey = provider === 'openai' ? cfg.openai_api_key : cfg.qwen_api_key;
