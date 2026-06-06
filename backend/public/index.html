@@ -7522,21 +7522,12 @@ function tOriginalSkill() {
     if (!items || items.length === 0) return '';
     return `<div style="margin-bottom:28px">
       ${sectionHeader(group)}
-      <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:12px">
         ${items.map(r => {
           const text = typeof r === 'string' ? r : (r.text || '');
-          const src = r.source || '';
-          const isProj = r.sourceType === 'project';
-          const uses = (r.uses != null) ? r.uses : 0;
-          return `<div style="display:flex;gap:12px">
-            <div style="font-size:14px;color:#C85A10;margin-top:2px;flex-shrink:0;font-weight:700">·</div>
-            <div style="flex:1">
-              <div style="font-size:14.5px;color:#1A1614;line-height:1.75;margin-bottom:6px">${esc(text)}</div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                ${src ? `<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:${isProj?'#EEF0FF':'#F0FDF4'};color:${isProj?'#5B5FD9':'#059669'};font-weight:600">${isProj?'项目同步':'养料'} · ${esc(src)}</span>` : ''}
-                <span style="font-size:11px;color:#C0B8B0">使用 ${uses} 次</span>
-              </div>
-            </div>
+          return `<div style="display:flex;gap:10px">
+            <div style="font-size:15px;color:#C85A10;margin-top:1px;flex-shrink:0;line-height:1.7">·</div>
+            <div style="font-size:14.5px;color:#1A1614;line-height:1.75">${esc(text)}</div>
           </div>`;
         }).join('')}
       </div>
