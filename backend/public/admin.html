@@ -233,6 +233,11 @@
               <input id="deepseek_model" placeholder="deepseek-chat" />
             </div>
           </div>
+          <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <label>输出 Token 上限（max_tokens_cap）</label>
+            <input id="max_tokens_cap" placeholder="0" style="max-width:160px" />
+            <div class="hint">第三方中转服务有限制时填写（如 xcode.best gpt-5.5 填 1200）；官方 OpenAI / DeepSeek 填 0 或留空表示不限制</div>
+          </div>
           <button class="btn-primary" onclick="saveKeys()">保存 AI 配置</button>
         </div>
 
@@ -570,6 +575,7 @@ async function loadKeys() {
   document.getElementById('zhipu_model').value = d.zhipu_model || '';
   document.getElementById('deepseek_api_key').value = d.deepseek_api_key || '';
   document.getElementById('deepseek_model').value = d.deepseek_model || '';
+  document.getElementById('max_tokens_cap').value = d.max_tokens_cap || '';
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
   document.getElementById('asr_url').value = d.asr_url || '';
   document.getElementById('video_url').value = d.video_url || '';
@@ -592,6 +598,7 @@ async function saveKeys() {
     zhipu_model: document.getElementById('zhipu_model').value,
     deepseek_api_key: document.getElementById('deepseek_api_key').value,
     deepseek_model: document.getElementById('deepseek_model').value,
+    max_tokens_cap: document.getElementById('max_tokens_cap').value,
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
     asr_url: document.getElementById('asr_url').value,
     video_url: document.getElementById('video_url').value,
