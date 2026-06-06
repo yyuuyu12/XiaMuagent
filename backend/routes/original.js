@@ -518,14 +518,62 @@ router.post('/learning/analyze', requireAuth, async (req, res) => {
       const v = await fetchVideoScript(realUrl, tikhubKey);
       if (!v.script.trim()) return res.status(422).json({ code: 422, msg: '该视频未提取到文案内容（可能无口播/无字幕）' });
 
-      const prompt = `你是资深短视频口播文案分析师。下面是一条抖音视频的真实文案（口播字幕）：
+      const scriptText = v.script.slice(0, 2000);
+      const estSec = Math.round(v.script.length / 2.5);
+
+      const prompt = `你是资深短视频口播文案拆解师。以下是一条抖音视频的完整口播文案：
+
 ---
-${v.script.slice(0, 1500)}
+${scriptText}
 ---
-请基于这条真实文案，提炼它的创作规律，重点分析：开场钩子写法、内容结构与节奏、结尾引导方式。
-要求：用一段连贯的中文描述（80-140字），具体到可复用的手法，不要泛泛而谈，不要加标题或编号。`;
-      const aiResult = await callAI(prompt, { maxTokens: 500, temperature: 0.6 });
-      return res.json({ code: 200, data: { type: 'video', insight: aiResult.trim() } });
+视频标题：${v.desc}
+点赞量：${v.likes}·预计时长约 ${estSec} 秒
+
+请做完整结构化拆解，严格以 JSON 格式返回下面的结构，不要输出 JSON 之外的任何内容：
+
+{
+  "overview": {
+    "contentTheme": "内容主题，20字内，说清讲什么、面向谁",
+    "estDuration": "约${estSec}秒",
+    "style": "整体风格，10字内，如：快节奏强反差、温和干货型"
+  },
+  "scriptExcerpt": "文案最精华开头的前40字，原文摘录不要改写",
+  "structure": {
+    "opening": "开场（前5秒）：用了什么钩子手法，从文案里引用原句说明",
+    "development": "中段（主体内容）：内容怎么展开的，逻辑结构是什么，引用关键句",
+    "cta": "结尾引导：怎么收尾或促互动，引用原文句子"
+  },
+  "language": "语言风格（2-3句）：句子长短、语速感受、口语化程度、有无标志性表达",
+  "rules": [
+    { "text": "具体可复用的创作手法，25-45字，说清是什么、怎么用、能达到什么效果", "freq": "贯穿全程 或 出现X次" }
+  ]
+}
+
+要求：
+- structure 三个字段必须包含从文案中引用的原句，不能只泛泛描述
+- rules 给出 3-4 条，每条聚焦一个可操作手法，举例越具体越好
+- 全部内容严格基于提供的文案，禁止编造`;
+
+      const aiResult = await callAI(prompt, { maxTokens: 900, temperature: 0.5 });
+
+      let videoAnalysis = null;
+      try {
+        const jsonMatch = aiResult.match(/\{[\s\S]*\}/);
+        if (jsonMatch) videoAnalysis = JSON.parse(jsonMatch[0]);
+      } catch (_) {
+        videoAnalysis = {
+          overview: { contentTheme: v.desc?.slice(0, 20) || '短视频', estDuration: `约${estSec}秒`, style: '口语化' },
+          scriptExcerpt: v.script.slice(0, 40),
+          structure: { opening: '—', development: '—', cta: '—' },
+          language: '—',
+          rules: [{ text: aiResult.replace(/\s+/g, ' ').slice(0, 200), freq: '全程' }],
+        };
+      }
+      if (videoAnalysis?.rules) {
+        videoAnalysis.rules = videoAnalysis.rules.filter(x => x && x.text).slice(0, 4)
+          .map(r => ({ ...r, checked: true }));
+      }
+      return res.json({ code: 200, data: { type: 'video', analysis: videoAnalysis } });
     }
 
     /* ── 账号主页：拉真实近期视频 → AI 归纳高频规律 ── */

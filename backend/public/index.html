@@ -7580,16 +7580,88 @@ function tOriginalLearning() {
   } else if (result === null) {
     resultBlock = '';
   } else if (type === 'video') {
-    const insight = (result && result[0]) ? result[0].text : '';
-    resultBlock = insight ? `
-      <div style="margin:0 0 24px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span style="font-size:14px;font-weight:700;color:#1A1614">单视频规律提取</span>
+    if (!result || (!result.rules?.length && !result.overview)) {
+      resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效分析</div>`;
+    } else {
+      const ov = result.overview || {};
+      const st = result.structure || {};
+      const rules = result.rules || [];
+      const checkedCount = rules.filter(r => r.checked).length;
+
+      // 概况卡（深色）
+      const ovCard = `
+        <div style="background:#1E1A14;border-radius:16px;padding:16px;margin-bottom:12px">
+          <div style="font-size:12px;color:#9E8B6E;font-weight:600;letter-spacing:.5px;margin-bottom:12px">视频概况</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            ${[['内容主题',ov.contentTheme||'—'],['预计时长',ov.estDuration||'—'],['整体风格',ov.style||'—'],['文案字数',`${result.scriptExcerpt?'有样本':'—'}`]].map(([k,v])=>`
+              <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px">
+                <div style="font-size:11px;color:#6E6255;margin-bottom:4px">${k}</div>
+                <div style="font-size:13px;color:#F5E8D0;font-weight:500;line-height:1.5">${esc(v)}</div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+
+      // 文案精华摘录
+      const excerptCard = result.scriptExcerpt ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:10px">开头原文摘录</div>
+          <div style="background:#FAF8F5;border-radius:10px;padding:12px;border-left:3px solid #F5602A">
+            <div style="font-size:13px;color:#2A241E;line-height:1.7">${esc(result.scriptExcerpt)}</div>
+          </div>
+        </div>` : '';
+
+      // 结构拆解（开场/中段/结尾）
+      const structItems = [['开场（前5秒）',st.opening],['中段展开',st.development],['结尾引导',st.cta]].filter(([,v])=>v&&v!=='—');
+      const structCard = structItems.length ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:12px">结构拆解</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${structItems.map(([label,val])=>`
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                <div style="min-width:6px;height:6px;border-radius:50%;background:#F5602A;margin-top:7px;flex-shrink:0"></div>
+                <div>
+                  <div style="font-size:11.5px;font-weight:600;color:#9E6B3A;margin-bottom:3px">${esc(label)}</div>
+                  <div style="font-size:13px;color:#2A241E;line-height:1.65">${esc(val)}</div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>` : '';
+
+      // 语言特征
+      const langCard = (result.language && result.language !== '—') ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">语言特征</div>
+          <div style="font-size:13px;color:#2A241E;line-height:1.75">${esc(result.language)}</div>
+        </div>` : '';
+
+      // 可写入规律
+      const rulesBlock = rules.length ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div>
+            <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${rules.map((item,idx)=>`
+              <div onclick="S.originalLearningResult.rules[${idx}].checked=!S.originalLearningResult.rules[${idx}].checked;render()"
+                   style="background:${item.checked?'#FFF8F3':'#FAF8F5'};border-radius:11px;padding:12px 13px;border:1.5px solid ${item.checked?'#F5602A':'transparent'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;-webkit-tap-highlight-color:transparent">
+                <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+                  ${item.checked?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+                </div>
+                <div style="flex:1">
+                  <div style="font-size:13px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
+                  ${item.freq?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.freq)}</div>`:''}
+                </div>
+              </div>`).join('')}
+          </div>
         </div>
-        <div style="background:#FAF8F5;border-radius:12px;padding:14px;font-size:13.5px;color:#2A241E;line-height:1.75;border-left:2.5px solid #F5602A;margin-bottom:14px">${esc(insight)}</div>
-        <button type="button" onclick="writeOriginalLearning()" style="width:100%;padding:13px 0;border:none;border-radius:16px;background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff;font-size:15px;font-weight:700;cursor:pointer">${scope==='global'?'写入 Skill（全局生效）':'用于本项目'}</button>
-      </div>` : `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效规律</div>`;
+        <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()"
+                style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">
+          ${scope==='global'?`写入 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}
+        </button>` : '';
+
+      resultBlock = `<div style="margin:0 0 24px">${ovCard}${excerptCard}${structCard}${langCard}${rulesBlock}</div>`;
+    }
   } else {
     // 账号分析：新格式（analysis 对象）
     if (!result || (!result.rules?.length && !result.overview)) {
@@ -8086,11 +8158,10 @@ async function analyzeOriginalLearning() {
         }
         setState({ originalLearningResult: analysis, originalLearningLoading: false });
       } else {
-        // 视频类型：保持旧格式（数组）
-        const items = r.data.insight
-          ? [{ label: '视频规律', text: r.data.insight, source: '', checked: true }]
-          : [];
-        setState({ originalLearningResult: items, originalLearningLoading: false });
+        // 视频类型：新格式（analysis 对象）
+        const analysis = r.data.analysis || {};
+        // rules 已由后端预设 checked:true，前端保持即可
+        setState({ originalLearningResult: analysis, originalLearningLoading: false });
       }
     } else {
       setState({ originalLearningLoading: false });
