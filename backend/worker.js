@@ -110,9 +110,14 @@ async function doTranscribe(taskId, mp4Urls, cacheKey, asrUrl, openaiKey, openai
       }
       if (!transcript && transcript !== '') throw new Error('ASR 识别超时（超过10分钟）');
     } catch (asrErr) {
-      if (!openaiKey) throw new Error(`本地语音识别服务不可用 (${asrErr.message})，且未配置 OpenAI API Key 作为备用`);
+      if (!openaiKey) throw new Error(`本地ASR失败(${asrErr.message})，且未配置 OpenAI Key 作为备用`);
       console.warn(`[Worker] 本地ASR失败，降级到Whisper: ${asrErr.message}`);
-      transcript = await transcribeWithWhisper(mp4Urls, openaiKey, openaiBaseUrl);
+      try {
+        transcript = await transcribeWithWhisper(mp4Urls, openaiKey, openaiBaseUrl);
+      } catch (whisperErr) {
+        // 把本地 ASR 的真实原因也带出来，方便排查
+        throw new Error(`本地ASR失败(${asrErr.message})；云端Whisper降级也失败: ${whisperErr.message}`);
+      }
     }
   } else if (openaiKey) {
     transcript = await transcribeWithWhisper(mp4Urls, openaiKey, openaiBaseUrl);
