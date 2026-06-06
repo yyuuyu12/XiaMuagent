@@ -30,8 +30,9 @@ async function transcribeWithWhisper(mp4Urls, apiKey, baseUrl) {
   }
   if (!videoBuffer) throw new Error(`视频下载失败 (${lastErr})，无法通过 Whisper 转写`);
 
-  if (videoBuffer.byteLength > 24 * 1024 * 1024) {
-    throw new Error('视频文件超过 24MB，无法通过 Whisper 转写，请换较短的视频');
+  // OpenAI Whisper API 硬限制 25MB；超出时给出明确提示（本地 ASR 不受此限制）
+  if (videoBuffer.byteLength > 25 * 1024 * 1024) {
+    throw new Error(`视频文件 ${(videoBuffer.byteLength / 1024 / 1024).toFixed(1)}MB 超过 OpenAI Whisper 25MB 上限，请确认本地 ASR 服务（asr.yyagent.top）正常运行后重试`);
   }
 
   const formData = new FormData();
