@@ -554,7 +554,7 @@ ${v.script.slice(0, 1500)}
     const videos = await fetchUserRecentVideos(secUserId, tikhubKey, 20);
     if (!videos.length) return res.status(422).json({ code: 422, msg: '未获取到该账号的视频，请确认主页链接正确' });
 
-    // 取点赞最高的前 6 条拉取真实字幕，结合标题构成语料
+    // 取点赞最高的前 6 条拉取真实字幕，结合所有标题构成语料
     const top = videos.slice().sort((a, b) => b.likes - a.likes).slice(0, 6);
     const subResults = await Promise.allSettled(
       top.map(v => fetchVideoScript(`https://www.douyin.com/video/${v.aweme_id}`, tikhubKey))
@@ -562,43 +562,86 @@ ${v.script.slice(0, 1500)}
     const corpusParts = [];
     subResults.forEach((r, i) => {
       if (r.status === 'fulfilled' && r.value.script.trim()) {
-        corpusParts.push(`【视频${i + 1}·赞${top[i].likes}】${r.value.script.slice(0, 400)}`);
+        const charCount = r.value.script.length;
+        const estSec = Math.round(charCount / 2.5);
+        corpusParts.push(`【视频${i + 1}·赞${top[i].likes}·约${estSec}秒】\n${r.value.script.slice(0, 600)}`);
       }
     });
-    // 字幕不足时，用所有视频标题作为补充语料
     const descCorpus = videos.filter(v => v.desc).slice(0, 20).map(v => `· ${v.desc}`).join('\n');
-    const corpus = (corpusParts.join('\n\n') + '\n\n【视频标题集】\n' + descCorpus).slice(0, 4000);
+    const corpus = (corpusParts.join('\n\n') + '\n\n【全部视频标题】\n' + descCorpus).slice(0, 5000);
 
     if (!corpus.replace(/[\s【】·]/g, '').trim()) {
       return res.status(422).json({ code: 422, msg: '该账号视频缺少可分析的文案内容' });
     }
 
-    const prompt = `你是资深短视频口播文案分析师。下面是某抖音账号近期多条视频的真实文案/标题语料：
+    const prompt = `你是一位资深短视频运营分析师。以下是某抖音账号近期 ${videos.length} 条视频的真实字幕/标题语料（按点赞排序）：
+
 ---
 ${corpus}
 ---
-请归纳这个账号反复出现的创作规律（钩子、结构、用词、结尾等）。
+
+请对这个账号做一次完整深度拆解，严格以 JSON 格式返回下面的结构，不要输出 JSON 之外的任何内容：
+
+{
+  "overview": {
+    "videoCount": ${videos.length},
+    "contentTheme": "内容方向，25字内，说清赛道和人群",
+    "avgDuration": "根据字数推算典型时长，150字≈60秒，300字≈2分钟",
+    "style": "整体风格，15字内，如：快节奏口语化、强数字感"
+  },
+  "topScripts": [
+    { "label": "赞XXX", "text": "该视频文案原文前150字，原样摘录不要改写" }
+  ],
+  "structure": {
+    "opening": "开场（0-5秒）：具体用什么手法抓注意力，从语料里引用真实例句说明",
+    "twist": "转折时机：约在第几秒出现转折或反转，转折套路是什么，引用真实例子",
+    "body": "主体展开：内容如何组织（如3步骤/案例/对比），节奏怎样，具体说明",
+    "cta": "结尾引导：用什么方式促互动或行动，引用语料中真实例句"
+  },
+  "topics": "选题规律（3-5句）：聚焦哪些话题方向、常用哪些切入角度、如何找到选题点",
+  "language": "语言特征（3-5句）：语速快慢、句子长短、口语化程度、有无标志性句式或口头禅",
+  "rules": [
+    { "text": "可复用创作手法，20-40字，具体到怎么做、带真实例子更好", "freq": "出现X次" }
+  ]
+}
+
 要求：
-1. 提炼 3-5 条最显著、可复用的规律，每条 15-40 字，具体可执行
-2. 基于语料中真实出现的频次估计每条规律的出现情况
-3. 严格用 JSON 数组返回，每项含 text(规律) 和 freq(如"出现 8 次")，不要输出 JSON 以外的任何内容
-示例：[{"text":"用'你以为X其实Y'制造反差","freq":"出现 9 次"}]`;
+- topScripts 取语料中点赞最高的 2-3 条，原文摘录，不要改写
+- structure 四个字段都要有具体细节，不能泛泛而谈，必须结合真实语料内容
+- rules 给出 4-5 条，每条聚焦一个具体可操作手法
+- 全部基于提供的语料，不编造数据`;
 
-    const aiResult = await callAI(prompt, { maxTokens: 700, temperature: 0.5 });
-    let insights = [];
+    const aiResult = await callAI(prompt, { maxTokens: 1500, temperature: 0.5 });
+
+    let analysis = null;
     try {
-      const jsonMatch = aiResult.match(/\[[\s\S]*\]/);
-      if (jsonMatch) insights = JSON.parse(jsonMatch[0]);
+      const jsonMatch = aiResult.match(/\{[\s\S]*\}/);
+      if (jsonMatch) analysis = JSON.parse(jsonMatch[0]);
     } catch (_) {
-      insights = aiResult.split('\n').filter(l => l.trim()).slice(0, 5).map(l => ({
-        text: l.replace(/^[-•\d.、\s]+/, '').replace(/^["「]|["」]$/g, '').trim(),
-        freq: '基于近期视频',
-      })).filter(x => x.text);
+      // JSON 解析失败降级：把 AI 返回文本拆成几条 rules
+      analysis = {
+        overview: { videoCount: videos.length, contentTheme: '解析中', avgDuration: '—', style: '—' },
+        topScripts: [],
+        structure: { opening: '—', twist: '—', body: '—', cta: '—' },
+        topics: aiResult.slice(0, 200),
+        language: '—',
+        rules: aiResult.split('\n').filter(l => l.trim().length > 10).slice(0, 5).map(l => ({
+          text: l.replace(/^[-•\d.、\s"「」"]+/, '').trim(),
+          freq: '基于近期视频',
+        })).filter(x => x.text.length > 5),
+      };
     }
-    insights = (insights || []).filter(x => x && x.text).slice(0, 5);
-    if (!insights.length) return res.status(422).json({ code: 422, msg: '未能提炼到有效规律，请换个账号试试' });
 
-    res.json({ code: 200, data: { type: 'account', insights, analyzedCount: videos.length } });
+    if (!analysis || (!analysis.rules?.length && !analysis.topics)) {
+      return res.status(422).json({ code: 422, msg: '未能提炼到有效分析，请换个账号试试' });
+    }
+
+    // 规范化 rules
+    analysis.rules = (analysis.rules || []).filter(x => x && x.text).slice(0, 5);
+    // 规范化 topScripts
+    analysis.topScripts = (analysis.topScripts || []).slice(0, 3);
+
+    res.json({ code: 200, data: { type: 'account', analysis, analyzedCount: videos.length } });
   } catch (err) {
     console.error('/original/learning/analyze error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });

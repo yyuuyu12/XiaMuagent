@@ -7591,32 +7591,108 @@ function tOriginalLearning() {
         <button type="button" onclick="writeOriginalLearning()" style="width:100%;padding:13px 0;border:none;border-radius:16px;background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff;font-size:15px;font-weight:700;cursor:pointer">${scope==='global'?'写入 Skill（全局生效）':'用于本项目'}</button>
       </div>` : `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效规律</div>`;
   } else {
-    if (!result || result.length === 0) {
-      resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效规律</div>`;
+    // 账号分析：新格式（analysis 对象）
+    if (!result || (!result.rules?.length && !result.overview)) {
+      resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效分析</div>`;
     } else {
-      const checkedCount = result.filter(r=>r.checked).length;
-      const items = result.map((item, idx) => `
-        <div onclick="S.originalLearningResult[${idx}].checked=!S.originalLearningResult[${idx}].checked;render()" style="background:${item.checked?'#FFF8F3':'#fff'};border-radius:12px;padding:13px 14px;border:1.5px solid ${item.checked?'#F5602A':'#F0EDE8'};cursor:pointer;display:flex;align-items:flex-start;gap:11px;transition:all .15s;-webkit-tap-highlight-color:transparent">
-          <div style="width:20px;height:20px;border-radius:6px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .15s">
-            ${item.checked?'<svg width="11" height="9" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+      const ov = result.overview || {};
+      const topScripts = result.topScripts || [];
+      const st = result.structure || {};
+      const rules = result.rules || [];
+      const checkedCount = rules.filter(r => r.checked).length;
+
+      // 概况卡
+      const overviewCard = `
+        <div style="background:#1E1A14;border-radius:16px;padding:16px;margin-bottom:12px">
+          <div style="font-size:12px;color:#9E8B6E;font-weight:600;letter-spacing:.5px;margin-bottom:12px">账号概况</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            ${[
+              ['内容方向', ov.contentTheme || '—'],
+              ['典型时长', ov.avgDuration || '—'],
+              ['整体风格', ov.style || '—'],
+              ['分析视频', `${ov.videoCount || '—'} 条`],
+            ].map(([k,v]) => `
+              <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px">
+                <div style="font-size:11px;color:#6E6255;margin-bottom:4px">${k}</div>
+                <div style="font-size:13px;color:#F5E8D0;font-weight:500;line-height:1.5">${esc(v)}</div>
+              </div>`).join('')}
           </div>
-          <div style="flex:1">
-            <div style="font-size:13.5px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
-            ${item.source?`<div style="font-size:11px;color:#B0AA9F;margin-top:4px">${esc(item.source)}</div>`:''}
+        </div>`;
+
+      // 文案样本
+      const scriptsCard = topScripts.length ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:12px">文案样本</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${topScripts.map(s => `
+              <div style="background:#FAF8F5;border-radius:10px;padding:12px;border-left:3px solid #F5602A">
+                <div style="font-size:11px;color:#B0AA9F;margin-bottom:6px">${esc(s.label || '')}</div>
+                <div style="font-size:13px;color:#2A241E;line-height:1.7">${esc(s.text || '')}</div>
+              </div>`).join('')}
           </div>
-        </div>`).join('');
-      resultBlock = `
-        <div style="margin:0 0 24px">
+        </div>` : '';
+
+      // 结构拆解
+      const structItems = [
+        ['开场（0-5秒）', st.opening],
+        ['转折时机', st.twist],
+        ['主体展开', st.body],
+        ['结尾引导', st.cta],
+      ].filter(([,v]) => v && v !== '—');
+      const structCard = structItems.length ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:12px">结构拆解</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${structItems.map(([label, val]) => `
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                <div style="min-width:6px;height:6px;border-radius:50%;background:#F5602A;margin-top:7px;flex-shrink:0"></div>
+                <div>
+                  <div style="font-size:11.5px;font-weight:600;color:#9E6B3A;margin-bottom:3px">${esc(label)}</div>
+                  <div style="font-size:13px;color:#2A241E;line-height:1.65">${esc(val)}</div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>` : '';
+
+      // 选题 & 语言
+      const topicsCard = (result.topics && result.topics !== '—') ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">选题规律</div>
+          <div style="font-size:13px;color:#2A241E;line-height:1.75">${esc(result.topics)}</div>
+        </div>` : '';
+      const langCard = (result.language && result.language !== '—') ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">语言特征</div>
+          <div style="font-size:13px;color:#2A241E;line-height:1.75">${esc(result.language)}</div>
+        </div>` : '';
+
+      // 可写入规律（勾选列表）
+      const rulesBlock = rules.length ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              <span style="font-size:14px;font-weight:700;color:#1A1614">发现 ${result.length} 条规律</span>
-            </div>
+            <div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div>
             <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">${items}</div>
-          <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()" style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">${scope==='global'?`写入 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}</button>
-        </div>`;
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${rules.map((item, idx) => `
+              <div onclick="S.originalLearningResult.rules[${idx}].checked=!S.originalLearningResult.rules[${idx}].checked;render()"
+                   style="background:${item.checked?'#FFF8F3':'#FAF8F5'};border-radius:11px;padding:12px 13px;border:1.5px solid ${item.checked?'#F5602A':'transparent'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;transition:all .15s;-webkit-tap-highlight-color:transparent">
+                <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;transition:all .15s">
+                  ${item.checked?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+                </div>
+                <div style="flex:1">
+                  <div style="font-size:13px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
+                  ${item.freq?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.freq)}</div>`:''}
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()"
+                style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">
+          ${scope==='global'?`写入 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}
+        </button>` : '';
+
+      resultBlock = `<div style="margin:0 0 24px">${overviewCard}${scriptsCard}${structCard}${topicsCard}${langCard}${rulesBlock}</div>`;
     }
   }
 
@@ -8002,20 +8078,20 @@ async function analyzeOriginalLearning() {
       projectId,
     });
     if (r.code === 200) {
-      let items = [];
       if (r.data.type === 'account') {
-        items = (r.data.insights || []).map(item => ({
-          label: '账号规律',
-          text: item.text,
-          source: item.freq || '',
-          checked: true,
-        }));
-      } else {
-        if (r.data.insight) {
-          items = [{ label: '视频规律', text: r.data.insight, source: '', checked: true }];
+        // 新格式：完整 analysis 对象
+        const analysis = r.data.analysis || {};
+        if (analysis.rules) {
+          analysis.rules = analysis.rules.map(rule => ({ ...rule, checked: true }));
         }
+        setState({ originalLearningResult: analysis, originalLearningLoading: false });
+      } else {
+        // 视频类型：保持旧格式（数组）
+        const items = r.data.insight
+          ? [{ label: '视频规律', text: r.data.insight, source: '', checked: true }]
+          : [];
+        setState({ originalLearningResult: items, originalLearningLoading: false });
       }
-      setState({ originalLearningResult: items, originalLearningLoading: false });
     } else {
       setState({ originalLearningLoading: false });
       showToast(r.msg || '分析失败');
@@ -8025,7 +8101,14 @@ async function analyzeOriginalLearning() {
 }
 
 async function writeOriginalLearning() {
-  const selected = (S.originalLearningResult || []).filter(r => r.checked);
+  const result = S.originalLearningResult;
+  // 兼容新格式（analysis 对象）和旧格式（数组）
+  let selected = [];
+  if (result && result.rules && Array.isArray(result.rules)) {
+    selected = result.rules.filter(r => r.checked);
+  } else if (Array.isArray(result)) {
+    selected = result.filter(r => r.checked);
+  }
   if (selected.length === 0) { showToast('请至少选择一条'); return; }
   try {
     const skill = S.originalSkill || { rules: {}, keywords: [], forbidden: [] };
@@ -8033,14 +8116,15 @@ async function writeOriginalLearning() {
     const groupName = '学习中心同步';
     if (!rules[groupName]) rules[groupName] = [];
     selected.forEach(item => {
-      rules[groupName].push({ text: item.text, source: item.source || S.originalLearningUrl, uses: 0 });
+      const exists = rules[groupName].some(r => r.text === item.text);
+      if (!exists) rules[groupName].push({ text: item.text, source: item.freq || S.originalLearningUrl, uses: 0 });
     });
     const r = await api.put('/original/skill', { rules, keywords: skill.keywords || [], forbidden: skill.forbidden || [] });
     if (r.code === 200) {
       const rSkill = await api.get('/original/skill');
       if (rSkill.code === 200) setState({ originalSkill: rSkill.data });
       setState({ originalLearningResult: null, originalLearningUrl: '' });
-      showToast(`已写入 ${selected.length} 条规律 ✓`);
+      showToast(`已写入 ${selected.length} 条规律`);
     } else {
       showToast(r.msg || '写入失败');
     }
