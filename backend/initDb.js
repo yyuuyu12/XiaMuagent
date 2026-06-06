@@ -182,14 +182,12 @@ async function initDb() {
     `INSERT IGNORE INTO system_config (config_key, value) VALUES ('video_url', '')`
   );
 
-  // DeepSeek AI 配置（强制写入，确保可用）
+  // AI 默认配置（INSERT IGNORE：仅首次插入，不覆盖管理后台已保存的选择）
   await db.query(
-    `INSERT INTO system_config (config_key, value) VALUES ('ai_provider', 'deepseek')
-     ON DUPLICATE KEY UPDATE value = 'deepseek'`
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('ai_provider', 'deepseek')`
   );
   await db.query(
-    `INSERT INTO system_config (config_key, value) VALUES ('deepseek_api_key', 'sk-49991c5474b14a2aa47f60541765f04d')
-     ON DUPLICATE KEY UPDATE value = IF(value = '' OR value IS NULL, 'sk-49991c5474b14a2aa47f60541765f04d', value)`
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('deepseek_api_key', 'sk-49991c5474b14a2aa47f60541765f04d')`
   );
   await db.query(
     `INSERT IGNORE INTO system_config (config_key, value) VALUES ('deepseek_model', 'deepseek-chat')`
