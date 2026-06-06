@@ -1,22 +1,46 @@
 const express = require('express');
+const https = require('https');
 const db = require('../db');
 const { requireAuth } = require('./auth');
 const { getAsrUrl, extractMp4Url, asrTranscribe } = require('../lib/asrHelper');
 const router = express.Router();
 
 async function checkUsage(userId) {
-  const { rows } = await db.query('SELECT daily_limit, role FROM users WHERE id = $1', [userId]);
+  const { rows } = await db.query('SELECT daily_limit, role FROM users WHERE id = ?', [userId]);
   const user = rows[0];
   if (!user) return { ok: false, msg: '用户不存在，请重新登录' };
   if (user.role === 'admin') return { ok: true, remaining: 999 };
   const { rows: u } = await db.query(
-    'SELECT COUNT(*) AS cnt FROM usage_logs WHERE user_id = $1 AND DATE(created_at) = CURRENT_DATE',
+    'SELECT COUNT(*) AS cnt FROM usage_logs WHERE user_id = ? AND DATE(created_at) = CURDATE()',
     [userId]
   );
   const used = parseInt(u[0].cnt);
   if (used >= user.daily_limit) return { ok: false, msg: `今日次数已用完（${user.daily_limit}次），明日再来` };
-  await db.query('INSERT INTO usage_logs (user_id, action) VALUES ($1, $2)', [userId, 'extract']);
+  await db.query('INSERT INTO usage_logs (user_id, action) VALUES (?, ?)', [userId, 'extract']);
   return { ok: true, remaining: user.daily_limit - used - 1 };
+}
+
+/**
+ * 用 https.get 手动处理一级重定向，取 Location 头里的视频 URL。
+ * 避免 Node.js native fetch 在 Location 含中文字符时抛 ByteString 错误。
+ */
+function getRedirectLocation(url, timeout = 6000) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { req.destroy(); resolve(''); }, timeout);
+    let resolved = false;
+    const done = (val) => { if (!resolved) { resolved = true; clearTimeout(timer); resolve(val); } };
+
+    const req = https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+        'Accept': '*/*',
+      },
+    }, (res) => {
+      res.resume(); // 不读 body，只要 headers
+      done(res.headers?.location || '');
+    });
+    req.on('error', () => done(''));
+  });
 }
 
 // 从抖音链接提取文案
@@ -32,25 +56,30 @@ router.post('/video', requireAuth, async (req, res) => {
     const tikhubKey = rows[0]?.value;
     if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员' });
 
-    // 从输入文本中提取真实链接（支持分享文本）
+    // 从分享文本中提取 URL
     const inputText = url.trim();
     const urlMatch = inputText.match(/https?:\/\/[^\s，。,）)]+/) || inputText.match(/(?:v\.douyin\.com|www\.douyin\.com)\/[^\s，。,]+/);
     const cleanUrl = urlMatch ? urlMatch[0].replace(/[）)>》\]]+$/, '') : inputText;
     const finalUrl = cleanUrl.startsWith('http') ? cleanUrl : 'https://' + cleanUrl;
 
-    // 解析 aweme_id（支持短链重定向）
+    // 解析 aweme_id
     let awemeId = null;
     const direct = finalUrl.match(/\/video\/(\d{10,20})/);
     if (direct) {
       awemeId = direct[1];
     } else {
+      // 用 https 模块手动跟随重定向，避免 fetch redirect:follow 遇到中文 Location 时崩溃
       try {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 6000);
-        const resp = await fetch(finalUrl, { method: 'GET', redirect: 'follow', signal: controller.signal });
-        clearTimeout(tid);
-        const m = (resp.url || '').match(/\/video\/(\d{10,20})/);
-        if (m) awemeId = m[1];
+        const loc1 = await getRedirectLocation(finalUrl);
+        const m1 = loc1.match(/\/video\/(\d{10,20})/);
+        if (m1) {
+          awemeId = m1[1];
+        } else if (loc1) {
+          // 可能还有一级跳转
+          const loc2 = await getRedirectLocation(loc1);
+          const m2 = loc2.match(/\/video\/(\d{10,20})/);
+          if (m2) awemeId = m2[1];
+        }
       } catch {}
     }
     if (!awemeId) throw new Error('无法解析视频ID，请确认是有效的抖音视频链接');
@@ -70,7 +99,7 @@ router.post('/video', requireAuth, async (req, res) => {
     }
     if (!item) throw new Error('视频信息获取失败，请检查链接是否有效');
 
-    // 1. 优先用 TikHub 内置字幕（快，无延迟）
+    // 1. 优先用 TikHub 内置字幕
     let script = '';
     try {
       const subtitleResp = await fetch(
@@ -86,7 +115,7 @@ router.post('/video', requireAuth, async (req, res) => {
       }
     } catch {}
 
-    // 2. 没有内置字幕 → 发给本地 Whisper ASR 转录
+    // 2. 无字幕 → ASR 转录
     if (!script) {
       const mp4Url = extractMp4Url(item);
       const asrUrl = await getAsrUrl();
@@ -96,7 +125,7 @@ router.post('/video', requireAuth, async (req, res) => {
       }
     }
 
-    // 3. ASR 也没结果 → 兜底用视频描述
+    // 3. 兜底用视频描述
     if (!script) script = item.desc || '未能提取到文案内容（视频可能无口播）';
 
     res.json({
