@@ -1,10 +1,30 @@
 // routes/original.js — 原创工坊：Skill + 项目 + 对话 + 学习中心
 const express = require('express');
+const https = require('https');
 const db = require('../db');
 const { requireAuth } = require('./auth');
 const { callAI } = require('../lib/callAI');
 const { getAsrUrl, extractMp4Url, asrTranscribe } = require('../lib/asrHelper');
 const router = express.Router();
+
+/**
+ * 手动取一次重定向的 Location 头（不用 fetch，避免 Node.js undici 对含中文字符
+ * 的 Location 抛 ByteString 错误）
+ */
+function getRedirectLocation(url, timeout = 6000) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const done = (val) => { if (!resolved) { resolved = true; clearTimeout(timer); resolve(val); } };
+    const timer = setTimeout(() => { try { req.destroy(); } catch {} done(''); }, timeout);
+    const req = https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+        'Accept': '*/*',
+      },
+    }, (res) => { res.resume(); done(res.headers?.location || ''); });
+    req.on('error', () => done(''));
+  });
+}
 
 /* ─────────── 工具函数 ─────────── */
 
@@ -26,7 +46,7 @@ function extractDouyinVideoUrl(input) {
   return '';
 }
 
-// 从 URL 或短链中解析 aweme_id（跟随重定向）
+// 从 URL 或短链中解析 aweme_id（跟随重定向，用 https.get 避免 ByteString 问题）
 async function resolveAwemeId(url) {
   // 1. 直接从完整 URL 提取（/video/XXXXXXXXXXXXXXXX）
   const direct = url.match(/\/video\/(\d{10,20})/);
@@ -34,15 +54,18 @@ async function resolveAwemeId(url) {
   // 2. 从查询参数提取
   const qp = url.match(/[?&]aweme_id=(\d{10,20})/);
   if (qp) return qp[1];
-  // 3. 短链跟随重定向
+  // 3. 短链跟随重定向（最多两跳）
   try {
-    const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 6000);
-    const resp = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal });
-    clearTimeout(tid);
-    const finalUrl = resp.url || '';
-    const m = finalUrl.match(/\/video\/(\d{10,20})/);
-    if (m) return m[1];
+    const loc1 = await getRedirectLocation(url);
+    if (loc1) {
+      const m1 = loc1.match(/\/video\/(\d{10,20})/);
+      if (m1) return m1[1];
+      const loc2 = await getRedirectLocation(loc1);
+      if (loc2) {
+        const m2 = loc2.match(/\/video\/(\d{10,20})/);
+        if (m2) return m2[1];
+      }
+    }
   } catch {}
   return null;
 }
@@ -506,9 +529,24 @@ ${v.script.slice(0, 1500)}
     }
 
     /* ── 账号主页：拉真实近期视频 → AI 归纳高频规律 ── */
-    // 先尝试从分享文本中提取 URL
-    const accountRealUrl = extractDouyinVideoUrl(url) || url;
-    const secUserId = extractSecUserId(accountRealUrl);
+    // 先从分享文本中提取 URL（支持短链 / 完整链接 / 纯文本粘贴）
+    const accountRealUrl = extractDouyinVideoUrl(url) || url.trim();
+    let secUserId = extractSecUserId(accountRealUrl);
+
+    // 若直接提取不到 sec_user_id，跟随短链重定向（最多两跳）
+    if (!secUserId) {
+      try {
+        const loc1 = await getRedirectLocation(accountRealUrl);
+        if (loc1) {
+          secUserId = extractSecUserId(loc1);
+          if (!secUserId) {
+            const loc2 = await getRedirectLocation(loc1);
+            if (loc2) secUserId = extractSecUserId(loc2);
+          }
+        }
+      } catch {}
+    }
+
     if (!secUserId) {
       return res.status(422).json({ code: 422, msg: '未识别到账号主页链接。请打开抖音 → 进入对方主页 → 点右上角分享 → 复制链接，再粘贴到这里' });
     }
