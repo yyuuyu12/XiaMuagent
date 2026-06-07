@@ -185,6 +185,7 @@ async function getOrCreateSkill(userId) {
       rules: typeof s.rules === 'string' ? JSON.parse(s.rules) : (s.rules || {}),
       keywords: typeof s.keywords === 'string' ? JSON.parse(s.keywords) : (s.keywords || []),
       forbidden: typeof s.forbidden === 'string' ? JSON.parse(s.forbidden) : (s.forbidden || []),
+      checkPrompt: s.check_prompt || '',
       updatedAt: s.updated_at,
     };
   }
@@ -242,7 +243,7 @@ router.get('/skill', requireAuth, async (req, res) => {
 
 // PUT /api/original/skill — 全量更新 skill（管理员或用户手动编辑）
 router.put('/skill', requireAuth, async (req, res) => {
-  const { rules, keywords, forbidden } = req.body;
+  const { rules, keywords, forbidden, checkPrompt } = req.body;
   try {
     // 先确保记录存在
     await getOrCreateSkill(req.userId);
@@ -254,8 +255,8 @@ router.put('/skill', requireAuth, async (req, res) => {
     const newVer = `v${parts[0]}.${parts[1]}`;
 
     await db.query(
-      'UPDATE cw_skills SET rules = ?, keywords = ?, forbidden = ?, version = ? WHERE user_id = ?',
-      [JSON.stringify(rules || {}), JSON.stringify(keywords || []), JSON.stringify(forbidden || []), newVer, req.userId]
+      'UPDATE cw_skills SET rules = ?, keywords = ?, forbidden = ?, check_prompt = ?, version = ? WHERE user_id = ?',
+      [JSON.stringify(rules || {}), JSON.stringify(keywords || []), JSON.stringify(forbidden || []), checkPrompt ?? null, newVer, req.userId]
     );
     const skill = await getOrCreateSkill(req.userId);
     res.json({ code: 200, data: skill });

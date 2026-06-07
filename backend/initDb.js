@@ -508,6 +508,9 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // cw_skills 表：补 check_prompt 列（验收指令，用户手动管理）
+  try { await db.query('ALTER TABLE cw_skills ADD COLUMN check_prompt TEXT DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] check_prompt:', e.message||e); }
+
   console.log('✅ 数据库初始化完成');
 }
 
