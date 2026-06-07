@@ -30,7 +30,7 @@ function extractMp4Url(item) {
  * @returns {Promise<string>}  转录文本，失败返回空字符串
  */
 async function asrTranscribe(mp4Url, asrBaseUrl) {
-  if (!mp4Url || !asrBaseUrl) return '';
+  if (!mp4Url || !asrBaseUrl) return { text: '', error: 'mp4Url 或 asrBaseUrl 为空' };
   try {
     // 1. 提交异步任务
     const ctrl1 = new AbortController();
@@ -43,11 +43,10 @@ async function asrTranscribe(mp4Url, asrBaseUrl) {
     });
     clearTimeout(t1);
     if (!submitResp.ok) {
-      console.warn('[ASR] submit 失败:', submitResp.status);
-      return '';
+      return { text: '', error: `ASR submit 失败 HTTP ${submitResp.status}` };
     }
     const { task_id } = await submitResp.json();
-    if (!task_id) return '';
+    if (!task_id) return { text: '', error: 'ASR 未返回 task_id' };
     console.log(`[ASR] 任务已提交 task_id=${task_id}`);
 
     // 2. 轮询结果（3s 间隔，最多 90s = 30 次）
@@ -62,20 +61,19 @@ async function asrTranscribe(mp4Url, asrBaseUrl) {
           const result = await pollResp.json();
           if (result.status === 'done' && result.text) {
             console.log(`[ASR] 转录完成，${result.text.length} 字`);
-            return result.text;
+            return { text: result.text, error: '' };
           }
           if (result.status === 'error') {
             console.warn('[ASR] 转录出错:', result.error);
-            return '';
+            return { text: '', error: result.error || 'ASR 转录失败' };
           }
         }
       } catch {}
     }
-    console.warn('[ASR] 等待超时（90s）');
+    return { text: '', error: 'ASR 等待超时（90s）' };
   } catch (err) {
-    console.warn('[ASR] 调用失败:', err.message);
+    return { text: '', error: `ASR 调用失败: ${err.message}` };
   }
-  return '';
 }
 
 module.exports = { getAsrUrl, extractMp4Url, asrTranscribe };

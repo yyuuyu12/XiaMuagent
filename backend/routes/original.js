@@ -123,12 +123,19 @@ async function fetchVideoScript(url, tikhubKey) {
   } catch {}
 
   // 2. 无内置字幕 → 发给本地 Whisper ASR 转录
+  let asrError = '';
   if (!script.trim()) {
     const mp4Url = extractMp4Url(item);
     const asrUrl = await getAsrUrl();
-    if (mp4Url && asrUrl) {
-      console.log(`[Original] TikHub 无字幕，启动 ASR 转录: aweme_id=${awemeId}`);
-      script = await asrTranscribe(mp4Url, asrUrl);
+    if (!mp4Url) {
+      asrError = 'TikHub 未返回可用的视频下载地址';
+    } else if (!asrUrl) {
+      asrError = 'ASR 服务地址未配置';
+    } else {
+      console.log(`[Original] TikHub 无字幕，启动 ASR 转录: aweme_id=${awemeId} mp4Url=${mp4Url.slice(0,60)}...`);
+      const asrResult = await asrTranscribe(mp4Url, asrUrl);
+      script = asrResult.text || '';
+      asrError = asrResult.error || '';
       if (script.trim()) scriptSource = 'asr';
     }
   }
@@ -138,6 +145,7 @@ async function fetchVideoScript(url, tikhubKey) {
   return {
     script: script.trim(),
     scriptSource,            // 'subtitle' | 'asr' | ''（空表示口播未取到）
+    asrError,                // 转录具体失败原因，便于用户排查
     desc: item.desc || '',
     likes: item.statistics?.digg_count || 0,
     author: item.author?.nickname || '',
@@ -538,7 +546,10 @@ router.post('/learning/extract', requireAuth, async (req, res) => {
       }
       const awemeId = await resolveAwemeId(realUrl);
       const v = await fetchVideoScript(realUrl, tikhubKey);
-      if (!v.script.trim()) return res.status(422).json({ code: 422, msg: '没取到这条视频的口播原文：该视频无内置字幕、语音转录也未成功（可能是纯画面/BGM、本地转录服务未在线）。换一条有口播的视频再试，注意学习的是口播内容而非标题。' });
+      if (!v.script.trim()) {
+        const reason = v.asrError ? `转录失败原因：${v.asrError}` : '可能是纯画面/BGM，或本地转录服务未在线';
+        return res.status(422).json({ code: 422, msg: `没取到这条视频的口播原文：无内置字幕，${reason}` });
+      }
       const estSec = Math.round(v.script.length / 2.5);
       return res.json({
         code: 200,
