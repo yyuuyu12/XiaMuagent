@@ -11,13 +11,15 @@ async function getAsrUrl() {
   }
 }
 
-// 从 TikHub 返回的 item 对象中提取最优 mp4 地址
+// 从 TikHub 返回的 item 对象中提取 mp4 地址
+// 优先用 play_addr（播放流，文件小，下载快，Whisper 识别效果一样）
+// 避免用 download_addr（原始高清文件，动辄 100-300MB，容易超时）
 function extractMp4Url(item) {
   if (!item) return '';
   const candidates = [
-    item.video?.download_addr?.url_list?.[0],
     item.video?.play_addr?.url_list?.[0],
     item.video?.bit_rate?.[0]?.play_addr?.url_list?.[0],
+    item.video?.download_addr?.url_list?.[0],
   ];
   return candidates.find(u => u && u.startsWith('http')) || '';
 }
@@ -49,8 +51,8 @@ async function asrTranscribe(mp4Url, asrBaseUrl) {
     if (!task_id) return { text: '', error: 'ASR 未返回 task_id' };
     console.log(`[ASR] 任务已提交 task_id=${task_id}`);
 
-    // 2. 轮询结果（3s 间隔，最多 90s = 30 次）
-    for (let i = 0; i < 30; i++) {
+    // 2. 轮询结果（3s 间隔，最多 180s = 60 次）
+    for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 3000));
       try {
         const ctrl2 = new AbortController();
