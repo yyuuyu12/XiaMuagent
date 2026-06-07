@@ -1315,8 +1315,8 @@ const S = {
   originalProjects: [],      // 项目列表
   originalMessages: [],      // 当前项目消息列表
   originalChatTab: 'chat',   // 'chat'|'doc'
-  originalSkillMode: 'structured', // 'structured'|'free'
-  originalSkillFreeTextDraft: '', // 自由编辑草稿
+  originalSkillFreeTextDraft: null, // 自由编辑草稿（null=未初始化）
+  originalSkillHistoryOpen: false,  // 历史记录弹窗
   originalInput: '',
   originalLoading: false,
   originalLearningUrl: '',
@@ -1853,10 +1853,13 @@ function tTopBar() {
     }
     const titles = { skill: '我的 Skill', learning: '学习中心', new: '新建项目', home: '原创工坊' };
     const back = v === 'home' ? "setState({currentTab:'home'});render()" : "setState({originalView:'home'});render()";
+    const rightSlotOrig = v === 'skill'
+      ? `<button onclick="_skillOpenHistory()" style="width:36px;height:36px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#9E9890;-webkit-tap-highlight-color:transparent" title="历史记录"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v4l3 3M3.05 11A9 9 0 1 0 4 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`
+      : `<div style="width:36px;flex-shrink:0"></div>`;
     return `<div class="top-bar top-bar-sub">
       <button type="button" class="back-btn" onclick="${back}" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <span class="sub-page-title">${titles[v] || '原创工坊'}</span>
-      <div style="width:36px;flex-shrink:0"></div>
+      ${rightSlotOrig}
     </div>`;
   }
 
@@ -7486,7 +7489,7 @@ function tOriginalHome() {
 
   return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 24px">
     <!-- Skill 暗色卡 -->
-    <div onclick="setState({originalView:'skill'});render()" style="margin:0 16px 14px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:22px;padding:18px 20px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent">
+    <div onclick="setState({originalView:'skill',originalSkillFreeTextDraft:null,originalSkillHistoryOpen:false});render()" style="margin:0 16px 14px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:22px;padding:18px 20px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent">
       <div style="position:absolute;top:-25px;right:-15px;width:120px;height:120px;border-radius:50%;background:rgba(255,184,119,0.06)"></div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;position:relative">
         <div>
@@ -7539,297 +7542,79 @@ function tOriginalSkill() {
   const skill = S.originalSkill;
   if (!skill) return `<div style="background:#FAF9F6;min-height:100%;padding:40px 16px;text-align:center;color:#B0AA9F;font-size:14px">暂无数据</div>`;
 
-  const rules = skill.rules || {};
-  const keywords = skill.keywords || [];
-  const forbidden = skill.forbidden || [];
-  const allRules = Object.values(rules).flat();
-  const em = S.originalSkillEditModal; // { group, idx, text } | { group, idx:'new', text:'' } | { type:'checkPrompt', text }
   const saving = S.originalSkillSaving;
-  const mode = S.originalSkillMode || 'structured'; // 'structured'|'free'
+  const historyOpen = S.originalSkillHistoryOpen;
+  const history = skill.freeTextHistory || [];
 
-  const sectionHeader = (label) => `
-    <div style="font-size:13px;font-weight:700;color:#6B5F55;letter-spacing:0.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
-      <div style="height:1px;width:16px;background:#D8D2C9"></div>${esc(label)}<div style="flex:1;height:1px;background:#D8D2C9"></div>
-    </div>`;
+  // 草稿：null 表示未初始化，自动从 freeText 填充
+  const draft = S.originalSkillFreeTextDraft !== null ? S.originalSkillFreeTextDraft : (skill.freeText || '');
 
-  // 编辑图标
-  const editIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-
-  const ruleGroups = Object.entries(rules).map(([group, items]) => {
-    if (!Array.isArray(items)) return '';
-    return `<div style="margin-bottom:28px">
-      ${sectionHeader(group)}
-      <div style="display:flex;flex-direction:column;gap:10px">
-        ${items.map((r, idx) => {
-          const text = typeof r === 'string' ? r : (r.text || '');
-          return `<div style="display:flex;gap:10px;align-items:flex-start">
-            <div style="font-size:15px;color:#C85A10;margin-top:2px;flex-shrink:0;line-height:1.7">·</div>
-            <div style="flex:1;font-size:14.5px;color:#1A1614;line-height:1.75">${esc(text)}</div>
-            <button onclick="_skillOpenEdit(${JSON.stringify(group)},${idx},${JSON.stringify(text)})"
-              style="flex-shrink:0;background:none;border:none;color:#B0AA9F;padding:4px;cursor:pointer;border-radius:6px;margin-top:2px;-webkit-tap-highlight-color:transparent">${editIcon}</button>
-          </div>`;
-        }).join('')}
-        <button onclick="_skillOpenEdit(${JSON.stringify(group)},'new','')"
-          style="display:flex;align-items:center;gap:6px;background:none;border:1.5px dashed #D8D2C9;border-radius:10px;padding:8px 12px;cursor:pointer;color:#9E9890;font-size:13px;width:100%;margin-top:4px;-webkit-tap-highlight-color:transparent">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-          添加条目
-        </button>
-      </div>
-    </div>`;
-  }).join('');
-
-  const checkPromptVal = skill.checkPrompt || '';
-  const checkPromptSection = `
-    <div style="margin-bottom:28px">
-      ${sectionHeader('验收指令')}
-      <div style="font-size:12px;color:#B0AA9F;margin-bottom:10px;line-height:1.6">写作完成后让 AI 自查用。将这段指令加在写作 prompt 末尾，AI 会按清单逐项检查再输出。</div>
-      <div onclick="_skillOpenEditCheckPrompt()" style="background:#fff;border:1.5px solid #EDE9E3;border-radius:12px;padding:13px 14px;cursor:pointer;min-height:60px">
-        ${checkPromptVal
-          ? `<div style="font-size:13px;color:#2A241E;line-height:1.7;white-space:pre-wrap">${esc(checkPromptVal.slice(0,120))}${checkPromptVal.length>120?'…':''}</div>`
-          : `<div style="font-size:13px;color:#B0AA9F">点击输入验收指令…</div>`}
-      </div>
-    </div>`;
-
-  // 编辑弹窗
-  const modal = em ? `
-    <div onclick="if(event.target===this)_skillCloseEdit()" style="position:fixed;inset:0;z-index:9000;background:rgba(26,22,20,0.45);display:flex;align-items:flex-end;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)">
-      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,0.12)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-          <span style="font-size:15px;font-weight:700;color:#1A1614">${em.type==='checkPrompt' ? '验收指令' : (em.idx==='new' ? `新增 · ${esc(em.group)}` : `编辑 · ${esc(em.group)}`)}</span>
-          <button onclick="_skillCloseEdit()" style="background:none;border:none;color:#B0AA9F;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+  // 历史记录底部弹窗
+  const historySheet = historyOpen ? `
+    <div onclick="if(event.target===this)setState({originalSkillHistoryOpen:false});render()" style="position:fixed;inset:0;z-index:9200;background:rgba(26,22,20,0.5);display:flex;align-items:flex-end;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)">
+      <div style="background:#fff;border-radius:22px 22px 0 0;width:100%;max-height:75vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 -4px 24px rgba(0,0,0,0.14)">
+        <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F0EDE8;flex-shrink:0">
+          <span style="font-size:15px;font-weight:700;color:#1A1614">历史记录</span>
+          <button onclick="setState({originalSkillHistoryOpen:false});render()" style="background:none;border:none;color:#B0AA9F;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">×</button>
         </div>
-        <textarea id="_skill_edit_ta" oninput="S.originalSkillEditModal={...S.originalSkillEditModal,text:this.value}"
-          style="width:100%;height:${em.type==='checkPrompt'?'220px':'120px'};border:1.5px solid #EDE9E3;border-radius:12px;padding:12px;font-size:14px;color:#1A1614;line-height:1.7;font-family:inherit;resize:none;box-sizing:border-box;outline:none"
-          placeholder="${em.type==='checkPrompt' ? '输入验收指令，如：请对照以下清单自查…' : '输入规律内容…'}">${esc(em.text)}</textarea>
-        <div style="display:flex;gap:10px;margin-top:12px">
-          ${em.idx !== 'new' && em.type !== 'checkPrompt' ? `<button onclick="_skillDeleteRule(${JSON.stringify(em.group)},${em.idx})" style="flex:0 0 auto;padding:12px 16px;border:none;border-radius:12px;background:#FFF0F0;color:#E5372A;font-size:14px;font-weight:600;cursor:pointer">删除</button>` : ''}
-          <button onclick="_skillSaveEdit()" ${saving?'disabled':''} style="flex:1;padding:13px 0;border:none;border-radius:12px;background:${saving?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${saving?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${saving?'default':'pointer'}">
-            ${saving ? '保存中…' : '保存'}
-          </button>
+        <div style="overflow-y:auto;flex:1;padding:12px 0 24px">
+          ${history.length === 0
+            ? `<div style="padding:32px;text-align:center;color:#B0AA9F;font-size:14px">暂无历史记录<br><span style="font-size:12px">每次保存前的内容会自动存档</span></div>`
+            : history.map((h, i) => {
+                const preview = (h.text || '').replace(/\n/g, ' ').slice(0, 60);
+                const d = new Date(h.savedAt);
+                const label = `${d.getMonth()+1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                return `<div onclick="_skillRestoreHistory(${i})" style="padding:12px 20px;cursor:pointer;border-bottom:1px solid #F8F5F0;-webkit-tap-highlight-color:transparent;active:background:#FFF8F2">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                    <span style="font-size:13px;font-weight:600;color:#1A1614">${label}</span>
+                    <span style="font-size:12px;color:#F5602A;font-weight:600">还原</span>
+                  </div>
+                  <div style="font-size:12px;color:#9E9890;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(preview) || '（空）'}</div>
+                </div>`;
+              }).join('')}
         </div>
       </div>
     </div>` : '';
 
-  // 模式切换 Tab
-  const modeTabs = `
-    <div style="display:flex;background:#F0EDE8;border-radius:12px;padding:3px;gap:2px">
-      <button onclick="_skillSetMode('structured')" style="flex:1;padding:7px 0;border:none;border-radius:9px;font-size:13px;font-weight:${mode==='structured'?700:500};background:${mode==='structured'?'#fff':'transparent'};color:${mode==='structured'?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${mode==='structured'?'0 1px 4px rgba(0,0,0,0.1)':'none'};transition:all .15s;-webkit-tap-highlight-color:transparent">条目视图</button>
-      <button onclick="_skillSetMode('free')" style="flex:1;padding:7px 0;border:none;border-radius:9px;font-size:13px;font-weight:${mode==='free'?700:500};background:${mode==='free'?'#fff':'transparent'};color:${mode==='free'?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${mode==='free'?'0 1px 4px rgba(0,0,0,0.1)':'none'};transition:all .15s;-webkit-tap-highlight-color:transparent">自由编辑</button>
-    </div>`;
-
-  // 自由编辑面板
-  const freeEditPanel = `
-    <div style="padding:0 16px 32px">
-      <div style="font-size:12px;color:#B0AA9F;margin-bottom:10px;line-height:1.6">直接写 Markdown / 纯文本。AI 创作时会优先读取这里的内容，结构化规则作为补充。</div>
+  return `<div style="background:#FAF9F6;min-height:100%;padding:8px 0 32px">
+    <div style="padding:0 16px 6px">
+      <div style="font-size:12px;color:#B0AA9F;line-height:1.6">Markdown / 纯文本，AI 创作时优先读取。</div>
+    </div>
+    <div style="padding:0 16px 80px">
       <textarea id="_skill_free_ta"
         oninput="setState({originalSkillFreeTextDraft:this.value})"
-        style="width:100%;min-height:420px;border:1.5px solid #EDE9E3;border-radius:14px;padding:14px 16px;font-size:14px;color:#1A1614;line-height:1.8;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;background:#fff"
-        placeholder="例如：
+        style="width:100%;min-height:calc(100vh - 200px);border:1.5px solid #EDE9E3;border-radius:16px;padding:16px;font-size:14px;color:#1A1614;line-height:1.85;font-family:inherit;resize:none;box-sizing:border-box;outline:none;background:#fff"
+        placeholder="自由写，支持 Markdown 格式：
 
 ## 人设
 我是一个…
 
 ## 开场钩子
 - 用数字+反差做开头
-- 前3秒必须出现核心卖点
+- 前3秒必须抓住用户
 
 ## 内容结构
 …
 
 ## 禁忌
 - 不讲技术原理
-…
 
 ## 验收标准
-…">${esc(S.originalSkillFreeTextDraft !== null && S.originalSkillFreeTextDraft !== undefined ? S.originalSkillFreeTextDraft : (skill.freeText || ''))}</textarea>
-      <button onclick="_skillSaveFreeText()" ${saving?'disabled':''} style="margin-top:12px;width:100%;padding:14px 0;border:none;border-radius:14px;background:${saving?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${saving?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${saving?'default':'pointer'};letter-spacing:0.5px">
-        ${saving ? '保存中…' : '保存自由编辑'}
-      </button>
-      ${skill.freeText ? `<button onclick="_skillClearFreeText()" style="margin-top:10px;width:100%;padding:11px 0;border:1.5px solid #EDE9E3;border-radius:14px;background:transparent;color:#B0AA9F;font-size:14px;cursor:pointer">清除自由编辑内容（恢复条目视图）</button>` : ''}
-    </div>`;
+…">${esc(draft)}</textarea>
+    </div>
 
-  return `<div style="background:#FAF9F6;min-height:100%;padding:4px 0 32px">
-    <div style="padding:0 16px 14px">
-      ${modeTabs}
+    <!-- 底部固定保存栏 -->
+    <div style="position:fixed;bottom:0;left:0;right:0;padding:12px 16px 28px;background:linear-gradient(to top,#FAF9F6 70%,rgba(250,249,246,0));pointer-events:none;z-index:100">
+      <button onclick="_skillSaveFreeText()" ${saving?'disabled':''} style="pointer-events:all;width:100%;padding:14px 0;border:none;border-radius:16px;background:${saving?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${saving?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${saving?'default':'pointer'};letter-spacing:0.5px;box-shadow:0 4px 16px rgba(245,96,42,0.3)">
+        ${saving ? '保存中…' : '保存'}
+      </button>
     </div>
-    <div style="padding:0 16px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="font-size:12px;color:#B0AA9F">最后更新 ${formatRelTime(skill.updated_at) || '—'}</span>
-      <span style="color:#D8D2C9">·</span>
-      <span style="font-size:12px;color:#B0AA9F">${allRules.length} 条规则 · ${keywords.length} 高频词 · ${forbidden.length} 禁区${skill.freeText ? ' · <span style="color:#C85A10">自由编辑已启用</span>' : ''}</span>
-    </div>
-    ${mode === 'free' ? freeEditPanel : `
-    <div style="padding:0 16px">
-      ${skill.freeText ? `<div style="background:#FFF8F2;border:1px solid #FFD9B8;border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:8px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#C85A10" stroke-width="2" stroke-linecap="round"/></svg>
-        <span style="font-size:12px;color:#C85A10;flex:1">已启用自由编辑，AI 创作以自由文本为主。</span>
-        <button onclick="_skillSetMode('free')" style="background:none;border:none;color:#F5602A;font-size:12px;font-weight:700;cursor:pointer;padding:0">编辑</button>
-      </div>` : ''}
-      ${ruleGroups || `<div style="padding:24px 0;text-align:center;color:#B0AA9F;font-size:14px">还没有规律，开始创作并同步积累吧</div>`}
-      ${forbidden.length > 0 ? `
-        <div style="margin-bottom:28px">
-          ${sectionHeader('禁忌清单')}
-          <div style="display:flex;flex-direction:column;gap:10px">
-            ${forbidden.map((f,fi)=>{
-              const text = typeof f === 'string' ? f : (f.text||'');
-              return `<div style="display:flex;align-items:flex-start;gap:10px">
-                <div style="width:18px;height:18px;border-radius:5px;background:#FFF0F0;border:1px solid #FECACA;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:3px">
-                  <svg width="9" height="9" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="#E5372A" stroke-width="2.2" stroke-linecap="round"/></svg>
-                </div>
-                <div style="flex:1;font-size:14px;color:#4A3828;line-height:1.6">${esc(text)}</div>
-                <button onclick="_skillOpenEditForbidden(${fi},${JSON.stringify(text)})" style="flex-shrink:0;background:none;border:none;color:#B0AA9F;padding:4px;cursor:pointer;-webkit-tap-highlight-color:transparent">${editIcon}</button>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>` : ''}
-      ${keywords.length > 0 ? `
-        <div style="margin-bottom:28px">
-          ${sectionHeader('高频词')}
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${keywords.map(k=>`<span style="font-size:14px;color:#1A1614;background:#FFF3E8;border:1px solid #FFD9B8;padding:5px 14px;border-radius:20px;font-weight:500">${esc(k)}</span>`).join('')}
-          </div>
-        </div>` : ''}
-      ${checkPromptSection}
-    </div>`}
-    ${modal}
+
+    ${historySheet}
   </div>`;
 }
 
-// ── Skill 内联编辑辅助函数 ──────────────────────────────────────────
-function _skillOpenEdit(group, idx, text) {
-  setState({ originalSkillEditModal: { group, idx, text: text || '' } });
-  render();
-  setTimeout(() => { const ta = document.getElementById('_skill_edit_ta'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 60);
-}
-function _skillOpenEditForbidden(idx, text) {
-  setState({ originalSkillEditModal: { type: 'forbidden', idx, text: text || '' } });
-  render();
-  setTimeout(() => { const ta = document.getElementById('_skill_edit_ta'); if (ta) ta.focus(); }, 60);
-}
-function _skillOpenEditCheckPrompt() {
-  const cp = (S.originalSkill && S.originalSkill.checkPrompt) || '';
-  setState({ originalSkillEditModal: { type: 'checkPrompt', text: cp } });
-  render();
-  setTimeout(() => { const ta = document.getElementById('_skill_edit_ta'); if (ta) ta.focus(); }, 60);
-}
-function _skillCloseEdit() {
-  setState({ originalSkillEditModal: null });
-  render();
-}
-async function _skillSaveEdit() {
-  const em = S.originalSkillEditModal;
-  if (!em) return;
-  const text = em.text.trim();
-  const skill = S.originalSkill;
-  if (!skill) return;
-
-  const rules = JSON.parse(JSON.stringify(skill.rules || {}));
-  const forbidden = (skill.forbidden || []).slice();
-  let checkPrompt = skill.checkPrompt || '';
-
-  if (em.type === 'checkPrompt') {
-    checkPrompt = text;
-  } else if (em.type === 'forbidden') {
-    if (!text) { forbidden.splice(em.idx, 1); }
-    else { forbidden[em.idx] = text; }
-  } else {
-    // rule in a group
-    if (!rules[em.group]) rules[em.group] = [];
-    const arr = rules[em.group];
-    if (em.idx === 'new') {
-      if (text) arr.push({ text, source: '手动添加', sourceType: 'manual', uses: 0 });
-    } else {
-      if (!text) { arr.splice(em.idx, 1); }
-      else { const old = arr[em.idx]; arr[em.idx] = old && typeof old === 'object' ? { ...old, text } : { text, source: '手动编辑', sourceType: 'manual', uses: 0 }; }
-      if (arr.length === 0) delete rules[em.group];
-    }
-  }
-
-  setState({ originalSkillSaving: true });
-  render();
-  try {
-    const r = await api.put('/original/skill', { rules, keywords: skill.keywords || [], forbidden, checkPrompt });
-    if (r.code === 200) {
-      setState({ originalSkill: r.data, originalSkillEditModal: null, originalSkillSaving: false });
-      showToast('已保存');
-    } else {
-      setState({ originalSkillSaving: false });
-      showToast(r.msg || '保存失败');
-    }
-  } catch { setState({ originalSkillSaving: false }); showToast('网络错误'); }
-  render();
-}
-async function _skillDeleteRule(group, idx) {
-  const skill = S.originalSkill;
-  if (!skill) return;
-  const rules = JSON.parse(JSON.stringify(skill.rules || {}));
-  if (rules[group]) {
-    rules[group].splice(idx, 1);
-    if (rules[group].length === 0) delete rules[group];
-  }
-  setState({ originalSkillSaving: true });
-  render();
-  try {
-    const r = await api.put('/original/skill', { rules, keywords: skill.keywords || [], forbidden: skill.forbidden || [], checkPrompt: skill.checkPrompt || '' });
-    if (r.code === 200) setState({ originalSkill: r.data, originalSkillEditModal: null, originalSkillSaving: false });
-    else setState({ originalSkillSaving: false });
-  } catch { setState({ originalSkillSaving: false }); }
-  showToast('已删除');
-  render();
-}
-
 // ── Skill 自由编辑辅助函数 ──────────────────────────────────────────
-function _skillSetMode(mode) {
-  // 切到自由编辑时，预填草稿：如果已有 freeText 用它，否则把结构化内容转成 Markdown
-  if (mode === 'free') {
-    const skill = S.originalSkill;
-    const existing = skill && skill.freeText ? skill.freeText : '';
-    let draft = S.originalSkillFreeTextDraft;
-    // 仅当草稿为空且没有保存的 freeText 时，自动从结构化转换
-    if (!draft && !existing && skill) {
-      draft = _skillToMarkdown(skill);
-    }
-    setState({ originalSkillMode: 'free', originalSkillFreeTextDraft: draft !== undefined ? draft : (existing || '') });
-  } else {
-    setState({ originalSkillMode: mode });
-  }
-  render();
-  if (mode === 'free') {
-    setTimeout(() => {
-      const ta = document.getElementById('_skill_free_ta');
-      if (ta) ta.focus();
-    }, 60);
-  }
-}
-
-// 把结构化 Skill 转成可读的 Markdown 文本（供自动预填）
-function _skillToMarkdown(skill) {
-  if (!skill) return '';
-  const lines = [];
-  const rules = skill.rules || {};
-  for (const [group, arr] of Object.entries(rules)) {
-    if (Array.isArray(arr) && arr.length > 0) {
-      lines.push(`## ${group}`);
-      arr.forEach(r => lines.push(`- ${typeof r === 'string' ? r : (r.text || '')}`));
-      lines.push('');
-    }
-  }
-  if ((skill.keywords || []).length > 0) {
-    lines.push(`## 高频词`);
-    lines.push(skill.keywords.join('、'));
-    lines.push('');
-  }
-  if ((skill.forbidden || []).length > 0) {
-    lines.push(`## 禁忌清单`);
-    skill.forbidden.forEach(f => lines.push(`- ${typeof f === 'string' ? f : (f.text || '')}`));
-    lines.push('');
-  }
-  if (skill.checkPrompt) {
-    lines.push(`## 验收指令`);
-    lines.push(skill.checkPrompt);
-  }
-  return lines.join('\n').trim();
-}
-
 async function _skillSaveFreeText() {
   const ta = document.getElementById('_skill_free_ta');
   const text = ta ? ta.value : (S.originalSkillFreeTextDraft || '');
@@ -7839,7 +7624,7 @@ async function _skillSaveFreeText() {
     const r = await api.put('/original/skill', { freeText: text });
     if (r.code === 200) {
       setState({ originalSkill: r.data, originalSkillSaving: false, originalSkillFreeTextDraft: text });
-      showToast('自由编辑已保存 ✓');
+      showToast('已保存 ✓');
     } else {
       setState({ originalSkillSaving: false });
       showToast(r.msg || '保存失败');
@@ -7848,21 +7633,19 @@ async function _skillSaveFreeText() {
   render();
 }
 
-async function _skillClearFreeText() {
-  if (!confirm('确认清除自由编辑内容？清除后将只使用条目规则。')) return;
-  setState({ originalSkillSaving: true });
+function _skillOpenHistory() {
+  setState({ originalSkillHistoryOpen: true });
   render();
-  try {
-    const r = await api.put('/original/skill', { freeText: '' });
-    if (r.code === 200) {
-      setState({ originalSkill: r.data, originalSkillSaving: false, originalSkillFreeTextDraft: '', originalSkillMode: 'structured' });
-      showToast('已清除');
-    } else {
-      setState({ originalSkillSaving: false });
-      showToast(r.msg || '操作失败');
-    }
-  } catch { setState({ originalSkillSaving: false }); showToast('网络错误'); }
+}
+
+function _skillRestoreHistory(idx) {
+  const history = (S.originalSkill && S.originalSkill.freeTextHistory) || [];
+  const entry = history[idx];
+  if (!entry) return;
+  setState({ originalSkillFreeTextDraft: entry.text, originalSkillHistoryOpen: false });
   render();
+  showToast('已还原，记得点保存');
+  setTimeout(() => { const ta = document.getElementById('_skill_free_ta'); if (ta) ta.focus(); }, 80);
 }
 
 // 逐句标注的角色配色

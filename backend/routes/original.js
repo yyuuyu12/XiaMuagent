@@ -187,6 +187,9 @@ async function getOrCreateSkill(userId) {
       forbidden: typeof s.forbidden === 'string' ? JSON.parse(s.forbidden) : (s.forbidden || []),
       checkPrompt: s.check_prompt || '',
       freeText: s.free_text || '',
+      freeTextHistory: s.free_text_history
+        ? (typeof s.free_text_history === 'string' ? JSON.parse(s.free_text_history) : s.free_text_history)
+        : [],
       updatedAt: s.updated_at,
     };
   }
@@ -195,7 +198,7 @@ async function getOrCreateSkill(userId) {
     "INSERT INTO cw_skills (user_id, version, rules, keywords, forbidden) VALUES (?, 'v1.0', '{}', '[]', '[]')",
     [userId]
   );
-  return { version: 'v1.0', rules: {}, keywords: [], forbidden: [], checkPrompt: '', freeText: '', updatedAt: new Date() };
+  return { version: 'v1.0', rules: {}, keywords: [], forbidden: [], checkPrompt: '', freeText: '', freeTextHistory: [], updatedAt: new Date() };
 }
 
 // 验证项目归属
@@ -266,11 +269,20 @@ router.put('/skill', requireAuth, async (req, res) => {
     parts[1] = (parts[1] || 0) + 1;
     const newVer = `v${parts[0]}.${parts[1]}`;
 
-    // freeText 模式：只更新 free_text 列（rules 等不动）
+    // freeText 模式：只更新 free_text 列（rules 等不动），同时记录历史
     if (typeof freeText === 'string' && freeText !== undefined && rules === undefined) {
+      // 把旧内容推进历史（最多保留 10 条）
+      const { rows: oldRows } = await db.query('SELECT free_text, free_text_history FROM cw_skills WHERE user_id = ?', [req.userId]);
+      const oldText = oldRows?.[0]?.free_text || '';
+      const rawHist = oldRows?.[0]?.free_text_history;
+      let history = rawHist ? (typeof rawHist === 'string' ? JSON.parse(rawHist) : rawHist) : [];
+      if (oldText.trim()) {
+        history.unshift({ text: oldText, savedAt: new Date().toISOString() });
+        if (history.length > 10) history = history.slice(0, 10);
+      }
       await db.query(
-        'UPDATE cw_skills SET free_text = ?, version = ? WHERE user_id = ?',
-        [freeText || null, newVer, req.userId]
+        'UPDATE cw_skills SET free_text = ?, free_text_history = ?, version = ? WHERE user_id = ?',
+        [freeText || null, JSON.stringify(history), newVer, req.userId]
       );
     } else {
       await db.query(
