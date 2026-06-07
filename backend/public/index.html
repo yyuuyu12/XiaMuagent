@@ -1333,6 +1333,7 @@ const S = {
   originalNewPlatform: 'douyin', // 'douyin'|'shipinhao'|'xiaohongshu'
   originalTopics: [],            // 智能选题列表
   originalTopicsLoading: false,  // 正在生成选题
+  originalSkillQuickModal: null, // { text, saving } 快速记 Skill 弹窗
   // ===== 智能体 =====
   agentsList: [], agentsLoading: false, agentsLoaded: false,
   selectedAgent: null, agentInputs: {}, agentRunning: false, agentResult: null, agentErr: '',
@@ -7622,6 +7623,48 @@ function tOriginalSkill() {
   </div>`;
 }
 
+// ── 对话内快速记 Skill ──────────────────────────────────────────
+function _openSkillQuick() {
+  setState({ originalSkillQuickModal: { text: '', saving: false } });
+  render();
+  setTimeout(() => { const ta = document.getElementById('_skill_quick_ta'); if (ta) ta.focus(); }, 60);
+}
+
+async function _skillQuickSave() {
+  const modal = S.originalSkillQuickModal;
+  if (!modal || modal.saving) return;
+  const text = (modal.text || '').trim();
+  if (!text) { showToast('请输入规则内容'); return; }
+
+  setState({ originalSkillQuickModal: { ...modal, saving: true } });
+  render();
+
+  try {
+    // 把新内容追加到 freeText 末尾
+    const skill = S.originalSkill;
+    const existing = (skill && skill.freeText) || '';
+    const separator = existing.trim() ? '\n\n' : '';
+    const newFreeText = existing + separator + text;
+
+    const r = await api.put('/original/skill', { freeText: newFreeText });
+    if (r.code === 200) {
+      setState({
+        originalSkill: r.data,
+        originalSkillQuickModal: null,
+        originalSkillFreeTextDraft: null, // 重置草稿，下次进 Skill 页会重新读
+      });
+      showToast('已记入 Skill ✓');
+    } else {
+      setState({ originalSkillQuickModal: { ...modal, saving: false } });
+      showToast(r.msg || '保存失败');
+    }
+  } catch {
+    setState({ originalSkillQuickModal: { ...modal, saving: false } });
+    showToast('网络错误');
+  }
+  render();
+}
+
 // ── Skill 自由编辑辅助函数 ──────────────────────────────────────────
 async function _skillSaveFreeText() {
   const ta = document.getElementById('_skill_free_ta');
@@ -8176,15 +8219,39 @@ function tOriginalChat() {
   </div>`;
 
   const inputActive = !!(S.originalInput && S.originalInput.trim()) && !loading;
-  const inputBar = `<div style="padding:10px 14px 22px;background:rgba(247,245,241,0.97);border-top:1px solid rgba(0,0,0,0.06);display:flex;gap:8px;align-items:center;flex-shrink:0">
-    <div style="flex:1;background:#fff;border-radius:22px;border:1.5px solid ${inputActive?'#F5602A':'#EDE9E3'};padding:10px 15px;transition:border-color .2s">
-      <input id="orig-chat-input" value="${esc(S.originalInput||'')}" oninput="S.originalInput=this.value;_origChatInputState()" onkeydown="if(event.key==='Enter'){event.preventDefault();sendOriginalMessage()}"
-        placeholder="告诉我想调整什么…" style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit" />
+  const skillQuickModal = S.originalSkillQuickModal; // { text, saving }
+  const skillQuickSheet = skillQuickModal ? `
+    <div onclick="if(event.target===this){setState({originalSkillQuickModal:null});render()}" style="position:fixed;inset:0;z-index:9300;background:rgba(26,22,20,0.5);display:flex;align-items:flex-end;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)">
+      <div style="background:#fff;border-radius:22px 22px 0 0;width:100%;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,0.14)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:15px;font-weight:700;color:#1A1614">📌 记入 Skill</span>
+          <button onclick="setState({originalSkillQuickModal:null});render()" style="background:none;border:none;color:#B0AA9F;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+        </div>
+        <div style="font-size:12px;color:#B0AA9F;margin-bottom:12px">直接追加到 Skill 自由编辑末尾，不影响现有内容</div>
+        <textarea id="_skill_quick_ta" oninput="S.originalSkillQuickModal={...S.originalSkillQuickModal,text:this.value}"
+          style="width:100%;height:100px;border:1.5px solid #EDE9E3;border-radius:12px;padding:12px;font-size:14px;color:#1A1614;line-height:1.7;font-family:inherit;resize:none;box-sizing:border-box;outline:none"
+          placeholder="例如：- 禁止用"这只是其中一个功能"这类AI腔套话&#10;- 开场必须是动作或数字，不能是自我介绍">${esc(skillQuickModal.text||'')}</textarea>
+        <button onclick="_skillQuickSave()" ${skillQuickModal.saving?'disabled':''} style="margin-top:12px;width:100%;padding:13px 0;border:none;border-radius:14px;background:${skillQuickModal.saving?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${skillQuickModal.saving?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${skillQuickModal.saving?'default':'pointer'}">
+          ${skillQuickModal.saving?'保存中…':'追加到 Skill'}
+        </button>
+      </div>
+    </div>` : '';
+
+  const inputBar = `<div style="padding:6px 14px 22px;background:rgba(247,245,241,0.97);border-top:1px solid rgba(0,0,0,0.06);flex-shrink:0">
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="_openSkillQuick()" title="记入 Skill" style="width:38px;height:38px;border-radius:50%;background:#FFF3E8;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+      <div style="flex:1;background:#fff;border-radius:22px;border:1.5px solid ${inputActive?'#F5602A':'#EDE9E3'};padding:10px 15px;transition:border-color .2s">
+        <input id="orig-chat-input" value="${esc(S.originalInput||'')}" oninput="S.originalInput=this.value;_origChatInputState()" onkeydown="if(event.key==='Enter'){event.preventDefault();sendOriginalMessage()}"
+          placeholder="告诉我想调整什么…" style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit" />
+      </div>
+      <div id="orig-chat-send" onclick="sendOriginalMessage()" style="width:44px;height:44px;border-radius:50%;background:${inputActive?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};display:flex;align-items:center;justify-content:center;cursor:${inputActive?'pointer':'default'};flex-shrink:0;transition:all .2s;box-shadow:${inputActive?'0 4px 12px rgba(245,96,42,0.35)':'none'}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${inputActive?'#fff':'#B0AA9F'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </div>
     </div>
-    <div id="orig-chat-send" onclick="sendOriginalMessage()" style="width:44px;height:44px;border-radius:50%;background:${inputActive?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};display:flex;align-items:center;justify-content:center;cursor:${inputActive?'pointer':'default'};flex-shrink:0;transition:all .2s;box-shadow:${inputActive?'0 4px 12px rgba(245,96,42,0.35)':'none'}">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${inputActive?'#fff':'#B0AA9F'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-    </div>
-  </div>`;
+  </div>
+  ${skillQuickSheet}`;
 
   const docCopyBtnId = 'orig-doc-copy';
   const docView = `<div style="flex:1;overflow-y:auto;min-height:0;padding:12px 22px 24px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch">
