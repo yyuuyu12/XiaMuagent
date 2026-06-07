@@ -7620,9 +7620,19 @@ function _renderLearnVideo(v, showHeader) {
         <div style="font-size:11px;color:#9E8B6E;font-weight:600;margin-bottom:3px">套路一句话</div>
         <div style="font-size:13.5px;color:#F5E8D0;line-height:1.55;font-weight:500">${esc(v.summary)}</div>
       </div>` : ''}
-      ${v.rhythm && v.rhythm !== '—' ? `<div style="margin-bottom:12px">
-        <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:5px">文案节奏</div>
-        <div style="font-size:13px;color:#2A241E;line-height:1.7">${esc(v.rhythm)}</div>
+      ${(v.persona || v.topic || v.rhythm && v.rhythm !== '—' || v.structure) ? `
+      <div style="background:#FBF6EF;border:1px solid #F0E6D8;border-radius:12px;padding:13px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#9E6B3A;margin-bottom:9px;letter-spacing:.5px">复刻蓝图 · 反推还原</div>
+        ${[
+          ['人设', v.persona],
+          ['选题主题', v.topic],
+          ['时长节奏', v.rhythm && v.rhythm !== '—' ? v.rhythm : ''],
+          ['结构骨架', v.structure],
+        ].filter(([,val]) => val && val.trim()).map(([label, val]) => `
+          <div style="display:flex;gap:9px;align-items:flex-start;margin-bottom:8px">
+            <span style="flex-shrink:0;font-size:11px;font-weight:700;color:#9E6B3A;background:#F3E7D6;border-radius:6px;padding:2px 7px;margin-top:1px">${label}</span>
+            <div style="flex:1;font-size:13px;color:#2A241E;line-height:1.65">${esc(val)}</div>
+          </div>`).join('')}
       </div>` : ''}
       <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:7px">原文逐句拆解</div>
       <div style="background:#FAF8F5;border-radius:10px;padding:13px;font-size:14px;color:#2A241E;line-height:2.1">${annotated || '—'}</div>
@@ -7741,22 +7751,48 @@ function tOriginalLearning() {
 
     const videoCards = videos.map(v => _renderLearnVideo(v, multi)).join('');
 
+    // 按维度分组展示，让规律读起来像一套从头到尾的复刻蓝图
+    const DIM_ORDER = ['人设｜身份','选题｜主题','时长｜节奏','结构｜骨架','开头钩子','中段展开','转折反转','结尾收束','其他'];
+    const dimKey = (d) => {
+      const s = String(d || '其他');
+      const hit = DIM_ORDER.find(k => s.indexOf(k) >= 0 || k.indexOf(s) >= 0 || k.replace(/[｜]/g,'').indexOf(s.replace(/[｜|]/g,'')) >= 0);
+      return hit || s;
+    };
+    const ruleGroups = {};
+    rules.forEach((item, idx) => {
+      const g = dimKey(item.dim);
+      (ruleGroups[g] = ruleGroups[g] || []).push({ item, idx });
+    });
+    const orderedGroups = [
+      ...DIM_ORDER.filter(g => ruleGroups[g]),
+      ...Object.keys(ruleGroups).filter(g => !DIM_ORDER.includes(g)),
+    ];
+    const renderRuleCard = ({ item, idx }) => `
+      <div onclick="S.originalLearningResult.rules[${idx}].checked=!S.originalLearningResult.rules[${idx}].checked;render()"
+           style="background:${item.checked?'#FFF8F3':'#FAF8F5'};border-radius:11px;padding:12px 13px;border:1.5px solid ${item.checked?'#F5602A':'transparent'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;-webkit-tap-highlight-color:transparent">
+        <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+          ${item.checked?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
+          ${item.freq?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.freq)}</div>`:''}
+        </div>
+      </div>`;
     const rulesBlock = rules.length ? `
       <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div>
           <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          ${rules.map((item,idx)=>`
-            <div onclick="S.originalLearningResult.rules[${idx}].checked=!S.originalLearningResult.rules[${idx}].checked;render()"
-                 style="background:${item.checked?'#FFF8F3':'#FAF8F5'};border-radius:11px;padding:12px 13px;border:1.5px solid ${item.checked?'#F5602A':'transparent'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;-webkit-tap-highlight-color:transparent">
-              <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
-                ${item.checked?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+        <div style="font-size:11px;color:#B0AA9F;line-height:1.5;margin-bottom:12px">覆盖人设·选题·节奏·结构·开头·展开·反转·结尾，拿着这套规律换个选题即可复刻同质量内容</div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          ${orderedGroups.map(g => `
+            <div>
+              <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:7px;display:flex;align-items:center;gap:6px">
+                <span style="width:3px;height:12px;background:#F5602A;border-radius:2px"></span>${esc(g)}
               </div>
-              <div style="flex:1">
-                <div style="font-size:13px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
-                ${item.freq?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.freq)}</div>`:''}
+              <div style="display:flex;flex-direction:column;gap:8px">
+                ${ruleGroups[g].map(renderRuleCard).join('')}
               </div>
             </div>`).join('')}
         </div>

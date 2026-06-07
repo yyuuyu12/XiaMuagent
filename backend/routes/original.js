@@ -595,7 +595,10 @@ async function analyzeOneVideo(item, tikhubKey) {
   const scriptForAI = script.slice(0, 1100); // 控制 token，过长截断
   const estSec = Math.round(script.length / 2.5);
 
-  const prompt = `你是顶级短视频口播文案拆解师。下面是一条抖音视频的完整口播原文，请把它"掰碎"逐句拆解，越细越好。
+  const prompt = `你是顶级短视频口播操盘手。下面是一条抖音爆款视频的完整口播原文。
+你的任务不是挑几个亮点，而是把这条视频【彻底反推还原成一套从 0 到 1 的可复刻创作蓝图】——
+要让另一个创作者只拿着这套蓝图 + 一个新选题，就能写出同等质量、同种人设、同种结构与节奏的完整视频。
+所以你给出的规律必须是"成体系、能反推出整条视频"的，而不是零散的几个亮点。
 
 【原文】
 ${scriptForAI}
@@ -605,12 +608,15 @@ ${scriptForAI}
 请严格只返回 JSON（不要输出 JSON 以外任何文字）：
 {
   "summary": "一句话点破这条视频的核心套路，30字内",
-  "rhythm": "文案节奏分析：多快进入正题、信息密度、停顿与重音、节奏在哪变化，2-4句",
+  "persona": "人设/身份/口吻：他以什么身份、对谁、用什么语气和姿态说话，2-3句",
+  "topic": "选题与主题逻辑：核心主题是什么、在第几秒或哪个位置正式界定主题、为什么目标观众会留下来看，2-3句",
+  "rhythm": "时长与节奏：总时长约多少、语速快慢、信息密度、停顿与重音、节奏在哪几处变化，2-4句",
+  "structure": "从头到尾的结构骨架：按时间顺序分段说明每一段在什么位置、抛出什么、起什么作用，写成一张能照着写的提纲，4-8句",
   "segments": [
     { "text": "原文里的一句或一小段（按自然句切分，原话不要改写）", "role": "hook|background|point|turn|example|cta|normal", "note": "这句起什么作用、为什么这么写、好在哪；普通过渡句留空字符串" }
   ],
   "rules": [
-    { "text": "可复用的创作手法，25-45字，具体到怎么做、能达到什么效果", "freq": "出现位置/次数" }
+    { "dim": "维度标签", "text": "可直接复用的创作指令，25-50字，具体到怎么做、放在视频什么位置、达到什么效果", "freq": "出现位置/次数" }
   ]
 }
 
@@ -618,9 +624,18 @@ ${scriptForAI}
 - segments 必须把原文【从头到尾完整覆盖】，按句切分，text 用原文原话，不得遗漏、不得改写
 - role 含义：hook=开场钩子 / background=铺垫背景 / point=核心观点 / turn=转折反转 / example=举例论证 / cta=结尾引导互动 / normal=过渡句
 - 至少明确标出 hook、turn、cta 分别落在哪一句；note 只在关键句写，普通句留空
-- rules 给 3-4 条`;
+- rules 是本次输出的核心：必须【覆盖下面全部 8 个维度】，每个维度给 1-3 条，合起来要能让人反推出整条视频该怎么从头写到尾。dim 字段就填下面这些标签：
+  1.「人设｜身份」创作者用什么身份、口吻、和观众的关系
+  2.「选题｜主题」选什么样的题、主题在什么位置界定、凭什么留住观众
+  3.「时长｜节奏」总时长区间、语速、信息密度、停顿与重音的用法
+  4.「结构｜骨架」最关键——开头/前段/中段/后段各自该干什么、按什么顺序推进
+  5.「开头钩子」开场前几句具体怎么设计，抓住注意力
+  6.「中段展开」用什么方式论证：举例、成本对比、制造对立冲突等
+  7.「转折反转」在哪里反转、怎么反转、制造什么认知落差
+  8.「结尾收束」怎么收尾、留什么悬念或引导动作
+- 每条 text 要写成"换个选题也能照着执行"的通用指令，不要只描述这一条视频的具体内容`;
 
-  const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.5 });
+  const aiResult = await callAI(prompt, { maxTokens: 3500, temperature: 0.5 });
   let parsed = extractJson(aiResult);
 
   // 降级：解析失败时，按句切分原文当作 segments，AI 文本塞进 rules
@@ -638,8 +653,8 @@ ${scriptForAI}
     .map(s => ({ text: String(s.text), role: s.role || 'normal', note: s.note || '' }));
   const rules = (parsed.rules || [])
     .filter(r => r && r.text)
-    .slice(0, 4)
-    .map(r => ({ text: String(r.text), freq: r.freq || '' }));
+    .slice(0, 24)
+    .map(r => ({ text: String(r.text), freq: r.freq || '', dim: r.dim ? String(r.dim) : '其他' }));
 
   return {
     awemeId: item.awemeId,
@@ -647,7 +662,10 @@ ${scriptForAI}
     likes: item.likes || 0,
     estSec,
     summary: parsed.summary || '',
+    persona: parsed.persona || '',
+    topic: parsed.topic || '',
     rhythm: parsed.rhythm || '',
+    structure: parsed.structure || '',
     segments,
     rules,
   };
@@ -679,7 +697,7 @@ router.post('/learning/analyze', requireAuth, async (req, res) => {
         const key = r.text.replace(/\s+/g, '');
         if (key && !seen.has(key)) {
           seen.add(key);
-          rules.push({ text: r.text, freq: r.freq, checked: true });
+          rules.push({ text: r.text, freq: r.freq, dim: r.dim || '其他', checked: true });
         }
       }
     }
