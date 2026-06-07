@@ -1403,13 +1403,40 @@ function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function showToast(msg) {
+function showToast(msg, duration) {
   const old = document.querySelector('.toast');
   if (old) old.remove();
   const t = document.createElement('div');
   t.className = 'toast'; t.textContent = msg;
+  // 时长自适应：按字数估算阅读时间，长文案最多停 8 秒；点一下立即关闭
+  const ms = duration || Math.min(8000, Math.max(2000, String(msg).length * 180));
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2000);
+  let timer = setTimeout(() => t.remove(), ms);
+  t.style.cursor = 'pointer';
+  t.addEventListener('click', () => { clearTimeout(timer); t.remove(); });
+}
+
+// 单按钮提示弹窗（必须手动点"知道了"才消失，适合较长/重要的提示）
+function showAlert(msg, title = '提示') {
+  const old = document.getElementById('_global_alert_modal');
+  if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = '_global_alert_modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(26,22,20,0.45);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)';
+  wrap.innerHTML = `
+    <div style="background:#fff;border-radius:18px;width:100%;max-width:320px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+      <div style="padding:22px 20px 6px">
+        <div style="font-size:16px;font-weight:700;color:#1A1814;margin-bottom:8px">${title}</div>
+        <div style="font-size:14px;color:#6B6560;line-height:1.7">${esc(msg)}</div>
+      </div>
+      <div style="border-top:1px solid #F0EEE8;margin-top:18px">
+        <button id="_alert_ok" style="width:100%;height:50px;font-size:15px;color:#F5762A;background:none;border:none;cursor:pointer;font-weight:700">知道了</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector('#_alert_ok').addEventListener('click', close);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
 }
 
 // 通用确认弹窗，返回 Promise<boolean>（true=确认，false=取消）
@@ -8184,7 +8211,7 @@ async function extractOriginalLearning() {
       });
     } else {
       setState({ originalLearningLoading: false });
-      showToast(r.msg || '未提取到内容');
+      showAlert(r.msg || '未提取到内容', '没取到原文');
     }
   } catch { setState({ originalLearningLoading: false }); showToast('网络错误'); }
   render();
@@ -8211,8 +8238,8 @@ async function analyzeOriginalLearning() {
       data.rules = (data.rules || []).map(rule => ({ ...rule, checked: rule.checked !== false }));
       setState({ originalLearningResult: data, originalLearningLoading: false });
     } else {
-      setState({ originalLearningLoading: false });
-      showToast(r.msg || '拆解失败');
+      setState({ originalLearningLoading: false, originalLearningPhase: 'select' });
+      showAlert(r.msg || '拆解失败', '拆解未成功');
     }
   } catch { setState({ originalLearningLoading: false }); showToast('网络错误'); }
   render();
