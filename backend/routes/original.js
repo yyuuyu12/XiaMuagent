@@ -186,6 +186,7 @@ async function getOrCreateSkill(userId) {
       keywords: typeof s.keywords === 'string' ? JSON.parse(s.keywords) : (s.keywords || []),
       forbidden: typeof s.forbidden === 'string' ? JSON.parse(s.forbidden) : (s.forbidden || []),
       checkPrompt: s.check_prompt || '',
+      freeText: s.free_text || '',
       updatedAt: s.updated_at,
     };
   }
@@ -194,7 +195,7 @@ async function getOrCreateSkill(userId) {
     "INSERT INTO cw_skills (user_id, version, rules, keywords, forbidden) VALUES (?, 'v1.0', '{}', '[]', '[]')",
     [userId]
   );
-  return { version: 'v1.0', rules: {}, keywords: [], forbidden: [], updatedAt: new Date() };
+  return { version: 'v1.0', rules: {}, keywords: [], forbidden: [], checkPrompt: '', freeText: '', updatedAt: new Date() };
 }
 
 // 验证项目归属
@@ -207,23 +208,34 @@ async function getProject(projectId, userId) {
 }
 
 // 把 rules 对象格式化成文本供 AI 读取
+// 若用户写了 freeText（自由编辑模式），优先使用它；结构化规则作为补充追加
 function formatRulesForPrompt(skill) {
   if (!skill) return '（暂无规则）';
-  const lines = [];
+
+  // 自由文本优先
+  const freeText = (skill.freeText || '').trim();
+
+  // 结构化规则
+  const structLines = [];
   const rules = skill.rules || {};
   for (const [group, arr] of Object.entries(rules)) {
     if (Array.isArray(arr) && arr.length > 0) {
-      lines.push(`【${group}】`);
-      arr.forEach(r => lines.push(`- ${r.text}`));
+      structLines.push(`【${group}】`);
+      arr.forEach(r => structLines.push(`- ${typeof r === 'string' ? r : r.text}`));
     }
   }
   if ((skill.keywords || []).length > 0) {
-    lines.push(`【高频词】${skill.keywords.join('、')}`);
+    structLines.push(`【高频词】${skill.keywords.join('、')}`);
   }
   if ((skill.forbidden || []).length > 0) {
-    lines.push(`【禁区】${skill.forbidden.join('、')}`);
+    structLines.push(`【禁区】${skill.forbidden.join('、')}`);
   }
-  return lines.length > 0 ? lines.join('\n') : '（暂无规则）';
+
+  if (freeText && structLines.length > 0) {
+    return `${freeText}\n\n---\n${structLines.join('\n')}`;
+  }
+  if (freeText) return freeText;
+  return structLines.length > 0 ? structLines.join('\n') : '（暂无规则）';
 }
 
 /* ═══════════════════════════════════════
@@ -243,7 +255,7 @@ router.get('/skill', requireAuth, async (req, res) => {
 
 // PUT /api/original/skill — 全量更新 skill（管理员或用户手动编辑）
 router.put('/skill', requireAuth, async (req, res) => {
-  const { rules, keywords, forbidden, checkPrompt } = req.body;
+  const { rules, keywords, forbidden, checkPrompt, freeText } = req.body;
   try {
     // 先确保记录存在
     await getOrCreateSkill(req.userId);
@@ -254,10 +266,18 @@ router.put('/skill', requireAuth, async (req, res) => {
     parts[1] = (parts[1] || 0) + 1;
     const newVer = `v${parts[0]}.${parts[1]}`;
 
-    await db.query(
-      'UPDATE cw_skills SET rules = ?, keywords = ?, forbidden = ?, check_prompt = ?, version = ? WHERE user_id = ?',
-      [JSON.stringify(rules || {}), JSON.stringify(keywords || []), JSON.stringify(forbidden || []), checkPrompt ?? null, newVer, req.userId]
-    );
+    // freeText 模式：只更新 free_text 列（rules 等不动）
+    if (typeof freeText === 'string' && freeText !== undefined && rules === undefined) {
+      await db.query(
+        'UPDATE cw_skills SET free_text = ?, version = ? WHERE user_id = ?',
+        [freeText || null, newVer, req.userId]
+      );
+    } else {
+      await db.query(
+        'UPDATE cw_skills SET rules = ?, keywords = ?, forbidden = ?, check_prompt = ?, version = ? WHERE user_id = ?',
+        [JSON.stringify(rules || {}), JSON.stringify(keywords || []), JSON.stringify(forbidden || []), checkPrompt ?? null, newVer, req.userId]
+      );
+    }
     const skill = await getOrCreateSkill(req.userId);
     res.json({ code: 200, data: skill });
   } catch (err) {

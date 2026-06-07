@@ -1315,6 +1315,8 @@ const S = {
   originalProjects: [],      // 项目列表
   originalMessages: [],      // 当前项目消息列表
   originalChatTab: 'chat',   // 'chat'|'doc'
+  originalSkillMode: 'structured', // 'structured'|'free'
+  originalSkillFreeTextDraft: '', // 自由编辑草稿
   originalInput: '',
   originalLoading: false,
   originalLearningUrl: '',
@@ -7543,6 +7545,7 @@ function tOriginalSkill() {
   const allRules = Object.values(rules).flat();
   const em = S.originalSkillEditModal; // { group, idx, text } | { group, idx:'new', text:'' } | { type:'checkPrompt', text }
   const saving = S.originalSkillSaving;
+  const mode = S.originalSkillMode || 'structured'; // 'structured'|'free'
 
   const sectionHeader = (label) => `
     <div style="font-size:13px;font-weight:700;color:#6B5F55;letter-spacing:0.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
@@ -7607,13 +7610,60 @@ function tOriginalSkill() {
       </div>
     </div>` : '';
 
+  // 模式切换 Tab
+  const modeTabs = `
+    <div style="display:flex;background:#F0EDE8;border-radius:12px;padding:3px;gap:2px">
+      <button onclick="_skillSetMode('structured')" style="flex:1;padding:7px 0;border:none;border-radius:9px;font-size:13px;font-weight:${mode==='structured'?700:500};background:${mode==='structured'?'#fff':'transparent'};color:${mode==='structured'?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${mode==='structured'?'0 1px 4px rgba(0,0,0,0.1)':'none'};transition:all .15s;-webkit-tap-highlight-color:transparent">条目视图</button>
+      <button onclick="_skillSetMode('free')" style="flex:1;padding:7px 0;border:none;border-radius:9px;font-size:13px;font-weight:${mode==='free'?700:500};background:${mode==='free'?'#fff':'transparent'};color:${mode==='free'?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${mode==='free'?'0 1px 4px rgba(0,0,0,0.1)':'none'};transition:all .15s;-webkit-tap-highlight-color:transparent">自由编辑</button>
+    </div>`;
+
+  // 自由编辑面板
+  const freeEditPanel = `
+    <div style="padding:0 16px 32px">
+      <div style="font-size:12px;color:#B0AA9F;margin-bottom:10px;line-height:1.6">直接写 Markdown / 纯文本。AI 创作时会优先读取这里的内容，结构化规则作为补充。</div>
+      <textarea id="_skill_free_ta"
+        oninput="setState({originalSkillFreeTextDraft:this.value})"
+        style="width:100%;min-height:420px;border:1.5px solid #EDE9E3;border-radius:14px;padding:14px 16px;font-size:14px;color:#1A1614;line-height:1.8;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;background:#fff"
+        placeholder="例如：
+
+## 人设
+我是一个…
+
+## 开场钩子
+- 用数字+反差做开头
+- 前3秒必须出现核心卖点
+
+## 内容结构
+…
+
+## 禁忌
+- 不讲技术原理
+…
+
+## 验收标准
+…">${esc(S.originalSkillFreeTextDraft !== null && S.originalSkillFreeTextDraft !== undefined ? S.originalSkillFreeTextDraft : (skill.freeText || ''))}</textarea>
+      <button onclick="_skillSaveFreeText()" ${saving?'disabled':''} style="margin-top:12px;width:100%;padding:14px 0;border:none;border-radius:14px;background:${saving?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${saving?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${saving?'default':'pointer'};letter-spacing:0.5px">
+        ${saving ? '保存中…' : '保存自由编辑'}
+      </button>
+      ${skill.freeText ? `<button onclick="_skillClearFreeText()" style="margin-top:10px;width:100%;padding:11px 0;border:1.5px solid #EDE9E3;border-radius:14px;background:transparent;color:#B0AA9F;font-size:14px;cursor:pointer">清除自由编辑内容（恢复条目视图）</button>` : ''}
+    </div>`;
+
   return `<div style="background:#FAF9F6;min-height:100%;padding:4px 0 32px">
-    <div style="padding:0 26px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <div style="padding:0 16px 14px">
+      ${modeTabs}
+    </div>
+    <div style="padding:0 16px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span style="font-size:12px;color:#B0AA9F">最后更新 ${formatRelTime(skill.updated_at) || '—'}</span>
       <span style="color:#D8D2C9">·</span>
-      <span style="font-size:12px;color:#B0AA9F">${allRules.length} 条规则 · ${keywords.length} 个高频词 · ${forbidden.length} 条禁区</span>
+      <span style="font-size:12px;color:#B0AA9F">${allRules.length} 条规则 · ${keywords.length} 高频词 · ${forbidden.length} 禁区${skill.freeText ? ' · <span style="color:#C85A10">自由编辑已启用</span>' : ''}</span>
     </div>
-    <div style="padding:0 26px">
+    ${mode === 'free' ? freeEditPanel : `
+    <div style="padding:0 16px">
+      ${skill.freeText ? `<div style="background:#FFF8F2;border:1px solid #FFD9B8;border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:8px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#C85A10" stroke-width="2" stroke-linecap="round"/></svg>
+        <span style="font-size:12px;color:#C85A10;flex:1">已启用自由编辑，AI 创作以自由文本为主。</span>
+        <button onclick="_skillSetMode('free')" style="background:none;border:none;color:#F5602A;font-size:12px;font-weight:700;cursor:pointer;padding:0">编辑</button>
+      </div>` : ''}
       ${ruleGroups || `<div style="padding:24px 0;text-align:center;color:#B0AA9F;font-size:14px">还没有规律，开始创作并同步积累吧</div>`}
       ${forbidden.length > 0 ? `
         <div style="margin-bottom:28px">
@@ -7639,7 +7689,7 @@ function tOriginalSkill() {
           </div>
         </div>` : ''}
       ${checkPromptSection}
-    </div>
+    </div>`}
     ${modal}
   </div>`;
 }
@@ -7724,6 +7774,94 @@ async function _skillDeleteRule(group, idx) {
     else setState({ originalSkillSaving: false });
   } catch { setState({ originalSkillSaving: false }); }
   showToast('已删除');
+  render();
+}
+
+// ── Skill 自由编辑辅助函数 ──────────────────────────────────────────
+function _skillSetMode(mode) {
+  // 切到自由编辑时，预填草稿：如果已有 freeText 用它，否则把结构化内容转成 Markdown
+  if (mode === 'free') {
+    const skill = S.originalSkill;
+    const existing = skill && skill.freeText ? skill.freeText : '';
+    let draft = S.originalSkillFreeTextDraft;
+    // 仅当草稿为空且没有保存的 freeText 时，自动从结构化转换
+    if (!draft && !existing && skill) {
+      draft = _skillToMarkdown(skill);
+    }
+    setState({ originalSkillMode: 'free', originalSkillFreeTextDraft: draft !== undefined ? draft : (existing || '') });
+  } else {
+    setState({ originalSkillMode: mode });
+  }
+  render();
+  if (mode === 'free') {
+    setTimeout(() => {
+      const ta = document.getElementById('_skill_free_ta');
+      if (ta) ta.focus();
+    }, 60);
+  }
+}
+
+// 把结构化 Skill 转成可读的 Markdown 文本（供自动预填）
+function _skillToMarkdown(skill) {
+  if (!skill) return '';
+  const lines = [];
+  const rules = skill.rules || {};
+  for (const [group, arr] of Object.entries(rules)) {
+    if (Array.isArray(arr) && arr.length > 0) {
+      lines.push(`## ${group}`);
+      arr.forEach(r => lines.push(`- ${typeof r === 'string' ? r : (r.text || '')}`));
+      lines.push('');
+    }
+  }
+  if ((skill.keywords || []).length > 0) {
+    lines.push(`## 高频词`);
+    lines.push(skill.keywords.join('、'));
+    lines.push('');
+  }
+  if ((skill.forbidden || []).length > 0) {
+    lines.push(`## 禁忌清单`);
+    skill.forbidden.forEach(f => lines.push(`- ${typeof f === 'string' ? f : (f.text || '')}`));
+    lines.push('');
+  }
+  if (skill.checkPrompt) {
+    lines.push(`## 验收指令`);
+    lines.push(skill.checkPrompt);
+  }
+  return lines.join('\n').trim();
+}
+
+async function _skillSaveFreeText() {
+  const ta = document.getElementById('_skill_free_ta');
+  const text = ta ? ta.value : (S.originalSkillFreeTextDraft || '');
+  setState({ originalSkillSaving: true });
+  render();
+  try {
+    const r = await api.put('/original/skill', { freeText: text });
+    if (r.code === 200) {
+      setState({ originalSkill: r.data, originalSkillSaving: false, originalSkillFreeTextDraft: text });
+      showToast('自由编辑已保存 ✓');
+    } else {
+      setState({ originalSkillSaving: false });
+      showToast(r.msg || '保存失败');
+    }
+  } catch { setState({ originalSkillSaving: false }); showToast('网络错误'); }
+  render();
+}
+
+async function _skillClearFreeText() {
+  if (!confirm('确认清除自由编辑内容？清除后将只使用条目规则。')) return;
+  setState({ originalSkillSaving: true });
+  render();
+  try {
+    const r = await api.put('/original/skill', { freeText: '' });
+    if (r.code === 200) {
+      setState({ originalSkill: r.data, originalSkillSaving: false, originalSkillFreeTextDraft: '', originalSkillMode: 'structured' });
+      showToast('已清除');
+    } else {
+      setState({ originalSkillSaving: false });
+      showToast(r.msg || '操作失败');
+    }
+  } catch { setState({ originalSkillSaving: false }); showToast('网络错误'); }
   render();
 }
 
