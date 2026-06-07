@@ -443,33 +443,61 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
 
     if (hasFeedback) {
       try {
-        // 检查上一条 AI 回复是否是文案更新（有 has_doc_update=1）
+        // 找上一条有文案更新的 AI 消息（摘要）+ 该消息前用户的修改要求
         const { rows: lastAiRows } = await db.query(
-          'SELECT content FROM cw_original_messages WHERE project_id = ? AND role = ? AND has_doc_update = 1 ORDER BY id DESC LIMIT 1',
-          [projectId, 'ai']
+          `SELECT m.id, m.content,
+            (SELECT content FROM cw_original_messages WHERE project_id = ? AND role = 'user' AND id < m.id ORDER BY id DESC LIMIT 1) AS user_req
+           FROM cw_original_messages m
+           WHERE m.project_id = ? AND m.role = 'ai' AND m.has_doc_update = 1
+           ORDER BY m.id DESC LIMIT 1`,
+          [projectId, projectId]
         );
         const lastChange = lastAiRows?.[0]?.content || '';
+        const lastUserReq = lastAiRows?.[0]?.user_req || '';
+
+        // 同时拿上一条文案的前200字（存在 project.doc 里已是最新版，取倒数第二次doc更新前的内容不易拿，用lastChange摘要+当前doc片段）
+        const docSnippet = (project.doc || '').slice(0, 200);
 
         if (lastChange) {
-          const extractPrompt = `用户反馈："${message}"。上一次文案修改描述："${lastChange.slice(0, 80)}"。
+          const extractPrompt = `你是一个写作风格分析师。
 
-判断：这条反馈是否包含可提炼的写作风格规则（关于语气/用词/风格/避免某类写法）？
-- 如果是 → 输出一条规则，格式以"-"开头，15-30字，直接说规则本身，不要解释
-- 如果只是修改指令（换方向/继续改等）而非质量评价 → 输出：SKIP
+【本次文案片段（前200字）】
+${docSnippet}
 
-只输出一行，不要其他文字。`;
+【上一次修改方向】${lastUserReq.slice(0, 60)}
+【AI修改摘要】${lastChange.slice(0, 80)}
+【用户此刻反馈】${message}
 
-          const extracted = (await callAI(extractPrompt, { maxTokens: 80, temperature: 0.2 })).trim();
+任务：判断这条反馈是否说明某种写法"更好"或"有问题"，并提炼成一条可复用的写作规则。
+要求：
+- 规则要结合上面的内容背景，说清楚「什么情况下，怎么写比较好/不好」
+- 不要说空洞结论（如"语言要口语化"），要说具体写法（如"写副业选题时开头别用'你是不是也...'，改成直接抛出真实数字"）
+- 长度30-50字，以"-"开头
+- 如果反馈只是新的修改指令，而非质量评价 → 只输出：SKIP
+
+只输出一行规则或SKIP，不要其他文字。`;
+
+          const extracted = (await callAI(extractPrompt, { maxTokens: 120, temperature: 0.3 })).trim();
 
           if (extracted && !extracted.startsWith('SKIP') && (extracted.startsWith('-') || extracted.length > 5)) {
             autoLearnRule = extracted.startsWith('-') ? extracted.slice(1).trim() : extracted;
-            // 追加到 Skill freeText
+            // 追加到 Skill freeText（同天的合并到同一个 ## 自动学习 区块）
             const skill = await getOrCreateSkill(req.userId);
             const existing = skill.freeText || '';
             const today = new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
-            const newFreeText = existing.trim()
-              ? `${existing}\n\n## 自动学习（${today}）\n- ${autoLearnRule}`
-              : `## 自动学习（${today}）\n- ${autoLearnRule}`;
+            const sectionHeader = `## 自动学习（${today}）`;
+            let newFreeText;
+            if (existing.includes(sectionHeader)) {
+              // 同一天：在该区块末尾追加一条
+              newFreeText = existing.replace(
+                new RegExp(`(${sectionHeader.replace(/[()]/g, '\\$&')}[\\s\\S]*?)(\n##|$)`),
+                (_, block, tail) => `${block.trimEnd()}\n- ${autoLearnRule}${tail}`
+              );
+            } else {
+              newFreeText = existing.trim()
+                ? `${existing}\n\n${sectionHeader}\n- ${autoLearnRule}`
+                : `${sectionHeader}\n- ${autoLearnRule}`;
+            }
             await db.query('UPDATE cw_skills SET free_text = ? WHERE user_id = ?', [newFreeText, req.userId]);
             console.log(`[AutoLearn] 已提炼规则: ${autoLearnRule}`);
           }
