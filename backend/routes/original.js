@@ -885,4 +885,72 @@ ${insightText}
   }
 });
 
+/* ═══════════════════════════════════════
+   智能选题
+═══════════════════════════════════════ */
+
+// POST /api/original/suggest-topics
+// 根据 Skill 规则 + 最近项目标题，AI 生成 4 个选题建议
+router.post('/suggest-topics', requireAuth, async (req, res) => {
+  try {
+    const skill = await getOrCreateSkill(req.userId);
+    const rulesText = formatRulesForPrompt(skill);
+
+    // 最近 6 个项目标题作为参考（避免重复）
+    const { rows: projRows } = await db.query(
+      'SELECT title FROM cw_original_projects WHERE user_id = ? ORDER BY updated_at DESC LIMIT 6',
+      [req.userId]
+    );
+    const recentTitles = (projRows || []).map(p => p.title).join('、') || '（暂无）';
+
+    const prompt = `你是一位经验丰富的短视频选题策划师。根据用户的创作风格（Skill规则）和最近的创作记录，为他生成 4 个差异化的选题建议。
+
+## 用户 Skill 规则
+${rulesText}
+
+## 最近创作过的主题（避免重复）
+${recentTitles}
+
+## 要求
+1. 每个选题必须差异化（不同角度/不同受众/不同结构）
+2. 选题要符合用户的 Skill 风格
+3. 贴近当前 AI/内容创业/效率工具等热点，有传播潜力
+4. 每个选题包含：标题、核心观点（一句话）、推荐风格、推荐时长
+
+## 严格按 JSON 格式输出，不要输出任何其他文字：
+[
+  {
+    "title": "选题标题",
+    "angle": "核心观点，一句话",
+    "style": "informative|story|contrast|twist 其中一个",
+    "duration": "30s|1min|3min 其中一个",
+    "reason": "推荐理由，≤20字"
+  }
+]`;
+
+    const raw = await callAI(prompt, { maxTokens: 800, temperature: 0.9 });
+
+    // 解析 JSON
+    let topics = [];
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      try { topics = JSON.parse(jsonMatch[0]); } catch {}
+    }
+    // 兜底：至少给 4 条
+    if (!Array.isArray(topics) || topics.length === 0) {
+      topics = [
+        { title: '我用 AI 把40%的重复工作自动化了', angle: '普通人也能用 AI 接管重复劳动', style: 'informative', duration: '1min', reason: '痛点精准，共鸣强' },
+        { title: '3天一个AI工具：我验证了什么', angle: '用真实数据说明小工具的变现路径', style: 'story', duration: '1min', reason: '有进度感，适合系列' },
+        { title: '同一个选题，有人10万播有人1万播', angle: '标题和前3秒决定80%流量', style: 'contrast', duration: '30s', reason: '对比结构，好奇心强' },
+        { title: '我以为AI能帮我做内容，结果……', angle: '用反转讲述AI工具的真实局限', style: 'twist', duration: '1min', reason: '反预期，完播率高' },
+      ];
+    }
+
+    res.json({ code: 200, data: topics.slice(0, 4) });
+  } catch (err) {
+    console.error('/original/suggest-topics error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
 module.exports = router;

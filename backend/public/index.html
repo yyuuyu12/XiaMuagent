@@ -1331,6 +1331,8 @@ const S = {
   originalNewDuration: '1min',   // '30s'|'1min'|'3min'
   originalNewStyle: 'informative', // 'informative'|'story'|'contrast'|'twist'
   originalNewPlatform: 'douyin', // 'douyin'|'shipinhao'|'xiaohongshu'
+  originalTopics: [],            // 智能选题列表
+  originalTopicsLoading: false,  // 正在生成选题
   // ===== 智能体 =====
   agentsList: [], agentsLoading: false, agentsLoaded: false,
   selectedAgent: null, agentInputs: {}, agentRunning: false, agentResult: null, agentErr: '',
@@ -7522,6 +7524,9 @@ function tOriginalHome() {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C0B8B0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
 
+    <!-- 智能选题 -->
+    ${_tOriginalTopics()}
+
     <!-- 我的项目 -->
     <div style="padding:0 22px 12px;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:17px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">我的项目</span>
@@ -7915,6 +7920,98 @@ function tOriginalLearning() {
   return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 28px">
     <div style="padding:0 22px">${resultBlock}</div>
   </div>`;
+}
+
+// ── 智能选题渲染 ──────────────────────────────────────────
+function _tOriginalTopics() {
+  const topics = S.originalTopics || [];
+  const loading = S.originalTopicsLoading;
+  const STYLE_LABEL = { informative:'干货', story:'故事', contrast:'对比', twist:'反转' };
+  const DUR_LABEL = { '30s':'30s', '1min':'1分钟', '3min':'3分钟' };
+  const STYLE_COLOR = { informative:'#1D4ED8,#3B82F6', story:'#059669,#10B981', contrast:'#7C3AED,#A78BFA', twist:'#BE185D,#EC4899' };
+
+  const header = `<div style="padding:0 22px 10px;display:flex;align-items:center;justify-content:space-between">
+    <span style="font-size:15px;font-weight:700;color:#1A1614">智能选题</span>
+    <button onclick="loadOriginalTopics()" ${loading?'disabled':''} style="display:flex;align-items:center;gap:4px;background:none;border:none;font-size:12px;color:${loading?'#C0B8B0':'#F5602A'};cursor:${loading?'default':'pointer'};font-weight:600;padding:0;-webkit-tap-highlight-color:transparent">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="${loading?'animation:spin 1s linear infinite':''}"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      ${loading ? '生成中…' : (topics.length ? '换一批' : '生成选题')}
+    </button>
+  </div>`;
+
+  if (!topics.length && !loading) {
+    return `<div style="margin-bottom:18px">
+      ${header}
+      <div style="margin:0 16px;background:#fff;border-radius:16px;padding:20px;border:1.5px dashed #E8E4DC;text-align:center">
+        <div style="font-size:13px;color:#B0AA9F;line-height:1.7">根据你的 Skill 和学习记录<br>AI 帮你生成个性化选题</div>
+        <button onclick="loadOriginalTopics()" style="margin-top:12px;padding:9px 28px;border:none;border-radius:24px;background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff;font-size:14px;font-weight:700;cursor:pointer">生成选题 →</button>
+      </div>
+    </div>`;
+  }
+
+  if (loading) {
+    return `<div style="margin-bottom:18px">
+      ${header}
+      <div style="margin:0 16px;display:flex;flex-direction:column;gap:10px">
+        ${[1,2,3,4].map(()=>`<div style="background:#fff;border-radius:14px;padding:16px;height:72px;animation:pulse 1.5s ease-in-out infinite;background:linear-gradient(90deg,#F4F1EC 25%,#EDE9E3 50%,#F4F1EC 75%);background-size:200% 100%"></div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  const cards = topics.map((t, i) => {
+    const [c1, c2] = (STYLE_COLOR[t.style] || '2563EB,3B82F6').split(',');
+    return `<div onclick="pickOriginalTopic(${i})" style="background:#fff;border-radius:14px;padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;active:background:#FFF8F2;border:1px solid #F0EDE8">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#${c1},#${c2});display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;color:#1A1614;line-height:1.5;margin-bottom:4px">${esc(t.title)}</div>
+          <div style="font-size:12px;color:#9E9890;line-height:1.5;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(t.angle)}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:10px">
+        <span style="font-size:11px;background:linear-gradient(135deg,#${c1}18,#${c2}18);color:#${c1};border-radius:6px;padding:2px 8px;font-weight:600">${STYLE_LABEL[t.style]||t.style}</span>
+        <span style="font-size:11px;background:#F4F1EC;color:#9E9890;border-radius:6px;padding:2px 8px">${DUR_LABEL[t.duration]||t.duration}</span>
+        <span style="font-size:11px;color:#B0AA9F;margin-left:auto">${esc(t.reason||'')}</span>
+        <span style="font-size:12px;color:#F5602A;font-weight:600;flex-shrink:0">选 →</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="margin-bottom:18px">
+    ${header}
+    <div style="margin:0 16px;display:flex;flex-direction:column;gap:10px">${cards}</div>
+  </div>`;
+}
+
+async function loadOriginalTopics() {
+  if (S.originalTopicsLoading) return;
+  setState({ originalTopicsLoading: true });
+  render();
+  try {
+    const r = await api.post('/original/suggest-topics', {});
+    if (r.code === 200) {
+      setState({ originalTopics: r.data, originalTopicsLoading: false });
+    } else {
+      setState({ originalTopicsLoading: false });
+      showToast(r.msg || '选题生成失败');
+    }
+  } catch { setState({ originalTopicsLoading: false }); showToast('网络错误'); }
+  render();
+}
+
+function pickOriginalTopic(idx) {
+  const t = (S.originalTopics || [])[idx];
+  if (!t) return;
+  setState({
+    originalView: 'new',
+    originalNewTitle: t.title,
+    originalNewBrief: t.angle || '',
+    originalNewDuration: t.duration || '1min',
+    originalNewStyle: t.style || 'informative',
+    originalNewPlatform: 'douyin',
+  });
+  render();
 }
 
 function tOriginalNew() {
