@@ -1320,7 +1320,9 @@ const S = {
   originalLearningUrl: '',
   originalLearningType: 'account',  // 'account'|'video'
   originalLearningScope: 'global',  // 'global'|'project'
-  originalLearningResult: null,     // [{label,text,source,checked}]
+  originalLearningPhase: 'input',   // 'input'|'select'|'result'
+  originalLearningItems: [],        // 阶段一提取出的原文/视频列表 [{awemeId,desc,likes,script,selected}]
+  originalLearningResult: null,     // 阶段二拆解结果 { type, videos:[...], rules:[...] }
   originalLearningLoading: false,
   originalNewTitle: '',
   originalNewBrief: '',
@@ -7474,7 +7476,7 @@ function tOriginalHome() {
     </div>
 
     <!-- 学习中心入口 -->
-    <div onclick="setState({originalView:'learning',originalLearningResult:null});render()" style="margin:0 16px 18px;background:#FAF7F3;border:1.5px dashed #E8D8C4;border-radius:16px;padding:13px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;-webkit-tap-highlight-color:transparent">
+    <div onclick="setState({originalView:'learning',originalLearningResult:null,originalLearningItems:[],originalLearningPhase:'input'});render()" style="margin:0 16px 18px;background:#FAF7F3;border:1.5px dashed #E8D8C4;border-radius:16px;padding:13px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;-webkit-tap-highlight-color:transparent">
       <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFB877"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8L12 2z"/></svg>
       </div>
@@ -7565,7 +7567,72 @@ function tOriginalSkill() {
   </div>`;
 }
 
+// 逐句标注的角色配色
+const LEARN_ROLE_META = {
+  hook:       { label: '钩子', color: '#C2410C', bg: '#FFEAD9' },
+  turn:       { label: '转折', color: '#BE185D', bg: '#FCE7F3' },
+  point:      { label: '观点', color: '#1D4ED8', bg: '#E0EBFF' },
+  example:    { label: '举例', color: '#0E7490', bg: '#D9F4F8' },
+  cta:        { label: '引导', color: '#15803D', bg: '#DCFCE7' },
+  background: { label: '铺垫', color: '#92744A', bg: '#F2ECE0' },
+  normal:     { label: '过渡', color: '#6E6860', bg: 'transparent' },
+};
+
+// 渲染单条视频的「掰碎式」拆解卡
+function _renderLearnVideo(v, showHeader) {
+  const meta = (role) => LEARN_ROLE_META[role] || LEARN_ROLE_META.normal;
+  const segs = v.segments || [];
+
+  // 原文逐句高亮（关键句染色，过渡句保留原样）
+  const annotated = segs.map(s => {
+    const m = meta(s.role);
+    if (s.role === 'normal' || s.role === 'background' || !s.role) return esc(s.text);
+    return `<span style="background:${m.bg};color:${m.color};border-radius:4px;padding:1px 4px;font-weight:600">${esc(s.text)}</span>`;
+  }).join('');
+
+  // 逐句批注（只列有 note 的关键句）
+  const noteItems = segs.filter(s => s.note && s.note.trim());
+  const notesHtml = noteItems.length ? `
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+      ${noteItems.map(s => {
+        const m = meta(s.role);
+        const quote = s.text.length > 40 ? s.text.slice(0, 40) + '…' : s.text;
+        return `<div style="display:flex;gap:9px;align-items:flex-start">
+          <span style="flex-shrink:0;font-size:11px;font-weight:700;color:${m.color};background:${m.bg==='transparent'?'#F2EFEA':m.bg};border-radius:6px;padding:2px 7px;margin-top:1px">${m.label}</span>
+          <div style="flex:1">
+            <div style="font-size:12px;color:#9E9890;line-height:1.5;margin-bottom:2px">"${esc(quote)}"</div>
+            <div style="font-size:13px;color:#2A241E;line-height:1.6">${esc(s.note)}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  const header = showHeader ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:13.5px;font-weight:700;color:#1A1614;flex:1;line-height:1.4">${esc(v.desc || '未命名视频')}</span>
+      <span style="font-size:11px;color:#B0AA9F;flex-shrink:0">赞${v.likes||0}·约${v.estSec||'?'}秒</span>
+    </div>` : '';
+
+  return `
+    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+      ${header}
+      ${v.summary ? `<div style="background:#1E1A14;border-radius:12px;padding:11px 13px;margin-bottom:12px">
+        <div style="font-size:11px;color:#9E8B6E;font-weight:600;margin-bottom:3px">套路一句话</div>
+        <div style="font-size:13.5px;color:#F5E8D0;line-height:1.55;font-weight:500">${esc(v.summary)}</div>
+      </div>` : ''}
+      ${v.rhythm && v.rhythm !== '—' ? `<div style="margin-bottom:12px">
+        <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:5px">文案节奏</div>
+        <div style="font-size:13px;color:#2A241E;line-height:1.7">${esc(v.rhythm)}</div>
+      </div>` : ''}
+      <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:7px">原文逐句拆解</div>
+      <div style="background:#FAF8F5;border-radius:10px;padding:13px;font-size:14px;color:#2A241E;line-height:2.1">${annotated || '—'}</div>
+      ${notesHtml}
+    </div>`;
+}
+
 function tOriginalLearning() {
+  const phase = S.originalLearningPhase || 'input';
+  const items = S.originalLearningItems || [];
   const result = S.originalLearningResult;
   const loading = S.originalLearningLoading;
   const type = S.originalLearningType || 'account';
@@ -7574,224 +7641,136 @@ function tOriginalLearning() {
 
   const seg = (active, label, action) => `<div onclick="${action}" style="flex:1;text-align:center;padding:9px 0;border-radius:11px;font-size:13px;font-weight:${active?700:500};cursor:pointer;transition:all .2s;background:${active?'#fff':'transparent'};color:${active?'#1A1614':'#9E9890'};box-shadow:${active?'0 2px 8px rgba(0,0,0,0.08)':'none'};-webkit-tap-highlight-color:transparent">${label}</div>`;
 
+  const backLink = `<div onclick="setState({originalLearningPhase:'input',originalLearningResult:null,originalLearningItems:[]});render()" style="display:inline-flex;align-items:center;gap:5px;margin:0 22px 14px;color:#9E6B3A;font-size:13px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent">← 重新输入链接</div>`;
+
+  /* ═══ 阶段一：输入链接 ═══ */
+  if (phase === 'input') {
+    return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 28px">
+      <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 12px">
+        ${seg(scope==='global','写入全局 Skill',"setState({originalLearningScope:'global'});render()")}
+        ${seg(scope==='project','仅用于本项目',"setState({originalLearningScope:'project'});render()")}
+      </div>
+      <div style="margin:0 22px 16px;padding:9px 14px;background:${scope==='global'?'#FFF3E8':'#F0FDF4'};border-radius:12px;font-size:12px;color:${scope==='global'?'#9A3D0C':'#065F46'};line-height:1.6">
+        ${scope==='global'?'学到的规律会融合进 Skill 工作流，对所有项目长期生效':'学到的规律仅用于当前项目，不改变全局 Skill'}
+      </div>
+      <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 14px">
+        ${seg(type==='account','账号主页',"setState({originalLearningType:'account',originalLearningResult:null,originalLearningItems:[],originalLearningPhase:'input'});render()")}
+        ${seg(type==='video','单个视频',"setState({originalLearningType:'video',originalLearningResult:null,originalLearningItems:[],originalLearningPhase:'input'});render()")}
+      </div>
+      <div style="margin:0 22px 16px">
+        <div style="font-size:13px;color:#6E6860;font-weight:600;margin-bottom:8px">${type==='account'?'输入账号主页链接（先提取近期视频，由你勾选要学的）':'输入单个视频链接（先提取原文给你确认）'}</div>
+        <div id="learning-url-wrap" style="background:#fff;border-radius:14px;border:1.5px solid ${url?'#F5602A':'#EDE9E3'};padding:12px 14px;transition:border-color .2s">
+          <textarea id="learning-url-input" oninput="S.originalLearningUrl=this.value;_origLearnInputState()"
+            placeholder="${type==='account'?'例如：https://www.douyin.com/user/xxx':'例如：https://v.douyin.com/xxx'}"
+            style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:52px;line-height:1.6;box-sizing:border-box">${esc(url)}</textarea>
+        </div>
+      </div>
+      <button type="button" id="learning-analyze-btn" onclick="extractOriginalLearning()"
+              style="width:calc(100% - 44px);margin:0 22px 16px;padding:14px 0;border:none;border-radius:16px;background:${(!url.trim()||loading)?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${(!url.trim()||loading)?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${(!url.trim()||loading)?'default':'pointer'}">
+        ${loading ? '提取中…' : '提取原文'}
+      </button>
+    </div>`;
+  }
+
+  /* ═══ 阶段二：选择要学习的原文 ═══ */
+  if (phase === 'select') {
+    let body = '';
+    if (type === 'video') {
+      const v = items[0];
+      body = v ? `
+        <div style="background:#fff;border-radius:16px;padding:16px;margin:0 22px 16px;border:1px solid #F0EDE8">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:13.5px;font-weight:700;color:#1A1614;flex:1;line-height:1.4">${esc(v.desc||'未命名视频')}</span>
+            <span style="font-size:11px;color:#B0AA9F;flex-shrink:0">赞${v.likes||0}·约${v.estSec||'?'}秒</span>
+          </div>
+          <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:7px">提取到的原文</div>
+          <div style="background:#FAF8F5;border-radius:10px;padding:13px;font-size:13.5px;color:#2A241E;line-height:1.85;max-height:260px;overflow-y:auto">${esc(v.script||'')}</div>
+        </div>` : `<div style="text-align:center;padding:24px;color:#B0AA9F">未提取到原文</div>`;
+    } else {
+      const selCount = items.filter(it => it.selected).length;
+      body = `
+        <div style="margin:0 22px 8px;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:700;color:#1A1614">勾选要学习的视频</div>
+          <span style="font-size:12px;color:#B0AA9F">已选 ${selCount}（最多拆解 4 条）</span>
+        </div>
+        <div style="margin:0 22px 16px;display:flex;flex-direction:column;gap:8px">
+          ${items.map((it, idx) => `
+            <div onclick="_toggleLearnItem(${idx})" style="background:${it.selected?'#FFF8F3':'#fff'};border-radius:12px;padding:12px 13px;border:1.5px solid ${it.selected?'#F5602A':'#F0EDE8'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;-webkit-tap-highlight-color:transparent">
+              <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${it.selected?'#F5602A':'#D8D2C9'};background:${it.selected?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+                ${it.selected?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;color:#1A1614;line-height:1.5">${esc(it.desc||'未命名视频')}</div>
+                <div style="font-size:11px;color:#B0AA9F;margin-top:3px">赞 ${it.likes||0}</div>
+              </div>
+            </div>`).join('')}
+        </div>`;
+    }
+    const selCount = type === 'video' ? (items.length ? 1 : 0) : items.filter(it => it.selected).length;
+    const canGo = selCount > 0 && !loading;
+    return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 28px">
+      ${backLink}
+      ${body}
+      <button type="button" ${canGo?'':'disabled'} onclick="analyzeOriginalLearning()"
+              style="width:calc(100% - 44px);margin:0 22px;padding:14px 0;border:none;border-radius:16px;background:${canGo?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};color:${canGo?'#fff':'#B0AA9F'};font-size:15px;font-weight:700;cursor:${canGo?'pointer':'default'}">
+        ${loading ? '逐句拆解中…' : (type==='video' ? '开始逐句拆解' : `逐句拆解选中（${selCount}）`)}
+      </button>
+    </div>`;
+  }
+
+  /* ═══ 阶段三：拆解结果 ═══ */
   let resultBlock = '';
   if (loading) {
-    resultBlock = `<div style="text-align:center;padding:28px 0;color:#B0AA9F;font-size:14px">正在读取真实内容并提炼规律…</div>`;
-  } else if (result === null) {
-    resultBlock = '';
-  } else if (type === 'video') {
-    if (!result || (!result.rules?.length && !result.overview)) {
-      resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效分析</div>`;
-    } else {
-      const ov = result.overview || {};
-      const st = result.structure || {};
-      const rules = result.rules || [];
-      const checkedCount = rules.filter(r => r.checked).length;
-
-      // 概况卡（深色）
-      const ovCard = `
-        <div style="background:#1E1A14;border-radius:16px;padding:16px;margin-bottom:12px">
-          <div style="font-size:12px;color:#9E8B6E;font-weight:600;letter-spacing:.5px;margin-bottom:12px">视频概况</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            ${[['内容主题',ov.contentTheme||'—'],['预计时长',ov.estDuration||'—'],['整体风格',ov.style||'—'],['文案字数',`${result.scriptExcerpt?'有样本':'—'}`]].map(([k,v])=>`
-              <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px">
-                <div style="font-size:11px;color:#6E6255;margin-bottom:4px">${k}</div>
-                <div style="font-size:13px;color:#F5E8D0;font-weight:500;line-height:1.5">${esc(v)}</div>
-              </div>`).join('')}
-          </div>
-        </div>`;
-
-      // 文案精华摘录
-      const excerptCard = result.scriptExcerpt ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:10px">开头原文摘录</div>
-          <div style="background:#FAF8F5;border-radius:10px;padding:12px;border-left:3px solid #F5602A">
-            <div style="font-size:13px;color:#2A241E;line-height:1.7">${esc(result.scriptExcerpt)}</div>
-          </div>
-        </div>` : '';
-
-      // 结构拆解（开场/中段/结尾）
-      const structItems = [['开场（前5秒）',st.opening],['中段展开',st.development],['结尾引导',st.cta]].filter(([,v])=>v&&v!=='—');
-      const structCard = structItems.length ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:12px">结构拆解</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            ${structItems.map(([label,val])=>`
-              <div style="display:flex;gap:10px;align-items:flex-start">
-                <div style="min-width:6px;height:6px;border-radius:50%;background:#F5602A;margin-top:7px;flex-shrink:0"></div>
-                <div>
-                  <div style="font-size:11.5px;font-weight:600;color:#9E6B3A;margin-bottom:3px">${esc(label)}</div>
-                  <div style="font-size:13px;color:#2A241E;line-height:1.65">${esc(val)}</div>
-                </div>
-              </div>`).join('')}
-          </div>
-        </div>` : '';
-
-      // 语言特征
-      const langCard = (result.language && result.language !== '—') ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">语言特征</div>
-          <div style="font-size:13px;color:#2A241E;line-height:1.75">${esc(result.language)}</div>
-        </div>` : '';
-
-      // 可写入规律
-      const rulesBlock = rules.length ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div>
-            <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            ${rules.map((item,idx)=>`
-              <div onclick="S.originalLearningResult.rules[${idx}].checked=!S.originalLearningResult.rules[${idx}].checked;render()"
-                   style="background:${item.checked?'#FFF8F3':'#FAF8F5'};border-radius:11px;padding:12px 13px;border:1.5px solid ${item.checked?'#F5602A':'transparent'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;-webkit-tap-highlight-color:transparent">
-                <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
-                  ${item.checked?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
-                </div>
-                <div style="flex:1">
-                  <div style="font-size:13px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
-                  ${item.freq?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.freq)}</div>`:''}
-                </div>
-              </div>`).join('')}
-          </div>
-        </div>
-        <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()"
-                style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">
-          ${scope==='global'?`写入 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}
-        </button>` : '';
-
-      resultBlock = `<div style="margin:0 0 24px">${ovCard}${excerptCard}${structCard}${langCard}${rulesBlock}</div>`;
-    }
+    resultBlock = `<div style="text-align:center;padding:28px 0;color:#B0AA9F;font-size:14px">正在逐句拆解，越细越慢，请稍候…</div>`;
+  } else if (!result || !(result.videos || []).length) {
+    resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效分析</div>`;
   } else {
-    // 账号分析：新格式（analysis 对象）
-    if (!result || (!result.rules?.length && !result.overview)) {
-      resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效分析</div>`;
-    } else {
-      const ov = result.overview || {};
-      const topScripts = result.topScripts || [];
-      const st = result.structure || {};
-      const rules = result.rules || [];
-      const checkedCount = rules.filter(r => r.checked).length;
+    const videos = result.videos || [];
+    const rules = result.rules || [];
+    const checkedCount = rules.filter(r => r.checked).length;
+    const multi = videos.length > 1;
 
-      // 概况卡
-      const overviewCard = `
-        <div style="background:#1E1A14;border-radius:16px;padding:16px;margin-bottom:12px">
-          <div style="font-size:12px;color:#9E8B6E;font-weight:600;letter-spacing:.5px;margin-bottom:12px">账号概况</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            ${[
-              ['内容方向', ov.contentTheme || '—'],
-              ['典型时长', ov.avgDuration || '—'],
-              ['整体风格', ov.style || '—'],
-              ['分析视频', `${ov.videoCount || '—'} 条`],
-            ].map(([k,v]) => `
-              <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 12px">
-                <div style="font-size:11px;color:#6E6255;margin-bottom:4px">${k}</div>
-                <div style="font-size:13px;color:#F5E8D0;font-weight:500;line-height:1.5">${esc(v)}</div>
-              </div>`).join('')}
-          </div>
-        </div>`;
+    // 角色图例
+    const legend = `
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin:0 0 12px">
+        ${['hook','turn','point','example','cta'].map(role => {
+          const m = LEARN_ROLE_META[role];
+          return `<span style="font-size:11px;font-weight:600;color:${m.color};background:${m.bg};border-radius:6px;padding:2px 8px">${m.label}</span>`;
+        }).join('')}
+      </div>`;
 
-      // 文案样本
-      const scriptsCard = topScripts.length ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:12px">文案样本</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            ${topScripts.map(s => `
-              <div style="background:#FAF8F5;border-radius:10px;padding:12px;border-left:3px solid #F5602A">
-                <div style="font-size:11px;color:#B0AA9F;margin-bottom:6px">${esc(s.label || '')}</div>
-                <div style="font-size:13px;color:#2A241E;line-height:1.7">${esc(s.text || '')}</div>
-              </div>`).join('')}
-          </div>
-        </div>` : '';
+    const videoCards = videos.map(v => _renderLearnVideo(v, multi)).join('');
 
-      // 结构拆解
-      const structItems = [
-        ['开场（0-5秒）', st.opening],
-        ['转折时机', st.twist],
-        ['主体展开', st.body],
-        ['结尾引导', st.cta],
-      ].filter(([,v]) => v && v !== '—');
-      const structCard = structItems.length ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:12px">结构拆解</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            ${structItems.map(([label, val]) => `
-              <div style="display:flex;gap:10px;align-items:flex-start">
-                <div style="min-width:6px;height:6px;border-radius:50%;background:#F5602A;margin-top:7px;flex-shrink:0"></div>
-                <div>
-                  <div style="font-size:11.5px;font-weight:600;color:#9E6B3A;margin-bottom:3px">${esc(label)}</div>
-                  <div style="font-size:13px;color:#2A241E;line-height:1.65">${esc(val)}</div>
-                </div>
-              </div>`).join('')}
-          </div>
-        </div>` : '';
-
-      // 选题 & 语言
-      const topicsCard = (result.topics && result.topics !== '—') ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">选题规律</div>
-          <div style="font-size:13px;color:#2A241E;line-height:1.75">${esc(result.topics)}</div>
-        </div>` : '';
-      const langCard = (result.language && result.language !== '—') ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">语言特征</div>
-          <div style="font-size:13px;color:#2A241E;line-height:1.75">${esc(result.language)}</div>
-        </div>` : '';
-
-      // 可写入规律（勾选列表）
-      const rulesBlock = rules.length ? `
-        <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div>
-            <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            ${rules.map((item, idx) => `
-              <div onclick="S.originalLearningResult.rules[${idx}].checked=!S.originalLearningResult.rules[${idx}].checked;render()"
-                   style="background:${item.checked?'#FFF8F3':'#FAF8F5'};border-radius:11px;padding:12px 13px;border:1.5px solid ${item.checked?'#F5602A':'transparent'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;transition:all .15s;-webkit-tap-highlight-color:transparent">
-                <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;transition:all .15s">
-                  ${item.checked?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
-                </div>
-                <div style="flex:1">
-                  <div style="font-size:13px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
-                  ${item.freq?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.freq)}</div>`:''}
-                </div>
-              </div>`).join('')}
-          </div>
+    const rulesBlock = rules.length ? `
+      <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div>
+          <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
         </div>
-        <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()"
-                style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">
-          ${scope==='global'?`写入 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}
-        </button>` : '';
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${rules.map((item,idx)=>`
+            <div onclick="S.originalLearningResult.rules[${idx}].checked=!S.originalLearningResult.rules[${idx}].checked;render()"
+                 style="background:${item.checked?'#FFF8F3':'#FAF8F5'};border-radius:11px;padding:12px 13px;border:1.5px solid ${item.checked?'#F5602A':'transparent'};cursor:pointer;display:flex;align-items:flex-start;gap:10px;-webkit-tap-highlight-color:transparent">
+              <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+                ${item.checked?'<svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+              </div>
+              <div style="flex:1">
+                <div style="font-size:13px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
+                ${item.freq?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.freq)}</div>`:''}
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()"
+              style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">
+        ${scope==='global'?`融合进 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}
+      </button>` : '';
 
-      resultBlock = `<div style="margin:0 0 24px">${overviewCard}${scriptsCard}${structCard}${topicsCard}${langCard}${rulesBlock}</div>`;
-    }
+    resultBlock = `${legend}${videoCards}${rulesBlock}`;
   }
 
   return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 28px">
-    <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 12px">
-      ${seg(scope==='global','写入全局 Skill',"setState({originalLearningScope:'global'});render()")}
-      ${seg(scope==='project','仅用于本项目',"setState({originalLearningScope:'project'});render()")}
-    </div>
-    <div style="margin:0 22px 16px;padding:9px 14px;background:${scope==='global'?'#FFF3E8':'#F0FDF4'};border-radius:12px;font-size:12px;color:${scope==='global'?'#9A3D0C':'#065F46'};line-height:1.6">
-      ${scope==='global'?'学到的规律将写入 Skill，对所有项目长期生效':'学到的规律仅用于当前项目，不改变全局 Skill'}
-    </div>
-    <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 14px">
-      ${seg(type==='account','账号主页',"setState({originalLearningType:'account',originalLearningResult:null});render()")}
-      ${seg(type==='video','单个视频',"setState({originalLearningType:'video',originalLearningResult:null});render()")}
-    </div>
-    <div style="margin:0 22px 16px">
-      <div style="font-size:13px;color:#6E6860;font-weight:600;margin-bottom:8px">${type==='account'?'输入账号主页链接（将分析最近多条视频）':'输入单个视频链接'}</div>
-      <div id="learning-url-wrap" style="background:#fff;border-radius:14px;border:1.5px solid ${url?'#F5602A':'#EDE9E3'};padding:12px 14px;transition:border-color .2s">
-        <textarea id="learning-url-input" oninput="S.originalLearningUrl=this.value;_origLearnInputState()"
-          placeholder="${type==='account'?'例如：https://www.douyin.com/user/xxx':'例如：https://v.douyin.com/xxx'}"
-          style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:52px;line-height:1.6;box-sizing:border-box">${esc(url)}</textarea>
-      </div>
-    </div>
-    <button type="button" id="learning-analyze-btn" onclick="analyzeOriginalLearning()"
-            style="width:calc(100% - 44px);margin:0 22px 16px;padding:14px 0;border:none;border-radius:16px;background:${(!url.trim()||loading)?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${(!url.trim()||loading)?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${(!url.trim()||loading)?'default':'pointer'}">
-      ${loading ? '分析中…' : (type==='account'?'分析账号文案规律':'提取视频规律')}
-    </button>
+    ${backLink}
     <div style="padding:0 22px">${resultBlock}</div>
   </div>`;
 }
@@ -8134,68 +8113,97 @@ async function skipOriginalRule(msgId) {
   render();
 }
 
-async function analyzeOriginalLearning() {
+// 切换账号场景下某条视频的勾选（最多 4 条）
+function _toggleLearnItem(idx) {
+  const items = (S.originalLearningItems || []).slice();
+  const it = items[idx];
+  if (!it) return;
+  if (!it.selected && items.filter(x => x.selected).length >= 4) {
+    showToast('最多拆解 4 条');
+    return;
+  }
+  items[idx] = { ...it, selected: !it.selected };
+  setState({ originalLearningItems: items });
+  render();
+}
+
+// 阶段一：提取原文（单视频→完整原文；账号→视频列表供勾选）
+async function extractOriginalLearning() {
   const urlEl = document.getElementById('learning-url-input');
   const url = (urlEl ? urlEl.value : S.originalLearningUrl).trim();
   if (!url) { showToast('请粘贴链接'); return; }
   if (S.originalLearningLoading) return;
-  setState({ originalLearningLoading: true, originalLearningUrl: url, originalLearningResult: null });
+  setState({ originalLearningLoading: true, originalLearningUrl: url, originalLearningResult: null, originalLearningItems: [] });
   render();
   try {
-    const projectId = S.originalLearningScope === 'project' && S.originalProject ? S.originalProject.id : null;
-    const r = await api.post('/original/learning/analyze', {
+    const r = await api.post('/original/learning/extract', {
       url,
       type: S.originalLearningType,
-      scope: S.originalLearningScope,
-      projectId,
     });
-    if (r.code === 200) {
-      if (r.data.type === 'account') {
-        // 新格式：完整 analysis 对象
-        const analysis = r.data.analysis || {};
-        if (analysis.rules) {
-          analysis.rules = analysis.rules.map(rule => ({ ...rule, checked: true }));
-        }
-        setState({ originalLearningResult: analysis, originalLearningLoading: false });
-      } else {
-        // 视频类型：新格式（analysis 对象）
-        const analysis = r.data.analysis || {};
-        // rules 已由后端预设 checked:true，前端保持即可
-        setState({ originalLearningResult: analysis, originalLearningLoading: false });
-      }
+    if (r.code === 200 && (r.data.items || []).length) {
+      setState({
+        originalLearningItems: r.data.items,
+        originalLearningPhase: 'select',
+        originalLearningLoading: false,
+      });
     } else {
       setState({ originalLearningLoading: false });
-      showToast(r.msg || '分析失败');
+      showToast(r.msg || '未提取到内容');
     }
   } catch { setState({ originalLearningLoading: false }); showToast('网络错误'); }
   render();
 }
 
+// 阶段二：对选中的原文做逐句深拆
+async function analyzeOriginalLearning() {
+  if (S.originalLearningLoading) return;
+  const type = S.originalLearningType;
+  const allItems = S.originalLearningItems || [];
+  const picked = type === 'video' ? allItems.slice(0, 1) : allItems.filter(it => it.selected).slice(0, 4);
+  if (!picked.length) { showToast('请先选择要学习的视频'); return; }
+
+  setState({ originalLearningLoading: true, originalLearningResult: null, originalLearningPhase: 'result' });
+  render();
+  try {
+    const r = await api.post('/original/learning/analyze', {
+      type,
+      scope: S.originalLearningScope,
+      items: picked.map(it => ({ awemeId: it.awemeId, desc: it.desc, likes: it.likes, script: it.script || '' })),
+    });
+    if (r.code === 200 && (r.data.videos || []).length) {
+      const data = r.data;
+      data.rules = (data.rules || []).map(rule => ({ ...rule, checked: rule.checked !== false }));
+      setState({ originalLearningResult: data, originalLearningLoading: false });
+    } else {
+      setState({ originalLearningLoading: false });
+      showToast(r.msg || '拆解失败');
+    }
+  } catch { setState({ originalLearningLoading: false }); showToast('网络错误'); }
+  render();
+}
+
+// 阶段三：把选中的规律融合进 Skill 工作流
 async function writeOriginalLearning() {
   const result = S.originalLearningResult;
-  // 兼容新格式（analysis 对象）和旧格式（数组）
-  let selected = [];
-  if (result && result.rules && Array.isArray(result.rules)) {
-    selected = result.rules.filter(r => r.checked);
-  } else if (Array.isArray(result)) {
-    selected = result.filter(r => r.checked);
-  }
+  const selected = (result && Array.isArray(result.rules)) ? result.rules.filter(r => r.checked) : [];
   if (selected.length === 0) { showToast('请至少选择一条'); return; }
+  const scope = S.originalLearningScope || 'global';
   try {
-    const skill = S.originalSkill || { rules: {}, keywords: [], forbidden: [] };
-    const rules = { ...(skill.rules || {}) };
-    const groupName = '学习中心同步';
-    if (!rules[groupName]) rules[groupName] = [];
-    selected.forEach(item => {
-      const exists = rules[groupName].some(r => r.text === item.text);
-      if (!exists) rules[groupName].push({ text: item.text, source: item.freq || S.originalLearningUrl, uses: 0 });
+    const projectId = scope === 'project' && S.originalProject ? S.originalProject.id : null;
+    const r = await api.post('/original/learning/write', {
+      insights: selected.map(s => ({ text: s.text, freq: s.freq })),
+      scope,
+      projectId,
     });
-    const r = await api.put('/original/skill', { rules, keywords: skill.keywords || [], forbidden: skill.forbidden || [] });
     if (r.code === 200) {
-      const rSkill = await api.get('/original/skill');
-      if (rSkill.code === 200) setState({ originalSkill: rSkill.data });
-      setState({ originalLearningResult: null, originalLearningUrl: '' });
-      showToast(`已写入 ${selected.length} 条规律`);
+      if (r.data && r.data.skill) setState({ originalSkill: r.data.skill });
+      setState({
+        originalLearningResult: null,
+        originalLearningUrl: '',
+        originalLearningItems: [],
+        originalLearningPhase: 'input',
+      });
+      showToast(scope === 'global' ? `已融合 ${selected.length} 条进 Skill ✓` : `已记录 ${selected.length} 条（本项目）`);
     } else {
       showToast(r.msg || '写入失败');
     }

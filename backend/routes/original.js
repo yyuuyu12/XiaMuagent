@@ -498,90 +498,54 @@ ${history ? `## 最近对话记录\n${history}\n` : ''}
    学习中心
 ═══════════════════════════════════════ */
 
-// POST /api/original/learning/analyze
-// 真实拉取抖音内容（TikHub）后由 AI 提炼规律
-router.post('/learning/analyze', requireAuth, async (req, res) => {
-  const { url, type = 'account', scope = 'global' } = req.body;
+// 工具：从 AI 文本中提取第一段 JSON
+function extractJson(text) {
+  if (!text) return null;
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch (_) { return null; }
+}
+
+// 把一段原文粗切成句子（中文标点 + 换行），用于降级标注
+function splitSentences(text) {
+  return String(text || '')
+    .split(/(?<=[。！？!?\n])/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+// POST /api/original/learning/extract —【阶段一】先提取原文，交给用户挑选
+// 单个视频：返回这一条的完整原文；账号主页：返回近期视频列表（标题+点赞），由用户勾选
+router.post('/learning/extract', requireAuth, async (req, res) => {
+  const { url, type = 'account' } = req.body;
   if (!url?.trim()) return res.status(400).json({ code: 400, msg: '请输入链接' });
 
   try {
     const tikhubKey = await getTikhubKey();
     if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员配置 TikHub Key' });
 
-    /* ── 单个视频：拉真实字幕 → AI 提炼结构规律 ── */
+    /* ── 单个视频：直接拉取完整原文 ── */
     if (type === 'video') {
-      // 从用户输入中提取真实 URL（支持分享文本/短链/完整链接）
       const realUrl = extractDouyinVideoUrl(url);
       if (!realUrl) {
         return res.status(422).json({ code: 422, msg: '未识别到有效的视频链接。请直接粘贴视频 URL（如 https://v.douyin.com/xxx），或复制视频分享文本（会自动提取链接）' });
       }
+      const awemeId = await resolveAwemeId(realUrl);
       const v = await fetchVideoScript(realUrl, tikhubKey);
       if (!v.script.trim()) return res.status(422).json({ code: 422, msg: '该视频未提取到文案内容（可能无口播/无字幕）' });
-
-      const scriptText = v.script.slice(0, 2000);
       const estSec = Math.round(v.script.length / 2.5);
-
-      const prompt = `你是资深短视频口播文案拆解师。以下是一条抖音视频的完整口播文案：
-
----
-${scriptText}
----
-视频标题：${v.desc}
-点赞量：${v.likes}·预计时长约 ${estSec} 秒
-
-请做完整结构化拆解，严格以 JSON 格式返回下面的结构，不要输出 JSON 之外的任何内容：
-
-{
-  "overview": {
-    "contentTheme": "内容主题，20字内，说清讲什么、面向谁",
-    "estDuration": "约${estSec}秒",
-    "style": "整体风格，10字内，如：快节奏强反差、温和干货型"
-  },
-  "scriptExcerpt": "文案最精华开头的前40字，原文摘录不要改写",
-  "structure": {
-    "opening": "开场（前5秒）：用了什么钩子手法，从文案里引用原句说明",
-    "development": "中段（主体内容）：内容怎么展开的，逻辑结构是什么，引用关键句",
-    "cta": "结尾引导：怎么收尾或促互动，引用原文句子"
-  },
-  "language": "语言风格（2-3句）：句子长短、语速感受、口语化程度、有无标志性表达",
-  "rules": [
-    { "text": "具体可复用的创作手法，25-45字，说清是什么、怎么用、能达到什么效果", "freq": "贯穿全程 或 出现X次" }
-  ]
-}
-
-要求：
-- structure 三个字段必须包含从文案中引用的原句，不能只泛泛描述
-- rules 给出 3-4 条，每条聚焦一个可操作手法，举例越具体越好
-- 全部内容严格基于提供的文案，禁止编造`;
-
-      const aiResult = await callAI(prompt, { maxTokens: 900, temperature: 0.5 });
-
-      let videoAnalysis = null;
-      try {
-        const jsonMatch = aiResult.match(/\{[\s\S]*\}/);
-        if (jsonMatch) videoAnalysis = JSON.parse(jsonMatch[0]);
-      } catch (_) {
-        videoAnalysis = {
-          overview: { contentTheme: v.desc?.slice(0, 20) || '短视频', estDuration: `约${estSec}秒`, style: '口语化' },
-          scriptExcerpt: v.script.slice(0, 40),
-          structure: { opening: '—', development: '—', cta: '—' },
-          language: '—',
-          rules: [{ text: aiResult.replace(/\s+/g, ' ').slice(0, 200), freq: '全程' }],
-        };
-      }
-      if (videoAnalysis?.rules) {
-        videoAnalysis.rules = videoAnalysis.rules.filter(x => x && x.text).slice(0, 4)
-          .map(r => ({ ...r, checked: true }));
-      }
-      return res.json({ code: 200, data: { type: 'video', analysis: videoAnalysis } });
+      return res.json({
+        code: 200,
+        data: {
+          type: 'video',
+          items: [{ awemeId, desc: v.desc, likes: v.likes, script: v.script, estSec, selected: true }],
+        },
+      });
     }
 
-    /* ── 账号主页：拉真实近期视频 → AI 归纳高频规律 ── */
-    // 先从分享文本中提取 URL（支持短链 / 完整链接 / 纯文本粘贴）
+    /* ── 账号主页：拉近期视频列表（标题 + 点赞），让用户挑选要学的几条 ── */
     const accountRealUrl = extractDouyinVideoUrl(url) || url.trim();
     let secUserId = extractSecUserId(accountRealUrl);
-
-    // 若直接提取不到 sec_user_id，跟随短链重定向（最多两跳）
     if (!secUserId) {
       try {
         const loc1 = await getRedirectLocation(accountRealUrl);
@@ -594,7 +558,6 @@ ${scriptText}
         }
       } catch {}
     }
-
     if (!secUserId) {
       return res.status(422).json({ code: 422, msg: '未识别到账号主页链接。请打开抖音 → 进入对方主页 → 点右上角分享 → 复制链接，再粘贴到这里' });
     }
@@ -602,130 +565,224 @@ ${scriptText}
     const videos = await fetchUserRecentVideos(secUserId, tikhubKey, 20);
     if (!videos.length) return res.status(422).json({ code: 422, msg: '未获取到该账号的视频，请确认主页链接正确' });
 
-    // 取点赞最高的前 6 条拉取真实字幕，结合所有标题构成语料
-    const top = videos.slice().sort((a, b) => b.likes - a.likes).slice(0, 6);
-    const subResults = await Promise.allSettled(
-      top.map(v => fetchVideoScript(`https://www.douyin.com/video/${v.aweme_id}`, tikhubKey))
-    );
-    const corpusParts = [];
-    subResults.forEach((r, i) => {
-      if (r.status === 'fulfilled' && r.value.script.trim()) {
-        const charCount = r.value.script.length;
-        const estSec = Math.round(charCount / 2.5);
-        corpusParts.push(`【视频${i + 1}·赞${top[i].likes}·约${estSec}秒】\n${r.value.script.slice(0, 600)}`);
-      }
-    });
-    const descCorpus = videos.filter(v => v.desc).slice(0, 20).map(v => `· ${v.desc}`).join('\n');
-    const corpus = (corpusParts.join('\n\n') + '\n\n【全部视频标题】\n' + descCorpus).slice(0, 5000);
+    // 按点赞从高到低排序，前 3 条默认勾选
+    const items = videos
+      .slice()
+      .sort((a, b) => b.likes - a.likes)
+      .map((v, i) => ({ awemeId: v.aweme_id, desc: v.desc, likes: v.likes, script: '', selected: i < 3 }));
 
-    if (!corpus.replace(/[\s【】·]/g, '').trim()) {
-      return res.status(422).json({ code: 422, msg: '该账号视频缺少可分析的文案内容' });
-    }
+    return res.json({ code: 200, data: { type: 'account', items } });
+  } catch (err) {
+    console.error('/original/learning/extract error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
 
-    const prompt = `你是一位资深短视频运营分析师。以下是某抖音账号近期 ${videos.length} 条视频的真实字幕/标题语料（按点赞排序）：
+// 对单条视频原文做「掰碎式」逐句拆解
+async function analyzeOneVideo(item, tikhubKey) {
+  let script = (item.script || '').trim();
+  // 账号场景：阶段一只给了 awemeId，这里按需补拉原文
+  if (!script && item.awemeId) {
+    try {
+      const v = await fetchVideoScript(`https://www.douyin.com/video/${item.awemeId}`, tikhubKey);
+      script = (v.script || '').trim();
+      if (!item.desc) item.desc = v.desc;
+      if (!item.likes) item.likes = v.likes;
+    } catch (_) {}
+  }
+  if (!script) return null;
 
----
-${corpus}
----
+  const scriptForAI = script.slice(0, 1100); // 控制 token，过长截断
+  const estSec = Math.round(script.length / 2.5);
 
-请对这个账号做一次完整深度拆解，严格以 JSON 格式返回下面的结构，不要输出 JSON 之外的任何内容：
+  const prompt = `你是顶级短视频口播文案拆解师。下面是一条抖音视频的完整口播原文，请把它"掰碎"逐句拆解，越细越好。
 
+【原文】
+${scriptForAI}
+
+【信息】标题：${item.desc || '—'}｜点赞：${item.likes || 0}｜约${estSec}秒
+
+请严格只返回 JSON（不要输出 JSON 以外任何文字）：
 {
-  "overview": {
-    "videoCount": ${videos.length},
-    "contentTheme": "内容方向，25字内，说清赛道和人群",
-    "avgDuration": "根据字数推算典型时长，150字≈60秒，300字≈2分钟",
-    "style": "整体风格，15字内，如：快节奏口语化、强数字感"
-  },
-  "topScripts": [
-    { "label": "赞XXX", "text": "该视频文案原文前150字，原样摘录不要改写" }
+  "summary": "一句话点破这条视频的核心套路，30字内",
+  "rhythm": "文案节奏分析：多快进入正题、信息密度、停顿与重音、节奏在哪变化，2-4句",
+  "segments": [
+    { "text": "原文里的一句或一小段（按自然句切分，原话不要改写）", "role": "hook|background|point|turn|example|cta|normal", "note": "这句起什么作用、为什么这么写、好在哪；普通过渡句留空字符串" }
   ],
-  "structure": {
-    "opening": "开场（0-5秒）：具体用什么手法抓注意力，从语料里引用真实例句说明",
-    "twist": "转折时机：约在第几秒出现转折或反转，转折套路是什么，引用真实例子",
-    "body": "主体展开：内容如何组织（如3步骤/案例/对比），节奏怎样，具体说明",
-    "cta": "结尾引导：用什么方式促互动或行动，引用语料中真实例句"
-  },
-  "topics": "选题规律（3-5句）：聚焦哪些话题方向、常用哪些切入角度、如何找到选题点",
-  "language": "语言特征（3-5句）：语速快慢、句子长短、口语化程度、有无标志性句式或口头禅",
   "rules": [
-    { "text": "可复用创作手法，20-40字，具体到怎么做、带真实例子更好", "freq": "出现X次" }
+    { "text": "可复用的创作手法，25-45字，具体到怎么做、能达到什么效果", "freq": "出现位置/次数" }
   ]
 }
 
-要求：
-- topScripts 取语料中点赞最高的 2-3 条，原文摘录，不要改写
-- structure 四个字段都要有具体细节，不能泛泛而谈，必须结合真实语料内容
-- rules 给出 4-5 条，每条聚焦一个具体可操作手法
-- 全部基于提供的语料，不编造数据`;
+硬性要求：
+- segments 必须把原文【从头到尾完整覆盖】，按句切分，text 用原文原话，不得遗漏、不得改写
+- role 含义：hook=开场钩子 / background=铺垫背景 / point=核心观点 / turn=转折反转 / example=举例论证 / cta=结尾引导互动 / normal=过渡句
+- 至少明确标出 hook、turn、cta 分别落在哪一句；note 只在关键句写，普通句留空
+- rules 给 3-4 条`;
 
-    const aiResult = await callAI(prompt, { maxTokens: 1500, temperature: 0.5 });
+  const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.5 });
+  let parsed = extractJson(aiResult);
 
-    let analysis = null;
-    try {
-      const jsonMatch = aiResult.match(/\{[\s\S]*\}/);
-      if (jsonMatch) analysis = JSON.parse(jsonMatch[0]);
-    } catch (_) {
-      // JSON 解析失败降级：把 AI 返回文本拆成几条 rules
-      analysis = {
-        overview: { videoCount: videos.length, contentTheme: '解析中', avgDuration: '—', style: '—' },
-        topScripts: [],
-        structure: { opening: '—', twist: '—', body: '—', cta: '—' },
-        topics: aiResult.slice(0, 200),
-        language: '—',
-        rules: aiResult.split('\n').filter(l => l.trim().length > 10).slice(0, 5).map(l => ({
-          text: l.replace(/^[-•\d.、\s"「」"]+/, '').trim(),
-          freq: '基于近期视频',
-        })).filter(x => x.text.length > 5),
-      };
+  // 降级：解析失败时，按句切分原文当作 segments，AI 文本塞进 rules
+  if (!parsed || !Array.isArray(parsed.segments) || !parsed.segments.length) {
+    parsed = {
+      summary: (item.desc || '').slice(0, 30) || '口播文案',
+      rhythm: '—',
+      segments: splitSentences(script).map(s => ({ text: s, role: 'normal', note: '' })),
+      rules: (parsed?.rules) || [{ text: aiResult.replace(/\s+/g, ' ').slice(0, 120), freq: '全程' }],
+    };
+  }
+
+  const segments = (parsed.segments || [])
+    .filter(s => s && s.text)
+    .map(s => ({ text: String(s.text), role: s.role || 'normal', note: s.note || '' }));
+  const rules = (parsed.rules || [])
+    .filter(r => r && r.text)
+    .slice(0, 4)
+    .map(r => ({ text: String(r.text), freq: r.freq || '' }));
+
+  return {
+    awemeId: item.awemeId,
+    desc: item.desc || '',
+    likes: item.likes || 0,
+    estSec,
+    summary: parsed.summary || '',
+    rhythm: parsed.rhythm || '',
+    segments,
+    rules,
+  };
+}
+
+// POST /api/original/learning/analyze —【阶段二】对用户选中的原文做逐句深拆
+router.post('/learning/analyze', requireAuth, async (req, res) => {
+  const { type = 'video', items = [], scope = 'global' } = req.body;
+  const picked = (Array.isArray(items) ? items : []).filter(it => it && (it.script || it.awemeId)).slice(0, 4);
+  if (!picked.length) return res.status(400).json({ code: 400, msg: '请先选择要学习的视频' });
+
+  try {
+    const tikhubKey = await getTikhubKey();
+    if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员配置 TikHub Key' });
+
+    // 逐条深拆（串行，避免并发触发 AI 限流）
+    const videos = [];
+    for (const it of picked) {
+      const one = await analyzeOneVideo(it, tikhubKey);
+      if (one) videos.push(one);
+    }
+    if (!videos.length) return res.status(422).json({ code: 422, msg: '所选视频未提取到可分析的文案' });
+
+    // 汇总所有视频的规律，去重后供用户勾选写入 Skill
+    const seen = new Set();
+    const rules = [];
+    for (const v of videos) {
+      for (const r of v.rules) {
+        const key = r.text.replace(/\s+/g, '');
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          rules.push({ text: r.text, freq: r.freq, checked: true });
+        }
+      }
     }
 
-    if (!analysis || (!analysis.rules?.length && !analysis.topics)) {
-      return res.status(422).json({ code: 422, msg: '未能提炼到有效分析，请换个账号试试' });
-    }
-
-    // 规范化 rules
-    analysis.rules = (analysis.rules || []).filter(x => x && x.text).slice(0, 5);
-    // 规范化 topScripts
-    analysis.topScripts = (analysis.topScripts || []).slice(0, 3);
-
-    res.json({ code: 200, data: { type: 'account', analysis, analyzedCount: videos.length } });
+    res.json({ code: 200, data: { type, videos, rules } });
   } catch (err) {
     console.error('/original/learning/analyze error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
   }
 });
 
-// POST /api/original/learning/write — 把选中的规律写入 Skill
+// POST /api/original/learning/write — 把选中的规律【融合】进 Skill 工作流（非简单追加）
 router.post('/learning/write', requireAuth, async (req, res) => {
   const { insights, scope = 'global', projectId } = req.body;
   if (!insights || !insights.length) return res.status(400).json({ code: 400, msg: '没有选中规律' });
 
+  // 仅用于本项目：不改全局 Skill，对话时作为上下文参考
+  if (scope !== 'global') {
+    return res.json({ code: 200, msg: '规律已记录，本项目对话时会参考' });
+  }
+
   try {
-    if (scope === 'global') {
-      const skill = await getOrCreateSkill(req.userId);
-      const rules = skill.rules || {};
-      if (!rules['学习中心']) rules['学习中心'] = [];
+    const skill = await getOrCreateSkill(req.userId);
+    const currentRules = skill.rules || {};
+    const curText = formatRulesForPrompt(skill);
+    const insightText = insights.map(i => `- ${i.text}`).join('\n');
+
+    // 让 AI 把新规律融合进既有工作流：补缺口、改写、归位，而不是堆在末尾
+    const prompt = `你是创作 Skill 工作流的架构师。下面是用户现有的创作 Skill（按创作流程节点分组）以及本次新学到的规律。
+请把新规律【融合】进现有工作流：先判断现有流程缺哪些环节、哪些节点需要补充或改写，再把每条新规律安放到最合适的流程节点中；可以新增节点、改写或合并已有条目，让整体更完整、不重复、像一套从头到尾可执行的工作流。不要简单把新规律堆在最后。
+
+【现有 Skill】
+${curText || '（暂时为空，请基于新规律搭建工作流骨架）'}
+
+【本次新学规律】
+${insightText}
+
+请只返回融合后的【完整】rules JSON（覆盖全部内容，按创作流程节点分组），示例结构：
+{
+  "选题方向": ["一句话可执行指令", "..."],
+  "开场钩子": ["..."],
+  "内容展开": ["..."],
+  "节奏与转折": ["..."],
+  "结尾引导": ["..."],
+  "语言风格": ["..."]
+}
+要求：
+- 分组名用创作流程节点（可按需增减分组）
+- 保留现有有价值的条目，与新规律去重合并、措辞更精炼
+- 每条是一句可直接执行的创作指令，不要解释
+- 只输出 JSON`;
+
+    let mergedRules = null;
+    try {
+      const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.4 });
+      const parsed = extractJson(aiResult);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        // AI 返回 {分组: [字符串]}，转成 {分组:[{text,...}]}，并尽量保留旧条目的 uses
+        const oldFlat = {};
+        for (const arr of Object.values(currentRules)) {
+          if (Array.isArray(arr)) arr.forEach(r => { if (r && r.text) oldFlat[r.text.replace(/\s+/g, '')] = r; });
+        }
+        mergedRules = {};
+        for (const [group, arr] of Object.entries(parsed)) {
+          if (!Array.isArray(arr)) continue;
+          const list = [];
+          for (const entry of arr) {
+            const text = typeof entry === 'string' ? entry : (entry && entry.text) || '';
+            if (!text.trim()) continue;
+            const prev = oldFlat[text.replace(/\s+/g, '')];
+            list.push(prev
+              ? { text: text.trim(), source: prev.source || '融合', sourceType: prev.sourceType || 'merge', uses: prev.uses || 0 }
+              : { text: text.trim(), source: '学习融合', sourceType: 'merge', uses: 0 });
+          }
+          if (list.length) mergedRules[group] = list;
+        }
+        if (!Object.keys(mergedRules).length) mergedRules = null;
+      }
+    } catch (e) {
+      console.warn('[Original] Skill 融合 AI 失败，降级为追加:', e.message);
+    }
+
+    // 降级：AI 融合失败时，退回到「学习中心」分组追加（保证数据不丢）
+    if (!mergedRules) {
+      mergedRules = { ...currentRules };
+      if (!mergedRules['学习中心']) mergedRules['学习中心'] = [];
       for (const ins of insights) {
-        const exists = rules['学习中心'].some(r => r.text === ins.text);
-        if (!exists) {
-          rules['学习中心'].push({ text: ins.text, source: '学习中心', sourceType: 'feed', uses: 0 });
+        if (!mergedRules['学习中心'].some(r => r.text === ins.text)) {
+          mergedRules['学习中心'].push({ text: ins.text, source: '学习中心', sourceType: 'feed', uses: 0 });
         }
       }
-      const curVer = skill.version || 'v1.0';
-      const parts = curVer.replace('v', '').split('.').map(Number);
-      parts[1] = (parts[1] || 0) + 1;
-      const newVer = `v${parts[0]}.${parts[1]}`;
-      await db.query(
-        'UPDATE cw_skills SET rules = ?, version = ? WHERE user_id = ?',
-        [JSON.stringify(rules), newVer, req.userId]
-      );
-      const updated = await getOrCreateSkill(req.userId);
-      res.json({ code: 200, data: { skill: updated } });
-    } else {
-      // 仅用于本项目：返回成功，前端无需实际写入（这些规律在对话时由 AI 上下文处理）
-      res.json({ code: 200, msg: '规律已记录，对话时会参考' });
     }
+
+    const curVer = skill.version || 'v1.0';
+    const parts = curVer.replace('v', '').split('.').map(Number);
+    parts[1] = (parts[1] || 0) + 1;
+    const newVer = `v${parts[0]}.${parts[1]}`;
+    await db.query(
+      'UPDATE cw_skills SET rules = ?, version = ? WHERE user_id = ?',
+      [JSON.stringify(mergedRules), newVer, req.userId]
+    );
+    const updated = await getOrCreateSkill(req.userId);
+    res.json({ code: 200, data: { skill: updated } });
   } catch (err) {
     console.error('/original/learning/write error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
