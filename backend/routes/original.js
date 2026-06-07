@@ -505,7 +505,7 @@ ${history ? `## 最近对话记录\n${history}\n` : ''}
 - 严格按目标时长控制字数：30s≈75字，1分钟≈150字，3分钟≈450字
 - 不用"首先其次最后"等书面框架词`;
 
-    const aiRaw = await callAI(systemPrompt + '\n\n用户：' + message.trim(), { maxTokens: 2500, temperature: 0.85 });
+    const aiRaw = await callAI(systemPrompt + '\n\n用户：' + message.trim(), { maxTokens: 4000, temperature: 0.85 });
 
     // 解析 AI 回复：提取说明 + 新剧本（兼容旧格式【新文案】）
     const docMatch = aiRaw.match(/【新剧本】([\s\S]*?)【\/新剧本】/) || aiRaw.match(/【新文案】([\s\S]*?)【\/新文案】/);
