@@ -1328,6 +1328,9 @@ const S = {
   originalLearningLoading: false,
   originalNewTitle: '',
   originalNewBrief: '',
+  originalNewDuration: '1min',   // '30s'|'1min'|'3min'
+  originalNewStyle: 'informative', // 'informative'|'story'|'contrast'|'twist'
+  originalNewPlatform: 'douyin', // 'douyin'|'shipinhao'|'xiaohongshu'
   // ===== 智能体 =====
   agentsList: [], agentsLoading: false, agentsLoaded: false,
   selectedAgent: null, agentInputs: {}, agentRunning: false, agentResult: null, agentErr: '',
@@ -7525,7 +7528,7 @@ function tOriginalHome() {
       <span style="font-size:13px;color:#9E9890">${projects.length} 个</span>
     </div>
     <div style="padding:0 16px;display:flex;flex-direction:column;gap:10px">
-      <div onclick="setState({originalView:'new',originalNewTitle:'',originalNewBrief:''});render()" style="border:1.5px dashed #D8D2C9;border-radius:14px;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;-webkit-tap-highlight-color:transparent">
+      <div onclick="setState({originalView:'new',originalNewTitle:'',originalNewBrief:'',originalNewDuration:'1min',originalNewStyle:'informative',originalNewPlatform:'douyin'});render()" style="border:1.5px dashed #D8D2C9;border-radius:14px;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;-webkit-tap-highlight-color:transparent">
         <div style="width:32px;height:32px;border-radius:10px;background:#FFF3E8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </div>
@@ -7604,8 +7607,8 @@ function tOriginalSkill() {
     </div>
 
     <!-- 底部固定保存栏 -->
-    <div style="position:fixed;bottom:0;left:0;right:0;padding:12px 16px 28px;background:linear-gradient(to top,#FAF9F6 70%,rgba(250,249,246,0));pointer-events:none;z-index:100">
-      <button onclick="_skillSaveFreeText()" ${saving?'disabled':''} style="pointer-events:all;width:100%;padding:14px 0;border:none;border-radius:16px;background:${saving?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${saving?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${saving?'default':'pointer'};letter-spacing:0.5px;box-shadow:0 4px 16px rgba(245,96,42,0.3)">
+    <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 16px 24px;background:linear-gradient(to top,#FAF9F6 80%,rgba(250,249,246,0));pointer-events:none;z-index:100;display:flex;justify-content:center">
+      <button onclick="_skillSaveFreeText()" ${saving?'disabled':''} style="pointer-events:all;padding:12px 48px;border:none;border-radius:50px;background:${saving?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${saving?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${saving?'default':'pointer'};letter-spacing:0.5px;box-shadow:0 4px 16px rgba(245,96,42,0.25);min-width:140px">
         ${saving ? '保存中…' : '保存'}
       </button>
     </div>
@@ -7918,40 +7921,66 @@ function tOriginalNew() {
   const skill = S.originalSkill;
   const loading = S.originalLoading;
   const ver = (skill && skill.version) ? skill.version : 'v1.0';
-  const ruleCount = skill ? Object.values(skill.rules || {}).flat().length : 0;
+  const ruleCount = skill ? Object.values(skill.rules || {}).flat().length + (skill.freeText ? 1 : 0) : 0;
   const title = S.originalNewTitle || '';
   const brief = S.originalNewBrief || '';
+  const dur = S.originalNewDuration || '1min';
+  const style = S.originalNewStyle || 'informative';
+  const platform = S.originalNewPlatform || 'douyin';
   const canCreate = !!title.trim() && !loading;
 
-  return `<div style="background:#F7F5F1;min-height:100%;padding:0 0 28px">
-    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 14px;padding:18px">
-      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">项目标题（这条视频在讲什么）</div>
+  // 分段选择器
+  const seg3 = (opts, val, stateKey) => `
+    <div style="display:flex;background:#F4F1EC;border-radius:10px;padding:3px;gap:2px">
+      ${opts.map(([v,label]) => `<button onclick="setState({${stateKey}:'${v}'});render()" style="flex:1;padding:7px 0;border:none;border-radius:7px;font-size:12.5px;font-weight:${val===v?700:500};background:${val===v?'#fff':'transparent'};color:${val===v?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${val===v?'0 1px 4px rgba(0,0,0,0.1)':'none'};transition:all .15s;-webkit-tap-highlight-color:transparent">${label}</button>`).join('')}
+    </div>`;
+
+  return `<div style="background:#F7F5F1;min-height:100%;padding:0 0 32px">
+    <!-- 标题 -->
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 16px 12px;padding:16px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">视频主题（这条视频在讲什么）</div>
       <input type="text" id="orig-new-title" oninput="S.originalNewTitle=this.value;_origNewUnderline()"
         value="${esc(title)}" placeholder="例如：我用3天做了个AI工具"
         style="width:100%;border:none;outline:none;font-size:15.5px;font-weight:600;color:#1A1614;background:transparent;font-family:inherit;padding:4px 0;box-sizing:border-box" />
       <div id="orig-new-title-line" style="height:2px;background:${title?'#F5602A':'#F0EDE8'};margin-top:8px;border-radius:1px;transition:background .2s"></div>
     </div>
-    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 14px;padding:18px">
-      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">想传达什么（可选）</div>
+    <!-- 核心观点 -->
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 16px 12px;padding:16px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">选题角度 / 核心观点（可选）</div>
       <textarea id="orig-new-brief" oninput="S.originalNewBrief=this.value;_origNewUnderline()"
-        placeholder="例如：让普通上班族知道AI工具其实不难用…"
-        style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:60px;line-height:1.65;box-sizing:border-box">${esc(brief)}</textarea>
-      <div id="orig-new-brief-line" style="height:2px;background:${brief?'#F5602A':'#F0EDE8'};margin-top:8px;border-radius:1px;transition:background .2s"></div>
+        placeholder="例如：普通人也能用 AI 把 40% 的重复运营工作自动化…"
+        style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:58px;line-height:1.65;box-sizing:border-box">${esc(brief)}</textarea>
+      <div id="orig-new-brief-line" style="height:2px;background:${brief?'#F5602A':'#F0EDE8'};margin-top:6px;border-radius:1px;transition:background .2s"></div>
+    </div>
+    <!-- 目标时长 -->
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 16px 12px;padding:16px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:10px">目标时长</div>
+      ${seg3([['30s','30 秒'],['1min','1 分钟'],['3min','3 分钟']], dur, 'originalNewDuration')}
+    </div>
+    <!-- 视频风格 -->
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 16px 12px;padding:16px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:10px">视频风格</div>
+      ${seg3([['informative','干货'],['story','故事'],['contrast','对比'],['twist','反转']], style, 'originalNewStyle')}
+    </div>
+    <!-- 目标平台 -->
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 16px 16px;padding:16px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:10px">目标平台</div>
+      ${seg3([['douyin','抖音'],['shipinhao','视频号'],['xiaohongshu','小红书']], platform, 'originalNewPlatform')}
     </div>
     ${skill ? `
-      <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 24px;padding:14px 16px;display:flex;align-items:center;gap:12px">
-        <div style="width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFB877" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 16px 20px;padding:13px 16px;display:flex;align-items:center;gap:12px">
+        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB877" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </div>
         <div style="flex:1">
-          <div style="font-size:13.5px;font-weight:600;color:#1A1614">自动加载 Skill ${esc(ver)}</div>
-          <div style="font-size:11.5px;color:#9E9890;margin-top:1px">${ruleCount} 条规则已就绪，开始对话即可</div>
+          <div style="font-size:13px;font-weight:600;color:#1A1614">自动加载 Skill ${esc(ver)}</div>
+          <div style="font-size:11px;color:#9E9890;margin-top:1px">${ruleCount > 0 ? `${ruleCount} 条规则已就绪` : '无规则，纯对话创作'}</div>
         </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>` : '<div style="height:10px"></div>'}
     <button type="button" id="orig-new-btn" ${canCreate?'':'disabled'} onclick="createOriginalProject()"
-            style="width:calc(100% - 44px);margin:0 22px;padding:15px 0;border:none;border-radius:16px;background:${canCreate?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};color:${canCreate?'#fff':'#B0AA9F'};font-size:16px;font-weight:700;cursor:${canCreate?'pointer':'default'}">
-      ${loading ? '创建中…' : '开始创作'}
+            style="width:calc(100% - 32px);margin:0 16px;padding:15px 0;border:none;border-radius:16px;background:${canCreate?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};color:${canCreate?'#fff':'#B0AA9F'};font-size:16px;font-weight:700;cursor:${canCreate?'pointer':'default'}">
+      ${loading ? '创建中…' : '开始创作 →'}
     </button>
   </div>`;
 }
@@ -8022,7 +8051,7 @@ function tOriginalChat() {
       <div style="max-width:88%;background:#fff;border-radius:4px 18px 18px 18px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
         <div style="font-size:13.5px;color:#2A241E;line-height:1.7">${displayContent ? esc(displayContent) : '文案已更新，点下方查看'}</div>
         ${msg.has_doc_update ? `<div onclick="setState({originalChatTab:'doc'});render()" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#F5602A;font-weight:600;cursor:pointer;background:#FFF3E8;padding:5px 10px;border-radius:8px">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 查看当前文案 ›
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 查看当前剧本 ›
         </div>` : ''}
         ${syncCard}
       </div>
@@ -8064,7 +8093,7 @@ function tOriginalChat() {
   const docView = `<div style="flex:1;overflow-y:auto;min-height:0;padding:12px 22px 24px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch">
     <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid #F0EDE8">
       <div>
-        <div style="font-size:11px;color:#B0AA9F;margin-bottom:2px">当前文案 · 活文档</div>
+        <div style="font-size:11px;color:#B0AA9F;margin-bottom:2px">当前剧本 · 活文档</div>
         <div style="font-size:12.5px;color:#9E9890">每次对话调整后自动更新</div>
       </div>
       ${proj.doc ? `<button type="button" id="${docCopyBtnId}" onclick="copyOriginalDoc('${docCopyBtnId}')" style="padding:7px 13px;font-size:12px;display:flex;align-items:center;gap:5px;color:#6E6860;background:#fff;border:1px solid #F0EDE8;border-radius:12px;cursor:pointer">
@@ -8072,18 +8101,18 @@ function tOriginalChat() {
       </button>` : ''}
     </div>
     ${proj.doc
-      ? `<div style="font-size:15px;color:#1A1614;line-height:2;white-space:pre-line;letter-spacing:0.01em;padding:4px 0">${esc(proj.doc)}</div>
+      ? `<div style="font-size:14px;color:#1A1614;line-height:1.9;white-space:pre-wrap;letter-spacing:0.01em;padding:4px 0;font-family:inherit">${esc(proj.doc)}</div>
          <div style="padding-top:12px;border-top:1px solid #F0EDE8;display:flex;align-items:center;gap:8px">
            <span style="font-size:11px;color:#B0AA9F">最后更新：对话第 ${proj.turns||0} 轮</span>
          </div>`
-      : `<div style="text-align:center;padding:48px 0;color:#B0AA9F;font-size:14px">文案还没生成，<br>开始对话让 AI 帮你写吧</div>`}
+      : `<div style="text-align:center;padding:48px 0;color:#B0AA9F;font-size:14px">剧本还没生成，<br>开始对话让 AI 帮你写吧</div>`}
   </div>`;
 
   const pill = (id, label, badge) => `<div onclick="setState({originalChatTab:'${id}'});render()" style="padding:8px 18px;border-radius:22px;font-size:13px;font-weight:${tab===id?700:500};background:${tab===id?'#fff':'transparent'};color:${tab===id?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${tab===id?'0 2px 8px rgba(0,0,0,0.1)':'none'};transition:all .2s">${label}${badge||''}</div>`;
 
   return `<div style="background:#F4F1EC;height:100%;display:flex;flex-direction:column">
     <div style="display:flex;gap:6px;padding:6px 22px 10px;flex-shrink:0">
-      ${pill('doc','当前文案', proj.doc?` <span style="font-size:9px;background:#F5602A;color:#fff;border-radius:6px;padding:1px 5px;vertical-align:middle">新</span>`:'')}
+      ${pill('doc','当前剧本', proj.doc?` <span style="font-size:9px;background:#F5602A;color:#fff;border-radius:6px;padding:1px 5px;vertical-align:middle">新</span>`:'')}
       ${pill('chat','对话调整')}
     </div>
     ${tab === 'doc' ? docView : chatView}
@@ -8167,10 +8196,13 @@ async function createOriginalProject() {
   const brief = (document.getElementById('orig-new-brief') ? document.getElementById('orig-new-brief').value : S.originalNewBrief).trim();
   if (!title) { showToast('请填写视频主题'); return; }
   if (S.originalLoading) return;
+  const duration = S.originalNewDuration || '1min';
+  const style = S.originalNewStyle || 'informative';
+  const platform = S.originalNewPlatform || 'douyin';
   setState({ originalLoading: true, originalNewTitle: title, originalNewBrief: brief });
   render();
   try {
-    const r = await api.post('/original/projects', { title, brief });
+    const r = await api.post('/original/projects', { title, brief, duration, angle: brief, style, platform });
     if (r.code === 200) {
       const rProj = await api.get('/original/projects');
       setState({

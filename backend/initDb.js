@@ -508,6 +508,9 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // cw_original_projects 表：补 meta 列（存时长/风格/平台等）
+  try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN meta JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.meta:', e.message||e); }
+
   // cw_skills 表：补 check_prompt / free_text / free_text_history 列
   try { await db.query('ALTER TABLE cw_skills ADD COLUMN check_prompt TEXT DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] check_prompt:', e.message||e); }
   try { await db.query('ALTER TABLE cw_skills ADD COLUMN free_text MEDIUMTEXT DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] free_text:', e.message||e); }

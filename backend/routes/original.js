@@ -201,13 +201,19 @@ async function getOrCreateSkill(userId) {
   return { version: 'v1.0', rules: {}, keywords: [], forbidden: [], checkPrompt: '', freeText: '', freeTextHistory: [], updatedAt: new Date() };
 }
 
-// 验证项目归属
+// 验证项目归属，自动解析 meta JSON
 async function getProject(projectId, userId) {
   const { rows } = await db.query(
     'SELECT * FROM cw_original_projects WHERE id = ? AND user_id = ?',
     [projectId, userId]
   );
-  return rows?.[0] || null;
+  if (!rows?.[0]) return null;
+  const p = rows[0];
+  if (p.meta && typeof p.meta === 'string') {
+    try { p.meta = JSON.parse(p.meta); } catch { p.meta = {}; }
+  }
+  p.meta = p.meta || {};
+  return p;
 }
 
 // 把 rules 对象格式化成文本供 AI 读取
@@ -318,15 +324,16 @@ router.get('/projects', requireAuth, async (req, res) => {
 
 // POST /api/original/projects — 创建新项目
 router.post('/projects', requireAuth, async (req, res) => {
-  const { title, brief = '' } = req.body;
+  const { title, brief = '', duration, angle, style, platform } = req.body;
   if (!title?.trim()) return res.status(400).json({ code: 400, msg: '请填写项目标题' });
+  const meta = { duration: duration || '1min', angle: angle || '', style: style || 'informative', platform: platform || 'douyin' };
   try {
     const { rows } = await db.query(
-      "INSERT INTO cw_original_projects (user_id, title, brief, status, doc, turns) VALUES (?, ?, ?, 'draft', '', 0)",
-      [req.userId, title.trim(), brief.trim()]
+      "INSERT INTO cw_original_projects (user_id, title, brief, status, doc, turns, meta) VALUES (?, ?, ?, 'draft', '', 0, ?)",
+      [req.userId, title.trim(), brief.trim(), JSON.stringify(meta)]
     );
     const id = rows?.[0]?.id;
-    res.json({ code: 200, data: { id, title: title.trim(), brief: brief.trim(), status: 'draft', doc: '', turns: 0 } });
+    res.json({ code: 200, data: { id, title: title.trim(), brief: brief.trim(), status: 'draft', doc: '', turns: 0, meta } });
   } catch (err) {
     console.error('/original/projects POST error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
@@ -432,49 +439,70 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
       .map(m => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`)
       .join('\n');
 
-    const systemPrompt = `你是一位经验丰富的短视频口播文案写手，专门帮用户写出能直接用的完整脚本。
+    // 读取项目元数据（时长/风格/平台）
+    const meta = project.meta || {};
+    const durationMap = { '30s': '30秒（约75字，6-8个镜头）', '1min': '1分钟（约150字，10-14个镜头）', '3min': '3分钟（约450字，22-28个镜头）' };
+    const styleMap = { informative: '干货讲解（直接、数据、干货）', story: '故事叙事（情节弧线、情感共鸣）', contrast: '对比反差（before/after、A vs B）', twist: '悬念反转（埋伏笔、出乎意料）' };
+    const platformMap = { douyin: '抖音', shipinhao: '视频号', xiaohongshu: '小红书' };
+    const durationLabel = durationMap[meta.duration] || '1分钟';
+    const styleLabel = styleMap[meta.style] || '干货讲解';
+    const platformLabel = platformMap[meta.platform] || '抖音';
+
+    const systemPrompt = `你是一位经验丰富的短视频分镜脚本写手，帮用户写出可以直接拍摄的完整分镜剧本。
 
 ## 你的核心工作方式
-**先写，再改。** 只要用户给了一点方向，就立刻写出第一版完整文案，不要无限追问。
-- 信息足够 → 直接写完整文案
-- 信息不够 → 问最关键的 1 个问题 + 同时写一版猜测方向的草稿，让用户有东西可以反应
-- 不要连续追问超过 1 次，第二条消息起必须有文案产出
+**先写，再改。** 只要用户给了一点方向，就立刻写出第一版完整剧本，不要无限追问。
+- 信息足够 → 直接写完整分镜剧本
+- 信息不够 → 问最关键的 1 个问题 + 同时写一版猜测方向的草稿
+- 不要连续追问超过 1 次，第二条消息起必须有剧本产出
 
-## 用户 Skill 规则（写文案时遵守）
+## 用户 Skill 规则（写剧本时遵守）
 ${rulesText}
 
 ## 当前项目信息
 项目标题：${project.title}${project.brief ? `\n项目说明：${project.brief}` : ''}
-⚠️ 注意：项目标题可能只是用户随手起的名字，不要过度解读标题，以用户在对话中说的内容为准。
+目标时长：${durationLabel}
+视频风格：${styleLabel}
+目标平台：${platformLabel}${meta.angle ? `\n核心观点：${meta.angle}` : ''}
 
-## 当前文案版本
-${isFirstMessage ? '（还没有文案，这是第一次创作）' : `---\n${currentDoc}\n---`}
+## 当前剧本版本
+${isFirstMessage ? '（还没有剧本，这是第一次创作）' : `---\n${currentDoc}\n---`}
 
 ${history ? `## 最近对话记录\n${history}\n` : ''}
 
-## 什么时候输出【新文案】
-- 用户说"帮我写/生成/来一版" → 立刻写，输出【新文案】
-- 用户描述了内容方向/主题/想法 → 直接写草稿，输出【新文案】
-- 用户说"改一下/调整/换" → 修改现有文案，输出【新文案】
-- 用户只是打招呼"你好"或反馈"这里不对" → 简短回应，不输出【新文案】
-- 但如果已经纯聊天了 1 轮还没写任何文案，下一轮必须主动产出文案草稿
+## 什么时候输出【新剧本】
+- 用户说"帮我写/生成/来一版" → 立刻写，输出【新剧本】
+- 用户描述了内容方向/主题/想法 → 直接写草稿，输出【新剧本】
+- 用户说"改一下/调整/换" → 修改现有剧本，输出【新剧本】
+- 用户只是打招呼或反馈问题 → 简短回应，不输出【新剧本】
+- 如果已经纯聊天了 1 轮还没有剧本，下一轮必须主动产出草稿
 
-## 输出格式（有文案时）
+## 输出格式（有剧本时）
 用一句话说你写/改了什么（≤30字）
-【新文案】
-完整文案内容
-【/新文案】
+【新剧本】
+【镜头1 | 0:00-0:05】
+📹 画面：（需要的场景/素材描述，例如：博主出镜，站在办公室背景前）
+🎤 台词：（这段要说的话）
 
-## 文案质量要求
-- 口播脚本，写成说话的语气，不要书面腔
-- 1分钟≈150字，5分钟≈750字，按用户要求的时长写够
-- 有钩子开场、内容主体、结尾引导，结构完整
-- 不要用"首先其次最后"这种框架感强的词，要自然流畅`;
+【镜头2 | 0:05-0:15】
+📹 画面：（例如：手机屏幕录屏展示工具界面）
+🎤 台词：（这段要说的话）
 
-    const aiRaw = await callAI(systemPrompt + '\n\n用户：' + message.trim(), { maxTokens: 1500, temperature: 0.85 });
+（以此类推，每个镜头一个块）
+【/新剧本】
 
-    // 解析 AI 回复：提取说明 + 新文案
-    const docMatch = aiRaw.match(/【新文案】([\s\S]*?)【\/新文案】/);
+## 剧本质量要求
+- 台词写成口语说话的语气，自然流畅，不要书面腔
+- 每个镜头时长3-15秒，画面描述要具体可操作（说清楚拍什么/用什么素材）
+- 结构完整：强钩子开场 → 内容主体 → 结尾引导关注/互动
+- 严格按目标时长控制总镜头数和台词字数
+- 台词不要用"首先其次最后"这种书面框架词`;
+
+    const aiRaw = await callAI(systemPrompt + '\n\n用户：' + message.trim(), { maxTokens: 2500, temperature: 0.85 });
+
+    // 解析 AI 回复：提取说明 + 新剧本（兼容旧格式【新文案】）
+    const docMatch = aiRaw.match(/【新剧本】([\s\S]*?)【\/新剧本】/) || aiRaw.match(/【新文案】([\s\S]*?)【\/新文案】/);
+    const docTag = aiRaw.includes('【新剧本】') ? '【新剧本】' : '【新文案】';
     let newDoc = currentDoc;
     let aiSummary = aiRaw.trim();
     let hasDocUpdate = 0;
@@ -482,9 +510,9 @@ ${history ? `## 最近对话记录\n${history}\n` : ''}
     if (docMatch) {
       newDoc = docMatch[1].trim();
       hasDocUpdate = 1;
-      // 摘要 = 【新文案】之前的部分
-      const beforeDoc = aiRaw.split('【新文案】')[0].trim();
-      aiSummary = beforeDoc || '已更新文案。';
+      // 摘要 = 标签之前的部分
+      const beforeDoc = aiRaw.split(docTag)[0].trim();
+      aiSummary = beforeDoc || '已更新剧本。';
     }
 
     // 生成 sync_label（从摘要提取一个简短的规律标签）
