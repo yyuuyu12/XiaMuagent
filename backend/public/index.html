@@ -7847,9 +7847,11 @@ function tOriginalLearning() {
             </div>`).join('')}
         </div>
       </div>
-      <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()"
-              style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">
-        ${scope==='global'?`融合进 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}
+      <button type="button" ${(checkedCount===0||S.originalLearningWriting)?'disabled':''} onclick="writeOriginalLearning()"
+              style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${(checkedCount===0||S.originalLearningWriting)?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${(checkedCount===0||S.originalLearningWriting)?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${(checkedCount===0||S.originalLearningWriting)?'default':'pointer'};display:flex;align-items:center;justify-content:center;gap:8px">
+        ${S.originalLearningWriting
+          ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="40 20"/></svg>AI 融合中，请稍候…`
+          : (scope==='global'?`融合进 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`)}
       </button>` : '';
 
     resultBlock = `${legend}${videoCards}${rulesBlock}`;
@@ -8306,10 +8308,13 @@ async function analyzeOriginalLearning() {
 
 // 阶段三：把选中的规律融合进 Skill 工作流
 async function writeOriginalLearning() {
+  if (S.originalLearningWriting) return;
   const result = S.originalLearningResult;
   const selected = (result && Array.isArray(result.rules)) ? result.rules.filter(r => r.checked) : [];
   if (selected.length === 0) { showToast('请至少选择一条'); return; }
   const scope = S.originalLearningScope || 'global';
+  setState({ originalLearningWriting: true });
+  render();
   try {
     const projectId = scope === 'project' && S.originalProject ? S.originalProject.id : null;
     const r = await api.post('/original/learning/write', {
@@ -8317,6 +8322,7 @@ async function writeOriginalLearning() {
       scope,
       projectId,
     });
+    setState({ originalLearningWriting: false });
     if (r.code === 200) {
       if (r.data && r.data.skill) setState({ originalSkill: r.data.skill });
       setState({
@@ -8329,7 +8335,10 @@ async function writeOriginalLearning() {
     } else {
       showToast(r.msg || '写入失败');
     }
-  } catch { showToast('网络错误'); }
+  } catch {
+    setState({ originalLearningWriting: false });
+    showToast('网络错误');
+  }
   render();
 }
 
