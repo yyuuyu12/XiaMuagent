@@ -417,10 +417,7 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
     const project = await getProject(projectId, req.userId);
     if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
 
-    const skill = await getOrCreateSkill(req.userId);
-    const rulesText = formatRulesForPrompt(skill);
-
-    // 保存用户消息
+    // 保存用户消息（先存，后面自动学习用得到对话历史）
     await db.query(
       'INSERT INTO cw_original_messages (project_id, role, content) VALUES (?, ?, ?)',
       [projectId, 'user', message.trim()]
@@ -438,6 +435,53 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
     const history = (histRows || []).reverse()
       .map(m => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`)
       .join('\n');
+
+    // ── 自动学习：检测用户反馈，提炼规则写入 Skill ──────────────────
+    let autoLearnRule = null;
+    const feedbackPattern = /好多了|更好了|好了|对了|就这个|这版.*好|对味|不错了|棒|可以了|喜欢这|AI味|机器味|太.*了|还是.*味|生硬|套话|太模板|太套路|不够真实|感觉.*假|不对味|腔|太官方/;
+    const hasFeedback = feedbackPattern.test(message) && message.trim().length < 60;
+
+    if (hasFeedback) {
+      try {
+        // 检查上一条 AI 回复是否是文案更新（有 has_doc_update=1）
+        const { rows: lastAiRows } = await db.query(
+          'SELECT content FROM cw_original_messages WHERE project_id = ? AND role = ? AND has_doc_update = 1 ORDER BY id DESC LIMIT 1',
+          [projectId, 'ai']
+        );
+        const lastChange = lastAiRows?.[0]?.content || '';
+
+        if (lastChange) {
+          const extractPrompt = `用户反馈："${message}"。上一次文案修改描述："${lastChange.slice(0, 80)}"。
+
+判断：这条反馈是否包含可提炼的写作风格规则（关于语气/用词/风格/避免某类写法）？
+- 如果是 → 输出一条规则，格式以"-"开头，15-30字，直接说规则本身，不要解释
+- 如果只是修改指令（换方向/继续改等）而非质量评价 → 输出：SKIP
+
+只输出一行，不要其他文字。`;
+
+          const extracted = (await callAI(extractPrompt, { maxTokens: 80, temperature: 0.2 })).trim();
+
+          if (extracted && !extracted.startsWith('SKIP') && (extracted.startsWith('-') || extracted.length > 5)) {
+            autoLearnRule = extracted.startsWith('-') ? extracted.slice(1).trim() : extracted;
+            // 追加到 Skill freeText
+            const skill = await getOrCreateSkill(req.userId);
+            const existing = skill.freeText || '';
+            const today = new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+            const newFreeText = existing.trim()
+              ? `${existing}\n\n## 自动学习（${today}）\n- ${autoLearnRule}`
+              : `## 自动学习（${today}）\n- ${autoLearnRule}`;
+            await db.query('UPDATE cw_skills SET free_text = ? WHERE user_id = ?', [newFreeText, req.userId]);
+            console.log(`[AutoLearn] 已提炼规则: ${autoLearnRule}`);
+          }
+        }
+      } catch (e) {
+        console.warn('[AutoLearn] 提取失败:', e.message);
+      }
+    }
+
+    // 读取 Skill（在 autoLearn 更新 DB 之后再读，确保拿到最新规则）
+    const skill = await getOrCreateSkill(req.userId);
+    const rulesText = formatRulesForPrompt(skill);
 
     // 读取项目元数据（时长/风格/平台）
     const meta = project.meta || {};
@@ -547,8 +591,8 @@ ${history ? `## 最近对话记录\n${history}\n` : ''}
 
     // 保存 AI 消息
     const { rows: ins } = await db.query(
-      'INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, sync_label, sync_done) VALUES (?, ?, ?, ?, ?, NULL)',
-      [projectId, 'ai', aiSummary, hasDocUpdate, syncLabel]
+      'INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, sync_label, sync_done, auto_learn) VALUES (?, ?, ?, ?, ?, NULL, ?)',
+      [projectId, 'ai', aiSummary, hasDocUpdate, syncLabel, autoLearnRule || null]
     );
     const msgId = ins?.[0]?.id;
 
@@ -565,6 +609,7 @@ ${history ? `## 最近对话记录\n${history}\n` : ''}
           has_doc_update: hasDocUpdate,
           sync_label: syncLabel,
           sync_done: null,
+          auto_learn: autoLearnRule || null,
         },
         doc: newDoc,
         turns: updated?.[0]?.turns || 0,
