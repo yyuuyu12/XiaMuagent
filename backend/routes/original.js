@@ -106,6 +106,7 @@ async function fetchVideoScript(url, tikhubKey) {
 
   // 1. 优先用 TikHub 内置字幕
   let script = '';
+  let scriptSource = '';
   try {
     const subtitleResp = await fetch(
       `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_subtitle?aweme_id=${awemeId}`,
@@ -116,22 +117,27 @@ async function fetchVideoScript(url, tikhubKey) {
       const subtitles = subData?.data?.subtitle_infos?.[0]?.subtitle_list;
       if (subtitles?.length) {
         script = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('');
+        if (script.trim()) scriptSource = 'subtitle';
       }
     }
   } catch {}
 
   // 2. 无内置字幕 → 发给本地 Whisper ASR 转录
-  if (!script) {
+  if (!script.trim()) {
     const mp4Url = extractMp4Url(item);
     const asrUrl = await getAsrUrl();
     if (mp4Url && asrUrl) {
       console.log(`[Original] TikHub 无字幕，启动 ASR 转录: aweme_id=${awemeId}`);
       script = await asrTranscribe(mp4Url, asrUrl);
+      if (script.trim()) scriptSource = 'asr';
     }
   }
 
+  // ⚠️ 不要用 item.desc（标题）兜底当原文，否则会把标题当口播去分析。
+  // 取不到口播就返回空 script，由上层如实提示用户。
   return {
-    script: script || item.desc || '',
+    script: script.trim(),
+    scriptSource,            // 'subtitle' | 'asr' | ''（空表示口播未取到）
     desc: item.desc || '',
     likes: item.statistics?.digg_count || 0,
     author: item.author?.nickname || '',
@@ -532,7 +538,7 @@ router.post('/learning/extract', requireAuth, async (req, res) => {
       }
       const awemeId = await resolveAwemeId(realUrl);
       const v = await fetchVideoScript(realUrl, tikhubKey);
-      if (!v.script.trim()) return res.status(422).json({ code: 422, msg: '该视频未提取到文案内容（可能无口播/无字幕）' });
+      if (!v.script.trim()) return res.status(422).json({ code: 422, msg: '没取到这条视频的口播原文：该视频无内置字幕、语音转录也未成功（可能是纯画面/BGM、本地转录服务未在线）。换一条有口播的视频再试，注意学习的是口播内容而非标题。' });
       const estSec = Math.round(v.script.length / 2.5);
       return res.json({
         code: 200,
