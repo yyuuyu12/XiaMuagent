@@ -830,14 +830,37 @@ ${scriptForAI}
 }
 
 // POST /api/original/learning/analyze —【阶段二】对用户选中的原文做逐句深拆
+// 支持两种来源：items（旧，带 awemeId/script）或 materialIds（从素材库选）
 router.post('/learning/analyze', requireAuth, async (req, res) => {
-  const { type = 'video', items = [], scope = 'global' } = req.body;
-  const picked = (Array.isArray(items) ? items : []).filter(it => it && (it.script || it.awemeId)).slice(0, 4);
-  if (!picked.length) return res.status(400).json({ code: 400, msg: '请先选择要学习的视频' });
+  const { type = 'video', items = [], scope = 'global', materialIds = [] } = req.body;
+
+  let picked = [];
+  let tikhubKey = null;
+
+  if (Array.isArray(materialIds) && materialIds.length > 0) {
+    // 从素材库加载
+    const ids = materialIds.slice(0, 4).map(Number).filter(Boolean);
+    if (ids.length) {
+      const { rows: mats } = await db.query(
+        `SELECT id, title, raw_content FROM cw_materials WHERE id IN (${ids.map(()=>'?').join(',')}) AND user_id = ?`,
+        [...ids, req.userId]
+      );
+      picked = mats.map(m => ({ desc: m.title, script: m.raw_content || '', likes: 0 }));
+    }
+  } else {
+    picked = (Array.isArray(items) ? items : []).filter(it => it && (it.script || it.awemeId)).slice(0, 4);
+    if (picked.some(p => !p.script && p.awemeId)) {
+      tikhubKey = await getTikhubKey();
+    }
+  }
+
+  if (!picked.length) return res.status(400).json({ code: 400, msg: '请先选择要学习的素材' });
 
   try {
-    const tikhubKey = await getTikhubKey();
-    if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员配置 TikHub Key' });
+    if (!tikhubKey && picked.some(p => !p.script && p.awemeId)) {
+      tikhubKey = await getTikhubKey();
+      if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员配置 TikHub Key' });
+    }
 
     // 逐条深拆（串行，避免并发触发 AI 限流）
     const videos = [];
@@ -1029,6 +1052,56 @@ ${recentTitles}
     res.json({ code: 200, data: topics.slice(0, 4) });
   } catch (err) {
     console.error('/original/suggest-topics error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   素材库 CRUD
+═══════════════════════════════════════════════════════════════ */
+
+// GET /api/original/materials — 列出用户所有素材
+router.get('/materials', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, title, source_url, source_type,
+              LEFT(raw_content, 120) AS preview,
+              CHAR_LENGTH(raw_content) AS content_len,
+              created_at
+       FROM cw_materials WHERE user_id = ? ORDER BY created_at DESC`,
+      [req.userId]
+    );
+    res.json({ code: 200, data: rows });
+  } catch (err) {
+    console.error('/original/materials GET error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/original/materials — 保存素材（文字直存 or URL提取后存）
+router.post('/materials', requireAuth, async (req, res) => {
+  const { title, rawContent, sourceUrl, sourceType = 'text' } = req.body;
+  if (!rawContent?.trim()) return res.status(400).json({ code: 400, msg: '素材内容不能为空' });
+  const finalTitle = (title || '').trim() || `素材 ${new Date().toLocaleDateString('zh-CN')}`;
+  try {
+    const { rows } = await db.query(
+      'INSERT INTO cw_materials (user_id, title, source_url, source_type, raw_content) VALUES (?, ?, ?, ?, ?)',
+      [req.userId, finalTitle, sourceUrl || null, sourceType, rawContent.trim()]
+    );
+    res.json({ code: 200, data: { id: rows[0]?.id } });
+  } catch (err) {
+    console.error('/original/materials POST error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// DELETE /api/original/materials/:id — 删除素材
+router.delete('/materials/:id', requireAuth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM cw_materials WHERE id = ? AND user_id = ?', [req.params.id, req.userId]);
+    res.json({ code: 200 });
+  } catch (err) {
+    console.error('/original/materials DELETE error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
   }
 });

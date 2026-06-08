@@ -508,6 +508,20 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // cw_materials 表：素材库（存竞品原文，永久保留）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_materials (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      user_id      INT NOT NULL,
+      title        VARCHAR(200) NOT NULL DEFAULT '',
+      source_url   VARCHAR(500) DEFAULT NULL,
+      source_type  VARCHAR(20)  DEFAULT 'text',
+      raw_content  MEDIUMTEXT,
+      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // cw_original_projects 表：补 meta 列（存时长/风格/平台等）
   try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN meta JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.meta:', e.message||e); }
   // cw_original_messages 表：补 auto_learn 列（自动学习提炼的规则）
