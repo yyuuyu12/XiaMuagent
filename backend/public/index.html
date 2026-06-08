@@ -7486,7 +7486,7 @@ function tOriginalHome() {
     if (last && last.text) lastNote = `最近更新：${esc(last.source || '同步')} · 「${esc(last.text.slice(0,12))}${last.text.length>12?'…':''}」`;
   }
 
-  const stat = (n, label) => `<div style="font-size:12px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:5px"><div style="width:4px;height:4px;border-radius:50%;background:#FFB877"></div>${n} ${label}</div>`;
+  const stat = (n, label) => `<div style="font-size:12px;color:rgba(255,255,255,0.75);display:flex;align-items:center;gap:5px"><div style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.5)"></div>${n} ${label}</div>`;
 
   const projectCards = projects.map(p => {
     const isFinal = p.status === 'final';
@@ -7508,23 +7508,24 @@ function tOriginalHome() {
   }).join('');
 
   return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 24px">
-    <!-- Skill 暗色卡 -->
-    <div onclick="setState({originalView:'skill',originalSkillFreeTextDraft:null,originalSkillHistoryOpen:false});render()" style="margin:0 16px 14px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:22px;padding:18px 20px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent">
-      <div style="position:absolute;top:-25px;right:-15px;width:120px;height:120px;border-radius:50%;background:rgba(255,184,119,0.06)"></div>
+    <!-- Skill 卡（品牌橙） -->
+    <div onclick="setState({originalView:'skill',originalSkillFreeTextDraft:null,originalSkillHistoryOpen:false});render()" style="margin:0 16px 14px;background:linear-gradient(135deg,#FF7A35,#F5602A);border-radius:22px;padding:18px 20px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 28px rgba(245,96,42,0.28)">
+      <div style="position:absolute;top:-30px;right:-20px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,0.08)"></div>
+      <div style="position:absolute;bottom:-20px;left:60px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.05)"></div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;position:relative">
         <div>
-          <div style="font-size:10.5px;color:rgba(255,255,255,0.45);letter-spacing:0.5px;margin-bottom:5px">全局唯一 · 蒸馏的你自己</div>
+          <div style="font-size:10.5px;color:rgba(255,255,255,0.6);letter-spacing:0.5px;margin-bottom:5px">全局唯一 · 蒸馏的你自己</div>
           <div style="font-size:18px;font-weight:700;color:#fff">我的 Skill</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:12px;font-weight:700;color:#FFB877;background:rgba(255,184,119,0.15);border:1px solid rgba(255,184,119,0.3);padding:3px 9px;border-radius:8px">${esc(ver)}</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          <span style="font-size:12px;font-weight:700;color:#fff;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.35);padding:3px 9px;border-radius:8px">${esc(ver)}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>
       <div style="display:flex;gap:14px;margin-bottom:12px;position:relative">
         ${stat(ruleCount,'条规则')}${stat(kwCount,'个高频词')}${stat(fbCount,'条禁区')}
       </div>
-      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:11px;font-size:11.5px;color:rgba(255,255,255,0.38);position:relative">${lastNote}</div>
+      <div style="border-top:1px solid rgba(255,255,255,0.15);padding-top:11px;font-size:11.5px;color:rgba(255,255,255,0.55);position:relative">${lastNote}</div>
     </div>
 
     <!-- 素材库 + 学习中心 双入口 -->
