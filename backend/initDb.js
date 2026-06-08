@@ -522,10 +522,28 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // cw_project_materials 表：项目对标（项目 ↔ 素材绑定，写文案时只参考绑定的素材）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_project_materials (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      project_id  INT NOT NULL,
+      material_id INT NOT NULL,
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_pm (project_id, material_id),
+      INDEX idx_project (project_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // cw_original_projects 表：补 meta 列（存时长/风格/平台等）
   try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN meta JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.meta:', e.message||e); }
+  // cw_original_projects 表：补 stage 列（分阶段创作：direction→outline→detail→script）
+  try { await db.query("ALTER TABLE cw_original_projects ADD COLUMN stage VARCHAR(20) DEFAULT 'script'"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.stage:', e.message||e); }
+  // cw_original_projects 表：补 artifacts 列（文件即记忆：各阶段已确认产出快照）
+  try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN artifacts JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.artifacts:', e.message||e); }
   // cw_original_messages 表：补 auto_learn 列（自动学习提炼的规则）
   try { await db.query('ALTER TABLE cw_original_messages ADD COLUMN auto_learn TEXT DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_messages.auto_learn:', e.message||e); }
+  // cw_original_messages 表：补 stage 列（消息属于哪个阶段，便于按阶段筛选展示）
+  try { await db.query("ALTER TABLE cw_original_messages ADD COLUMN stage VARCHAR(20) DEFAULT NULL"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_messages.stage:', e.message||e); }
 
   // cw_skills 表：补 check_prompt / free_text / free_text_history 列
   try { await db.query('ALTER TABLE cw_skills ADD COLUMN check_prompt TEXT DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] check_prompt:', e.message||e); }

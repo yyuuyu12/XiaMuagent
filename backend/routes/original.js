@@ -213,6 +213,11 @@ async function getProject(projectId, userId) {
     try { p.meta = JSON.parse(p.meta); } catch { p.meta = {}; }
   }
   p.meta = p.meta || {};
+  if (p.artifacts && typeof p.artifacts === 'string') {
+    try { p.artifacts = JSON.parse(p.artifacts); } catch { p.artifacts = {}; }
+  }
+  p.artifacts = p.artifacts || {};
+  if (!p.stage || !STAGES.includes(p.stage)) p.stage = 'script';
   return p;
 }
 
@@ -245,6 +250,194 @@ function formatRulesForPrompt(skill) {
   }
   if (freeText) return freeText;
   return structLines.length > 0 ? structLines.join('\n') : '（暂无规则）';
+}
+
+/* ═══════════════════════════════════════
+   分阶段创作（拆方向→粗纲→细纲→剧本）
+═══════════════════════════════════════ */
+
+const STAGES = ['direction', 'outline', 'detail', 'script'];
+const STAGE_META = {
+  direction: { name: '选题方向', short: '方向', tag: '选题方向', next: 'outline', prev: null },
+  outline:   { name: '内容粗纲', short: '粗纲', tag: '粗纲',     next: 'detail',  prev: 'direction' },
+  detail:    { name: '细化大纲', short: '细纲', tag: '细纲',     next: 'script',  prev: 'outline' },
+  script:    { name: '口播剧本', short: '剧本', tag: '新剧本',   next: null,      prev: 'detail' },
+};
+
+// 解析项目 artifacts JSON（各阶段已确认产出快照）
+function parseArtifacts(project) {
+  let a = project.artifacts;
+  if (a && typeof a === 'string') { try { a = JSON.parse(a); } catch { a = {}; } }
+  return a || {};
+}
+
+// 读取项目绑定的对标素材（cw_project_materials → cw_materials）
+async function getBoundMaterials(projectId) {
+  const { rows } = await db.query(
+    `SELECT m.id, m.title, m.raw_content
+       FROM cw_project_materials pm
+       JOIN cw_materials m ON m.id = pm.material_id
+      WHERE pm.project_id = ?
+      ORDER BY pm.id ASC`,
+    [projectId]
+  );
+  return rows || [];
+}
+
+// 提取某阶段产出标签内容（兼容旧 script 标签【新文案】）
+function extractStageDoc(raw, stage) {
+  const tag = STAGE_META[stage]?.tag || '新剧本';
+  let m = raw.match(new RegExp(`【${tag}】([\\s\\S]*?)【\\/${tag}】`));
+  if (!m && stage === 'script') m = raw.match(/【新文案】([\s\S]*?)【\/新文案】/);
+  return m ? m[1].trim() : null;
+}
+
+// 构建某阶段的 system prompt（含决策树分支 + 对标素材 + 前序产出）
+function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft }) {
+  const meta = project.meta || {};
+  const durationMap = { '30s': '30秒（约75字）', '1min': '1分钟（约150字）', '3min': '3分钟（约450字）' };
+  const styleMap = { informative: '干货讲解', story: '故事叙事', contrast: '对比反差', twist: '悬念反转' };
+  const platformMap = { douyin: '抖音', shipinhao: '视频号', xiaohongshu: '小红书' };
+  const durationLabel = durationMap[meta.duration] || '1分钟';
+  const styleLabel = styleMap[meta.style] || '干货讲解';
+  const platformLabel = platformMap[meta.platform] || '抖音';
+  const rulesText = formatRulesForPrompt(skill);
+
+  // 对标素材区块（项目级对标：只参考绑定的素材，参考写法而非照抄）
+  let benchmarkBlock = '';
+  if (boundMaterials && boundMaterials.length) {
+    const list = boundMaterials.slice(0, 4).map((m, i) =>
+      `【对标${i + 1}·${m.title || '素材'}】\n${(m.raw_content || '').slice(0, 600)}`
+    ).join('\n\n');
+    benchmarkBlock = `\n## 对标素材（学习其结构/钩子/节奏，绝不照抄原句）\n${list}\n`;
+  }
+
+  // 前序阶段已确认产出
+  const priorBlocks = [];
+  if (artifacts.direction) priorBlocks.push(`【已确认·选题方向】\n${artifacts.direction}`);
+  if (stage !== 'outline' && artifacts.outline) priorBlocks.push(`【已确认·内容粗纲】\n${artifacts.outline}`);
+  if (stage === 'script' && artifacts.detail) priorBlocks.push(`【已确认·细化大纲】\n${artifacts.detail}`);
+  const priorBlock = priorBlocks.length ? `\n## 前序已确认内容（必须严格延续，不要推翻）\n${priorBlocks.join('\n\n')}\n` : '';
+
+  const projInfo = `## 当前项目
+标题：${project.title}${project.brief ? `\n说明：${project.brief}` : ''}
+时长：${durationLabel} · 风格：${styleLabel} · 平台：${platformLabel}${meta.angle ? `\n用户初始观点：${meta.angle}` : ''}`;
+
+  const skillBlock = `## 用户 Skill 规则（始终遵守）\n${rulesText}`;
+  const histBlock = history ? `\n## 最近对话\n${history}\n` : '';
+  const draftBlock = currentDraft && currentDraft.trim()
+    ? `\n## 本阶段当前草稿（在此基础上改）\n---\n${currentDraft}\n---\n`
+    : '';
+
+  const tag = STAGE_META[stage].tag;
+  const common = `${skillBlock}\n\n${projInfo}\n${benchmarkBlock}${priorBlock}${draftBlock}${histBlock}`;
+
+  // ── 决策树：是否已有明确方向 ──
+  const hasDirection = !!(meta.angle || project.brief || artifacts.direction);
+
+  if (stage === 'direction') {
+    return `你是短视频选题策划。本阶段只定【选题方向】，不要写正文文案。
+${common}
+## 本阶段任务
+${hasDirection
+  ? '用户已给了大致方向，你的工作是把它打磨成 1 条清晰可执行的选题方向，并简短说明为什么这样切更容易出爆款。'
+  : '用户方向还不明确。先给出 2-3 个差异化的候选选题方向（每条一句话点明角度+人群+钩子），引导用户选一个；如果用户已经选了，就细化成 1 条。'}
+
+## 输出格式
+先用一两句话说你的思路（≤40字），然后：
+【选题方向】
+角度：xxx
+目标人群：xxx
+核心钩子：xxx
+一句话选题：xxx
+【/选题方向】
+（候选阶段可在标签外先列 2-3 个选项让用户挑，确定后再用标签输出最终方向）`;
+  }
+
+  if (stage === 'outline') {
+    return `你是短视频内容架构师。本阶段只搭【粗纲】结构，不写完整台词。
+${common}
+## 本阶段任务
+基于已确认的选题方向，搭出口播的三段式骨架：强钩子开场 → 内容主体（2-4 个递进要点）→ 结尾引导。只写要点，不写完整句子。
+
+## 输出格式
+先一句话说结构思路（≤30字），然后：
+【粗纲】
+开场钩子：xxx
+主体要点1：xxx
+主体要点2：xxx
+（按需 3-4 个）
+结尾引导：xxx
+【/粗纲】`;
+  }
+
+  if (stage === 'detail') {
+    return `你是短视频脚本细化师。本阶段把粗纲展开成【细纲】，仍不是最终台词。
+${common}
+## 本阶段任务
+把已确认的粗纲每一节展开：这一节具体讲什么、给一个关键句示例、配什么画面方向。让写剧本时照着填就行。
+
+## 输出格式
+先一句话说细化重点（≤30字），然后：
+【细纲】
+〔开场〕讲什么：xxx ｜ 关键句：「xxx」 ｜ 画面：xxx
+〔要点1〕讲什么：xxx ｜ 关键句：「xxx」 ｜ 画面：xxx
+（逐节展开）
+〔结尾〕讲什么：xxx ｜ 关键句：「xxx」
+【/细纲】`;
+  }
+
+  // script
+  return `你是一位经验丰富的短视频口播文案写手，把已确认的细纲写成可直接念的口播【新剧本】。
+${common}
+## 本阶段任务
+严格按已确认的细纲，写出连贯口语化口播台词。${hasDirection ? '' : '若细纲缺失，可凭方向直接成稿。'}
+
+## 输出格式
+用一句话说你写/改了什么（≤30字），然后：
+【新剧本】
+（连续口播台词，说话的语气）
+
+在画面自然切换处用一行括号标注：〔画面：xxx〕
+【/新剧本】
+
+## 质量要求
+- 台词是主体，口语化，不是读稿；画面标注不超过段落的 1/3
+- 强钩子开场 → 内容主体 → 结尾引导
+- 严格控制时长：${durationLabel}
+- 不用"首先其次最后"等书面框架词`;
+}
+
+// 统一的阶段生成：构建 prompt → 调 AI → 解析产出。返回 { aiSummary, newDoc, hasDocUpdate, syncLabel }
+async function generateStageReply({ project, skill, stage, boundMaterials, history, userMessage }) {
+  const artifacts = parseArtifacts(project);
+  const currentDraft = project.doc || '';
+  const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft });
+  const aiRaw = await callAI(systemPrompt + '\n\n用户：' + userMessage, { maxTokens: 4000, temperature: 0.85 });
+
+  const tag = STAGE_META[stage].tag;
+  const parsed = extractStageDoc(aiRaw, stage);
+  let newDoc = currentDraft;
+  let aiSummary = aiRaw.trim();
+  let hasDocUpdate = 0;
+  if (parsed !== null) {
+    newDoc = parsed;
+    hasDocUpdate = 1;
+    const before = aiRaw.split(`【${tag}】`)[0].trim();
+    aiSummary = before || `已更新${STAGE_META[stage].name}。`;
+  }
+
+  // sync_label 仅在剧本阶段提炼（与原逻辑一致）
+  let syncLabel = null;
+  if (hasDocUpdate && stage === 'script') {
+    const labelMatch = aiSummary.match(/[「」""](.{4,20})[「」""]/);
+    if (labelMatch) syncLabel = labelMatch[1];
+    else {
+      const kw = aiSummary.match(/[\u4e00-\u9fa5]{3,8}(钩子|写法|结构|开场|结尾|节奏|风格)/);
+      if (kw) syncLabel = kw[0];
+    }
+  }
+  return { aiSummary, newDoc, hasDocUpdate, syncLabel };
 }
 
 /* ═══════════════════════════════════════
@@ -312,7 +505,7 @@ router.put('/skill', requireAuth, async (req, res) => {
 router.get('/projects', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, title, brief, status, turns, created_at, updated_at FROM cw_original_projects WHERE user_id = ? ORDER BY updated_at DESC',
+      'SELECT id, title, brief, status, stage, turns, created_at, updated_at FROM cw_original_projects WHERE user_id = ? ORDER BY updated_at DESC',
       [req.userId]
     );
     res.json({ code: 200, data: rows || [] });
@@ -324,16 +517,30 @@ router.get('/projects', requireAuth, async (req, res) => {
 
 // POST /api/original/projects — 创建新项目
 router.post('/projects', requireAuth, async (req, res) => {
-  const { title, brief = '', duration, angle, style, platform } = req.body;
+  const { title, brief = '', duration, angle, style, platform, staged = true, materialIds = [] } = req.body;
   if (!title?.trim()) return res.status(400).json({ code: 400, msg: '请填写项目标题' });
   const meta = { duration: duration || '1min', angle: angle || '', style: style || 'informative', platform: platform || 'douyin' };
+  const stage = staged ? 'direction' : 'script';
   try {
     const { rows } = await db.query(
-      "INSERT INTO cw_original_projects (user_id, title, brief, status, doc, turns, meta) VALUES (?, ?, ?, 'draft', '', 0, ?)",
-      [req.userId, title.trim(), brief.trim(), JSON.stringify(meta)]
+      "INSERT INTO cw_original_projects (user_id, title, brief, status, doc, turns, meta, stage, artifacts) VALUES (?, ?, ?, 'draft', '', 0, ?, ?, '{}')",
+      [req.userId, title.trim(), brief.trim(), JSON.stringify(meta), stage]
     );
     const id = rows?.[0]?.id;
-    res.json({ code: 200, data: { id, title: title.trim(), brief: brief.trim(), status: 'draft', doc: '', turns: 0, meta } });
+    // 绑定对标素材（项目级对标）
+    const ids = (Array.isArray(materialIds) ? materialIds : []).map(Number).filter(Boolean);
+    if (id && ids.length) {
+      const valid = ids.slice(0, 8);
+      for (const mid of valid) {
+        try {
+          await db.query(
+            'INSERT IGNORE INTO cw_project_materials (project_id, material_id) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM cw_materials WHERE id = ? AND user_id = ?)',
+            [id, mid, mid, req.userId]
+          );
+        } catch (_) {}
+      }
+    }
+    res.json({ code: 200, data: { id, title: title.trim(), brief: brief.trim(), status: 'draft', doc: '', turns: 0, meta, stage, artifacts: {} } });
   } catch (err) {
     console.error('/original/projects POST error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
@@ -351,7 +558,14 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
       'SELECT * FROM cw_original_messages WHERE project_id = ? ORDER BY created_at ASC',
       [projectId]
     );
-    res.json({ code: 200, data: { project, messages: msgs || [] } });
+    // 绑定的对标素材（精简字段）
+    const { rows: bound } = await db.query(
+      `SELECT m.id, m.title, LEFT(m.raw_content, 80) AS preview
+         FROM cw_project_materials pm JOIN cw_materials m ON m.id = pm.material_id
+        WHERE pm.project_id = ? ORDER BY pm.id ASC`,
+      [projectId]
+    );
+    res.json({ code: 200, data: { project, messages: msgs || [], boundMaterials: bound || [] } });
   } catch (err) {
     console.error('/original/projects/:id GET error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
@@ -419,8 +633,8 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
 
     // 保存用户消息（先存，后面自动学习用得到对话历史）
     await db.query(
-      'INSERT INTO cw_original_messages (project_id, role, content) VALUES (?, ?, ?)',
-      [projectId, 'user', message.trim()]
+      'INSERT INTO cw_original_messages (project_id, role, content, stage) VALUES (?, ?, ?, ?)',
+      [projectId, 'user', message.trim(), project.stage || 'script']
     );
 
     // 构建 AI 提示词
@@ -511,101 +725,15 @@ ${docSnippet}
     const skill = await getOrCreateSkill(req.userId);
     const rulesText = formatRulesForPrompt(skill);
 
-    // 读取项目元数据（时长/风格/平台）
-    const meta = project.meta || {};
-    const durationMap = { '30s': '30秒（约75字，6-8个镜头）', '1min': '1分钟（约150字，10-14个镜头）', '3min': '3分钟（约450字，22-28个镜头）' };
-    const styleMap = { informative: '干货讲解（直接、数据、干货）', story: '故事叙事（情节弧线、情感共鸣）', contrast: '对比反差（before/after、A vs B）', twist: '悬念反转（埋伏笔、出乎意料）' };
-    const platformMap = { douyin: '抖音', shipinhao: '视频号', xiaohongshu: '小红书' };
-    const durationLabel = durationMap[meta.duration] || '1分钟';
-    const styleLabel = styleMap[meta.style] || '干货讲解';
-    const platformLabel = platformMap[meta.platform] || '抖音';
+    // 当前阶段 + 对标素材（项目级对标）
+    const stage = project.stage || 'script';
+    const boundMaterials = await getBoundMaterials(projectId);
 
-    const systemPrompt = `你是一位经验丰富的短视频口播文案写手，帮用户写出能直接用的口播脚本。
-
-## 你的核心工作方式
-**先写，再改。** 只要用户给了一点方向，就立刻写出第一版，不要无限追问。
-- 信息足够 → 直接写完整口播
-- 信息不够 → 问最关键的 1 个问题 + 同时写一版猜测方向的草稿
-- 不要连续追问超过 1 次，第二条消息起必须有文案产出
-
-## 用户 Skill 规则（写文案时遵守）
-${rulesText}
-
-## 当前项目信息
-项目标题：${project.title}${project.brief ? `\n项目说明：${project.brief}` : ''}
-目标时长：${durationLabel}
-视频风格：${styleLabel}
-目标平台：${platformLabel}${meta.angle ? `\n核心观点：${meta.angle}` : ''}
-
-## 当前文案版本
-${isFirstMessage ? '（还没有文案，这是第一次创作）' : `---\n${currentDoc}\n---`}
-
-${history ? `## 最近对话记录\n${history}\n` : ''}
-
-## 什么时候输出【新剧本】
-- 用户说"帮我写/生成/来一版" → 立刻写，输出【新剧本】
-- 用户描述了内容方向/主题/想法 → 直接写草稿，输出【新剧本】
-- 用户说"改一下/调整/换" → 修改现有文案，输出【新剧本】
-- 用户只是打招呼或反馈问题 → 简短回应，不输出【新剧本】
-- 如果已经纯聊天了 1 轮还没有文案，下一轮必须主动产出草稿
-
-## 输出格式（有文案时）
-用一句话说你写/改了什么（≤30字）
-【新剧本】
-（连续口播台词，写成说话的语气）
-
-在**画面自然需要切换**的地方，用一行括号简单标注画面建议，格式：
-〔画面：xxx〕
-
-示例结构：
-40%的选题判断，我现在直接丢给AI做。
-
-〔画面：屏幕录屏，AI扫描爆款列表〕
-
-0粉创作者最痛苦的不是不会剪，是你根本不知道该拍哪条。以前我靠感觉，拍完才知道不行。现在先看预测，再决定要不要开拍。
-
-〔画面：左右对比，左"凭感觉"右"AI预测后开拍"〕
-
-（继续台词……）
-【/新剧本】
-
-## 文案质量要求
-- **台词是主体**，口语化，说话的感觉，不是读稿
-- 画面标注只在自然切换点出现，不强制每句都配，不超过总段落的 1/3
-- 画面描述简短（一句话），是方向建议，不是精确分镜
-- 结构完整：强钩子开场 → 内容主体 → 结尾引导
-- 严格按目标时长控制字数：30s≈75字，1分钟≈150字，3分钟≈450字
-- 不用"首先其次最后"等书面框架词`;
-
-    const aiRaw = await callAI(systemPrompt + '\n\n用户：' + message.trim(), { maxTokens: 4000, temperature: 0.85 });
-
-    // 解析 AI 回复：提取说明 + 新剧本（兼容旧格式【新文案】）
-    const docMatch = aiRaw.match(/【新剧本】([\s\S]*?)【\/新剧本】/) || aiRaw.match(/【新文案】([\s\S]*?)【\/新文案】/);
-    const docTag = aiRaw.includes('【新剧本】') ? '【新剧本】' : '【新文案】';
-    let newDoc = currentDoc;
-    let aiSummary = aiRaw.trim();
-    let hasDocUpdate = 0;
-
-    if (docMatch) {
-      newDoc = docMatch[1].trim();
-      hasDocUpdate = 1;
-      // 摘要 = 标签之前的部分
-      const beforeDoc = aiRaw.split(docTag)[0].trim();
-      aiSummary = beforeDoc || '已更新剧本。';
-    }
-
-    // 生成 sync_label（从摘要提取一个简短的规律标签）
-    let syncLabel = null;
-    if (hasDocUpdate) {
-      const labelMatch = aiSummary.match(/[「」""](.{4,20})[「」""]/);
-      if (labelMatch) {
-        syncLabel = labelMatch[1];
-      } else {
-        // 从摘要中截取关键词作为 label
-        const keywords = aiSummary.match(/[\u4e00-\u9fa5]{3,8}(钩子|写法|结构|开场|结尾|节奏|风格)/);
-        if (keywords) syncLabel = keywords[0];
-      }
-    }
+    // 分阶段生成（按 stage 走不同决策树 prompt，解析对应阶段标签）
+    const gen = await generateStageReply({
+      project, skill, stage, boundMaterials, history, userMessage: message.trim(),
+    });
+    let { aiSummary, newDoc, hasDocUpdate, syncLabel } = gen;
 
     // 更新活文档 + turns
     if (hasDocUpdate) {
@@ -617,10 +745,10 @@ ${history ? `## 最近对话记录\n${history}\n` : ''}
       await db.query('UPDATE cw_original_projects SET turns = turns + 1 WHERE id = ?', [projectId]);
     }
 
-    // 保存 AI 消息
+    // 保存 AI 消息（记录所属阶段）
     const { rows: ins } = await db.query(
-      'INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, sync_label, sync_done, auto_learn) VALUES (?, ?, ?, ?, ?, NULL, ?)',
-      [projectId, 'ai', aiSummary, hasDocUpdate, syncLabel, autoLearnRule || null]
+      'INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, sync_label, sync_done, auto_learn, stage) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
+      [projectId, 'ai', aiSummary, hasDocUpdate, syncLabel, autoLearnRule || null, stage]
     );
     const msgId = ins?.[0]?.id;
 
@@ -638,13 +766,175 @@ ${history ? `## 最近对话记录\n${history}\n` : ''}
           sync_label: syncLabel,
           sync_done: null,
           auto_learn: autoLearnRule || null,
+          stage,
         },
         doc: newDoc,
         turns: updated?.[0]?.turns || 0,
+        stage,
       }
     });
   } catch (err) {
     console.error('/original/projects/:id/chat error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+/* ═══════════════════════════════════════
+   阶段流转（确认进入下一步 / 回退上一步）
+═══════════════════════════════════════ */
+
+// POST /api/original/projects/:id/stage/advance — 确认当前阶段产出，进入下一阶段并自动生成初稿
+router.post('/projects/:id/stage/advance', requireAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  try {
+    const project = await getProject(projectId, req.userId);
+    if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
+
+    const stage = project.stage || 'script';
+    const nextStage = STAGE_META[stage]?.next;
+    if (!nextStage) {
+      // 已是最后一步：标记完成
+      await db.query("UPDATE cw_original_projects SET status = 'final' WHERE id = ?", [projectId]);
+      return res.json({ code: 200, data: { done: true, stage, status: 'final' } });
+    }
+    const curDraft = (project.doc || '').trim();
+    if (!curDraft) return res.status(400).json({ code: 400, msg: `请先生成${STAGE_META[stage].name}再进入下一步` });
+
+    // 快照当前阶段产出到 artifacts
+    const artifacts = parseArtifacts(project);
+    artifacts[stage] = curDraft;
+
+    // 进入下一阶段，doc 清空准备承载下一阶段草稿
+    await db.query(
+      'UPDATE cw_original_projects SET stage = ?, artifacts = ?, doc = ? WHERE id = ?',
+      [nextStage, JSON.stringify(artifacts), '', projectId]
+    );
+
+    // 插入一条阶段分隔提示（system 信息以 ai 角色呈现，不含产出）
+    const stageTipName = STAGE_META[nextStage].name;
+    await db.query(
+      "INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, stage) VALUES (?, 'ai', ?, 0, ?)",
+      [projectId, `✅ ${STAGE_META[stage].name}已确认。进入下一步：${stageTipName}。`, nextStage]
+    );
+
+    // 自动生成下一阶段初稿
+    const skill = await getOrCreateSkill(req.userId);
+    const boundMaterials = await getBoundMaterials(projectId);
+    const freshProject = await getProject(projectId, req.userId); // doc 已清空、stage 已更新
+    const gen = await generateStageReply({
+      project: freshProject, skill, stage: nextStage, boundMaterials, history: '',
+      userMessage: `请根据已确认的内容，直接写出这一阶段（${stageTipName}）的初稿。`,
+    });
+
+    if (gen.hasDocUpdate) {
+      await db.query('UPDATE cw_original_projects SET doc = ?, turns = turns + 1 WHERE id = ?', [gen.newDoc, projectId]);
+    }
+    const { rows: ins } = await db.query(
+      "INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, sync_label, sync_done, stage) VALUES (?, 'ai', ?, ?, ?, NULL, ?)",
+      [projectId, gen.aiSummary, gen.hasDocUpdate, gen.syncLabel, nextStage]
+    );
+    const { rows: updated } = await db.query('SELECT * FROM cw_original_projects WHERE id = ?', [projectId]);
+
+    res.json({
+      code: 200,
+      data: {
+        stage: nextStage,
+        prevStage: stage,
+        tipName: stageTipName,
+        message: { id: ins?.[0]?.id, role: 'ai', content: gen.aiSummary, has_doc_update: gen.hasDocUpdate, sync_label: gen.syncLabel, sync_done: null, stage: nextStage },
+        doc: gen.newDoc,
+        turns: updated?.[0]?.turns || 0,
+      }
+    });
+  } catch (err) {
+    console.error('/original/projects/:id/stage/advance error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/original/projects/:id/stage/back — 回退到上一阶段，恢复其已确认产出到 doc
+router.post('/projects/:id/stage/back', requireAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  try {
+    const project = await getProject(projectId, req.userId);
+    if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const stage = project.stage || 'script';
+    const prevStage = STAGE_META[stage]?.prev;
+    if (!prevStage) return res.status(400).json({ code: 400, msg: '已经是第一步' });
+
+    const artifacts = parseArtifacts(project);
+    const restored = artifacts[prevStage] || '';
+    await db.query("UPDATE cw_original_projects SET stage = ?, doc = ?, status = 'draft' WHERE id = ?", [prevStage, restored, projectId]);
+    res.json({ code: 200, data: { stage: prevStage, doc: restored } });
+  } catch (err) {
+    console.error('/original/projects/:id/stage/back error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+/* ═══════════════════════════════════════
+   项目对标素材绑定
+═══════════════════════════════════════ */
+
+// GET /api/original/projects/:id/materials — 项目已绑定的对标素材
+router.get('/projects/:id/materials', requireAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  try {
+    const project = await getProject(projectId, req.userId);
+    if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const { rows } = await db.query(
+      `SELECT m.id, m.title, LEFT(m.raw_content, 100) AS preview
+         FROM cw_project_materials pm JOIN cw_materials m ON m.id = pm.material_id
+        WHERE pm.project_id = ? ORDER BY pm.id ASC`,
+      [projectId]
+    );
+    res.json({ code: 200, data: rows || [] });
+  } catch (err) {
+    console.error('/original/projects/:id/materials GET error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/original/projects/:id/materials — 绑定对标素材 { materialIds: [] }
+router.post('/projects/:id/materials', requireAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const { materialIds = [] } = req.body;
+  try {
+    const project = await getProject(projectId, req.userId);
+    if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const ids = (Array.isArray(materialIds) ? materialIds : []).map(Number).filter(Boolean).slice(0, 8);
+    for (const mid of ids) {
+      try {
+        await db.query(
+          'INSERT IGNORE INTO cw_project_materials (project_id, material_id) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM cw_materials WHERE id = ? AND user_id = ?)',
+          [projectId, mid, mid, req.userId]
+        );
+      } catch (_) {}
+    }
+    const { rows } = await db.query(
+      `SELECT m.id, m.title, LEFT(m.raw_content, 100) AS preview
+         FROM cw_project_materials pm JOIN cw_materials m ON m.id = pm.material_id
+        WHERE pm.project_id = ? ORDER BY pm.id ASC`,
+      [projectId]
+    );
+    res.json({ code: 200, data: rows || [] });
+  } catch (err) {
+    console.error('/original/projects/:id/materials POST error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// DELETE /api/original/projects/:id/materials/:mid — 解绑某个对标素材
+router.delete('/projects/:id/materials/:mid', requireAuth, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const mid = parseInt(req.params.mid);
+  try {
+    const project = await getProject(projectId, req.userId);
+    if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    await db.query('DELETE FROM cw_project_materials WHERE project_id = ? AND material_id = ?', [projectId, mid]);
+    res.json({ code: 200, msg: 'ok' });
+  } catch (err) {
+    console.error('/original/projects/:id/materials DELETE error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
   }
 });
