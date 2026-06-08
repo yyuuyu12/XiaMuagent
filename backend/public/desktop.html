@@ -494,6 +494,7 @@ html, body {
 .do-seg-i.on{background:#fff;color:#1A1614;box-shadow:0 1px 5px rgba(0,0,0,0.08)}
 .do-topic-card{background:#fff;border:1px solid #F0EDE8;border-radius:13px;padding:14px 16px;cursor:pointer;transition:all .15s}
 .do-topic-card:hover{border-color:#F5762A;box-shadow:0 4px 14px rgba(245,118,42,0.12)}
+.do-topic-card.on{border-color:#F5762A;background:#FFFaf5;box-shadow:0 4px 14px rgba(245,118,42,0.12)}
 .do-rule-card{background:#FAF8F5;border:1.5px solid transparent;border-radius:11px;padding:11px 13px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;transition:all .12s}
 .do-rule-card.on{background:#FFF8F3;border-color:#F5762A}
 .do-mat-del{border:none;background:none;padding:4px;cursor:pointer;opacity:.4;flex-shrink:0}
@@ -2818,7 +2819,7 @@ const O_LEARN_ROLE = {
 };
 
 /* ---------- 入口 / 调度 ---------- */
-function dOEnter(){ dS.oView='home'; dS.oProject=null; dS.oLoaded=false; dGoPage('original'); }
+function dOEnter(){ dS.oView='home'; dS.oProject=null; dGoPage('original'); }
 function dRenderOriginal(){
   if(dS.oView==='workspace') return dOWorkspace();
   if(dS.oView==='new')       return dONew();
@@ -2828,12 +2829,14 @@ function dRenderOriginal(){
   return dOHome();
 }
 async function dBindOriginal(){
-  if(dS.oView==='home' && !dS.oLoaded){
+  if(dS.oView==='home'){
+    // 已加载过则用缓存秒开，后台静默刷新；首次进入才显示「加载中」
+    const wasLoaded = dS.oLoaded;
     const [rs, rp] = await Promise.all([ dHttp.get('/original/skill'), dHttp.get('/original/projects') ]);
     if(rs.code===200) dS.oSkill = rs.data;
     if(rp.code===200) dS.oProjects = rp.data || [];
     dS.oLoaded = true;
-    dRender();
+    if(dS.oView==='home') dRender();
   }
   if((dS.oView==='materials' || dS.oView==='learning') && !dS.oMaterialsLoaded){
     await dOLoadMaterials(true);
@@ -2847,7 +2850,7 @@ function dOSetView(v){
   dRender();
   if(v==='new' || v==='materials' || v==='learning') dOLoadMaterials(v!=='new');
 }
-function dOBackHome(){ dS.oView='home'; dS.oProject=null; dS.oLoaded=false; dRender(); }
+function dOBackHome(){ dS.oView='home'; dS.oProject=null; dRender(); }
 function dOScrollChat(){ setTimeout(()=>{ const el=document.getElementById('doChatBody'); if(el) el.scrollTop=el.scrollHeight; },0); }
 
 /* ---------- 首页 ---------- */
@@ -2911,40 +2914,39 @@ function dOHome(){
     <div><div class="do-page-title">原创工坊</div><div class="do-page-sub">分阶段深度创作：选题方向 → 粗纲 → 细纲 → 剧本</div></div>
     <button class="do-btn do-btn-pri" onclick="dOSetView('new')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg> 新建项目</button>
   </div>
-  ${dS.oLoaded ? skillCard + entryRow + dOTopicsBlock() + `<div style="font-size:14px;font-weight:700;color:#1A1614;margin:4px 0 12px">我的项目 <span style="font-size:12px;color:#B0AA9F;font-weight:500">${dS.oProjects.length}</span></div>` + projGrid : `<div class="do-empty">加载中…</div>`}
+  ${dS.oLoaded ? skillCard + entryRow + `<div style="font-size:14px;font-weight:700;color:#1A1614;margin:14px 0 12px">我的项目 <span style="font-size:12px;color:#B0AA9F;font-weight:500">${dS.oProjects.length}</span></div>` + projGrid : `<div class="do-empty">加载中…</div>`}
   `;
 }
 
-/* ---------- 智能选题（首页区块） ---------- */
+/* ---------- 智能选题（新建项目页内） ---------- */
 function dOTopicsBlock(){
   const topics = dS.oTopics || [];
   const busy = dS.oTopicsBusy;
-  const head = `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 12px">
-    <span style="font-size:14px;font-weight:700;color:#1A1614">智能选题 <span style="font-size:12px;color:#B0AA9F;font-weight:500">基于你的 Skill</span></span>
-    <button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" ${busy?'disabled':''} onclick="dOLoadTopics()">
+  const head = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div><div style="font-size:13px;font-weight:700;color:#1A1614">还没想好做什么？</div><div style="font-size:11.5px;color:#9E9890;margin-top:2px">让 AI 基于你的 Skill 推荐几个选题，点一下自动填入下方</div></div>
+    <button class="do-btn do-btn-gho" style="padding:7px 13px;font-size:12px" ${busy?'disabled':''} onclick="dOLoadTopics()">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="${busy?'animation:spin 1s linear infinite':''}"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      ${busy?'生成中…':(topics.length?'换一批':'生成选题')}
+      ${busy?'生成中…':(topics.length?'换一批':'帮我想选题')}
     </button>
   </div>`;
-  let body;
+  let body = '';
   if(busy){
-    body = `<div class="do-proj-grid">${[1,2,3].map(()=>`<div style="background:#fff;border:1px solid #F0EDE8;border-radius:13px;padding:14px 16px;height:84px;opacity:.6">生成中…</div>`).join('')}</div>`;
-  } else if(!topics.length){
-    body = `<div style="background:#fff;border:1.5px dashed #E8E4DC;border-radius:14px;padding:22px;text-align:center;color:#B0AA9F;font-size:13px;line-height:1.7">根据你的 Skill 和学习记录，AI 帮你生成个性化选题<br><button class="do-btn do-btn-pri" style="margin-top:12px;padding:8px 22px" onclick="dOLoadTopics()">生成选题 →</button></div>`;
-  } else {
-    body = `<div class="do-proj-grid">${topics.map((t,i)=>{
-      return `<div class="do-topic-card" onclick="dOPickTopic(${i})">
-        <div style="font-size:14px;font-weight:700;color:#1A1614;line-height:1.45;margin-bottom:6px">${esc(t.title||'')}</div>
+    body = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${[1,2].map(()=>`<div style="background:#fff;border:1px solid #F0EDE8;border-radius:12px;padding:14px;height:78px;opacity:.6;color:#B0AA9F;font-size:12px">生成中…</div>`).join('')}</div>`;
+  } else if(topics.length){
+    body = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${topics.map((t,i)=>{
+      const active = dS.oNewTitle && dS.oNewTitle===t.title;
+      return `<div class="do-topic-card ${active?'on':''}" onclick="dOPickTopic(${i})">
+        <div style="font-size:13.5px;font-weight:700;color:#1A1614;line-height:1.45;margin-bottom:6px">${esc(t.title||'')}</div>
         <div style="font-size:12px;color:#9E9890;line-height:1.55;max-height:36px;overflow:hidden">${esc(t.angle||'')}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:10px">
           <span class="do-chip">${O_STYLE_LABEL[t.style]||t.style||''}</span>
           <span class="do-chip" style="background:#F4F1EC;color:#9E9890">${O_DUR_LABEL[t.duration]||t.duration||''}</span>
-          <span style="font-size:12px;color:#F5762A;font-weight:600;margin-left:auto">选用 →</span>
+          ${active?'<span style="font-size:12px;color:#F5762A;font-weight:600;margin-left:auto">已填入</span>':''}
         </div>
       </div>`;
     }).join('')}</div>`;
   }
-  return `<div style="margin-bottom:20px">${head}${body}</div>`;
+  return `<div class="do-skill-card" style="margin-bottom:16px">${head}${body}</div>`;
 }
 async function dOLoadTopics(){
   if(dS.oTopicsBusy) return;
@@ -2962,8 +2964,7 @@ function dOPickTopic(i){
   dS.oNewBrief = t.angle||'';
   dS.oNewDuration = t.duration||'1min';
   dS.oNewStyle = t.style||'informative';
-  dS.oNewPlatform = 'douyin';
-  dOSetView('new');
+  dRender();
 }
 
 /* ---------- 打开项目 ---------- */
@@ -3008,7 +3009,11 @@ function dOWorkspace(){
     : '';
   const msgs = dS.oMessages.map(dOMsgHtml).join('');
   const busy = dS.oBusy ? `<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">正在创作中…</div></div>` : '';
-  const quick = ['换个钩子开头','精简一半','更口语化','加个反差点','检查禁区词'];
+  const quick = stage==='direction'
+    ? ['帮我想3个方向','偏个人经历','换个角度切入','更聚焦痛点']
+    : (stage==='outline'||stage==='detail')
+      ? ['结构更清晰','补一个案例','调整顺序','这段展开讲']
+      : ['换个钩子开头','更口语化','加个反差点','检查禁区词'];
   const leftCol = `
     <div class="do-col">
       <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">当前：${oStageName(stage)}${isFinal?' · 已定稿':''}</div></div></div>
@@ -3016,8 +3021,8 @@ function dOWorkspace(){
       <div class="do-chat-foot">
         <div class="do-quick">${quick.map(q=>`<span class="do-quick-chip" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
         <div style="display:flex;gap:8px;align-items:flex-end">
-          <textarea class="do-chat-input" id="doInput" rows="2" placeholder="说说你想怎么写，回车发送…" oninput="dS.oInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dOSendMsg();}">${esc(dS.oInput)}</textarea>
-          <button class="do-btn do-btn-pri" style="padding:9px 14px" ${dS.oBusy?'disabled':''} onclick="dOSendMsg()">发送</button>
+          <textarea class="do-chat-input" id="doInput" rows="2" style="flex:1;min-width:0" placeholder="说说你想怎么写，回车发送…" oninput="dS.oInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dOSendMsg();}">${esc(dS.oInput)}</textarea>
+          <button class="do-btn do-btn-pri" style="padding:9px 18px;white-space:nowrap;flex-shrink:0" ${dS.oBusy?'disabled':''} onclick="dOSendMsg()">发送</button>
         </div>
       </div>
     </div>`;
@@ -3037,7 +3042,7 @@ function dOWorkspace(){
   }
   const midCol = `
     <div class="do-col">
-      <div class="do-col-head"><div><div class="do-col-h-title">${esc(p.title||'项目')}</div><div class="do-col-h-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回列表</span></div></div></div>
+      <div class="do-col-head"><div style="min-width:0;flex:1"><div class="do-col-h-title" title="${esc(p.title||'项目')}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title||'项目')}</div><div class="do-col-h-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回列表</span></div></div></div>
       <div class="do-col-body">
         <div class="do-nav-grp">阶段</div>
         ${stageNav}
@@ -3070,7 +3075,7 @@ function dOWorkspace(){
     const advBtn = isFinal ? ''
       : (stage==='script'
           ? `<button class="do-btn do-btn-ok" ${dS.oStageBusy?'disabled':''} onclick="dOAdvance()">✓ 完成定稿</button>`
-          : `<button class="do-btn do-btn-pri" ${dS.oStageBusy?'disabled':''} onclick="dOAdvance()">${dS.oStageBusy?'生成中…':'确认'+oStageShort(stage)+'，写'+oStageShort(nextKey)+' →'}</button>`);
+          : `<button class="do-btn do-btn-pri" ${dS.oStageBusy?'disabled':''} onclick="dOAdvance()">${dS.oStageBusy?'生成中…':'确认'+oStageShort(stage)+'，写'+oStageShort(nextKey)}</button>`);
     const backBtn = (inFlow && idx>0 && !isFinal) ? `<button class="do-btn do-btn-gho" ${dS.oStageBusy?'disabled':''} onclick="dOBack()">← 上一步</button>` : '';
     rightCol = `<div class="do-col">
       <div class="do-col-head"><div><div class="do-col-h-title">${inFlow?('当前 · '+oStageName(stage)):'口播剧本'}</div><div class="do-col-h-sub">可直接编辑，下方保存</div></div><span style="font-size:11px;color:#9E9890">${isFinal?'已定稿':'第 '+(p.turns||0)+' 轮'}</span></div>
@@ -3276,10 +3281,11 @@ function dONew(){
   <div class="do-page-head">
     <div><div class="do-page-title">新建项目</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span></div></div>
   </div>
-  <div style="max-width:680px">
+  <div style="max-width:720px;margin:0 auto">
     <div class="do-steps" style="margin-bottom:18px">
       ${steps.map((s,i)=>`<div class="do-step-pill ${i===0&&dS.oNewStaged?'cur':''}">${i+1} ${s}</div>${i<steps.length-1?'<span style="color:#D8D3CC">›</span>':''}`).join('')}
     </div>
+    ${dOTopicsBlock()}
     <div class="do-skill-card">
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">项目标题</div>
       <input class="do-input" placeholder="例如：30秒讲清楚副业避坑" value="${esc(dS.oNewTitle)}" oninput="dS.oNewTitle=this.value">
@@ -3365,7 +3371,7 @@ function dOMaterials(){
   <div class="do-page-head">
     <div><div class="do-page-title">素材库</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · 收集爆款原文，可勾选后送去学习</div></div>
     <div style="display:flex;gap:10px">
-      ${selCount>0?`<button class="do-btn do-btn-pri" onclick="dOMatGoLearn()">学习已选 ${selCount} 条 →</button>`:''}
+      ${selCount>0?`<button class="do-btn do-btn-pri" onclick="dOMatGoLearn()">学习已选 ${selCount} 条</button>`:''}
       <button class="do-btn do-btn-gho" onclick="dOMatOpenModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#6E6860" stroke-width="2.5" stroke-linecap="round"/></svg> 添加素材</button>
     </div>
   </div>
@@ -3490,7 +3496,7 @@ function dOLearningInput(){
   <div class="do-page-head">
     <div><div class="do-page-title">学习中心</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · 选爆款原文，AI 逐句拆解规律</div></div>
   </div>
-  <div style="max-width:760px">
+  <div style="max-width:760px;margin:0 auto">
     <div class="do-seg" style="margin-bottom:12px">
       <div class="do-seg-i ${scope==='global'?'on':''}" onclick="dS.oLearnScope='global';dRender()">写入全局 Skill</div>
       <div class="do-seg-i ${scope==='project'?'on':''}" onclick="dS.oLearnScope='project';dRender()">仅用于参考</div>
@@ -3584,7 +3590,7 @@ function dOLearningResult(){
   <div class="do-page-head">
     <div><div class="do-page-title">拆解结果</div><div class="do-page-sub"><span class="do-link" onclick="dS.oLearnPhase='input';dRender()">‹ 重新选素材</span></div></div>
   </div>
-  <div style="max-width:760px">${block}</div>`;
+  <div style="max-width:760px;margin:0 auto">${block}</div>`;
 }
 async function dOLearnWrite(){
   if(dS.oLearnWriting) return;
@@ -3637,7 +3643,7 @@ function dOSkillPage(){
       <button class="do-btn do-btn-pri" ${dS.oSkillSaving?'disabled':''} onclick="dOSkillSave()">${dS.oSkillSaving?'保存中…':'保存'}</button>
     </div>
   </div>
-  <div style="max-width:860px;display:grid;grid-template-columns:1fr 240px;gap:18px;align-items:start">
+  <div style="max-width:860px;margin:0 auto;display:grid;grid-template-columns:1fr 240px;gap:18px;align-items:start">
     <textarea class="do-input" style="min-height:calc(100vh - 200px);line-height:1.85;font-size:14px;padding:18px;resize:none" placeholder="自由写，支持 Markdown 格式：
 
 ## 人设
