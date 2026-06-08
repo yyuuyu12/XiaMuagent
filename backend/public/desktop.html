@@ -484,6 +484,20 @@ html, body {
 .do-input{width:100%;border:1px solid #EDE9E3;border-radius:11px;padding:10px 13px;font-size:13px;font-family:inherit;outline:none;color:#1A1614}
 .do-input:focus{border-color:#F5A05A}
 .do-empty{text-align:center;padding:50px 20px;color:#B0AA9F;font-size:13px}
+/* 原创工坊补齐：素材库/学习中心/选题/Skill编辑 */
+.do-entry-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.do-entry{flex:1;min-width:200px;background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:15px 17px;cursor:pointer;transition:all .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px}
+.do-entry:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+.do-entry-ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.do-seg{display:flex;background:#F0EDE8;border-radius:11px;padding:3px;gap:2px}
+.do-seg-i{flex:1;text-align:center;padding:8px 0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;color:#9E9890}
+.do-seg-i.on{background:#fff;color:#1A1614;box-shadow:0 1px 5px rgba(0,0,0,0.08)}
+.do-topic-card{background:#fff;border:1px solid #F0EDE8;border-radius:13px;padding:14px 16px;cursor:pointer;transition:all .15s}
+.do-topic-card:hover{border-color:#F5762A;box-shadow:0 4px 14px rgba(245,118,42,0.12)}
+.do-rule-card{background:#FAF8F5;border:1.5px solid transparent;border-radius:11px;padding:11px 13px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;transition:all .12s}
+.do-rule-card.on{background:#FFF8F3;border-color:#F5762A}
+.do-mat-del{border:none;background:none;padding:4px;cursor:pointer;opacity:.4;flex-shrink:0}
+.do-mat-del:hover{opacity:.8}
 </style>
 </head>
 <body>
@@ -2777,11 +2791,40 @@ function oSkillStats(sk){
   return { rules, kw, fb, free, done };
 }
 
+/* ---------- 补齐模块状态 ---------- */
+Object.assign(dS, {
+  // 素材库
+  oMatModal:false, oMatTab:'text', oMatTitle:'', oMatContent:'', oMatUrl:'', oMatUrlLoading:false, oMatUrlResult:null, oMatSaving:false,
+  oMatSel:[],                 // 学习中心勾选的素材 id
+  // 学习中心
+  oLearnPhase:'input',        // 'input' | 'result'
+  oLearnScope:'global',       // 'global' | 'project'
+  oLearnResult:null, oLearnBusy:false, oLearnWriting:false,
+  // 智能选题
+  oTopics:[], oTopicsBusy:false,
+  // Skill 自由编辑
+  oSkillDraft:null, oSkillSaving:false, oSkillHistoryOpen:false,
+  oSkillQuickModal:false, oSkillQuickText:'', oSkillQuickSaving:false,
+  // 新建维度
+  oNewDuration:'1min', oNewStyle:'informative', oNewPlatform:'douyin',
+});
+const O_STYLE_LABEL = { informative:'干货', story:'故事', contrast:'对比', twist:'反转' };
+const O_DUR_LABEL = { '30s':'30秒', '1min':'1分钟', '3min':'3分钟' };
+const O_LEARN_ROLE = {
+  hook:{label:'钩子',color:'#C2410C',bg:'#FFEAD9'}, turn:{label:'转折',color:'#BE185D',bg:'#FCE7F3'},
+  point:{label:'观点',color:'#1D4ED8',bg:'#E0EBFF'}, example:{label:'举例',color:'#0E7490',bg:'#D9F4F8'},
+  cta:{label:'引导',color:'#15803D',bg:'#DCFCE7'}, background:{label:'铺垫',color:'#92744A',bg:'#F2ECE0'},
+  normal:{label:'过渡',color:'#6E6860',bg:'transparent'},
+};
+
 /* ---------- 入口 / 调度 ---------- */
 function dOEnter(){ dS.oView='home'; dS.oProject=null; dS.oLoaded=false; dGoPage('original'); }
 function dRenderOriginal(){
   if(dS.oView==='workspace') return dOWorkspace();
   if(dS.oView==='new')       return dONew();
+  if(dS.oView==='materials') return dOMaterials();
+  if(dS.oView==='learning')  return dOLearning();
+  if(dS.oView==='skill')     return dOSkillPage();
   return dOHome();
 }
 async function dBindOriginal(){
@@ -2792,9 +2835,18 @@ async function dBindOriginal(){
     dS.oLoaded = true;
     dRender();
   }
+  if((dS.oView==='materials' || dS.oView==='learning') && !dS.oMaterialsLoaded){
+    await dOLoadMaterials(true);
+  }
   if(dS.oView==='workspace') dOScrollChat();
 }
-function dOSetView(v){ dS.oView = v; dRender(); if(v==='new') dOLoadMaterials(); }
+function dOSetView(v){
+  dS.oView = v;
+  if(v==='learning'){ dS.oLearnPhase='input'; dS.oLearnResult=null; dS.oMatSel=[]; }
+  if(v==='skill'){ dS.oSkillDraft=null; dS.oSkillHistoryOpen=false; }
+  dRender();
+  if(v==='new' || v==='materials' || v==='learning') dOLoadMaterials(v!=='new');
+}
 function dOBackHome(){ dS.oView='home'; dS.oProject=null; dS.oLoaded=false; dRender(); }
 function dOScrollChat(){ setTimeout(()=>{ const el=document.getElementById('doChatBody'); if(el) el.scrollTop=el.scrollHeight; },0); }
 
@@ -2806,7 +2858,7 @@ function dOHome(){
   const tips = [];
   if(!st.rules) tips.push('沉淀风格规则'); if(!st.kw) tips.push('高频词'); if(!st.fb) tips.push('禁区词');
   const skillCard = `
-    <div class="do-skill-card">
+    <div class="do-skill-card" onclick="dOSetView('skill')" style="cursor:pointer">
       <div class="do-skill-top">
         <div class="do-skill-badge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5H22L16.5 14L18.5 21L12 17L5.5 21L7.5 14L2 9.5H9.5L12 2Z" fill="white"/></svg></div>
         <div style="flex:1">
@@ -2842,13 +2894,76 @@ function dOHome(){
         </div>`;
       }).join('')}</div>`;
 
+  const entryRow = `
+    <div class="do-entry-row">
+      <div class="do-entry" onclick="dOSetView('materials')">
+        <div class="do-entry-ic" style="background:#EEF0FF"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1614">素材库</div><div style="font-size:12px;color:#9E9890;margin-top:2px">收集爆款原文，长期积累</div></div>
+      </div>
+      <div class="do-entry" onclick="dOSetView('learning')">
+        <div class="do-entry-ic" style="background:#FFF0E6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1614">学习中心</div><div style="font-size:12px;color:#9E9890;margin-top:2px">拆解爆款规律，融进 Skill</div></div>
+      </div>
+    </div>`;
+
   return `
   <div class="do-page-head">
     <div><div class="do-page-title">原创工坊</div><div class="do-page-sub">分阶段深度创作：选题方向 → 粗纲 → 细纲 → 剧本</div></div>
     <button class="do-btn do-btn-pri" onclick="dOSetView('new')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg> 新建项目</button>
   </div>
-  ${dS.oLoaded ? skillCard + `<div style="font-size:14px;font-weight:700;color:#1A1614;margin:4px 0 12px">我的项目 <span style="font-size:12px;color:#B0AA9F;font-weight:500">${dS.oProjects.length}</span></div>` + projGrid : `<div class="do-empty">加载中…</div>`}
+  ${dS.oLoaded ? skillCard + entryRow + dOTopicsBlock() + `<div style="font-size:14px;font-weight:700;color:#1A1614;margin:4px 0 12px">我的项目 <span style="font-size:12px;color:#B0AA9F;font-weight:500">${dS.oProjects.length}</span></div>` + projGrid : `<div class="do-empty">加载中…</div>`}
   `;
+}
+
+/* ---------- 智能选题（首页区块） ---------- */
+function dOTopicsBlock(){
+  const topics = dS.oTopics || [];
+  const busy = dS.oTopicsBusy;
+  const head = `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 12px">
+    <span style="font-size:14px;font-weight:700;color:#1A1614">智能选题 <span style="font-size:12px;color:#B0AA9F;font-weight:500">基于你的 Skill</span></span>
+    <button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" ${busy?'disabled':''} onclick="dOLoadTopics()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="${busy?'animation:spin 1s linear infinite':''}"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      ${busy?'生成中…':(topics.length?'换一批':'生成选题')}
+    </button>
+  </div>`;
+  let body;
+  if(busy){
+    body = `<div class="do-proj-grid">${[1,2,3].map(()=>`<div style="background:#fff;border:1px solid #F0EDE8;border-radius:13px;padding:14px 16px;height:84px;opacity:.6">生成中…</div>`).join('')}</div>`;
+  } else if(!topics.length){
+    body = `<div style="background:#fff;border:1.5px dashed #E8E4DC;border-radius:14px;padding:22px;text-align:center;color:#B0AA9F;font-size:13px;line-height:1.7">根据你的 Skill 和学习记录，AI 帮你生成个性化选题<br><button class="do-btn do-btn-pri" style="margin-top:12px;padding:8px 22px" onclick="dOLoadTopics()">生成选题 →</button></div>`;
+  } else {
+    body = `<div class="do-proj-grid">${topics.map((t,i)=>{
+      return `<div class="do-topic-card" onclick="dOPickTopic(${i})">
+        <div style="font-size:14px;font-weight:700;color:#1A1614;line-height:1.45;margin-bottom:6px">${esc(t.title||'')}</div>
+        <div style="font-size:12px;color:#9E9890;line-height:1.55;max-height:36px;overflow:hidden">${esc(t.angle||'')}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:10px">
+          <span class="do-chip">${O_STYLE_LABEL[t.style]||t.style||''}</span>
+          <span class="do-chip" style="background:#F4F1EC;color:#9E9890">${O_DUR_LABEL[t.duration]||t.duration||''}</span>
+          <span style="font-size:12px;color:#F5762A;font-weight:600;margin-left:auto">选用 →</span>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+  return `<div style="margin-bottom:20px">${head}${body}</div>`;
+}
+async function dOLoadTopics(){
+  if(dS.oTopicsBusy) return;
+  dS.oTopicsBusy=true; dRender();
+  const r = await dHttp.post('/original/suggest-topics', {});
+  dS.oTopicsBusy=false;
+  if(r.code===200) dS.oTopics = r.data||[];
+  else dToast(r.msg||'选题生成失败');
+  dRender();
+}
+function dOPickTopic(i){
+  const t = (dS.oTopics||[])[i];
+  if(!t) return;
+  dS.oNewTitle = t.title||'';
+  dS.oNewBrief = t.angle||'';
+  dS.oNewDuration = t.duration||'1min';
+  dS.oNewStyle = t.style||'informative';
+  dS.oNewPlatform = 'douyin';
+  dOSetView('new');
 }
 
 /* ---------- 打开项目 ---------- */
@@ -2971,7 +3086,7 @@ function dOWorkspace(){
     </div>`;
   }
 
-  return `<div class="do-ws">${leftCol}${midCol}${rightCol}</div>`;
+  return `<div class="do-ws">${leftCol}${midCol}${rightCol}</div>${dS.oSkillQuickModal?dOQuickModalHtml():''}`;
 }
 
 function dOBenchPanel(){
@@ -3008,7 +3123,7 @@ function dOSkillPanel(){
         <div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#F5762A;margin-bottom:5px">${esc(cat)}</div>
         ${(Array.isArray(arr)?arr:[]).map(r=>`<div style="font-size:12.5px;color:#2A241E;line-height:1.6;padding:5px 0;border-bottom:1px dashed #F0EDE8">· ${esc(r.text||r)}</div>`).join('')}</div>`).join('');
   return `<div class="do-col">
-    <div class="do-col-head"><div><div class="do-col-h-title">我的 Skill</div><div class="do-col-h-sub">${esc(sk.version||'v1.0')} · 写作时自动遵循</div></div></div>
+    <div class="do-col-head"><div><div class="do-col-h-title">我的 Skill</div><div class="do-col-h-sub">${esc(sk.version||'v1.0')} · 写作时自动遵循</div></div><div style="display:flex;gap:8px"><button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" onclick="dOQuickOpen()">＋ 快速记</button><span class="do-link" onclick="dOSetView('skill')">完整编辑 ›</span></div></div>
     <div class="do-col-body">
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">风格规则</div>
       ${rulesHtml}
@@ -3099,8 +3214,8 @@ async function dOBack(){
 }
 
 /* ---------- 对标素材绑定 ---------- */
-async function dOLoadMaterials(){
-  if(dS.oMaterialsLoaded) return;
+async function dOLoadMaterials(force){
+  if(dS.oMaterialsLoaded && !force) return;
   const r = await dHttp.get('/original/materials');
   if(r.code===200){ dS.oMaterials = r.data||[]; dS.oMaterialsLoaded=true; dRender(); }
 }
@@ -3171,6 +3286,19 @@ function dONew(){
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 8px">一句话简介 / 想法（选填）</div>
       <textarea class="do-input" rows="3" style="resize:vertical" placeholder="想讲什么、给谁看、想要什么效果…没想好也可以留空，进去和 AI 聊" oninput="dS.oNewBrief=this.value">${esc(dS.oNewBrief)}</textarea>
 
+      <div style="display:flex;gap:14px;margin-top:18px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">目标时长</div>
+          <div class="do-seg">${[['30s','30秒'],['1min','1分钟'],['3min','3分钟']].map(([v,l])=>`<div class="do-seg-i ${dS.oNewDuration===v?'on':''}" onclick="dS.oNewDuration='${v}';dRender()">${l}</div>`).join('')}</div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">目标平台</div>
+          <div class="do-seg">${[['douyin','抖音'],['shipinhao','视频号'],['xiaohongshu','小红书']].map(([v,l])=>`<div class="do-seg-i ${dS.oNewPlatform===v?'on':''}" onclick="dS.oNewPlatform='${v}';dRender()">${l}</div>`).join('')}</div>
+        </div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin:18px 0 8px">视频风格</div>
+      <div class="do-seg">${[['informative','干货'],['story','故事'],['contrast','对比'],['twist','反转']].map(([v,l])=>`<div class="do-seg-i ${dS.oNewStyle===v?'on':''}" onclick="dS.oNewStyle='${v}';dRender()">${l}</div>`).join('')}</div>
+
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin:18px 0 8px">创作模式</div>
       <div style="display:flex;gap:10px">
         <div onclick="dS.oNewStaged=true;dRender()" style="flex:1;border:1.5px solid ${dS.oNewStaged?'#F5762A':'#EDE9E3'};background:${dS.oNewStaged?'#FFFaf5':'#fff'};border-radius:12px;padding:12px 14px;cursor:pointer">
@@ -3195,12 +3323,387 @@ async function dOCreateProject(){
   if(!title){ dToast('请填写项目标题'); return; }
   if(dS.oBusy) return;
   dS.oBusy=true; dRender();
-  const r = await dHttp.post('/original/projects', { title, brief:(dS.oNewBrief||'').trim(), staged:dS.oNewStaged, materialIds:dS.oNewMatIds });
+  const r = await dHttp.post('/original/projects', {
+    title, brief:(dS.oNewBrief||'').trim(), angle:(dS.oNewBrief||'').trim(),
+    duration:dS.oNewDuration, style:dS.oNewStyle, platform:dS.oNewPlatform,
+    staged:dS.oNewStaged, materialIds:dS.oNewMatIds });
   dS.oBusy=false;
   if(r.code!==200){ dToast(r.msg||'创建失败'); dRender(); return; }
   dToast(dS.oNewStaged?'项目已创建 · 先定选题方向':'项目已创建');
   dS.oNewTitle=''; dS.oNewBrief=''; dS.oNewMatIds=[]; dS.oLoaded=false;
   await dOOpenProject(r.data.id);
+}
+
+/* ============================================================
+   素材库
+   ============================================================ */
+function dOMaterials(){
+  const mats = dS.oMaterials || [];
+  const sel = dS.oMatSel || [];
+  const selSet = new Set(sel);
+  const typeBadge = t => t==='video'
+    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`
+    : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+  const list = !dS.oMaterialsLoaded
+    ? `<div class="do-empty">加载中…</div>`
+    : (mats.length===0
+        ? `<div class="do-empty">还没有素材。点右上角「添加素材」收集竞品爆款原文，长期积累成你的学习库。</div>`
+        : `<div class="do-proj-grid">${mats.map(m=>{
+            const on = selSet.has(m.id);
+            return `<div class="do-mat-row ${on?'bound':''}" style="cursor:pointer;align-items:flex-start" onclick="dOMatToggleSel(${m.id})">
+              <div class="do-mat-check ${on?'on':''}">${on?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">${typeBadge(m.source_type)}<span style="font-size:13.5px;font-weight:600;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.title||'未命名素材')}</span></div>
+                <div style="font-size:12px;color:#9E9890;line-height:1.55;max-height:36px;overflow:hidden">${esc((m.preview||'').replace(/\n/g,' '))}</div>
+                <div style="font-size:11px;color:#C0B8B0;margin-top:5px">${dFmtTime(m.created_at)} · 约${Math.max(1,Math.round((m.content_len||0)/300))}分钟素材</div>
+              </div>
+              <button class="do-mat-del" onclick="event.stopPropagation();dOMatDelete(${m.id})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg></button>
+            </div>`;
+          }).join('')}</div>`);
+  const selCount = sel.length;
+  return `
+  <div class="do-page-head">
+    <div><div class="do-page-title">素材库</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · 收集爆款原文，可勾选后送去学习</div></div>
+    <div style="display:flex;gap:10px">
+      ${selCount>0?`<button class="do-btn do-btn-pri" onclick="dOMatGoLearn()">学习已选 ${selCount} 条 →</button>`:''}
+      <button class="do-btn do-btn-gho" onclick="dOMatOpenModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#6E6860" stroke-width="2.5" stroke-linecap="round"/></svg> 添加素材</button>
+    </div>
+  </div>
+  ${list}
+  ${dS.oMatModal?dOMatModalHtml():''}`;
+}
+function dOMatModalHtml(){
+  const tab = dS.oMatTab||'text';
+  const ur = dS.oMatUrlResult;
+  const seg = `<div class="do-seg" style="margin-bottom:16px">
+    <div class="do-seg-i ${tab==='text'?'on':''}" onclick="dS.oMatTab='text';dS.oMatUrlResult=null;dRender()">粘贴文字</div>
+    <div class="do-seg-i ${tab==='url'?'on':''}" onclick="dS.oMatTab='url';dRender()">视频链接</div>
+  </div>`;
+  let body;
+  if(tab==='text'){
+    body = `
+      <input class="do-input" placeholder="素材标题（可选），如：某博主·副业选题" value="${esc(dS.oMatTitle)}" oninput="dS.oMatTitle=this.value" style="margin-bottom:12px">
+      <textarea class="do-input" rows="8" style="resize:vertical;line-height:1.7" placeholder="把竞品视频的口播原文、文案文字粘贴到这里…" oninput="dS.oMatContent=this.value">${esc(dS.oMatContent)}</textarea>
+      <button class="do-btn do-btn-pri" style="width:100%;margin-top:14px;padding:11px" ${dS.oMatSaving?'disabled':''} onclick="dOMatSaveText()">${dS.oMatSaving?'保存中…':'保存到素材库'}</button>`;
+  } else {
+    const extracted = ur ? `
+      <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:13px;margin-top:14px">
+        <div style="font-size:12px;font-weight:700;color:#0369A1;margin-bottom:8px">提取到的原文（可编辑后保存）</div>
+        <textarea class="do-input" rows="7" style="resize:vertical;line-height:1.7;border-color:#BAE6FD;background:#fff" oninput="dS.oMatUrlResult.script=this.value">${esc(ur.script||'')}</textarea>
+        <button class="do-btn do-btn-pri" style="width:100%;margin-top:12px;padding:11px" ${dS.oMatSaving?'disabled':''} onclick="dOMatSaveUrl()">${dS.oMatSaving?'保存中…':'保存到素材库'}</button>
+      </div>` : '';
+    body = `
+      <textarea class="do-input" rows="3" style="resize:none;line-height:1.6" placeholder="粘贴抖音视频链接…" oninput="dS.oMatUrl=this.value">${esc(dS.oMatUrl)}</textarea>
+      <button class="do-btn do-btn-pri" style="width:100%;margin-top:12px;padding:11px" ${(!((dS.oMatUrl||'').trim())||dS.oMatUrlLoading)?'disabled':''} onclick="dOMatExtractUrl()">${dS.oMatUrlLoading?'提取中…':'提取原文'}</button>
+      ${extracted}`;
+  }
+  return `<div class="d-modal-overlay" style="display:flex" onclick="if(event.target===this)dOMatCloseModal()">
+    <div class="d-modal" style="max-width:560px;text-align:left">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div class="d-modal-title" style="margin:0">添加素材</div>
+        <button style="background:none;border:none;font-size:24px;color:#B0AA9F;cursor:pointer;line-height:1" onclick="dOMatCloseModal()">×</button>
+      </div>
+      ${seg}${body}
+    </div>
+  </div>`;
+}
+function dOMatOpenModal(){ dS.oMatModal=true; dS.oMatTab='text'; dS.oMatTitle=''; dS.oMatContent=''; dS.oMatUrl=''; dS.oMatUrlResult=null; dRender(); }
+function dOMatCloseModal(){ dS.oMatModal=false; dRender(); }
+function dOMatToggleSel(id){
+  const i = dS.oMatSel.indexOf(id);
+  if(i>=0) dS.oMatSel.splice(i,1);
+  else { if(dS.oMatSel.length>=4){ dToast('最多选 4 条一起学习'); return; } dS.oMatSel.push(id); }
+  dRender();
+}
+async function dOMatSaveText(){
+  const content = (dS.oMatContent||'').trim();
+  if(!content){ dToast('请粘贴原文内容'); return; }
+  dS.oMatSaving=true; dRender();
+  const r = await dHttp.post('/original/materials', { title:(dS.oMatTitle||'').trim()||null, rawContent:content, sourceType:'text' });
+  dS.oMatSaving=false;
+  if(r.code===200){ dS.oMatModal=false; dToast('已保存到素材库'); await dOLoadMaterials(true); }
+  else { dToast(r.msg||'保存失败'); dRender(); }
+}
+async function dOMatExtractUrl(){
+  const url = (dS.oMatUrl||'').trim();
+  if(!url) return;
+  dS.oMatUrlLoading=true; dS.oMatUrlResult=null; dRender();
+  const r = await dHttp.post('/original/learning/extract', { url, type:'video' });
+  dS.oMatUrlLoading=false;
+  if(r.code===200 && r.data && r.data.items && r.data.items[0]){
+    const v = r.data.items[0];
+    dS.oMatUrlResult = { title:v.desc||'', script:v.script||'', sourceUrl:url };
+  } else dToast(r.msg||'提取失败');
+  dRender();
+}
+async function dOMatSaveUrl(){
+  const ur = dS.oMatUrlResult;
+  if(!ur) return;
+  const content = (ur.script||'').trim();
+  if(!content){ dToast('原文为空'); return; }
+  dS.oMatSaving=true; dRender();
+  const r = await dHttp.post('/original/materials', { title:ur.title||null, rawContent:content, sourceUrl:ur.sourceUrl, sourceType:'video' });
+  dS.oMatSaving=false;
+  if(r.code===200){ dS.oMatModal=false; dS.oMatUrlResult=null; dS.oMatUrl=''; dToast('已保存到素材库'); await dOLoadMaterials(true); }
+  else { dToast(r.msg||'保存失败'); dRender(); }
+}
+async function dOMatDelete(id){
+  if(!confirm('确认删除这条素材？')) return;
+  const r = await dApi('DELETE','/original/materials/'+id);
+  if(r.code===200){
+    dS.oMaterials = dS.oMaterials.filter(m=>m.id!==id);
+    dS.oMatSel = dS.oMatSel.filter(x=>x!==id);
+    dToast('已删除'); dRender();
+  } else dToast(r.msg||'删除失败');
+}
+function dOMatGoLearn(){
+  if(!dS.oMatSel.length){ dToast('请先勾选素材'); return; }
+  dS.oView='learning'; dS.oLearnPhase='input'; dS.oLearnResult=null; dRender();
+}
+
+/* ============================================================
+   学习中心：选素材 → AI 拆解 → 规律多选 → 融进 Skill
+   ============================================================ */
+function dOLearning(){
+  if(dS.oLearnPhase==='result') return dOLearningResult();
+  return dOLearningInput();
+}
+function dOLearningInput(){
+  const mats = dS.oMaterials || [];
+  const sel = dS.oMatSel || [];
+  const selSet = new Set(sel);
+  const scope = dS.oLearnScope||'global';
+  const list = !dS.oMaterialsLoaded
+    ? `<div class="do-empty">加载中…</div>`
+    : (mats.length===0
+        ? `<div class="do-empty">素材库为空，先去 <span class="do-link" onclick="dOSetView('materials')">素材库</span> 添加几条爆款原文。</div>`
+        : `<div class="do-proj-grid">${mats.map(m=>{
+            const on = selSet.has(m.id);
+            return `<div class="do-mat-row ${on?'bound':''}" style="cursor:pointer" onclick="dOMatToggleSel(${m.id})">
+              <div class="do-mat-check ${on?'on':''}">${on?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+              <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.title||'未命名素材')}</div><div style="font-size:12px;color:#9E9890;margin-top:3px;max-height:20px;overflow:hidden">${esc((m.preview||'').replace(/\n/g,' '))}</div></div>
+            </div>`;
+          }).join('')}</div>`);
+  const selCount = sel.length;
+  const canLearn = selCount>0 && !dS.oLearnBusy;
+  return `
+  <div class="do-page-head">
+    <div><div class="do-page-title">学习中心</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · 选爆款原文，AI 逐句拆解规律</div></div>
+  </div>
+  <div style="max-width:760px">
+    <div class="do-seg" style="margin-bottom:12px">
+      <div class="do-seg-i ${scope==='global'?'on':''}" onclick="dS.oLearnScope='global';dRender()">写入全局 Skill</div>
+      <div class="do-seg-i ${scope==='project'?'on':''}" onclick="dS.oLearnScope='project';dRender()">仅用于参考</div>
+    </div>
+    <div style="background:${scope==='global'?'#FFF3E8':'#F0FDF4'};border-radius:12px;padding:10px 14px;font-size:12px;color:${scope==='global'?'#9A3D0C':'#065F46'};line-height:1.6;margin-bottom:16px">
+      ${scope==='global'?'学到的规律会融合进 Skill 工作流，对所有项目长期生效':'学到的规律只展示拆解结果，不改变全局 Skill'}
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:14px;font-weight:700;color:#1A1614">选择要学习的素材（最多 4 条）</div>
+      <span class="do-link" onclick="dOSetView('materials')">＋ 去素材库添加</span>
+    </div>
+    ${list}
+    <button class="do-btn do-btn-pri" style="width:100%;margin-top:16px;padding:13px" ${canLearn?'':'disabled'} onclick="dOLearnAnalyze()">
+      ${dS.oLearnBusy?'拆解中，约 30–90 秒…':(selCount>0?`开始学习（已选 ${selCount} 条）`:'请先勾选素材')}
+    </button>
+  </div>`;
+}
+async function dOLearnAnalyze(){
+  const sel = dS.oMatSel || [];
+  if(!sel.length || dS.oLearnBusy) return;
+  dS.oLearnBusy=true; dS.oLearnResult=null; dRender();
+  const r = await dHttp.post('/original/learning/analyze', { materialIds:sel, scope:dS.oLearnScope });
+  dS.oLearnBusy=false;
+  if(r.code===200 && r.data){
+    const data = r.data;
+    data.rules = (data.rules||[]).map(rule=>({ ...rule, checked: rule.checked!==false }));
+    dS.oLearnResult = data; dS.oLearnPhase='result';
+  } else dToast(r.msg||'拆解失败');
+  dRender();
+}
+function dOLearnVideoCard(v, showHead){
+  const meta = role => O_LEARN_ROLE[role] || O_LEARN_ROLE.normal;
+  const segs = v.segments || [];
+  const annotated = segs.map(s=>{
+    const m = meta(s.role);
+    if(s.role==='normal'||s.role==='background'||!s.role) return esc(s.text);
+    return `<span style="background:${m.bg};color:${m.color};border-radius:4px;padding:1px 4px;font-weight:600">${esc(s.text)}</span>`;
+  }).join('');
+  const notes = segs.filter(s=>s.note&&s.note.trim());
+  const notesHtml = notes.length?`<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">${notes.map(s=>{
+    const m=meta(s.role); const q=s.text.length>40?s.text.slice(0,40)+'…':s.text;
+    return `<div style="display:flex;gap:9px;align-items:flex-start"><span style="flex-shrink:0;font-size:11px;font-weight:700;color:${m.color};background:${m.bg==='transparent'?'#F2EFEA':m.bg};border-radius:6px;padding:2px 7px;margin-top:1px">${m.label}</span><div style="flex:1"><div style="font-size:12px;color:#9E9890;line-height:1.5;margin-bottom:2px">"${esc(q)}"</div><div style="font-size:13px;color:#2A241E;line-height:1.6">${esc(s.note)}</div></div></div>`;
+  }).join('')}</div>`:'';
+  const blueprint = (v.persona||v.topic||(v.rhythm&&v.rhythm!=='—')||v.structure)?`
+    <div style="background:#FBF6EF;border:1px solid #F0E6D8;border-radius:12px;padding:13px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#9E6B3A;margin-bottom:9px;letter-spacing:.5px">复刻蓝图 · 反推还原</div>
+      ${[['人设',v.persona],['选题主题',v.topic],['时长节奏',v.rhythm&&v.rhythm!=='—'?v.rhythm:''],['结构骨架',v.structure]].filter(([,val])=>val&&val.trim()).map(([l,val])=>`<div style="display:flex;gap:9px;align-items:flex-start;margin-bottom:8px"><span style="flex-shrink:0;font-size:11px;font-weight:700;color:#9E6B3A;background:#F3E7D6;border-radius:6px;padding:2px 7px;margin-top:1px">${l}</span><div style="flex:1;font-size:13px;color:#2A241E;line-height:1.65">${esc(val)}</div></div>`).join('')}
+    </div>`:'';
+  const head = showHead?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:13.5px;font-weight:700;color:#1A1614;flex:1;line-height:1.4">${esc(v.desc||'未命名视频')}</span><span style="font-size:11px;color:#B0AA9F;flex-shrink:0">赞${v.likes||0}</span></div>`:'';
+  return `<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
+    ${head}
+    ${v.summary?`<div style="background:linear-gradient(135deg,#FFF3E8,#FDE8D4);border:1px solid #F8C8A0;border-radius:12px;padding:11px 13px;margin-bottom:12px"><div style="font-size:11px;color:#C2410C;font-weight:700;margin-bottom:3px">💡 套路一句话</div><div style="font-size:13.5px;color:#1A1614;line-height:1.55;font-weight:500">${esc(v.summary)}</div></div>`:''}
+    ${blueprint}
+    <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:7px">原文逐句拆解</div>
+    <div style="background:#FAF8F5;border-radius:10px;padding:13px;font-size:14px;color:#2A241E;line-height:2.05">${annotated||'—'}</div>
+    ${notesHtml}
+  </div>`;
+}
+function dOLearningResult(){
+  const result = dS.oLearnResult;
+  const scope = dS.oLearnScope||'global';
+  let block;
+  if(dS.oLearnBusy){
+    block = `<div class="do-empty"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite"><path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="#F5762A" stroke-width="2" stroke-linecap="round"/></svg><div style="margin-top:12px">逐句拆解中，约 30–90 秒…</div></div>`;
+  } else if(!result || !(result.videos||[]).length){
+    block = `<div class="do-empty">未提炼到有效分析，换素材重试。</div>`;
+  } else {
+    const videos = result.videos||[];
+    const rules = result.rules||[];
+    const multi = videos.length>1;
+    const checkedCount = rules.filter(r=>r.checked).length;
+    const legend = `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px">${['hook','turn','point','example','cta'].map(role=>{const m=O_LEARN_ROLE[role];return `<span style="font-size:11px;font-weight:600;color:${m.color};background:${m.bg};border-radius:6px;padding:2px 8px">${m.label}</span>`;}).join('')}</div>`;
+    const videoCards = videos.map(v=>dOLearnVideoCard(v,multi)).join('');
+    const ruleCards = rules.map((item,idx)=>`
+      <div class="do-rule-card ${item.checked?'on':''}" onclick="dS.oLearnResult.rules[${idx}].checked=!dS.oLearnResult.rules[${idx}].checked;dRender()">
+        <div class="do-mat-check ${item.checked?'on':''}" style="width:18px;height:18px;border-radius:5px">${item.checked?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+        <div style="flex:1"><div style="font-size:13px;color:#1A1614;line-height:1.6">${esc(item.text||'')}</div>${item.dim?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.dim)}${item.freq?' · '+esc(item.freq):''}</div>`:''}</div>
+      </div>`).join('');
+    const rulesBlock = rules.length?`
+      <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div><span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span></div>
+        <div style="font-size:11px;color:#B0AA9F;line-height:1.5;margin-bottom:12px">勾选要沉淀的规律，融进 Skill 后所有项目写作时自动遵循</div>
+        <div style="display:flex;flex-direction:column;gap:8px">${ruleCards}</div>
+      </div>
+      <button class="do-btn do-btn-pri" style="width:100%;padding:13px" ${(checkedCount===0||dS.oLearnWriting)?'disabled':''} onclick="dOLearnWrite()">
+        ${dS.oLearnWriting?'AI 融合中，请稍候…':(scope==='global'?`融合进 Skill（${checkedCount} 条）`:`记录参考（${checkedCount} 条）`)}
+      </button>`:'';
+    block = `${legend}${videoCards}${rulesBlock}`;
+  }
+  return `
+  <div class="do-page-head">
+    <div><div class="do-page-title">拆解结果</div><div class="do-page-sub"><span class="do-link" onclick="dS.oLearnPhase='input';dRender()">‹ 重新选素材</span></div></div>
+  </div>
+  <div style="max-width:760px">${block}</div>`;
+}
+async function dOLearnWrite(){
+  if(dS.oLearnWriting) return;
+  const result = dS.oLearnResult;
+  const selected = (result&&Array.isArray(result.rules))?result.rules.filter(r=>r.checked):[];
+  if(!selected.length){ dToast('请至少勾选一条规律'); return; }
+  const scope = dS.oLearnScope||'global';
+  dS.oLearnWriting=true; dRender();
+  const projectId = scope==='project' && dS.oProject ? dS.oProject.id : null;
+  const r = await dHttp.post('/original/learning/write', { insights:selected.map(s=>({text:s.text,freq:s.freq})), scope, projectId });
+  dS.oLearnWriting=false;
+  if(r.code===200){
+    if(r.data && r.data.skill) dS.oSkill = r.data.skill;
+    dToast(scope==='global'?`已融合 ${selected.length} 条进 Skill ✓`:`已记录 ${selected.length} 条`);
+    dS.oLearnResult=null; dS.oLearnPhase='input'; dS.oMatSel=[]; dS.oLoaded=false; dS.oView='home';
+    dRender();
+  } else { dToast(r.msg||'写入失败'); dRender(); }
+}
+
+/* ============================================================
+   Skill 自由编辑页（全屏）
+   ============================================================ */
+function dOSkillPage(){
+  const sk = dS.oSkill;
+  const draft = dS.oSkillDraft!==null ? dS.oSkillDraft : ((sk&&sk.freeText)||'');
+  const history = (sk&&sk.freeTextHistory)||[];
+  const st = oSkillStats(sk);
+  const ver = sk?(sk.version||'v1.0'):'v1.0';
+  const historySheet = dS.oSkillHistoryOpen?`
+    <div class="d-modal-overlay" style="display:flex" onclick="if(event.target===this){dS.oSkillHistoryOpen=false;dRender();}">
+      <div class="d-modal" style="max-width:520px;text-align:left;max-height:70vh;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div class="d-modal-title" style="margin:0">历史记录</div><button style="background:none;border:none;font-size:24px;color:#B0AA9F;cursor:pointer;line-height:1" onclick="dS.oSkillHistoryOpen=false;dRender()">×</button></div>
+        <div style="overflow-y:auto;flex:1">
+          ${history.length===0?`<div class="do-empty">暂无历史记录。每次保存前的内容会自动存档。</div>`:history.map((h,i)=>{
+            const d=new Date(h.savedAt); const label=`${d.getMonth()+1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            const preview=(h.text||'').replace(/\n/g,' ').slice(0,70);
+            return `<div onclick="dOSkillRestore(${i})" style="padding:12px 14px;cursor:pointer;border-bottom:1px solid #F2EFEA;border-radius:8px" onmouseover="this.style.background='#FAF8F5'" onmouseout="this.style.background='transparent'">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:13px;font-weight:600;color:#1A1614">${label}</span><span style="font-size:12px;color:#F5602A;font-weight:600">还原</span></div>
+              <div style="font-size:12px;color:#9E9890;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(preview)||'（空）'}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`:'';
+  return `
+  <div class="do-page-head">
+    <div><div class="do-page-title">我的创作 Skill <span style="font-size:12px;color:#B0AA9F;font-weight:500">${esc(ver)}</span></div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · Markdown / 纯文本，AI 创作时优先读取</div></div>
+    <div style="display:flex;gap:10px">
+      <button class="do-btn do-btn-gho" onclick="dS.oSkillHistoryOpen=true;dRender()">历史记录</button>
+      <button class="do-btn do-btn-pri" ${dS.oSkillSaving?'disabled':''} onclick="dOSkillSave()">${dS.oSkillSaving?'保存中…':'保存'}</button>
+    </div>
+  </div>
+  <div style="max-width:860px;display:grid;grid-template-columns:1fr 240px;gap:18px;align-items:start">
+    <textarea class="do-input" style="min-height:calc(100vh - 200px);line-height:1.85;font-size:14px;padding:18px;resize:none" placeholder="自由写，支持 Markdown 格式：
+
+## 人设
+我是一个…
+
+## 开场钩子
+- 用数字+反差做开头
+- 前3秒必须抓住用户
+
+## 内容结构
+…
+
+## 禁忌
+- 不讲技术原理" oninput="dS.oSkillDraft=this.value">${esc(draft)}</textarea>
+    <div class="do-skill-card" style="margin:0">
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:10px">沉淀概览</div>
+      <div class="do-bar"><div class="do-bar-fill" style="width:${Math.round(st.done/4*100)}%"></div></div>
+      <div style="font-size:11px;color:#B0AA9F;margin-top:6px;margin-bottom:10px">完善度 ${st.done}/4</div>
+      <div><span class="do-chip ${st.rules?'':'muted'}">规则 ${st.rules}</span><span class="do-chip ${st.kw?'':'muted'}">高频词 ${st.kw}</span><span class="do-chip ${st.fb?'':'muted'}">禁区 ${st.fb}</span></div>
+      <div style="font-size:11.5px;color:#9E9890;line-height:1.6;margin-top:12px">规则、高频词、禁区会在项目对话里自动提炼沉淀；这里写的是你的整体人设与创作准则。</div>
+    </div>
+  </div>
+  ${historySheet}`;
+}
+async function dOSkillSave(){
+  if(dS.oSkillSaving) return;
+  const text = dS.oSkillDraft!==null ? dS.oSkillDraft : ((dS.oSkill&&dS.oSkill.freeText)||'');
+  dS.oSkillSaving=true; dRender();
+  const r = await dHttp.put('/original/skill', { freeText:text });
+  dS.oSkillSaving=false;
+  if(r.code===200){ dS.oSkill=r.data; dS.oSkillDraft=text; dToast('已保存 ✓'); }
+  else dToast(r.msg||'保存失败');
+  dRender();
+}
+function dOSkillRestore(idx){
+  const history = (dS.oSkill&&dS.oSkill.freeTextHistory)||[];
+  const entry = history[idx];
+  if(!entry) return;
+  dS.oSkillDraft = entry.text; dS.oSkillHistoryOpen=false;
+  dToast('已还原，记得点保存'); dRender();
+}
+
+/* ---------- 工作台内：快速记 Skill ---------- */
+function dOQuickModalHtml(){
+  return `<div class="d-modal-overlay" style="display:flex" onclick="if(event.target===this)dOQuickClose()">
+    <div class="d-modal" style="max-width:480px;text-align:left">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div class="d-modal-title" style="margin:0">记一条 Skill</div><button style="background:none;border:none;font-size:24px;color:#B0AA9F;cursor:pointer;line-height:1" onclick="dOQuickClose()">×</button></div>
+      <div class="d-modal-sub">随手记下创作心得，追加到 Skill 自由笔记末尾</div>
+      <textarea class="do-input" rows="4" style="resize:vertical;line-height:1.7" placeholder="例如：开头先抛一个反常识结论，再用一个数字佐证…" oninput="dS.oSkillQuickText=this.value">${esc(dS.oSkillQuickText)}</textarea>
+      <button class="do-btn do-btn-pri" style="width:100%;margin-top:14px;padding:11px" ${dS.oSkillQuickSaving?'disabled':''} onclick="dOQuickSave()">${dS.oSkillQuickSaving?'保存中…':'记入 Skill'}</button>
+    </div>
+  </div>`;
+}
+function dOQuickOpen(){ dS.oSkillQuickModal=true; dS.oSkillQuickText=''; dRender(); }
+function dOQuickClose(){ dS.oSkillQuickModal=false; dRender(); }
+async function dOQuickSave(){
+  const text = (dS.oSkillQuickText||'').trim();
+  if(!text){ dToast('请输入内容'); return; }
+  dS.oSkillQuickSaving=true; dRender();
+  const existing = (dS.oSkill&&dS.oSkill.freeText)||'';
+  const newFree = existing + (existing.trim()?'\n\n':'') + text;
+  const r = await dHttp.put('/original/skill', { freeText:newFree });
+  dS.oSkillQuickSaving=false;
+  if(r.code===200){ dS.oSkill=r.data; dS.oSkillDraft=null; dS.oSkillQuickModal=false; dToast('已记入 Skill ✓'); }
+  else dToast(r.msg||'保存失败');
+  dRender();
 }
 </script>
 </body>
