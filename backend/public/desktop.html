@@ -398,6 +398,92 @@ html, body {
 .hint-green { background:#F0FDF4; border-color:#BBF7D0; color:#16A34A; }
 .hint-gray { background:#F7F5F1; border-color:#EDE9E3; color:#6E6860; }
 .hint-err  { background:#FFF2F2; border-color:#FFCDD2; color:#C62828; }
+
+/* ============================================================
+   CSS · 原创工坊（do- 前缀，独立于克隆流程，互不影响）
+   ============================================================ */
+.do-page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.do-page-title{font-size:18px;font-weight:700;color:#1A1614}
+.do-page-sub{font-size:12px;color:#9E9890;margin-top:3px}
+
+.do-skill-card{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.05);margin-bottom:18px}
+.do-skill-top{display:flex;align-items:center;gap:12px}
+.do-skill-badge{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#FF8040,#F5602A);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+.do-bar{height:6px;border-radius:6px;background:#F0EDE8;overflow:hidden;margin-top:8px}
+.do-bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#FF8040,#F5602A);transition:width .3s}
+.do-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#FFF3E8;color:#F5762A;margin-right:6px;margin-top:6px}
+.do-chip.muted{background:#F5F3EF;color:#9E9890}
+
+.do-proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.do-proj-card{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:16px 18px;cursor:pointer;transition:all .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
+.do-proj-card:hover{border-color:rgba(245,118,42,0.3);box-shadow:0 4px 18px rgba(245,96,42,0.1);transform:translateY(-1px)}
+.do-stage-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px}
+.do-stage-tag.s-direction{background:#FEF3E2;color:#D97706}
+.do-stage-tag.s-outline{background:#EFF6FF;color:#2563EB}
+.do-stage-tag.s-detail{background:#F5F3FF;color:#7C3AED}
+.do-stage-tag.s-script{background:#ECFDF5;color:#059669}
+.do-stage-tag.s-final{background:#1A1614;color:#fff}
+
+.do-ws{display:grid;grid-template-columns:340px 220px 1fr;gap:14px;height:calc(100vh - 96px)}
+.do-col{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.05)}
+.do-col-head{padding:13px 16px;border-bottom:1px solid #F2EFEA;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.do-col-h-title{font-size:13px;font-weight:700;color:#1A1614}
+.do-col-h-sub{font-size:11px;color:#9E9890;margin-top:2px}
+.do-col-body{flex:1;overflow-y:auto;padding:14px 16px}
+.do-col-body::-webkit-scrollbar{width:5px}
+.do-col-body::-webkit-scrollbar-thumb{background:#E0DCD6;border-radius:4px}
+
+.do-msg{margin-bottom:12px;display:flex;flex-direction:column}
+.do-msg.user{align-items:flex-end}
+.do-msg.ai{align-items:flex-start}
+.do-bubble{max-width:90%;padding:9px 13px;border-radius:13px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.do-bubble.user{background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff;border-bottom-right-radius:4px}
+.do-bubble.ai{background:#F5F3EF;color:#2A241E;border-bottom-left-radius:4px}
+.do-doc-flag{font-size:11px;color:#F5762A;font-weight:600;margin-top:4px}
+.do-sync-card{background:#FFFaf5;border:1px solid rgba(245,118,42,0.3);border-radius:11px;padding:10px 12px;margin-top:6px;max-width:90%}
+
+.do-chat-foot{flex-shrink:0;border-top:1px solid #F2EFEA;padding:10px 12px}
+.do-chat-input{width:100%;border:1px solid #EDE9E3;border-radius:11px;padding:9px 12px;font-size:13px;font-family:inherit;resize:none;outline:none;color:#1A1614;line-height:1.5}
+.do-chat-input:focus{border-color:#F5A05A}
+
+.do-quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.do-quick-chip{font-size:11px;padding:4px 10px;border-radius:18px;background:#F5F3EF;color:#6E6860;cursor:pointer;border:1px solid transparent;transition:all .12s}
+.do-quick-chip:hover{background:#FFF3E8;color:#F5762A;border-color:rgba(245,118,42,0.25)}
+
+.do-nav-grp{font-size:10px;font-weight:600;color:#B0AA9F;letter-spacing:.5px;margin:14px 0 6px}
+.do-nav-grp:first-child{margin-top:0}
+.do-nav-i{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:10px;font-size:12.5px;color:#6E6860;cursor:pointer;transition:all .12s;margin-bottom:2px;user-select:none}
+.do-nav-i:hover{background:#F7F5F1;color:#1A1614}
+.do-nav-i.active{background:#FFF3E8;color:#F5762A;font-weight:600}
+.do-step-c{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;background:#F0EDE8;color:#B0AA9F}
+.do-step-c.done{background:#FDE9D8;color:#F5762A}
+.do-step-c.cur{background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff}
+
+.do-doc-edit{flex:1;width:100%;border:none;outline:none;resize:none;font-size:14px;line-height:1.9;color:#2A241E;font-family:inherit;padding:18px 22px;overflow-y:auto;background:transparent}
+.do-doc-foot{flex-shrink:0;border-top:1px solid #F2EFEA;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.do-doc-stat{font-size:12px;color:#9E9890}
+
+.do-mat-row{display:flex;align-items:flex-start;gap:11px;padding:12px 14px;border:1px solid #EDE9E3;border-radius:12px;margin-bottom:10px;transition:all .12s}
+.do-mat-row.bound{border-color:rgba(245,118,42,0.4);background:#FFFaf5}
+.do-mat-check{width:20px;height:20px;border-radius:6px;border:1.5px solid #D8D3CC;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:1px}
+.do-mat-check.on{background:#F5762A;border-color:#F5762A}
+
+.do-steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.do-step-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#F5F3EF;color:#B0AA9F}
+.do-step-pill.done{background:#FDE9D8;color:#F5762A}
+.do-step-pill.cur{background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff}
+
+.do-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:11px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s;padding:9px 16px}
+.do-btn-pri{background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff;box-shadow:0 3px 12px rgba(245,96,42,0.3)}
+.do-btn-pri:hover{filter:brightness(1.05)}
+.do-btn-pri:disabled{opacity:.5;cursor:not-allowed}
+.do-btn-ok{background:#16A34A;color:#fff}
+.do-btn-gho{background:#F5F3EF;color:#6E6860}
+.do-btn-gho:hover{background:#EDE9E3}
+.do-link{color:#F5762A;font-size:12px;font-weight:600;cursor:pointer}
+.do-input{width:100%;border:1px solid #EDE9E3;border-radius:11px;padding:10px 13px;font-size:13px;font-family:inherit;outline:none;color:#1A1614}
+.do-input:focus{border-color:#F5A05A}
+.do-empty{text-align:center;padding:50px 20px;color:#B0AA9F;font-size:13px}
 </style>
 </head>
 <body>
@@ -465,6 +551,10 @@ html, body {
       <div class="d-nav-item" id="dNavTasks" onclick="dGoPage('tasks')">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2.5" stroke="#9E9890" stroke-width="1.8"/><path d="M9 8H15M9 12H15M9 16H12" stroke="#9E9890" stroke-width="1.6" stroke-linecap="round"/></svg>
         <span>我的任务</span>
+      </div>
+      <div class="d-nav-item" id="dNavOriginal" onclick="dOEnter()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 20L4 16L15 5L19 9L8 20L4 20Z" stroke="#9E9890" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 7L17 11" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>原创工坊</span>
       </div>
     </div>
     <div class="d-nav-section">
@@ -603,6 +693,7 @@ function dRender() {
     case 'tasks':   el.innerHTML = dRenderTasks(); dBindTasks(); break;
     case 'voices':  el.innerHTML = dRenderVoices(); break;
     case 'avatars': el.innerHTML = dRenderAvatars(); break;
+    case 'original': el.innerHTML = dRenderOriginal(); dBindOriginal(); break;
     case 'profile': el.innerHTML = dRenderProfile(); dBindProfile(); break;
     default:        el.innerHTML = dRenderHome(); dBindHome();
   }
@@ -611,7 +702,7 @@ function dRender() {
 function dGoPage(page) {
   dS.page = page;
   document.querySelectorAll('.d-nav-item').forEach(el => el.classList.remove('active'));
-  const navMap = { home:'dNavHome', tasks:'dNavTasks', voices:'dNavVoices', avatars:'dNavAvatars', profile:'' };
+  const navMap = { home:'dNavHome', tasks:'dNavTasks', voices:'dNavVoices', avatars:'dNavAvatars', original:'dNavOriginal', profile:'' };
   if (navMap[page]) document.getElementById(navMap[page])?.classList.add('active');
   dRender();
 }
@@ -2640,6 +2731,476 @@ function dLogout() {
   dClearAuth();
   dS.userInfo = null;
   dShowLogin();
+}
+</script>
+
+<script>
+/* ============================================================
+   JS · 原创工坊（桌面版三栏工作台）—— 全部 dO 前缀，独立于克隆流程
+   后端复用 /api/original/*（手机版同源），本模块不改任何现有函数
+   ============================================================ */
+Object.assign(dS, {
+  oView: 'home',          // home | workspace | new
+  oLoaded: false,
+  oSkill: null,
+  oProjects: [],
+  oProject: null,         // 详情 {id,title,brief,status,stage,doc,turns,artifacts,meta}
+  oMessages: [],
+  oBound: [],             // 已绑定对标素材 [{id,title,preview}]
+  oMaterials: [],         // 素材库 [{id,title,preview,...}]
+  oMaterialsLoaded: false,
+  oRight: 'doc',          // 右栏：doc | art:<stage> | bench | skill | info
+  oInput: '',
+  oBusy: false,
+  oStageBusy: false,
+  oSaving: false,
+  oNewTitle: '', oNewBrief: '', oNewStaged: true, oNewMatIds: [],
+});
+
+const O_STAGES = [
+  { key:'direction', name:'选题方向', short:'方向' },
+  { key:'outline',   name:'内容粗纲', short:'粗纲' },
+  { key:'detail',    name:'细化大纲', short:'细纲' },
+  { key:'script',    name:'口播剧本', short:'剧本' },
+];
+function oStageIdx(k){ const i = O_STAGES.findIndex(s=>s.key===k); return i<0?3:i; }
+function oStageName(k){ return (O_STAGES.find(s=>s.key===k)||{}).name || '口播剧本'; }
+function oStageShort(k){ return (O_STAGES.find(s=>s.key===k)||{}).short || '剧本'; }
+function oInFlow(p){ const a=p.artifacts||{}; return (p.stage||'script')!=='script' || a.direction || a.outline || a.detail; }
+function oSkillStats(sk){
+  if(!sk) return { rules:0, kw:0, fb:0, free:false, done:0 };
+  const rules = Object.values(sk.rules||{}).reduce((a,arr)=>a+(Array.isArray(arr)?arr.length:0),0);
+  const kw = (sk.keywords||[]).length;
+  const fb = (sk.forbidden||[]).length;
+  const free = (sk.freeText||'').trim().length>0;
+  const done = [rules>0, kw>0, fb>0, free].filter(Boolean).length;
+  return { rules, kw, fb, free, done };
+}
+
+/* ---------- 入口 / 调度 ---------- */
+function dOEnter(){ dS.oView='home'; dS.oProject=null; dS.oLoaded=false; dGoPage('original'); }
+function dRenderOriginal(){
+  if(dS.oView==='workspace') return dOWorkspace();
+  if(dS.oView==='new')       return dONew();
+  return dOHome();
+}
+async function dBindOriginal(){
+  if(dS.oView==='home' && !dS.oLoaded){
+    const [rs, rp] = await Promise.all([ dHttp.get('/original/skill'), dHttp.get('/original/projects') ]);
+    if(rs.code===200) dS.oSkill = rs.data;
+    if(rp.code===200) dS.oProjects = rp.data || [];
+    dS.oLoaded = true;
+    dRender();
+  }
+  if(dS.oView==='workspace') dOScrollChat();
+}
+function dOSetView(v){ dS.oView = v; dRender(); if(v==='new') dOLoadMaterials(); }
+function dOBackHome(){ dS.oView='home'; dS.oProject=null; dS.oLoaded=false; dRender(); }
+function dOScrollChat(){ setTimeout(()=>{ const el=document.getElementById('doChatBody'); if(el) el.scrollTop=el.scrollHeight; },0); }
+
+/* ---------- 首页 ---------- */
+function dOHome(){
+  const st = oSkillStats(dS.oSkill);
+  const pct = Math.round(st.done/4*100);
+  const ver = dS.oSkill ? (dS.oSkill.version||'v1.0') : 'v1.0';
+  const tips = [];
+  if(!st.rules) tips.push('沉淀风格规则'); if(!st.kw) tips.push('高频词'); if(!st.fb) tips.push('禁区词');
+  const skillCard = `
+    <div class="do-skill-card">
+      <div class="do-skill-top">
+        <div class="do-skill-badge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5H22L16.5 14L18.5 21L12 17L5.5 21L7.5 14L2 9.5H9.5L12 2Z" fill="white"/></svg></div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:700;color:#1A1614">我的创作 Skill</span><span style="font-size:11px;color:#B0AA9F">${esc(ver)}</span></div>
+          <div style="font-size:12px;color:#9E9890;margin-top:2px">沉淀你的专属风格，写作时自动遵循——做自己，而不是抄别人</div>
+        </div>
+        <div style="text-align:right"><div style="font-size:20px;font-weight:800;color:#F5762A">${st.done}<span style="font-size:13px;color:#B0AA9F">/4</span></div><div style="font-size:10px;color:#B0AA9F">完善度</div></div>
+      </div>
+      <div class="do-bar"><div class="do-bar-fill" style="width:${pct}%"></div></div>
+      <div style="margin-top:4px">
+        <span class="do-chip ${st.rules?'':'muted'}">规则 ${st.rules}</span>
+        <span class="do-chip ${st.kw?'':'muted'}">高频词 ${st.kw}</span>
+        <span class="do-chip ${st.fb?'':'muted'}">禁区 ${st.fb}</span>
+        <span class="do-chip ${st.free?'':'muted'}">自由笔记 ${st.free?'有':'无'}</span>
+      </div>
+      ${tips.length?`<div style="font-size:12px;color:#9E9890;margin-top:10px">建议补全：${tips.join(' · ')}（在项目对话里写作时会自动学习沉淀）</div>`:''}
+    </div>`;
+
+  const projGrid = dS.oProjects.length===0
+    ? `<div class="do-empty">还没有项目，点右上角「新建项目」开始第一条原创口播 ✏️</div>`
+    : `<div class="do-proj-grid">${dS.oProjects.map(p=>{
+        const stg = p.status==='final' ? 'final' : (p.stage||'script');
+        const tag = p.status==='final' ? '已定稿' : oStageName(p.stage||'script');
+        return `<div class="do-proj-card" onclick="dOOpenProject(${p.id})">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <div style="font-size:14px;font-weight:700;color:#1A1614;line-height:1.4;flex:1;overflow:hidden;text-overflow:ellipsis">${esc(p.title||'未命名项目')}</div>
+            <span class="do-stage-tag s-${stg}">${tag}</span>
+          </div>
+          <div style="font-size:12px;color:#9E9890;margin-top:7px;line-height:1.5;max-height:36px;overflow:hidden">${esc(p.brief||'（无简介）')}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:11px;font-size:11px;color:#B0AA9F">
+            <span>${p.turns||0} 轮对话</span><span>${dFmtTime(p.updated_at||p.created_at)}</span>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+
+  return `
+  <div class="do-page-head">
+    <div><div class="do-page-title">原创工坊</div><div class="do-page-sub">分阶段深度创作：选题方向 → 粗纲 → 细纲 → 剧本</div></div>
+    <button class="do-btn do-btn-pri" onclick="dOSetView('new')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg> 新建项目</button>
+  </div>
+  ${dS.oLoaded ? skillCard + `<div style="font-size:14px;font-weight:700;color:#1A1614;margin:4px 0 12px">我的项目 <span style="font-size:12px;color:#B0AA9F;font-weight:500">${dS.oProjects.length}</span></div>` + projGrid : `<div class="do-empty">加载中…</div>`}
+  `;
+}
+
+/* ---------- 打开项目 ---------- */
+async function dOOpenProject(id){
+  dToast('加载项目…');
+  const r = await dHttp.get('/original/projects/'+id);
+  if(r.code!==200){ dToast(r.msg||'加载失败'); return; }
+  dS.oProject = r.data.project || null;
+  if(dS.oProject) dS.oProject.artifacts = dS.oProject.artifacts || {};
+  dS.oMessages = r.data.messages || [];
+  dS.oBound = r.data.boundMaterials || [];
+  dS.oRight = 'doc'; dS.oInput=''; dS.oView='workspace';
+  dRender(); dOScrollChat();
+}
+
+/* ---------- 工作台（三栏） ---------- */
+function dOMsgHtml(m){
+  const isUser = m.role==='user';
+  let extra='';
+  if(!isUser && m.has_doc_update) extra += `<div class="do-doc-flag">✎ 已更新${oStageName(m.stage||(dS.oProject&&dS.oProject.stage))} ›</div>`;
+  let sync='';
+  if(!isUser && m.sync_label){
+    if(m.sync_done==='synced') sync = `<div class="do-sync-card" style="color:#16A34A;font-size:12px;font-weight:600">✓ 已沉淀到 Skill：${esc(m.sync_label)}</div>`;
+    else if(m.sync_done==='skipped') sync = `<div class="do-sync-card" style="color:#9E9890;font-size:12px">已忽略：${esc(m.sync_label)}</div>`;
+    else sync = `<div class="do-sync-card"><div style="font-size:12px;color:#6E6860;margin-bottom:7px">发现规律：<b style="color:#1A1614">${esc(m.sync_label)}</b></div><div style="display:flex;gap:7px"><button class="do-btn do-btn-pri" style="padding:5px 12px;font-size:11px" onclick="dOSyncRule(${m.id})">沉淀到 Skill</button><button class="do-btn do-btn-gho" style="padding:5px 12px;font-size:11px" onclick="dOSkipSync(${m.id})">忽略</button></div></div>`;
+  }
+  return `<div class="do-msg ${isUser?'user':'ai'}"><div class="do-bubble ${isUser?'user':'ai'}">${esc(m.content)}</div>${extra}${sync}</div>`;
+}
+
+function dOWorkspace(){
+  const p = dS.oProject;
+  if(!p) return dOHome();
+  const stage = p.stage || 'script';
+  const idx = oStageIdx(stage);
+  const arts = p.artifacts || {};
+  const isFinal = p.status==='final';
+  const inFlow = oInFlow(p);
+
+  /* 左栏：对话 */
+  const intro = dS.oMessages.length===0
+    ? `<div class="do-msg ai"><div class="do-bubble ai">${stage==='direction'?'我们先定 <b>选题方向</b>。说说你想做什么主题、给谁看；没想好也行，让我给你几个方向候选。':'说说你想怎么写，我来帮你打磨这一段文案。'}</div></div>`
+    : '';
+  const msgs = dS.oMessages.map(dOMsgHtml).join('');
+  const busy = dS.oBusy ? `<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">正在创作中…</div></div>` : '';
+  const quick = ['换个钩子开头','精简一半','更口语化','加个反差点','检查禁区词'];
+  const leftCol = `
+    <div class="do-col">
+      <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">当前：${oStageName(stage)}${isFinal?' · 已定稿':''}</div></div></div>
+      <div class="do-col-body" id="doChatBody">${intro}${msgs}${busy}</div>
+      <div class="do-chat-foot">
+        <div class="do-quick">${quick.map(q=>`<span class="do-quick-chip" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <textarea class="do-chat-input" id="doInput" rows="2" placeholder="说说你想怎么写，回车发送…" oninput="dS.oInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dOSendMsg();}">${esc(dS.oInput)}</textarea>
+          <button class="do-btn do-btn-pri" style="padding:9px 14px" ${dS.oBusy?'disabled':''} onclick="dOSendMsg()">发送</button>
+        </div>
+      </div>
+    </div>`;
+
+  /* 中栏：导航 */
+  let stageNav;
+  if(inFlow){
+    stageNav = O_STAGES.map((s,i)=>{
+      const state = i<idx?'done':(i===idx?'cur':'');
+      const active = (dS.oRight==='doc'&&i===idx)||(dS.oRight==='art:'+s.key);
+      const click = i<idx?`dOSetRight('art:${s.key}')` : (i===idx?`dOSetRight('doc')` : '');
+      const dim = i>idx ? 'opacity:.4;cursor:default' : '';
+      return `<div class="do-nav-i ${active?'active':''}" style="${dim}" ${click?`onclick="${click}"`:''}><span class="do-step-c ${state}">${i<idx?'✓':(i+1)}</span><span>${s.name}</span></div>`;
+    }).join('');
+  } else {
+    stageNav = `<div class="do-nav-i ${dS.oRight==='doc'?'active':''}" onclick="dOSetRight('doc')"><span class="do-step-c cur">✎</span><span>口播剧本</span></div>`;
+  }
+  const midCol = `
+    <div class="do-col">
+      <div class="do-col-head"><div><div class="do-col-h-title">${esc(p.title||'项目')}</div><div class="do-col-h-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回列表</span></div></div></div>
+      <div class="do-col-body">
+        <div class="do-nav-grp">阶段</div>
+        ${stageNav}
+        <div class="do-nav-grp">对标</div>
+        <div class="do-nav-i ${dS.oRight==='bench'?'active':''}" onclick="dOSetRight('bench')"><span class="do-step-c" style="background:#FFF3E8;color:#F5762A">◎</span><span>对标参考 (${dS.oBound.length})</span></div>
+        <div class="do-nav-grp">沉淀</div>
+        <div class="do-nav-i ${dS.oRight==='skill'?'active':''}" onclick="dOSetRight('skill')"><span class="do-step-c" style="background:#FDE9D8;color:#F5762A">★</span><span>我的 Skill</span></div>
+        <div class="do-nav-grp">信息</div>
+        <div class="do-nav-i ${dS.oRight==='info'?'active':''}" onclick="dOSetRight('info')"><span class="do-step-c">i</span><span>项目简介</span></div>
+      </div>
+    </div>`;
+
+  /* 右栏：按 oRight 切换 */
+  let rightCol;
+  if(dS.oRight && dS.oRight.indexOf('art:')===0){
+    const k = dS.oRight.slice(4);
+    rightCol = `<div class="do-col">
+      <div class="do-col-head"><div><div class="do-col-h-title">${oStageName(k)} · 已确认</div><div class="do-col-h-sub">历史快照（只读）</div></div><span class="do-link" onclick="dOSetRight('doc')">回到当前 ›</span></div>
+      <div class="do-col-body" style="white-space:pre-wrap;line-height:1.9;font-size:14px;color:#2A241E">${esc(arts[k]||'（无内容）')}</div>
+    </div>`;
+  } else if(dS.oRight==='bench'){
+    rightCol = dOBenchPanel();
+  } else if(dS.oRight==='skill'){
+    rightCol = dOSkillPanel();
+  } else if(dS.oRight==='info'){
+    rightCol = dOInfoPanel(p);
+  } else {
+    // doc 编辑
+    const nextKey = idx<O_STAGES.length-1 ? O_STAGES[idx+1].key : null;
+    const advBtn = isFinal ? ''
+      : (stage==='script'
+          ? `<button class="do-btn do-btn-ok" ${dS.oStageBusy?'disabled':''} onclick="dOAdvance()">✓ 完成定稿</button>`
+          : `<button class="do-btn do-btn-pri" ${dS.oStageBusy?'disabled':''} onclick="dOAdvance()">${dS.oStageBusy?'生成中…':'确认'+oStageShort(stage)+'，写'+oStageShort(nextKey)+' →'}</button>`);
+    const backBtn = (inFlow && idx>0 && !isFinal) ? `<button class="do-btn do-btn-gho" ${dS.oStageBusy?'disabled':''} onclick="dOBack()">← 上一步</button>` : '';
+    rightCol = `<div class="do-col">
+      <div class="do-col-head"><div><div class="do-col-h-title">${inFlow?('当前 · '+oStageName(stage)):'口播剧本'}</div><div class="do-col-h-sub">可直接编辑，下方保存</div></div><span style="font-size:11px;color:#9E9890">${isFinal?'已定稿':'第 '+(p.turns||0)+' 轮'}</span></div>
+      <textarea class="do-doc-edit" placeholder="这一阶段还没有内容，去左边和创作助手聊聊，让它先生成草稿…" oninput="dS.oProject.doc=this.value">${esc(p.doc||'')}</textarea>
+      <div class="do-doc-foot">
+        <div class="do-doc-stat">${(p.doc||'').length} 字</div>
+        <div style="display:flex;gap:8px">
+          ${backBtn}
+          <button class="do-btn do-btn-gho" ${dS.oSaving?'disabled':''} onclick="dOSaveDoc()">${dS.oSaving?'保存中…':'保存'}</button>
+          ${advBtn}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="do-ws">${leftCol}${midCol}${rightCol}</div>`;
+}
+
+function dOBenchPanel(){
+  const boundIds = dS.oBound.map(m=>m.id);
+  const lib = dS.oMaterialsLoaded
+    ? (dS.oMaterials.length===0
+        ? `<div class="do-empty">素材库还没有素材。在手机端「素材库」提取爆款原文后，这里就能选来对标。</div>`
+        : dS.oMaterials.map(m=>{
+            const on = boundIds.includes(m.id);
+            return `<div class="do-mat-row ${on?'bound':''}" onclick="dOToggleBench(${m.id})" style="cursor:pointer">
+              <div class="do-mat-check ${on?'on':''}">${on?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+              <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1A1614">${esc(m.title||'未命名素材')}</div><div style="font-size:12px;color:#9E9890;margin-top:3px;line-height:1.5;max-height:36px;overflow:hidden">${esc(m.preview||'')}</div></div>
+            </div>`;
+          }).join(''))
+    : `<div class="do-empty">加载素材库…</div>`;
+  return `<div class="do-col">
+    <div class="do-col-head"><div><div class="do-col-h-title">对标参考</div><div class="do-col-h-sub">绑定后，写作时只参考这几条学结构/钩子/节奏，绝不照抄</div></div><span style="font-size:11px;color:#F5762A;font-weight:600">已绑定 ${dS.oBound.length}/8</span></div>
+    <div class="do-col-body">
+      <div style="background:#FFFaf5;border:1px solid rgba(245,118,42,0.25);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#6E6860;line-height:1.6">
+        <b style="color:#1A1614">对标素材</b> = 你要学的爆款范本。给本项目绑定后，创作助手会去读它的 <b>文风 / 节奏 / 钩子</b> 来贴笔法。需要在这里手动指定，不会自动配。
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#1A1614;margin-bottom:10px">从素材库选择对标（可多选，最多 8 条）</div>
+      ${lib}
+    </div>
+  </div>`;
+}
+
+function dOSkillPanel(){
+  const sk = dS.oSkill;
+  if(!sk) return `<div class="do-col"><div class="do-col-head"><div class="do-col-h-title">我的 Skill</div></div><div class="do-empty">加载中…</div></div>`;
+  const rulesHtml = Object.keys(sk.rules||{}).length===0
+    ? `<div style="font-size:12px;color:#B0AA9F">暂无沉淀规则。在项目对话里写作时，创作助手会自动提炼并询问是否沉淀。</div>`
+    : Object.entries(sk.rules).map(([cat,arr])=>`
+        <div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#F5762A;margin-bottom:5px">${esc(cat)}</div>
+        ${(Array.isArray(arr)?arr:[]).map(r=>`<div style="font-size:12.5px;color:#2A241E;line-height:1.6;padding:5px 0;border-bottom:1px dashed #F0EDE8">· ${esc(r.text||r)}</div>`).join('')}</div>`).join('');
+  return `<div class="do-col">
+    <div class="do-col-head"><div><div class="do-col-h-title">我的 Skill</div><div class="do-col-h-sub">${esc(sk.version||'v1.0')} · 写作时自动遵循</div></div></div>
+    <div class="do-col-body">
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">风格规则</div>
+      ${rulesHtml}
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 8px">高频词</div>
+      <div>${(sk.keywords||[]).length?(sk.keywords||[]).map(k=>`<span class="do-chip">${esc(k)}</span>`).join(''):'<span style="font-size:12px;color:#B0AA9F">暂无</span>'}</div>
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 8px">禁区词</div>
+      <div>${(sk.forbidden||[]).length?(sk.forbidden||[]).map(k=>`<span class="do-chip" style="background:#FEF2F2;color:#DC2626">${esc(k)}</span>`).join(''):'<span style="font-size:12px;color:#B0AA9F">暂无</span>'}</div>
+      ${(sk.freeText||'').trim()?`<div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 8px">自由笔记</div><div style="font-size:12.5px;color:#2A241E;line-height:1.7;white-space:pre-wrap;background:#F7F5F1;border-radius:10px;padding:12px 14px">${esc(sk.freeText)}</div>`:''}
+    </div>
+  </div>`;
+}
+
+function dOInfoPanel(p){
+  const meta = p.meta || {};
+  const row = (k,v)=>`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #F2EFEA;font-size:13px"><span style="color:#9E9890">${k}</span><span style="color:#1A1614;font-weight:600">${esc(v||'—')}</span></div>`;
+  return `<div class="do-col">
+    <div class="do-col-head"><div class="do-col-h-title">项目简介</div></div>
+    <div class="do-col-body">
+      <div style="font-size:16px;font-weight:700;color:#1A1614;margin-bottom:6px">${esc(p.title||'未命名项目')}</div>
+      <div style="font-size:13px;color:#6E6860;line-height:1.7;margin-bottom:14px">${esc(p.brief||'（无简介）')}</div>
+      ${row('当前阶段', p.status==='final'?'已定稿':oStageName(p.stage||'script'))}
+      ${row('对话轮数', String(p.turns||0))}
+      ${row('时长定位', meta.duration||'—')}
+      ${row('平台', meta.platform||'—')}
+      ${row('风格', meta.style||'—')}
+    </div>
+  </div>`;
+}
+
+/* ---------- 对话 / 阶段 / 保存 ---------- */
+function dOQuick(text){ dS.oInput = text; dOSendMsg(); }
+async function dOSendMsg(){
+  const v = (dS.oInput||'').trim();
+  if(!v || dS.oBusy || !dS.oProject) return;
+  dS.oMessages.push({ role:'user', content:v });
+  dS.oInput=''; dS.oBusy=true; dRender(); dOScrollChat();
+  const r = await dHttp.post('/original/projects/'+dS.oProject.id+'/chat', { message:v });
+  dS.oBusy=false;
+  if(r.code===200){
+    dS.oMessages.push(r.data.message);
+    dS.oProject.doc = r.data.doc;
+    dS.oProject.turns = r.data.turns;
+    dS.oProject.stage = r.data.stage || dS.oProject.stage;
+  } else {
+    dToast(r.msg||'生成失败，请重试');
+  }
+  dRender(); dOScrollChat();
+}
+async function dOSaveDoc(silent){
+  if(!dS.oProject) return;
+  dS.oSaving=true; if(!silent) dRender();
+  const r = await dApi('PATCH','/original/projects/'+dS.oProject.id, { doc: dS.oProject.doc||'' });
+  dS.oSaving=false;
+  if(!silent){ dToast(r.code===200?'已保存':(r.msg||'保存失败')); dRender(); }
+}
+async function dOAdvance(){
+  if(dS.oStageBusy || !dS.oProject) return;
+  const stage = dS.oProject.stage || 'script';
+  const isLast = stage==='script';
+  if(!isLast && !(dS.oProject.doc||'').trim()){ dToast('请先生成'+oStageName(stage)+'再进入下一步'); return; }
+  if(isLast){ if(!confirm('确认定稿？定稿后项目标记为完成。')) return; }
+  dS.oStageBusy=true; dRender();
+  if(!isLast) await dOSaveDoc(true);   // 先把手动编辑落库，advance 会快照 project.doc
+  const r = await dHttp.post('/original/projects/'+dS.oProject.id+'/stage/advance', {});
+  dS.oStageBusy=false;
+  if(r.code!==200){ dToast(r.msg||'操作失败'); dRender(); return; }
+  if(r.data.done){ dS.oProject.status='final'; dToast('已完成定稿 🎉'); dRender(); return; }
+  dS.oProject.artifacts = dS.oProject.artifacts || {};
+  dS.oProject.artifacts[r.data.prevStage] = dS.oProject.doc || dS.oProject.artifacts[r.data.prevStage] || '';
+  dS.oMessages.push({ role:'ai', content:'✅ '+oStageName(r.data.prevStage)+'已确认。进入下一步：'+r.data.tipName+'。' });
+  if(r.data.message) dS.oMessages.push(r.data.message);
+  dS.oProject.stage = r.data.stage; dS.oProject.doc = r.data.doc; dS.oProject.turns = r.data.turns;
+  dS.oRight='doc';
+  dRender(); dOScrollChat();
+}
+async function dOBack(){
+  if(dS.oStageBusy || !dS.oProject) return;
+  const stage = dS.oProject.stage || 'script';
+  if(stage==='direction'){ dToast('已经是第一步'); return; }
+  if(!confirm('回到上一步？当前'+oStageName(stage)+'草稿不会进入对标，可重新生成。')) return;
+  dS.oStageBusy=true; dRender();
+  const r = await dHttp.post('/original/projects/'+dS.oProject.id+'/stage/back', {});
+  dS.oStageBusy=false;
+  if(r.code!==200){ dToast(r.msg||'操作失败'); dRender(); return; }
+  dS.oProject.stage = r.data.stage; dS.oProject.doc = r.data.doc; dS.oProject.status='draft';
+  dS.oRight='doc'; dToast('已回到'+oStageName(r.data.stage));
+  dRender();
+}
+
+/* ---------- 对标素材绑定 ---------- */
+async function dOLoadMaterials(){
+  if(dS.oMaterialsLoaded) return;
+  const r = await dHttp.get('/original/materials');
+  if(r.code===200){ dS.oMaterials = r.data||[]; dS.oMaterialsLoaded=true; dRender(); }
+}
+function dOSetRight(v){ dS.oRight=v; dRender(); if(v==='bench') dOLoadMaterials(); }
+async function dOToggleBench(id){
+  if(!dS.oProject) return;
+  const bound = dS.oBound.some(m=>m.id===id);
+  if(bound){
+    const r = await dApi('DELETE','/original/projects/'+dS.oProject.id+'/materials/'+id);
+    if(r.code===200){ dS.oBound = dS.oBound.filter(m=>m.id!==id); dRender(); }
+    else dToast(r.msg||'解绑失败');
+  } else {
+    if(dS.oBound.length>=8){ dToast('最多绑定 8 条对标素材'); return; }
+    const r = await dHttp.post('/original/projects/'+dS.oProject.id+'/materials', { materialIds:[id] });
+    if(r.code===200){ dS.oBound = r.data||[]; dRender(); }
+    else dToast(r.msg||'绑定失败');
+  }
+}
+
+/* ---------- 同步规律到 Skill ---------- */
+async function dOSyncRule(msgId){
+  if(!dS.oProject) return;
+  const r = await dApi('PATCH','/original/projects/'+dS.oProject.id, { msgId, syncDone:'synced' });
+  if(r.code===200){
+    dS.oMessages = dS.oMessages.map(m=>m.id===msgId?{...m,sync_done:'synced'}:m);
+    const rs = await dHttp.get('/original/skill'); if(rs.code===200) dS.oSkill=rs.data;
+    dToast('已沉淀到 Skill'); dRender();
+  } else dToast(r.msg||'操作失败');
+}
+function dOSkipSync(msgId){
+  if(!dS.oProject) return;
+  dApi('PATCH','/original/projects/'+dS.oProject.id, { msgId, syncDone:'skipped' });
+  dS.oMessages = dS.oMessages.map(m=>m.id===msgId?{...m,sync_done:'skipped'}:m);
+  dRender();
+}
+
+/* ---------- 新建项目向导 ---------- */
+function dONewToggleMat(id){
+  const i = dS.oNewMatIds.indexOf(id);
+  if(i>=0) dS.oNewMatIds.splice(i,1);
+  else { if(dS.oNewMatIds.length>=8){ dToast('最多 8 条'); return; } dS.oNewMatIds.push(id); }
+  dRender();
+}
+function dONew(){
+  const steps = ['选题方向','内容粗纲','细化大纲','口播剧本'];
+  const matList = dS.oMaterialsLoaded
+    ? (dS.oMaterials.length===0
+        ? `<div style="font-size:12px;color:#B0AA9F;padding:8px 0">素材库为空，可跳过；之后在项目里随时绑定</div>`
+        : dS.oMaterials.map(m=>{
+            const on = dS.oNewMatIds.includes(m.id);
+            return `<div class="do-mat-row ${on?'bound':''}" onclick="dONewToggleMat(${m.id})" style="cursor:pointer">
+              <div class="do-mat-check ${on?'on':''}">${on?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+              <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1A1614">${esc(m.title||'未命名素材')}</div><div style="font-size:12px;color:#9E9890;margin-top:3px;max-height:20px;overflow:hidden">${esc(m.preview||'')}</div></div>
+            </div>`;
+          }).join(''))
+    : `<div style="font-size:12px;color:#B0AA9F;padding:8px 0">加载素材库…</div>`;
+  return `
+  <div class="do-page-head">
+    <div><div class="do-page-title">新建项目</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span></div></div>
+  </div>
+  <div style="max-width:680px">
+    <div class="do-steps" style="margin-bottom:18px">
+      ${steps.map((s,i)=>`<div class="do-step-pill ${i===0&&dS.oNewStaged?'cur':''}">${i+1} ${s}</div>${i<steps.length-1?'<span style="color:#D8D3CC">›</span>':''}`).join('')}
+    </div>
+    <div class="do-skill-card">
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">项目标题</div>
+      <input class="do-input" placeholder="例如：30秒讲清楚副业避坑" value="${esc(dS.oNewTitle)}" oninput="dS.oNewTitle=this.value">
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 8px">一句话简介 / 想法（选填）</div>
+      <textarea class="do-input" rows="3" style="resize:vertical" placeholder="想讲什么、给谁看、想要什么效果…没想好也可以留空，进去和 AI 聊" oninput="dS.oNewBrief=this.value">${esc(dS.oNewBrief)}</textarea>
+
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin:18px 0 8px">创作模式</div>
+      <div style="display:flex;gap:10px">
+        <div onclick="dS.oNewStaged=true;dRender()" style="flex:1;border:1.5px solid ${dS.oNewStaged?'#F5762A':'#EDE9E3'};background:${dS.oNewStaged?'#FFFaf5':'#fff'};border-radius:12px;padding:12px 14px;cursor:pointer">
+          <div style="font-size:13px;font-weight:700;color:#1A1614">分步打磨 ${dS.oNewStaged?'✓':''}</div>
+          <div style="font-size:11px;color:#9E9890;margin-top:3px;line-height:1.5">方向→粗纲→细纲→剧本，逐步确认，质量更稳</div>
+        </div>
+        <div onclick="dS.oNewStaged=false;dRender()" style="flex:1;border:1.5px solid ${!dS.oNewStaged?'#F5762A':'#EDE9E3'};background:${!dS.oNewStaged?'#FFFaf5':'#fff'};border-radius:12px;padding:12px 14px;cursor:pointer">
+          <div style="font-size:13px;font-weight:700;color:#1A1614">直接成稿 ${!dS.oNewStaged?'✓':''}</div>
+          <div style="font-size:11px;color:#9E9890;margin-top:3px;line-height:1.5">直接进对话写剧本，适合思路清晰、要得快</div>
+        </div>
+      </div>
+
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin:18px 0 8px">绑定对标素材（选填，最多 8 条）</div>
+      ${matList}
+
+      <button class="do-btn do-btn-pri" style="width:100%;margin-top:18px;padding:12px" ${dS.oBusy?'disabled':''} onclick="dOCreateProject()">${dS.oBusy?'创建中…':(dS.oNewStaged?'创建并开始定方向':'创建并开始写')}</button>
+    </div>
+  </div>`;
+}
+async function dOCreateProject(){
+  const title = (dS.oNewTitle||'').trim();
+  if(!title){ dToast('请填写项目标题'); return; }
+  if(dS.oBusy) return;
+  dS.oBusy=true; dRender();
+  const r = await dHttp.post('/original/projects', { title, brief:(dS.oNewBrief||'').trim(), staged:dS.oNewStaged, materialIds:dS.oNewMatIds });
+  dS.oBusy=false;
+  if(r.code!==200){ dToast(r.msg||'创建失败'); dRender(); return; }
+  dToast(dS.oNewStaged?'项目已创建 · 先定选题方向':'项目已创建');
+  dS.oNewTitle=''; dS.oNewBrief=''; dS.oNewMatIds=[]; dS.oLoaded=false;
+  await dOOpenProject(r.data.id);
 }
 </script>
 </body>

@@ -575,13 +575,17 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
 // PATCH /api/original/projects/:id — 更新状态 / 更新消息 sync_done
 router.patch('/projects/:id', requireAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const { status, msgId, syncDone } = req.body;
+  const { status, msgId, syncDone, doc } = req.body;
   try {
     const project = await getProject(projectId, req.userId);
     if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
 
     if (status) {
       await db.query('UPDATE cw_original_projects SET status = ? WHERE id = ?', [status, projectId]);
+    }
+    // 手动保存当前阶段活文档（PC 编辑器保存按钮）
+    if (typeof doc === 'string') {
+      await db.query('UPDATE cw_original_projects SET doc = ? WHERE id = ?', [doc, projectId]);
     }
     if (msgId && syncDone) {
       await db.query('UPDATE cw_original_messages SET sync_done = ? WHERE id = ? AND project_id = ?', [syncDone, msgId, projectId]);
