@@ -3486,8 +3486,11 @@ function dONew(){
           }).join(''))
     : `<div style="font-size:12px;color:#B0AA9F;padding:8px 0">加载素材库…</div>`;
   return `
-  <div class="do-page-head">
-    <div><div class="do-page-title">新建项目</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span></div></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <div onclick="dOBackHome()" class="hov-back-btn" style="width:38px;height:38px;border-radius:11px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="#6E6860" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div style="font-size:20px;font-weight:700;color:#1A1614;line-height:1.2">新建项目</div>
   </div>
   <div style="max-width:720px;margin:0 auto">
     <div class="do-steps" style="margin-bottom:18px">
@@ -3576,8 +3579,16 @@ function dOMaterials(){
           }).join('')}</div>`);
   const selCount = sel.length;
   return `
-  <div class="do-page-head">
-    <div><div class="do-page-title">素材库</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · 收集爆款原文，可勾选后送去学习</div></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div onclick="dOBackHome()" class="hov-back-btn" style="width:38px;height:38px;border-radius:11px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="#6E6860" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#1A1614;line-height:1.2">素材库</div>
+        <div style="font-size:12.5px;color:#9E9890;margin-top:3px">收集爆款原文，可勾选后送去学习</div>
+      </div>
+    </div>
     <div style="display:flex;gap:10px">
       ${selCount>0?`<button class="do-btn do-btn-pri" onclick="dOMatGoLearn()">学习已选 ${selCount} 条</button>`:''}
       <button class="do-btn do-btn-gho" onclick="dOMatOpenModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#6E6860" stroke-width="2.5" stroke-linecap="round"/></svg> 添加素材</button>
@@ -3701,16 +3712,31 @@ function dOLearningInput(){
   const selCount = sel.length;
   const canLearn = selCount>0 && !dS.oLearnBusy;
   return `
-  <div class="do-page-head">
-    <div><div class="do-page-title">学习中心</div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · 选爆款原文，AI 逐句拆解规律</div></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <div onclick="dOBackHome()" class="hov-back-btn" style="width:38px;height:38px;border-radius:11px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="#6E6860" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div>
+      <div style="font-size:20px;font-weight:700;color:#1A1614;line-height:1.2">学习中心</div>
+      <div style="font-size:12.5px;color:#9E9890;margin-top:3px">选择素材原文，AI 拆解规律，写入 Skill 或仅供本次参考</div>
+    </div>
   </div>
   <div style="max-width:760px;margin:0 auto">
-    <div class="do-seg" style="margin-bottom:12px">
-      <div class="do-seg-i ${scope==='global'?'on':''}" onclick="dS.oLearnScope='global';dRender()">写入全局 Skill</div>
-      <div class="do-seg-i ${scope==='project'?'on':''}" onclick="dS.oLearnScope='project';dRender()">仅用于参考</div>
-    </div>
-    <div style="background:${scope==='global'?'#FFF3E8':'#F0FDF4'};border-radius:12px;padding:10px 14px;font-size:12px;color:${scope==='global'?'#9A3D0C':'#065F46'};line-height:1.6;margin-bottom:16px">
-      ${scope==='global'?'学到的规律会融合进 Skill 工作流，对所有项目长期生效':'学到的规律只展示拆解结果，不改变全局 Skill'}
+    <div style="display:flex;gap:12px;margin-bottom:20px">
+      <div onclick="dS.oLearnScope='global';dRender()" style="flex:1;padding:16px 18px;border-radius:14px;border:2px solid ${scope==='global'?'#F5602A':'#EDE9E3'};background:${scope==='global'?'#FFF6EE':'#FAFAF8'};cursor:pointer;transition:all .18s">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
+          <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${scope==='global'?'#F5602A':'#C8C2BA'};background:${scope==='global'?'#F5602A':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s">${scope==='global'?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+          <span style="font-size:14px;font-weight:700;color:#1A1614">写入全局 Skill</span>
+        </div>
+        <div style="font-size:12px;color:#9E9890;line-height:1.5;padding-left:27px">学到的规律融合进 Skill 工作流，对所有项目长期生效</div>
+      </div>
+      <div onclick="dS.oLearnScope='project';dRender()" style="flex:1;padding:16px 18px;border-radius:14px;border:2px solid ${scope==='project'?'#F5602A':'#EDE9E3'};background:${scope==='project'?'#FFF6EE':'#FAFAF8'};cursor:pointer;transition:all .18s">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
+          <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${scope==='project'?'#F5602A':'#C8C2BA'};background:${scope==='project'?'#F5602A':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s">${scope==='project'?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+          <span style="font-size:14px;font-weight:700;color:#1A1614">仅本次参考</span>
+        </div>
+        <div style="font-size:12px;color:#9E9890;line-height:1.5;padding-left:27px">拆解结果只展示给你参考，不改变全局 Skill</div>
+      </div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="font-size:14px;font-weight:700;color:#1A1614">选择要学习的素材（最多 4 条）</div>
@@ -3795,8 +3821,16 @@ function dOLearningResult(){
     block = `${legend}${videoCards}${rulesBlock}`;
   }
   return `
-  <div class="do-page-head">
-    <div><div class="do-page-title">拆解结果</div><div class="do-page-sub"><span class="do-link" onclick="dS.oLearnPhase='input';dRender()">‹ 重新选素材</span></div></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div onclick="dS.oLearnPhase='input';dRender()" class="hov-back-btn" style="width:38px;height:38px;border-radius:11px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="#6E6860" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#1A1614;line-height:1.2">拆解结果</div>
+        <div style="font-size:12.5px;color:#9E9890;margin-top:3px">勾选要沉淀的规律，写入 Skill</div>
+      </div>
+    </div>
   </div>
   <div style="max-width:760px;margin:0 auto">${block}</div>`;
 }
