@@ -430,7 +430,7 @@ html, body {
 .do-stage-tag.s-script{background:#ECFDF5;color:#059669}
 .do-stage-tag.s-final{background:#1A1614;color:#fff}
 
-.do-ws{display:grid;grid-template-columns:340px 220px 1fr;gap:14px;height:calc(100vh - 96px)}
+.do-ws{display:grid;grid-template-columns:200px 1fr 380px;gap:14px;height:calc(100vh - 96px)}
 .do-col{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.05)}
 .do-col-head{padding:13px 16px;border-bottom:1px solid #F2EFEA;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .do-col-h-title{font-size:13px;font-weight:700;color:#1A1614}
@@ -2826,6 +2826,7 @@ Object.assign(dS, {
   oSaving: false,
   oNewTitle: '', oNewBrief: '', oNewStaged: true, oNewMatIds: [],
   oProjSort: 'recent',        // 'recent' | 'stage'
+  oActiveStage: null,         // null=自由聊天 | stage key=操作该阶段
 });
 
 const O_STAGES = [
@@ -3121,13 +3122,14 @@ async function dOOpenProject(id){
   dS.oProject = cached ? {...cached, artifacts:{}} : {id, title:'加载中…', stage:'script', artifacts:{}};
   dS.oMessages = []; dS.oBound = [];
   dS.oRight = 'doc'; dS.oInput = ''; dS.oView = 'workspace';
+  dS.oActiveStage = cached ? (cached.stage || 'script') : 'script'; // 默认操作当前阶段
   dRender(); dOScrollChat(); // 立即进入工作台，用户不会感知等待
   // 后台拉取完整数据（消息记录、绑定素材等）
   const r = await dHttp.get('/original/projects/'+id);
   dS.oProjectLoading = false;
   if(r.code!==200){ dToast(r.msg||'加载失败'); return; }
   dS.oProject = r.data.project || null;
-  if(dS.oProject) dS.oProject.artifacts = dS.oProject.artifacts || {};
+  if(dS.oProject){ dS.oProject.artifacts = dS.oProject.artifacts || {}; dS.oActiveStage = dS.oProject.stage || 'script'; }
   dS.oMessages = r.data.messages || [];
   dS.oBound = r.data.boundMaterials || [];
   if(dS.oView==='workspace') { dRender(); dOScrollChat(); }
@@ -3162,50 +3164,31 @@ function dOWorkspace(){
   const arts = p.artifacts || {};
   const isFinal = p.status==='final';
   const inFlow = oInFlow(p);
+  const activeStage = dS.oActiveStage; // null=自由聊天, stage key=操作目标
 
-  /* 左栏：对话 */
-  const intro = dS.oMessages.length===0
-    ? `<div class="do-msg ai"><div class="do-bubble ai">${stage==='direction'?'我们先定 <b>选题方向</b>。说说你想做什么主题、给谁看；没想好也行，让我给你几个方向候选。':'说说你想怎么写，我来帮你打磨这一段文案。'}</div></div>`
-    : '';
-  const msgs = dS.oMessages.map(dOMsgHtml).join('');
-  const busy = dS.oBusy ? `<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">正在创作中…</div></div>` : '';
-  const quick = stage==='direction'
-    ? ['帮我想3个方向','偏个人经历','换个角度切入','更聚焦痛点']
-    : (stage==='outline'||stage==='detail')
-      ? ['结构更清晰','补一个案例','调整顺序','这段展开讲']
-      : ['换个钩子开头','更口语化','加个反差点','检查禁区词'];
-  const leftCol = `
-    <div class="do-col">
-      <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">已加载 Skill ${esc(dS.oSkill?(dS.oSkill.version||'v1.0'):'v1.0')} · ${(()=>{const st=oSkillStats(dS.oSkill);return st.rules+st.kw+st.fb;})()}条规则生效</div></div></div>
-      <div class="do-col-body" id="doChatBody">${intro}${msgs}${busy}</div>
-      <div class="do-chat-foot">
-        <div class="do-quick">${quick.map(q=>`<span class="do-quick-chip" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
-        <div style="display:flex;gap:8px;align-items:flex-end">
-          <textarea class="do-chat-input" id="doInput" rows="2" style="flex:1;min-width:0" placeholder="说说你想怎么写，回车发送…" oninput="dS.oInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dOSendMsg();}">${esc(dS.oInput)}</textarea>
-          <button class="do-btn do-btn-pri" style="padding:9px 18px;white-space:nowrap;flex-shrink:0" ${dS.oBusy?'disabled':''} onclick="dOSendMsg()">发送</button>
-        </div>
-      </div>
-    </div>`;
-
-  /* 中栏：导航 */
-  let stageNav;
+  /* === 左栏：项目导航（200px 固定）=== */
+  let stageNavHtml;
   if(inFlow){
-    stageNav = O_STAGES.map((s,i)=>{
+    stageNavHtml = O_STAGES.map((s,i)=>{
       const state = i<idx?'done':(i===idx?'cur':'');
-      const active = (dS.oRight==='doc'&&i===idx)||(dS.oRight==='art:'+s.key);
-      const click = i<idx?`dOSetRight('art:${s.key}')` : (i===idx?`dOSetRight('doc')` : '');
-      const dim = i>idx ? 'opacity:.4;cursor:default' : '';
-      return `<div class="do-nav-i ${active?'active':''}" style="${dim}" ${click?`onclick="${click}"`:''}><span class="do-step-c ${state}">${i<idx?'✓':(i+1)}</span><span>${s.name}</span></div>`;
+      const navActive = (dS.oRight==='doc'&&i===idx)||(dS.oRight==='art:'+s.key);
+      const isOpTarget = activeStage===s.key;
+      const actCls = (navActive||isOpTarget)?'active':'';
+      const disabled = i>idx;
+      const dimStyle = disabled?'opacity:.4;cursor:default':'';
+      const clickFn = disabled?'':(`dOSetActiveStage('${s.key}')`);
+      return `<div class="do-nav-i ${actCls}" style="${dimStyle}" ${clickFn?`onclick="${clickFn}"`:''}><span class="do-step-c ${state}">${i<idx?'✓':(i+1)}</span><span>${s.name}</span>${isOpTarget?`<span style="margin-left:auto;font-size:9px;color:#F5762A;font-weight:700;flex-shrink:0">✏</span>`:''}</div>`;
     }).join('');
   } else {
-    stageNav = `<div class="do-nav-i ${dS.oRight==='doc'?'active':''}" onclick="dOSetRight('doc')"><span class="do-step-c cur">✎</span><span>口播剧本</span></div>`;
+    const actCls = (dS.oRight==='doc'||activeStage==='script')?'active':'';
+    stageNavHtml = `<div class="do-nav-i ${actCls}" onclick="dOSetActiveStage('script')"><span class="do-step-c cur">✎</span><span>口播剧本</span>${activeStage==='script'?`<span style="margin-left:auto;font-size:9px;color:#F5762A;font-weight:700;flex-shrink:0">✏</span>`:''}</div>`;
   }
-  const midCol = `
+  const navCol = `
     <div class="do-col">
-      <div class="do-col-head"><div><div class="do-col-h-title">阶段导航</div><div class="do-col-h-sub">点击查看历史快照</div></div></div>
-      <div class="do-col-body">
+      <div class="do-col-head"><div><div class="do-col-h-title">项目导航</div><div class="do-col-h-sub">点击阶段设为操作目标</div></div></div>
+      <div class="do-col-body" style="padding:10px 8px">
         <div class="do-nav-grp">阶段</div>
-        ${stageNav}
+        ${stageNavHtml}
         <div class="do-nav-grp">对标</div>
         <div class="do-nav-i ${dS.oRight==='bench'?'active':''}" onclick="dOSetRight('bench')"><span class="do-step-c" style="background:#FFF3E8;color:#F5762A">◎</span><span>对标参考 (${dS.oBound.length})</span></div>
         <div class="do-nav-grp">沉淀</div>
@@ -3215,7 +3198,48 @@ function dOWorkspace(){
       </div>
     </div>`;
 
-  /* 右栏：按 oRight 切换 */
+  /* === 中栏：创作助手（1fr 弹性）=== */
+  const intro = dS.oMessages.length===0
+    ? `<div class="do-msg ai"><div class="do-bubble ai">${stage==='direction'?'我们先定 <b>选题方向</b>。说说你想做什么主题、给谁看；没想好也行，让我给你几个方向候选。':'说说你想怎么写，我来帮你打磨这一段文案。'}</div></div>`
+    : '';
+  const msgs = dS.oMessages.map(dOMsgHtml).join('');
+  const busy = dS.oBusy ? `<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">正在创作中…</div></div>` : '';
+
+  // 操作阶段选择器（null=自由聊天，key=操作该阶段）
+  const stageOpts = [
+    { key:null, label:'💬 自由聊天', tip:'仅聊天，AI 不会修改文案' },
+    ...O_STAGES.map(s=>({ key:s.key, label:s.name, tip:`AI 将针对「${s.name}」修改` }))
+  ];
+  const picker = `<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 12px 4px;border-top:1px solid #F2EFEA">
+    ${stageOpts.map(opt=>{
+      const isAct = activeStage===opt.key;
+      const clickJs = opt.key===null ? `dS.oActiveStage=null;dRender()` : `dOSetActiveStage('${opt.key}')`;
+      return `<span title="${opt.tip}" onclick="${clickJs}" style="padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid ${isAct?'#F5762A':'#EDEAE4'};background:${isAct?'#FFF0E4':'transparent'};color:${isAct?'#F5762A':'#A09890'};user-select:none">${opt.label}</span>`;
+    }).join('')}
+  </div>`;
+
+  const placeholderText = activeStage===null ? '自由聊天，AI 不会更新文案…' : `说说你对「${oStageName(activeStage)}」的想法…`;
+  const quick = stage==='direction'
+    ? ['帮我想3个方向','偏个人经历','换个角度切入','更聚焦痛点']
+    : (stage==='outline'||stage==='detail')
+      ? ['结构更清晰','补一个案例','调整顺序','这段展开讲']
+      : ['换个钩子开头','更口语化','加个反差点','检查禁区词'];
+
+  const chatCol = `
+    <div class="do-col">
+      <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">已加载 Skill ${esc(dS.oSkill?(dS.oSkill.version||'v1.0'):'v1.0')} · ${(()=>{const st=oSkillStats(dS.oSkill);return st.rules+st.kw+st.fb;})()}条规则生效</div></div></div>
+      <div class="do-col-body" id="doChatBody">${intro}${msgs}${busy}</div>
+      <div class="do-chat-foot">
+        ${picker}
+        <div class="do-quick">${quick.map(q=>`<span class="do-quick-chip" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <textarea class="do-chat-input" id="doInput" rows="2" style="flex:1;min-width:0" placeholder="${placeholderText}" oninput="dS.oInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dOSendMsg();}">${esc(dS.oInput)}</textarea>
+          <button class="do-btn do-btn-pri" style="padding:9px 18px;white-space:nowrap;flex-shrink:0" ${dS.oBusy?'disabled':''} onclick="dOSendMsg()">发送</button>
+        </div>
+      </div>
+    </div>`;
+
+  /* === 右栏：展示面板（380px 固定）=== */
   let rightCol;
   if(dS.oRight && dS.oRight.indexOf('art:')===0){
     const k = dS.oRight.slice(4);
@@ -3230,7 +3254,7 @@ function dOWorkspace(){
   } else if(dS.oRight==='info'){
     rightCol = dOInfoPanel(p);
   } else {
-    // doc 编辑
+    // 活文档 / 当前阶段草稿
     const nextKey = idx<O_STAGES.length-1 ? O_STAGES[idx+1].key : null;
     const advBtn = isFinal ? ''
       : (stage==='script'
@@ -3243,14 +3267,14 @@ function dOWorkspace(){
       <div class="do-col-head">
         <div style="min-width:0;flex:1">
           <div class="do-col-h-title">${docTitle}</div>
-          <div class="do-col-h-sub">${isFinal?'已定稿，可导出':'每轮对话后自动覆盖更新'}</div>
+          <div class="do-col-h-sub">${isFinal?'已定稿，可导出':'每轮对话后自动更新'}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           <button class="do-btn do-btn-gho" style="padding:5px 10px;font-size:12px" onclick="navigator.clipboard.writeText(document.getElementById('doDocEdit').value||'').then(()=>dToast('已复制'))">复制全文</button>
           <button class="do-btn do-btn-gho" style="padding:5px 10px;font-size:12px" onclick="dOExportDoc()">导出</button>
         </div>
       </div>
-      <textarea id="doDocEdit" class="do-doc-edit" placeholder="这一阶段还没有内容，去左边和创作助手聊聊，让它先生成草稿…" oninput="dS.oProject.doc=this.value">${esc(p.doc||'')}</textarea>
+      <textarea id="doDocEdit" class="do-doc-edit" placeholder="这一阶段还没有内容，去创作助手聊聊，让它先生成草稿…" oninput="dS.oProject.doc=this.value">${esc(p.doc||'')}</textarea>
       <div class="do-doc-foot">
         <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
           <span class="do-doc-stat">约 ${docWordCount} 字</span>
@@ -3267,7 +3291,7 @@ function dOWorkspace(){
     </div>`;
   }
 
-  /* 顶部面包屑导航栏 */
+  /* 顶部面包屑 */
   const titleShort = (p.title||'项目').length>22 ? (p.title||'项目').slice(0,20)+'…' : (p.title||'项目');
   const statusBadge = isFinal
     ? `<span style="font-size:10px;padding:2px 8px;border-radius:6px;background:#ECFDF5;color:#16A34A;font-weight:700;margin-left:2px;flex-shrink:0">已定稿</span>`
@@ -3284,9 +3308,8 @@ function dOWorkspace(){
 
   return `
     ${breadcrumb}
-    <div class="do-ws" style="height:calc(100vh - 150px)">${leftCol}${midCol}${rightCol}</div>
+    <div class="do-ws" style="height:calc(100vh - 150px)">${navCol}${chatCol}${rightCol}</div>
     ${dS.oSkillQuickModal?dOQuickModalHtml():''}`;
-
 }
 
 function dOBenchPanel(){
@@ -3360,11 +3383,19 @@ async function dOSendMsg(){
   if(!v || dS.oBusy || !dS.oProject) return;
   dS.oMessages.push({ role:'user', content:v });
   dS.oInput=''; dS.oBusy=true; dRender(); dOScrollChat();
-  const r = await dHttp.post('/original/projects/'+dS.oProject.id+'/chat', { message:v });
+  // 传递 activeStage：null=自由聊天，stage key=AI 操作该阶段
+  const payload = { message: v, activeStage: dS.oActiveStage };
+  const r = await dHttp.post('/original/projects/'+dS.oProject.id+'/chat', payload);
   dS.oBusy=false;
   if(r.code===200){
     dS.oMessages.push(r.data.message);
-    dS.oProject.doc = r.data.doc;
+    if(r.data.artifactKey){
+      // 历史阶段编辑 → 更新对应快照，不动活文档
+      dS.oProject.artifacts = dS.oProject.artifacts || {};
+      dS.oProject.artifacts[r.data.artifactKey] = r.data.artifactContent || '';
+    } else if(r.data.doc !== undefined){
+      dS.oProject.doc = r.data.doc;
+    }
     dS.oProject.turns = r.data.turns;
     dS.oProject.stage = r.data.stage || dS.oProject.stage;
   } else {
@@ -3437,6 +3468,19 @@ async function dOLoadMaterials(force){
   if(r.code===200){ dS.oMaterials = r.data||[]; dS.oMaterialsLoaded=true; dRender(); }
 }
 function dOSetRight(v){ dS.oRight=v; dRender(); if(v==='bench') dOLoadMaterials(); }
+function dOSetActiveStage(key){
+  dS.oActiveStage = key; // null=自由聊天, stage key=操作目标
+  if(key !== null){
+    const p = dS.oProject;
+    if(p){
+      const curIdx = oStageIdx(p.stage || 'script');
+      const selIdx = oStageIdx(key);
+      // 历史阶段 → 展示已确认快照；当前/未来 → 展示活文档
+      dS.oRight = selIdx < curIdx ? 'art:'+key : 'doc';
+    }
+  }
+  dRender();
+}
 async function dOToggleBench(id){
   if(!dS.oProject) return;
   const bound = dS.oBound.some(m=>m.id===id);

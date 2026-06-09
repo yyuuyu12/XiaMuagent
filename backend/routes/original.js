@@ -409,9 +409,9 @@ ${common}
 }
 
 // 统一的阶段生成：构建 prompt → 调 AI → 解析产出。返回 { aiSummary, newDoc, hasDocUpdate, syncLabel }
-async function generateStageReply({ project, skill, stage, boundMaterials, history, userMessage }) {
+async function generateStageReply({ project, skill, stage, boundMaterials, history, userMessage, currentDraftOverride }) {
   const artifacts = parseArtifacts(project);
-  const currentDraft = project.doc || '';
+  const currentDraft = currentDraftOverride !== undefined ? currentDraftOverride : (project.doc || '');
   const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft });
   const aiRaw = await callAI(systemPrompt + '\n\n用户：' + userMessage, { maxTokens: 4000, temperature: 0.85 });
 
@@ -628,7 +628,10 @@ router.patch('/projects/:id', requireAuth, async (req, res) => {
 // POST /api/original/projects/:id/chat
 router.post('/projects/:id/chat', requireAuth, async (req, res) => {
   const projectId = parseInt(req.params.id);
-  const { message } = req.body;
+  const { message, activeStage } = req.body;
+  // activeStage: undefined → 兼容旧版，使用 project.stage
+  //              null       → 自由聊天模式，不更新任何文案
+  //              string     → 明确指定操作的阶段 key
   if (!message?.trim()) return res.status(400).json({ code: 400, msg: '消息不能为空' });
 
   try {
@@ -729,18 +732,59 @@ ${docSnippet}
     const skill = await getOrCreateSkill(req.userId);
     const rulesText = formatRulesForPrompt(skill);
 
-    // 当前阶段 + 对标素材（项目级对标）
-    const stage = project.stage || 'script';
+    // 当前项目阶段 + 对标素材
+    const projectStage = project.stage || 'script';
     const boundMaterials = await getBoundMaterials(projectId);
 
-    // 分阶段生成（按 stage 走不同决策树 prompt，解析对应阶段标签）
-    const gen = await generateStageReply({
-      project, skill, stage, boundMaterials, history, userMessage: message.trim(),
-    });
-    let { aiSummary, newDoc, hasDocUpdate, syncLabel } = gen;
+    // ── 确定操作模式 ──────────────────────────────────────────────
+    // activeStage: undefined → 兼容旧版，用 projectStage
+    //              null      → 自由聊天，纯回复不更新任何文案
+    //              key       → 明确操作该阶段（可能与 projectStage 不同）
+    const effectiveStage = (activeStage === undefined) ? projectStage : activeStage;
+    const isFreeChatMode = (effectiveStage === null);
+    const isCrossStageEdit = (!isFreeChatMode && effectiveStage !== projectStage);
 
-    // 更新活文档 + turns
-    if (hasDocUpdate) {
+    let aiSummary, newDoc, hasDocUpdate, syncLabel;
+
+    if (isFreeChatMode) {
+      // 自由聊天：不操作文案，只自然回答
+      const artifacts = parseArtifacts(project);
+      const freePrompt = `你是一位专注于短视频口播文案的创作助手，正在帮助用户进行项目「${project.title}」的创作。
+这是自由对话模式，你无需输出任何文案标签，只需自然地回答用户的问题、提供建议或探讨想法。
+${rulesText ? '用户风格参考（Skill）：\n' + rulesText + '\n' : ''}当前项目阶段：${projectStage}
+${Object.keys(artifacts).length ? '已确认产出：' + Object.keys(artifacts).map(k => k).join('、') : ''}
+对话历史：
+${history}`;
+      const aiRaw = await callAI(freePrompt + '\n\n用户：' + message.trim(), { maxTokens: 800, temperature: 0.85 });
+      aiSummary = aiRaw.trim();
+      newDoc = project.doc || '';
+      hasDocUpdate = 0;
+      syncLabel = null;
+    } else {
+      // 分阶段生成（可能是当前阶段，也可能是历史阶段的二次修改）
+      const artifacts = parseArtifacts(project);
+      // 历史阶段编辑时，currentDraft 用该阶段的已确认快照（不是 project.doc）
+      const currentDraftOverride = isCrossStageEdit ? (artifacts[effectiveStage] || '') : undefined;
+      const gen = await generateStageReply({
+        project, skill, stage: effectiveStage, boundMaterials, history,
+        userMessage: message.trim(), currentDraftOverride,
+      });
+      ({ aiSummary, newDoc, hasDocUpdate, syncLabel } = gen);
+    }
+
+    // ── 更新数据库 ────────────────────────────────────────────────
+    let artifactKey = null;
+    if (hasDocUpdate && isCrossStageEdit) {
+      // 历史阶段编辑 → 更新 artifacts 字段，不动 project.doc
+      const currentArtifacts = parseArtifacts(project);
+      currentArtifacts[effectiveStage] = newDoc;
+      await db.query(
+        'UPDATE cw_original_projects SET artifacts = ?, turns = turns + 1 WHERE id = ?',
+        [JSON.stringify(currentArtifacts), projectId]
+      );
+      artifactKey = effectiveStage;
+    } else if (hasDocUpdate) {
+      // 当前阶段生成 → 更新活文档
       await db.query(
         'UPDATE cw_original_projects SET doc = ?, turns = turns + 1 WHERE id = ?',
         [newDoc, projectId]
@@ -750,33 +794,42 @@ ${docSnippet}
     }
 
     // 保存 AI 消息（记录所属阶段）
+    const stageForMsg = isFreeChatMode ? projectStage : effectiveStage;
     const { rows: ins } = await db.query(
       'INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, sync_label, sync_done, auto_learn, stage) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
-      [projectId, 'ai', aiSummary, hasDocUpdate, syncLabel, autoLearnRule || null, stage]
+      [projectId, 'ai', aiSummary, hasDocUpdate, syncLabel, autoLearnRule || null, stageForMsg]
     );
     const msgId = ins?.[0]?.id;
 
     // 获取最新项目数据
     const { rows: updated } = await db.query('SELECT * FROM cw_original_projects WHERE id = ?', [projectId]);
 
-    res.json({
-      code: 200,
-      data: {
-        message: {
-          id: msgId,
-          role: 'ai',
-          content: aiSummary,
-          has_doc_update: hasDocUpdate,
-          sync_label: syncLabel,
-          sync_done: null,
-          auto_learn: autoLearnRule || null,
-          stage,
-        },
-        doc: newDoc,
-        turns: updated?.[0]?.turns || 0,
-        stage,
-      }
-    });
+    // ── 构建响应 ─────────────────────────────────────────────────
+    const responseData = {
+      message: {
+        id: msgId,
+        role: 'ai',
+        content: aiSummary,
+        has_doc_update: hasDocUpdate,
+        sync_label: syncLabel,
+        sync_done: null,
+        auto_learn: autoLearnRule || null,
+        stage: stageForMsg,
+      },
+      turns: updated?.[0]?.turns || 0,
+      stage: projectStage, // 项目当前阶段不变
+    };
+
+    if (artifactKey) {
+      // 历史阶段编辑 → 前端更新对应 artifact
+      responseData.artifactKey = artifactKey;
+      responseData.artifactContent = newDoc;
+    } else {
+      // 当前阶段或自由聊天 → 前端更新 doc（自由聊天时 doc 不变）
+      responseData.doc = newDoc;
+    }
+
+    res.json({ code: 200, data: responseData });
   } catch (err) {
     console.error('/original/projects/:id/chat error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });
