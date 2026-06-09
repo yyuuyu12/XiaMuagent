@@ -246,6 +246,12 @@ html, body {
 @keyframes progress-indeterminate { 0%{transform:translateX(-100%)} 100%{transform:translateX(400%)} }
 .d-progress-fill { height:100%; background:linear-gradient(90deg,#FF8040,#F5602A); border-radius:4px; transition:width 0.4s; }
 
+/* 任务筛选 tabs */
+.filter-tabs { display:flex; gap:2px; }
+.filter-tab { padding:5px 14px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; transition:all 0.15s; color:#9E9890; }
+.filter-tab:hover { background:#F0EDE8; color:#1A1614; }
+.filter-tab.active { background:#FFF3E8; color:#F5762A; font-weight:700; }
+
 /* ============================================================
    CSS · 登录弹窗
    ============================================================ */
@@ -694,7 +700,7 @@ const dS = {
   publishCopied: null, postProcessedVideoUrl: null,
   postProcessing: false, postProgressPct: 0, postProcessErr: '',
   // 任务列表
-  tasks: [], tasksLoaded: false,
+  tasks: [], tasksLoaded: false, taskFilter: 'all',
 };
 
 /* ============================================================
@@ -2244,12 +2250,19 @@ function _dUpdateAvatarProgress() {
 const STEP_LABELS = ['提取','改写','语音','数字人','后期','发布'];
 
 function dRenderTasks() {
-  const tasks = dS.tasks;
-  const rows = tasks.length === 0
+  const filter = dS.taskFilter || 'all';
+  const allTasks = dS.tasks;
+
+  // filter tasks
+  const filteredTasks = filter === 'all' ? allTasks
+    : filter === 'active' ? allTasks.filter(t => { const steps = dTaskSteps(t); return steps.some(s=>s!=='done'); })
+    : allTasks.filter(t => { const steps = dTaskSteps(t); return steps.every(s=>s==='done'); });
+
+  const rows = filteredTasks.length === 0
     ? `<tr><td colspan="4" style="text-align:center;padding:40px;color:#B0AA9F;font-size:13px">
-        ${dS.tasksLoaded ? '暂无任务，去克隆第一条视频吧 🎬' : '加载中...'}
+        ${dS.tasksLoaded ? (filter==='all'?'暂无任务，去克隆第一条视频吧 🎬':'暂无符合条件的任务') : '加载中...'}
        </td></tr>`
-    : tasks.map(t => {
+    : filteredTasks.map(t => {
         const steps = dTaskSteps(t);
         const cur = steps.findIndex(s => s !== 'done');
         const nextLabel = cur >= 0 ? `去${STEP_LABELS[cur]}` : '已完成';
@@ -2271,16 +2284,28 @@ function dRenderTasks() {
           </td>
         </tr>`;
       }).join('');
+
+  const filterTabs = ['all','active','done'].map((f,_,arr) => {
+    const labels = {all:`全部 (${allTasks.length})`, active:'进行中', done:'已完成'};
+    return `<div class="filter-tab ${filter===f?'active':''}" onclick="dS.taskFilter='${f}';dRender()">${labels[f]}</div>`;
+  }).join('');
+
   return `
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div style="font-size:18px;font-weight:700;color:#1A1614">我的任务</div>
-      <button class="d-btn d-btn-primary" onclick="dGoPage('home')" style="gap:5px;padding:8px 18px">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#1A1614">我的任务</div>
+        <div style="font-size:12px;color:#9E9890;margin-top:3px">保存的克隆流程，随时继续</div>
+      </div>
+      <button class="b b-sm b-primary" onclick="dGoPage('home')" style="gap:5px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
         新建克隆
       </button>
     </div>
     <div class="d-card">
+      <div style="padding:12px 16px;border-bottom:1px solid #F7F5F1;display:flex;align-items:center;gap:0">
+        <div class="filter-tabs">${filterTabs}</div>
+      </div>
       <table class="d-table">
         <thead>
           <tr>
@@ -2395,8 +2420,23 @@ function dRenderProfile() {
           <div id="dAuthCodeMsg" style="display:none;padding:0 18px 12px;font-size:12px;color:#22C55E"></div>
         </div>
 
+        <!-- 使用统计 -->
+        <div class="d-card">
+          <div style="padding:12px 18px 0;font-size:12px;font-weight:700;color:#9E9890;letter-spacing:0.5px">使用统计</div>
+          ${[
+            { label:'累计克隆', value: (u.totalClone ?? u.total_clone ?? '—') },
+            { label:'累计改写', value: (u.totalRewrite ?? u.total_rewrite ?? '—') },
+            { label:'本月用量', value: usedToday },
+          ].map((item,i,arr) => `
+          <div style="display:flex;align-items:center;padding:13px 18px;${i<arr.length-1?'border-bottom:1px solid #F7F5F1':''}">
+            <div style="font-size:13px;color:#6E6860;flex:1">${item.label}</div>
+            <div style="font-size:13px;font-weight:700;color:#1A1614">${esc(String(item.value))}</div>
+          </div>`).join('')}
+        </div>
+
         <!-- 退出 -->
-        <button class="d-btn d-btn-danger" onclick="dLogout()" style="width:100%;padding:12px;font-size:14px;border-radius:14px">
+        <button onclick="dLogout()" style="width:100%;padding:12px;background:#fff;border:1.5px solid #F5C0BA;border-radius:14px;font-size:14px;font-weight:600;color:#E5534B;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:all .15s"
+          onmouseover="this.style.background='#FFF5F5'" onmouseout="this.style.background='#fff'">
           退出登录
         </button>
       </div>
@@ -2806,6 +2846,9 @@ Object.assign(dS, {
   // Skill 自由编辑
   oSkillDraft:null, oSkillSaving:false, oSkillHistoryOpen:false,
   oSkillQuickModal:false, oSkillQuickText:'', oSkillQuickSaving:false,
+  // 多 Skill 支持（额外的本地 Skill 存 localStorage，主 Skill 同步后端）
+  oSkillList: null,       // [{id,name,version,content,updatedAt}] 懒加载
+  oSkillCurId: 'main',    // 当前选中的 skill id，'main' = 后端主 Skill
   // 新建维度
   oNewDuration:'1min', oNewStyle:'informative', oNewPlatform:'douyin',
 });
@@ -2846,76 +2889,102 @@ async function dBindOriginal(){
 function dOSetView(v){
   dS.oView = v;
   if(v==='learning'){ dS.oLearnPhase='input'; dS.oLearnResult=null; dS.oMatSel=[]; }
-  if(v==='skill'){ dS.oSkillDraft=null; dS.oSkillHistoryOpen=false; }
+  if(v==='skill'){ dS.oSkillDraft=null; dS.oSkillHistoryOpen=false; dS.oSkillList=null; dS.oSkillCurId='main'; }
   dRender();
   if(v==='new' || v==='materials' || v==='learning') dOLoadMaterials(v!=='new');
 }
 function dOBackHome(){ dS.oView='home'; dS.oProject=null; dRender(); }
 function dOScrollChat(){ setTimeout(()=>{ const el=document.getElementById('doChatBody'); if(el) el.scrollTop=el.scrollHeight; },0); }
 
-/* ---------- 首页 ---------- */
+/* ---------- 首页（2 列布局：项目列表 + 工具侧栏） ---------- */
 function dOHome(){
   const st = oSkillStats(dS.oSkill);
-  const pct = Math.round(st.done/4*100);
   const ver = dS.oSkill ? (dS.oSkill.version||'v1.0') : 'v1.0';
-  const tips = [];
-  if(!st.rules) tips.push('沉淀风格规则'); if(!st.kw) tips.push('高频词'); if(!st.fb) tips.push('禁区词');
-  const skillCard = `
-    <div class="do-skill-card" onclick="dOSetView('skill')" style="cursor:pointer">
-      <div class="do-skill-top">
-        <div class="do-skill-badge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5H22L16.5 14L18.5 21L12 17L5.5 21L7.5 14L2 9.5H9.5L12 2Z" fill="white"/></svg></div>
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:700;color:#1A1614">我的创作 Skill</span><span style="font-size:11px;color:#B0AA9F">${esc(ver)}</span></div>
-          <div style="font-size:12px;color:#9E9890;margin-top:2px">沉淀你的专属风格，写作时自动遵循——做自己，而不是抄别人</div>
+  const totalRules = st.rules + st.kw + st.fb;
+
+  /* 右侧：深色 Skill 卡 */
+  const darkSkillCard = `
+    <div onclick="dOSetView('skill')" style="background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:16px;padding:18px;cursor:pointer;transition:opacity .15s;margin-bottom:10px"
+      onmouseover="this.style.opacity='0.88'" onmouseout="this.style.opacity='1'">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.5px;margin-bottom:4px">全局唯一 · 蒸馏的你自己</div>
+          <div style="font-size:16px;font-weight:700;color:#fff">我的 Skill</div>
         </div>
-        <div style="text-align:right"><div style="font-size:20px;font-weight:800;color:#F5762A">${st.done}<span style="font-size:13px;color:#B0AA9F">/4</span></div><div style="font-size:10px;color:#B0AA9F">完善度</div></div>
+        <span style="font-size:11px;font-weight:700;color:#FFB877;background:rgba(255,184,119,0.15);border:1px solid rgba(255,184,119,0.25);padding:2px 8px;border-radius:6px">${esc(ver)}</span>
       </div>
-      <div class="do-bar"><div class="do-bar-fill" style="width:${pct}%"></div></div>
-      <div style="margin-top:4px">
-        <span class="do-chip ${st.rules?'':'muted'}">规则 ${st.rules}</span>
-        <span class="do-chip ${st.kw?'':'muted'}">高频词 ${st.kw}</span>
-        <span class="do-chip ${st.fb?'':'muted'}">禁区 ${st.fb}</span>
-        <span class="do-chip ${st.free?'':'muted'}">自由笔记 ${st.free?'有':'无'}</span>
+      <div style="height:3px;background:rgba(255,255,255,0.1);border-radius:2px;margin-bottom:12px;overflow:hidden">
+        <div style="width:${Math.round(st.done/4*100)}%;height:100%;background:linear-gradient(90deg,#FF8040,#F5762A);border-radius:2px"></div>
       </div>
-      ${tips.length?`<div style="font-size:12px;color:#9E9890;margin-top:10px">建议补全：${tips.join(' · ')}（在项目对话里写作时会自动学习沉淀）</div>`:''}
+      <div style="display:flex;gap:0">
+        ${[[st.rules,'条规则'],[st.kw,'个高频词'],[st.fb,'条禁区']].map(([v,l],i)=>`
+          <div style="flex:1;${i<2?'border-right:1px solid rgba(255,255,255,0.08);padding-right:10px;':''};${i>0?'padding-left:10px;':''}">
+            <div style="font-size:16px;font-weight:700;color:#fff">${v}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px">${l}</div>
+          </div>`).join('')}
+      </div>
     </div>`;
 
-  const projGrid = dS.oProjects.length===0
+  /* 右侧：工具入口 */
+  const toolEntries = [
+    { view:'materials', title:'素材库', desc:'收集爆款原文，长期积累',
+      icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M14 3H7C5.9 3 5 3.9 5 5V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V8L14 3Z" stroke="#6366F1" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3V8H19" stroke="#6366F1" stroke-width="1.8"/></svg>',
+      bg:'#EEF2FF' },
+    { view:'learning', title:'学习中心', desc:'拆解规律，写进 Skill',
+      icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2L15 8L21 9L17 14L18 20L12 17L6 20L7 14L3 9L9 8L12 2Z" stroke="#F59E0B" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+      bg:'#FFFBEB' },
+  ].map(e=>`
+    <div onclick="dOSetView('${e.view}')" style="background:#fff;border-radius:12px;border:1px solid #EDE9E3;padding:13px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .15s;margin-bottom:8px"
+      onmouseover="this.style.borderColor='#D8D2C9';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.06)'"
+      onmouseout="this.style.borderColor='#EDE9E3';this.style.boxShadow=''">
+      <div style="width:34px;height:34px;border-radius:9px;background:${e.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">${e.icon}</div>
+      <div style="flex:1">
+        <div style="font-size:13.5px;font-weight:700;color:#1A1614;margin-bottom:1px">${e.title}</div>
+        <div style="font-size:11.5px;color:#9E9890">${e.desc}</div>
+      </div>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="#D0CCC6" stroke-width="2" stroke-linecap="round"/></svg>
+    </div>`).join('');
+
+  /* 左侧：项目列表 */
+  const projList = dS.oProjects.length===0
     ? `<div class="do-empty">还没有项目，点右上角「新建项目」开始第一条原创口播 ✏️</div>`
-    : `<div class="do-proj-grid">${dS.oProjects.map(p=>{
+    : dS.oProjects.map(p=>{
         const stg = p.status==='final' ? 'final' : (p.stage||'script');
         const tag = p.status==='final' ? '已定稿' : oStageName(p.stage||'script');
-        return `<div class="do-proj-card" onclick="dOOpenProject(${p.id})">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-            <div style="font-size:14px;font-weight:700;color:#1A1614;line-height:1.4;flex:1;overflow:hidden;text-overflow:ellipsis">${esc(p.title||'未命名项目')}</div>
-            <span class="do-stage-tag s-${stg}">${tag}</span>
+        return `<div class="scard" style="padding:14px 16px;cursor:pointer;transition:all .15s;margin-bottom:9px"
+          onclick="dOOpenProject(${p.id})"
+          onmouseover="this.style.borderColor='rgba(245,118,42,0.3)';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.08)'"
+          onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+            <div style="font-size:13.5px;font-weight:700;color:#1A1614;line-height:1.4;flex:1">${esc(p.title||'未命名项目')}</div>
+            <span class="do-stage-tag s-${stg}" style="flex-shrink:0">${tag}</span>
           </div>
-          <div style="font-size:12px;color:#9E9890;margin-top:7px;line-height:1.5;max-height:36px;overflow:hidden">${esc(p.brief||'（无简介）')}</div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:11px;font-size:11px;color:#B0AA9F">
-            <span>${p.turns||0} 轮对话</span><span>${dFmtTime(p.updated_at||p.created_at)}</span>
+          <div style="font-size:12px;color:#9E9890;line-height:1.5;margin-bottom:10px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">${esc(p.brief||'（无简介）')}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;color:#C0B8B0">${p.turns||0} 轮对话</span>
+            <span style="color:#E8E4DF;font-size:11px">·</span>
+            <span style="font-size:11px;color:#C0B8B0">${dFmtTime(p.updated_at||p.created_at)}</span>
           </div>
         </div>`;
-      }).join('')}</div>`;
+      }).join('');
 
-  const entryRow = `
-    <div class="do-entry-row">
-      <div class="do-entry" onclick="dOSetView('materials')">
-        <div class="do-entry-ic" style="background:#EEF0FF"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1614">素材库</div><div style="font-size:12px;color:#9E9890;margin-top:2px">收集爆款原文，长期积累</div></div>
+  const content = dS.oLoaded ? `
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start">
+      <div>
+        ${projList}
       </div>
-      <div class="do-entry" onclick="dOSetView('learning')">
-        <div class="do-entry-ic" style="background:#FFF0E6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1614">学习中心</div><div style="font-size:12px;color:#9E9890;margin-top:2px">拆解爆款规律，融进 Skill</div></div>
+      <div style="position:sticky;top:20px">
+        ${darkSkillCard}
+        ${toolEntries}
       </div>
-    </div>`;
+    </div>` : `<div class="do-empty">加载中…</div>`;
 
   return `
   <div class="do-page-head">
-    <div><div class="do-page-title">原创工坊</div><div class="do-page-sub">分阶段深度创作：选题方向 → 粗纲 → 细纲 → 剧本</div></div>
+    <div><div class="do-page-title">原创工坊</div><div class="do-page-sub">选题方向 → 粗纲 → 细纲 → 口播剧本</div></div>
     <button class="do-btn do-btn-pri" onclick="dOSetView('new')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg> 新建项目</button>
   </div>
-  ${dS.oLoaded ? skillCard + entryRow + `<div style="font-size:14px;font-weight:700;color:#1A1614;margin:14px 0 12px">我的项目 <span style="font-size:12px;color:#B0AA9F;font-weight:500">${dS.oProjects.length}</span></div>` + projGrid : `<div class="do-empty">加载中…</div>`}
-  `;
+  ${content}`;
 }
 
 /* ---------- 智能选题（新建项目页内） ---------- */
@@ -3613,12 +3682,55 @@ async function dOLearnWrite(){
 /* ============================================================
    Skill 自由编辑页（全屏）
    ============================================================ */
+/* ── 多 Skill 辅助 ── */
+function dOGetSkillList(){
+  if(dS.oSkillList) return dS.oSkillList;
+  // 主 Skill（后端）
+  const main = {
+    id:'main', name:'主 Skill',
+    version: dS.oSkill?(dS.oSkill.version||'v1.0'):'v1.0',
+    content: (dS.oSkill&&dS.oSkill.freeText)||'',
+    updatedAt: dS.oSkill&&dS.oSkill.updated_at ? dFmtTime(dS.oSkill.updated_at) : '—',
+  };
+  // 从 localStorage 加载额外 Skills
+  let extra = [];
+  try { extra = JSON.parse(localStorage.getItem('wf_extra_skills')||'[]'); } catch{}
+  dS.oSkillList = [main, ...extra];
+  return dS.oSkillList;
+}
+function dOGetCurSkill(){
+  const list = dOGetSkillList();
+  return list.find(s=>s.id===dS.oSkillCurId) || list[0];
+}
+function dOSaveExtraSkills(){
+  const list = dOGetSkillList();
+  const extra = list.filter(s=>s.id!=='main');
+  localStorage.setItem('wf_extra_skills', JSON.stringify(extra));
+}
+function dOSkillAddNew(){
+  const id = 'sk_'+Date.now();
+  const list = dOGetSkillList();
+  list.push({ id, name:'新 Skill', version:'v1.0', content:'## 开场规则\n- \n\n## 结构规则\n- ', updatedAt:'刚刚' });
+  dS.oSkillList = list;
+  dOSaveExtraSkills();
+  dS.oSkillCurId = id;
+  dS.oSkillDraft = '## 开场规则\n- \n\n## 结构规则\n- ';
+  dRender();
+}
+function dOSkillSelect(id){
+  if(dS.oSkillCurId===id) return;
+  dS.oSkillCurId = id;
+  dS.oSkillDraft = null; // reset draft so we load from the selected skill
+  dRender();
+}
+
 function dOSkillPage(){
-  const sk = dS.oSkill;
-  const draft = dS.oSkillDraft!==null ? dS.oSkillDraft : ((sk&&sk.freeText)||'');
-  const history = (sk&&sk.freeTextHistory)||[];
-  const st = oSkillStats(sk);
-  const ver = sk?(sk.version||'v1.0'):'v1.0';
+  const list = dOGetSkillList();
+  const cur = dOGetCurSkill();
+  const draft = dS.oSkillDraft!==null ? dS.oSkillDraft : (cur.content||'');
+  const history = (cur.id==='main' && dS.oSkill&&dS.oSkill.freeTextHistory)||[];
+  const ruleCount = (draft.match(/^- /mg)||[]).length;
+
   const historySheet = dS.oSkillHistoryOpen?`
     <div class="d-modal-overlay" style="display:flex" onclick="if(event.target===this){dS.oSkillHistoryOpen=false;dRender();}">
       <div class="d-modal" style="max-width:520px;text-align:left;max-height:70vh;overflow:hidden;display:flex;flex-direction:column">
@@ -3635,47 +3747,85 @@ function dOSkillPage(){
         </div>
       </div>
     </div>`:'';
+
+  /* 左侧栏：Skill 列表 */
+  const sidebar = `
+    <div style="width:200px;flex-shrink:0;background:#F7F5F1;border-right:1px solid #EDE9E3;display:flex;flex-direction:column;overflow:hidden;min-height:calc(100vh - 180px)">
+      <div style="padding:16px 14px 10px;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <div onclick="dOBackHome()" style="width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6E6860;transition:all .15s"
+            onmouseover="this.style.background='#EDE9E3'" onmouseout="this.style.background='transparent'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span style="font-size:12px;font-weight:700;color:#9E9890;letter-spacing:0.3px">我的 Skill</span>
+        </div>
+        <button onclick="dOSkillAddNew()" style="width:100%;padding:7px 0;border-radius:8px;border:1.5px dashed #D8D2C9;background:transparent;color:#9E9890;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s"
+          onmouseover="this.style.borderColor='#F5762A';this.style.color='#F5762A'" onmouseout="this.style.borderColor='#D8D2C9';this.style.color='#9E9890'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          新建 Skill
+        </button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:3px">
+        ${list.map(s=>`
+          <div onclick="dOSkillSelect('${s.id}')" style="padding:10px;border-radius:9px;cursor:pointer;background:${dS.oSkillCurId===s.id?'#fff':'transparent'};box-shadow:${dS.oSkillCurId===s.id?'0 1px 6px rgba(0,0,0,0.07)':'none'};transition:all .15s"
+            onmouseover="if('${s.id}'!==dS.oSkillCurId)this.style.background='#EDE9E3'" onmouseout="if('${s.id}'!==dS.oSkillCurId)this.style.background='transparent'">
+            <div style="font-size:13px;font-weight:${dS.oSkillCurId===s.id?700:500};color:${dS.oSkillCurId===s.id?'#1A1614':'#6E6860'};margin-bottom:3px">${esc(s.name)}</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:10.5px;color:#F5762A;font-weight:600;background:#FFF3E8;padding:1px 6px;border-radius:4px">${esc(s.version)}</span>
+              <span style="font-size:10.5px;color:#B0AA9F">${esc(s.updatedAt||'—')}</span>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  /* 右侧：编辑区 */
+  const editor = `
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+      <div style="padding:14px 20px;border-bottom:1px solid #F0EDE8;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#fff">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#1A1614">${esc(cur.name)} <span style="font-size:11px;color:#B0AA9F;font-weight:500">${esc(cur.version)}</span></div>
+          <div style="font-size:11px;color:#9E9890;margin-top:2px">Markdown / 纯文本，AI 创作时优先读取 · ${ruleCount} 条规则</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${cur.id==='main'?`<button class="do-btn do-btn-gho" onclick="dS.oSkillHistoryOpen=true;dRender()">历史记录</button>`:''}
+          <button class="do-btn do-btn-pri" ${dS.oSkillSaving?'disabled':''} onclick="dOSkillSave()">${dS.oSkillSaving?'保存中…':'保存'}</button>
+        </div>
+      </div>
+      <textarea class="do-input" style="flex:1;min-height:400px;resize:none;line-height:1.85;font-size:14px;padding:20px;border:none;border-radius:0;outline:none"
+        placeholder="自由写，支持 Markdown 格式：&#10;&#10;## 开场钩子&#10;- 用数字+反差做开头&#10;- 前3秒必须抓住用户&#10;&#10;## 禁区&#10;- 不讲技术原理"
+        oninput="dS.oSkillDraft=this.value">${esc(draft)}</textarea>
+    </div>`;
+
   return `
-  <div class="do-page-head">
-    <div><div class="do-page-title">我的创作 Skill <span style="font-size:12px;color:#B0AA9F;font-weight:500">${esc(ver)}</span></div><div class="do-page-sub"><span class="do-link" onclick="dOBackHome()">‹ 返回</span> · Markdown / 纯文本，AI 创作时优先读取</div></div>
-    <div style="display:flex;gap:10px">
-      <button class="do-btn do-btn-gho" onclick="dS.oSkillHistoryOpen=true;dRender()">历史记录</button>
-      <button class="do-btn do-btn-pri" ${dS.oSkillSaving?'disabled':''} onclick="dOSkillSave()">${dS.oSkillSaving?'保存中…':'保存'}</button>
-    </div>
-  </div>
-  <div style="max-width:860px;margin:0 auto;display:grid;grid-template-columns:1fr 240px;gap:18px;align-items:start">
-    <textarea class="do-input" style="min-height:calc(100vh - 200px);line-height:1.85;font-size:14px;padding:18px;resize:none" placeholder="自由写，支持 Markdown 格式：
-
-## 人设
-我是一个…
-
-## 开场钩子
-- 用数字+反差做开头
-- 前3秒必须抓住用户
-
-## 内容结构
-…
-
-## 禁忌
-- 不讲技术原理" oninput="dS.oSkillDraft=this.value">${esc(draft)}</textarea>
-    <div class="do-skill-card" style="margin:0">
-      <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:10px">沉淀概览</div>
-      <div class="do-bar"><div class="do-bar-fill" style="width:${Math.round(st.done/4*100)}%"></div></div>
-      <div style="font-size:11px;color:#B0AA9F;margin-top:6px;margin-bottom:10px">完善度 ${st.done}/4</div>
-      <div><span class="do-chip ${st.rules?'':'muted'}">规则 ${st.rules}</span><span class="do-chip ${st.kw?'':'muted'}">高频词 ${st.kw}</span><span class="do-chip ${st.fb?'':'muted'}">禁区 ${st.fb}</span></div>
-      <div style="font-size:11.5px;color:#9E9890;line-height:1.6;margin-top:12px">规则、高频词、禁区会在项目对话里自动提炼沉淀；这里写的是你的整体人设与创作准则。</div>
-    </div>
+  <div style="display:flex;height:calc(100vh - 120px);border-radius:16px;overflow:hidden;border:1px solid #EFEAE2;box-shadow:0 2px 16px rgba(0,0,0,0.06)">
+    ${sidebar}${editor}
   </div>
   ${historySheet}`;
 }
 async function dOSkillSave(){
   if(dS.oSkillSaving) return;
-  const text = dS.oSkillDraft!==null ? dS.oSkillDraft : ((dS.oSkill&&dS.oSkill.freeText)||'');
+  const cur = dOGetCurSkill();
+  const text = dS.oSkillDraft!==null ? dS.oSkillDraft : (cur.content||'');
   dS.oSkillSaving=true; dRender();
-  const r = await dHttp.put('/original/skill', { freeText:text });
-  dS.oSkillSaving=false;
-  if(r.code===200){ dS.oSkill=r.data; dS.oSkillDraft=text; dToast('已保存 ✓'); }
-  else dToast(r.msg||'保存失败');
+  if(cur.id==='main'){
+    // 主 Skill → 同步后端
+    const r = await dHttp.put('/original/skill', { freeText:text });
+    dS.oSkillSaving=false;
+    if(r.code===200){
+      dS.oSkill=r.data;
+      // 同步更新 list 里的 main
+      if(dS.oSkillList){ const m=dS.oSkillList.find(s=>s.id==='main'); if(m){ m.content=text; m.updatedAt='刚刚'; } }
+      dS.oSkillDraft=text;
+      dToast('已保存 ✓');
+    } else dToast(r.msg||'保存失败');
+  } else {
+    // 额外 Skill → 仅本地
+    if(dS.oSkillList){ const s=dS.oSkillList.find(s=>s.id===cur.id); if(s){ s.content=text; s.updatedAt='刚刚'; } }
+    dOSaveExtraSkills();
+    dS.oSkillSaving=false;
+    dS.oSkillDraft=text;
+    dToast('已保存（本地）✓');
+  }
   dRender();
 }
 function dOSkillRestore(idx){
