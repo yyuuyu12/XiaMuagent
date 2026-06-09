@@ -181,8 +181,8 @@ html, body {
   background:linear-gradient(135deg,#FF8040,#F5602A); color:#fff;
   box-shadow:0 3px 10px rgba(245,96,42,0.35);
 }
-.d-btn-primary:hover { box-shadow:0 5px 16px rgba(245,96,42,0.45); transform:translateY(-1px); }
-.d-btn-primary:disabled { background:#E8E4DF; color:#B0AA9F; box-shadow:none; transform:none; cursor:not-allowed; }
+.d-btn-primary:hover { box-shadow:0 5px 16px rgba(245,96,42,0.45); }
+.d-btn-primary:disabled { background:#E8E4DF; color:#B0AA9F; box-shadow:none; cursor:not-allowed; }
 .d-btn-lg {
   width:100%; padding:11px; border-radius:12px; border:none;
   background:linear-gradient(135deg,#FF8040,#F5602A); color:#fff;
@@ -190,8 +190,8 @@ html, body {
   cursor:pointer; box-shadow:0 4px 16px rgba(245,96,42,0.4);
   transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:6px;
 }
-.d-btn-lg:hover { box-shadow:0 6px 22px rgba(245,96,42,0.5); transform:translateY(-1px); }
-.d-btn-lg:disabled { background:#E8E4DF; color:#B0AA9F; box-shadow:none; transform:none; cursor:not-allowed; }
+.d-btn-lg:hover { box-shadow:0 6px 22px rgba(245,96,42,0.5); }
+.d-btn-lg:disabled { background:#E8E4DF; color:#B0AA9F; box-shadow:none; cursor:not-allowed; }
 .d-btn-danger { background:#FFF0EF; color:#E5534B; border:1px solid #F5C0BA; }
 .d-btn-danger:hover { background:#FFE4E2; }
 
@@ -422,7 +422,7 @@ html, body {
 
 .do-proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .do-proj-card{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:16px 18px;cursor:pointer;transition:all .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
-.do-proj-card:hover{border-color:rgba(245,118,42,0.3);box-shadow:0 4px 18px rgba(245,96,42,0.1);transform:translateY(-1px)}
+.do-proj-card:hover{border-color:rgba(245,118,42,0.3);box-shadow:0 4px 18px rgba(245,96,42,0.1)}
 .do-stage-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px}
 .do-stage-tag.s-direction{background:#FEF3E2;color:#D97706}
 .do-stage-tag.s-outline{background:#EFF6FF;color:#2563EB}
@@ -493,7 +493,7 @@ html, body {
 /* 原创工坊补齐：素材库/学习中心/选题/Skill编辑 */
 .do-entry-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
 .do-entry{flex:1;min-width:200px;background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:15px 17px;cursor:pointer;transition:all .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px}
-.do-entry:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+.do-entry:hover{box-shadow:0 6px 18px rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1)}
 .do-entry-ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .do-seg{display:flex;background:#F0EDE8;border-radius:11px;padding:3px;gap:2px}
 .do-seg-i{flex:1;text-align:center;padding:8px 0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;color:#9E9890}
@@ -505,6 +505,22 @@ html, body {
 .do-rule-card.on{background:#FFF8F3;border-color:#F5762A}
 .do-mat-del{border:none;background:none;padding:4px;cursor:pointer;opacity:.4;flex-shrink:0}
 .do-mat-del:hover{opacity:.8}
+
+/* ── Hover helpers (CSS-based, no onmouseover/onmouseout jitter) ── */
+.hov-dark-skill:hover { opacity:0.88; }
+.hov-tool-entry:hover { border-color:#D8D2C9 !important; box-shadow:0 2px 10px rgba(0,0,0,0.06) !important; }
+.hov-proj-item:hover  { border-color:rgba(245,118,42,0.3) !important; box-shadow:0 3px 14px rgba(0,0,0,0.08) !important; }
+.hov-skill-item:hover { background:#EDE9E3; }
+.hov-skill-item-on    { background:#fff !important; }
+.hov-hist-item:hover  { background:#FAF8F5; }
+.hov-back-btn:hover   { background:#EDE9E3; }
+.hov-add-skill:hover  { border-color:#F5762A !important; color:#F5762A !important; }
+.hov-picker-row:hover { background:#F9F7F4; }
+.hov-picker-row-on:hover { background:#FFF5EE !important; }
+.hov-picker-upload:hover { background:#FFF5EE; }
+.hov-avatar-del:hover { background:#F0EDE8 !important; color:#E5534B !important; }
+.hov-logout-btn:hover { background:#FFF5F5 !important; }
+.hov-nav-item:hover   { background:#F7F5F1; }
 </style>
 </head>
 <body>
@@ -1166,8 +1182,8 @@ function dCardAvatar() {
     ? dS.avatarList.map(a => {
         const active = a.id === dS.avatarSelectedId;
         return `<div onclick="${a.needsReupload?`dToast('请重新上传该形象视频文件')`:''};dSelectAvatar('${a.id}')"
+          class="hov-picker-row${active?' hov-picker-row-on':''}"
           style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;background:${active?'#FFF5EE':'transparent'};transition:background 0.12s"
-          onmouseover="if(!${active})this.style.background='#F9F7F4'" onmouseout="this.style.background='${active?'#FFF5EE':'transparent'}'">
           <div style="width:34px;height:60px;border-radius:5px;overflow:hidden;background:#1A1614;flex-shrink:0;border:1px solid rgba(0,0,0,0.06)">
             ${a.thumb
               ? `<img src="${a.thumb}" style="width:100%;height:100%;object-fit:cover">`
@@ -1180,8 +1196,7 @@ function dCardAvatar() {
             </div>
           </div>
           ${active?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12l6 6L20 6" stroke="#F5762A" stroke-width="2.5" stroke-linecap="round"/></svg>`:''}
-          <button onclick="dAvatarPickerDelete('${a.id}',event)" style="width:20px;height:20px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#C4BEB8;flex-shrink:0"
-            onmouseover="this.style.background='#F0EDE8';this.style.color='#E5534B'" onmouseout="this.style.background='transparent';this.style.color='#C4BEB8'">
+          <button onclick="dAvatarPickerDelete('${a.id}',event)" class="hov-avatar-del" style="width:20px;height:20px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#C4BEB8;flex-shrink:0">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
           </button>
         </div>`;
@@ -1207,8 +1222,8 @@ function dCardAvatar() {
       ${listItems}
       <div style="height:1px;background:#F0EDE8;margin:0 12px"></div>
       <div onclick="document.getElementById('dAvatarVideoInput').click()"
-        style="display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer;color:#F5762A;font-size:12px;font-weight:600"
-        onmouseover="this.style.background='#FFF5EE'" onmouseout="this.style.background='transparent'">
+        class="hov-picker-upload"
+        style="display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer;color:#F5762A;font-size:12px;font-weight:600">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
         上传新的参考视频
       </div>
@@ -2435,8 +2450,7 @@ function dRenderProfile() {
         </div>
 
         <!-- 退出 -->
-        <button onclick="dLogout()" style="width:100%;padding:12px;background:#fff;border:1.5px solid #F5C0BA;border-radius:14px;font-size:14px;font-weight:600;color:#E5534B;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:all .15s"
-          onmouseover="this.style.background='#FFF5F5'" onmouseout="this.style.background='#fff'">
+        <button onclick="dLogout()" class="hov-logout-btn" style="width:100%;padding:12px;background:#fff;border:1.5px solid #F5C0BA;border-radius:14px;font-size:14px;font-weight:600;color:#E5534B;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:all .15s">
           退出登录
         </button>
       </div>
@@ -2904,8 +2918,7 @@ function dOHome(){
 
   /* 右侧：深色 Skill 卡 */
   const darkSkillCard = `
-    <div onclick="dOSetView('skill')" style="background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:16px;padding:18px;cursor:pointer;transition:opacity .15s;margin-bottom:10px"
-      onmouseover="this.style.opacity='0.88'" onmouseout="this.style.opacity='1'">
+    <div onclick="dOSetView('skill')" class="hov-dark-skill" style="background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:16px;padding:18px;cursor:pointer;transition:opacity .15s;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
         <div>
           <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.5px;margin-bottom:4px">全局唯一 · 蒸馏的你自己</div>
@@ -2934,9 +2947,7 @@ function dOHome(){
       icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2L15 8L21 9L17 14L18 20L12 17L6 20L7 14L3 9L9 8L12 2Z" stroke="#F59E0B" stroke-width="1.8" stroke-linejoin="round"/></svg>',
       bg:'#FFFBEB' },
   ].map(e=>`
-    <div onclick="dOSetView('${e.view}')" style="background:#fff;border-radius:12px;border:1px solid #EDE9E3;padding:13px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .15s;margin-bottom:8px"
-      onmouseover="this.style.borderColor='#D8D2C9';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.06)'"
-      onmouseout="this.style.borderColor='#EDE9E3';this.style.boxShadow=''">
+    <div onclick="dOSetView('${e.view}')" class="hov-tool-entry" style="background:#fff;border-radius:12px;border:1px solid #EDE9E3;padding:13px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .15s;margin-bottom:8px">
       <div style="width:34px;height:34px;border-radius:9px;background:${e.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">${e.icon}</div>
       <div style="flex:1">
         <div style="font-size:13.5px;font-weight:700;color:#1A1614;margin-bottom:1px">${e.title}</div>
@@ -2951,10 +2962,8 @@ function dOHome(){
     : dS.oProjects.map(p=>{
         const stg = p.status==='final' ? 'final' : (p.stage||'script');
         const tag = p.status==='final' ? '已定稿' : oStageName(p.stage||'script');
-        return `<div class="scard" style="padding:14px 16px;cursor:pointer;transition:all .15s;margin-bottom:9px"
-          onclick="dOOpenProject(${p.id})"
-          onmouseover="this.style.borderColor='rgba(245,118,42,0.3)';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.08)'"
-          onmouseout="this.style.borderColor='';this.style.boxShadow=''">
+        return `<div class="scard hov-proj-item" style="padding:14px 16px;cursor:pointer;transition:all .15s;margin-bottom:9px"
+          onclick="dOOpenProject(${p.id})">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
             <div style="font-size:13.5px;font-weight:700;color:#1A1614;line-height:1.4;flex:1">${esc(p.title||'未命名项目')}</div>
             <span class="do-stage-tag s-${stg}" style="flex-shrink:0">${tag}</span>
@@ -3739,7 +3748,7 @@ function dOSkillPage(){
           ${history.length===0?`<div class="do-empty">暂无历史记录。每次保存前的内容会自动存档。</div>`:history.map((h,i)=>{
             const d=new Date(h.savedAt); const label=`${d.getMonth()+1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
             const preview=(h.text||'').replace(/\n/g,' ').slice(0,70);
-            return `<div onclick="dOSkillRestore(${i})" style="padding:12px 14px;cursor:pointer;border-bottom:1px solid #F2EFEA;border-radius:8px" onmouseover="this.style.background='#FAF8F5'" onmouseout="this.style.background='transparent'">
+            return `<div onclick="dOSkillRestore(${i})" class="hov-hist-item" style="padding:12px 14px;cursor:pointer;border-bottom:1px solid #F2EFEA;border-radius:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:13px;font-weight:600;color:#1A1614">${label}</span><span style="font-size:12px;color:#F5602A;font-weight:600">还原</span></div>
               <div style="font-size:12px;color:#9E9890;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(preview)||'（空）'}</div>
             </div>`;
@@ -3753,22 +3762,19 @@ function dOSkillPage(){
     <div style="width:200px;flex-shrink:0;background:#F7F5F1;border-right:1px solid #EDE9E3;display:flex;flex-direction:column;overflow:hidden;min-height:calc(100vh - 180px)">
       <div style="padding:16px 14px 10px;flex-shrink:0">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <div onclick="dOBackHome()" style="width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6E6860;transition:all .15s"
-            onmouseover="this.style.background='#EDE9E3'" onmouseout="this.style.background='transparent'">
+          <div onclick="dOBackHome()" class="hov-back-btn" style="width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6E6860;transition:all .15s">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
           <span style="font-size:12px;font-weight:700;color:#9E9890;letter-spacing:0.3px">我的 Skill</span>
         </div>
-        <button onclick="dOSkillAddNew()" style="width:100%;padding:7px 0;border-radius:8px;border:1.5px dashed #D8D2C9;background:transparent;color:#9E9890;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s"
-          onmouseover="this.style.borderColor='#F5762A';this.style.color='#F5762A'" onmouseout="this.style.borderColor='#D8D2C9';this.style.color='#9E9890'">
+        <button onclick="dOSkillAddNew()" class="hov-add-skill" style="width:100%;padding:7px 0;border-radius:8px;border:1.5px dashed #D8D2C9;background:transparent;color:#9E9890;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
           新建 Skill
         </button>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:3px">
         ${list.map(s=>`
-          <div onclick="dOSkillSelect('${s.id}')" style="padding:10px;border-radius:9px;cursor:pointer;background:${dS.oSkillCurId===s.id?'#fff':'transparent'};box-shadow:${dS.oSkillCurId===s.id?'0 1px 6px rgba(0,0,0,0.07)':'none'};transition:all .15s"
-            onmouseover="if('${s.id}'!==dS.oSkillCurId)this.style.background='#EDE9E3'" onmouseout="if('${s.id}'!==dS.oSkillCurId)this.style.background='transparent'">
+          <div onclick="dOSkillSelect('${s.id}')" class="hov-skill-item ${dS.oSkillCurId===s.id?'hov-skill-item-on':''}" style="padding:10px;border-radius:9px;cursor:pointer;box-shadow:${dS.oSkillCurId===s.id?'0 1px 6px rgba(0,0,0,0.07)':'none'};transition:all .15s">
             <div style="font-size:13px;font-weight:${dS.oSkillCurId===s.id?700:500};color:${dS.oSkillCurId===s.id?'#1A1614':'#6E6860'};margin-bottom:3px">${esc(s.name)}</div>
             <div style="display:flex;align-items:center;gap:6px">
               <span style="font-size:10.5px;color:#F5762A;font-weight:600;background:#FFF3E8;padding:1px 6px;border-radius:4px">${esc(s.version)}</span>
