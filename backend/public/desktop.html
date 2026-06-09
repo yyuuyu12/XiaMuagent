@@ -3049,20 +3049,18 @@ function dOHome(){
   <div class="do-page-head">
     <div><div class="do-page-title">原创工坊</div><div class="do-page-sub">选题方向 → 粗纲 → 细纲 → 口播剧本</div></div>
   </div>
-  <div style="max-width:1000px">
-    ${topRow}
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div style="font-size:15px;font-weight:700;color:#1A1614">我的项目${dS.oLoaded&&cnt?` <span style="font-size:13px;color:#B0AA9F;font-weight:500">${cnt}</span>`:''}</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="display:flex;background:#F7F5F1;border-radius:8px;padding:2px">
-          <div onclick="dS.oProjSort='recent';dRender()" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${sort==='recent'?'#1A1614':'transparent'};color:${sort==='recent'?'#fff':'#9E9890'}">最近更新</div>
-          <div onclick="dS.oProjSort='stage';dRender()" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${sort==='stage'?'#1A1614':'transparent'};color:${sort==='stage'?'#fff':'#9E9890'}">按阶段</div>
-        </div>
-        <span onclick="dOSetView('new')" style="font-size:13px;font-weight:700;color:#F5762A;cursor:pointer;padding:4px 0">+ 新建</span>
+  ${topRow}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:15px;font-weight:700;color:#1A1614">我的项目${dS.oLoaded&&cnt?` <span style="font-size:13px;color:#B0AA9F;font-weight:500">${cnt}</span>`:''}</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;background:#F7F5F1;border-radius:8px;padding:2px">
+        <div onclick="dS.oProjSort='recent';dRender()" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${sort==='recent'?'#1A1614':'transparent'};color:${sort==='recent'?'#fff':'#9E9890'}">最近更新</div>
+        <div onclick="dS.oProjSort='stage';dRender()" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:${sort==='stage'?'#1A1614':'transparent'};color:${sort==='stage'?'#fff':'#9E9890'}">按阶段</div>
       </div>
+      <span onclick="dOSetView('new')" style="font-size:13px;font-weight:700;color:#F5762A;cursor:pointer;padding:4px 0">+ 新建</span>
     </div>
-    ${projHtml}
-  </div>`;
+  </div>
+  ${projHtml}`;
 }
 
 /* ---------- 智能选题（新建项目页内） ---------- */
@@ -3498,8 +3496,7 @@ function dONew(){
     </div>
     <div style="font-size:20px;font-weight:700;color:#1A1614;line-height:1.2">新建项目</div>
   </div>
-  <div style="max-width:720px;margin:0 auto">
-    <div class="do-steps" style="margin-bottom:18px">
+  <div class="do-steps" style="margin-bottom:18px">
       ${steps.map((s,i)=>`<div class="do-step-pill ${i===0&&dS.oNewStaged?'cur':''}">${i+1} ${s}</div>${i<steps.length-1?'<span style="color:#D8D3CC">›</span>':''}`).join('')}
     </div>
     ${dOTopicsBlock()}
@@ -3538,8 +3535,7 @@ function dONew(){
       ${matList}
 
       <button class="do-btn do-btn-pri" style="width:100%;margin-top:18px;padding:12px" ${dS.oBusy?'disabled':''} onclick="dOCreateProject()">${dS.oBusy?'创建中…':(dS.oNewStaged?'创建并开始定方向':'创建并开始写')}</button>
-    </div>
-  </div>`;
+    </div>`;
 }
 async function dOCreateProject(){
   const title = (dS.oNewTitle||'').trim();
@@ -3727,32 +3723,30 @@ function dOLearningInput(){
       <div style="font-size:12.5px;color:#9E9890;margin-top:3px">选择素材原文，AI 拆解规律，写入 Skill 或仅供本次参考</div>
     </div>
   </div>
-  <div style="max-width:760px;margin:0 auto">
-    <div style="display:flex;gap:12px;margin-bottom:20px">
-      <div onclick="dS.oLearnScope='global';dRender()" style="flex:1;padding:16px 18px;border-radius:14px;border:2px solid ${scope==='global'?'#F5602A':'#EDE9E3'};background:${scope==='global'?'#FFF6EE':'#FAFAF8'};cursor:pointer;transition:all .18s">
-        <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
-          <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${scope==='global'?'#F5602A':'#C8C2BA'};background:${scope==='global'?'#F5602A':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s">${scope==='global'?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
-          <span style="font-size:14px;font-weight:700;color:#1A1614">写入全局 Skill</span>
-        </div>
-        <div style="font-size:12px;color:#9E9890;line-height:1.5;padding-left:27px">学到的规律融合进 Skill 工作流，对所有项目长期生效</div>
+  <div style="display:flex;gap:12px;margin-bottom:20px">
+    <div onclick="dS.oLearnScope='global';dRender()" style="flex:1;padding:16px 18px;border-radius:14px;border:2px solid ${scope==='global'?'#F5602A':'#EDE9E3'};background:${scope==='global'?'#FFF6EE':'#FAFAF8'};cursor:pointer;transition:all .18s">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
+        <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${scope==='global'?'#F5602A':'#C8C2BA'};background:${scope==='global'?'#F5602A':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s">${scope==='global'?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+        <span style="font-size:14px;font-weight:700;color:#1A1614">写入全局 Skill</span>
       </div>
-      <div onclick="dS.oLearnScope='project';dRender()" style="flex:1;padding:16px 18px;border-radius:14px;border:2px solid ${scope==='project'?'#F5602A':'#EDE9E3'};background:${scope==='project'?'#FFF6EE':'#FAFAF8'};cursor:pointer;transition:all .18s">
-        <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
-          <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${scope==='project'?'#F5602A':'#C8C2BA'};background:${scope==='project'?'#F5602A':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s">${scope==='project'?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
-          <span style="font-size:14px;font-weight:700;color:#1A1614">仅本次参考</span>
-        </div>
-        <div style="font-size:12px;color:#9E9890;line-height:1.5;padding-left:27px">拆解结果只展示给你参考，不改变全局 Skill</div>
+      <div style="font-size:12px;color:#9E9890;line-height:1.5;padding-left:27px">学到的规律融合进 Skill 工作流，对所有项目长期生效</div>
+    </div>
+    <div onclick="dS.oLearnScope='project';dRender()" style="flex:1;padding:16px 18px;border-radius:14px;border:2px solid ${scope==='project'?'#F5602A':'#EDE9E3'};background:${scope==='project'?'#FFF6EE':'#FAFAF8'};cursor:pointer;transition:all .18s">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
+        <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${scope==='project'?'#F5602A':'#C8C2BA'};background:${scope==='project'?'#F5602A':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s">${scope==='project'?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+        <span style="font-size:14px;font-weight:700;color:#1A1614">仅本次参考</span>
       </div>
+      <div style="font-size:12px;color:#9E9890;line-height:1.5;padding-left:27px">拆解结果只展示给你参考，不改变全局 Skill</div>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:14px;font-weight:700;color:#1A1614">选择要学习的素材（最多 4 条）</div>
-      <span class="do-link" onclick="dOSetView('materials')">＋ 去素材库添加</span>
-    </div>
-    ${list}
-    <button class="do-btn do-btn-pri" style="width:100%;margin-top:16px;padding:13px" ${canLearn?'':'disabled'} onclick="dOLearnAnalyze()">
-      ${dS.oLearnBusy?'拆解中，约 30–90 秒…':(selCount>0?`开始学习（已选 ${selCount} 条）`:'请先勾选素材')}
-    </button>
-  </div>`;
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:14px;font-weight:700;color:#1A1614">选择要学习的素材（最多 4 条）</div>
+    <span class="do-link" onclick="dOSetView('materials')">＋ 去素材库添加</span>
+  </div>
+  ${list}
+  <button class="do-btn do-btn-pri" style="width:100%;margin-top:16px;padding:13px" ${canLearn?'':'disabled'} onclick="dOLearnAnalyze()">
+    ${dS.oLearnBusy?'拆解中，约 30–90 秒…':(selCount>0?`开始学习（已选 ${selCount} 条）`:'请先勾选素材')}
+  </button>`;
 }
 async function dOLearnAnalyze(){
   const sel = dS.oMatSel || [];
@@ -3838,7 +3832,7 @@ function dOLearningResult(){
       </div>
     </div>
   </div>
-  <div style="max-width:760px;margin:0 auto">${block}</div>`;
+  ${block}`;
 }
 async function dOLearnWrite(){
   if(dS.oLearnWriting) return;
