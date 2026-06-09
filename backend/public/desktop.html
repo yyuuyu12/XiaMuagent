@@ -2959,25 +2959,52 @@ function dOHome(){
     </div>`).join('');
 
   /* 左侧：项目列表 */
+  /* 阶段图标颜色 */
+  const STAGE_ICON_COLOR = { direction:'#F5762A', outline:'#5B5FD9', detail:'#0E7490', script:'#16A34A', final:'#1A1614' };
   const projList = dS.oProjects.length===0
     ? `<div class="do-empty">还没有项目，点右上角「新建项目」开始第一条原创口播 ✏️</div>`
     : dS.oProjects.map(p=>{
         const stg = p.status==='final' ? 'final' : (p.stage||'script');
         const tag = p.status==='final' ? '已定稿' : oStageName(p.stage||'script');
-        return `<div class="scard hov-proj-item" style="padding:14px 16px;cursor:pointer;transition:border-color .15s,box-shadow .15s;margin-bottom:9px"
+        const iconColor = STAGE_ICON_COLOR[stg] || '#9E9890';
+        const iconBg = stg==='final'?'#2A241E': stg==='direction'?'#FFF3E8': stg==='outline'?'#EEF2FF': stg==='detail'?'#D9F4F8':'#ECFDF5';
+        const skillVer = dS.oSkill ? (dS.oSkill.version||'v1.0') : 'v1.0';
+        const updTime = dFmtTime(p.updated_at||p.created_at);
+        return `<div class="scard hov-proj-item" style="padding:14px 16px;cursor:pointer;transition:border-color .15s,box-shadow .15s;margin-bottom:9px;display:flex;align-items:flex-start;gap:12px"
           onclick="dOOpenProject(${p.id})">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
-            <div style="font-size:13.5px;font-weight:700;color:#1A1614;line-height:1.4;flex:1">${esc(p.title||'未命名项目')}</div>
-            <span class="do-stage-tag s-${stg}" style="flex-shrink:0">${tag}</span>
+          <div style="width:38px;height:38px;border-radius:10px;background:${iconBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 3H7C5.9 3 5 3.9 5 5V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V8L14 3Z" stroke="${iconColor}" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3V8H19" stroke="${iconColor}" stroke-width="1.8"/><path d="M9 13h6M9 17h4" stroke="${iconColor}" stroke-width="1.6" stroke-linecap="round"/></svg>
           </div>
-          <div style="font-size:12px;color:#9E9890;line-height:1.5;margin-bottom:10px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">${esc(p.brief||'（无简介）')}</div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:11px;color:#C0B8B0">${p.turns||0} 轮对话</span>
-            <span style="color:#E8E4DF;font-size:11px">·</span>
-            <span style="font-size:11px;color:#C0B8B0">${dFmtTime(p.updated_at||p.created_at)}</span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:5px">
+              <div style="font-size:13.5px;font-weight:700;color:#1A1614;line-height:1.4;flex:1">${esc(p.title||'未命名项目')}</div>
+              <span class="do-stage-tag s-${stg}" style="flex-shrink:0">${tag}</span>
+            </div>
+            <div style="font-size:12px;color:#9E9890;line-height:1.5;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">${esc(p.brief||'（无简介）')}</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:#C0B8B0">更新：${updTime}</span>
+              <span style="color:#E8E4DF;font-size:11px">·</span>
+              <span style="font-size:11px;color:#C0B8B0">${p.turns||0} 轮对话</span>
+              <span style="color:#E8E4DF;font-size:11px">·</span>
+              <span style="font-size:11px;color:#C0B8B0">Skill ${esc(skillVer)}</span>
+            </div>
           </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:12px"><path d="M9 18L15 12L9 6" stroke="#D0CCC6" stroke-width="2" stroke-linecap="round"/></svg>
         </div>`;
       }).join('');
+
+  /* 右侧：创作概览统计 */
+  const totalProjs = dS.oProjects.length;
+  const doneProjs = dS.oProjects.filter(p=>p.status==='final'||(p.stage==='script'&&(p.turns||0)>0)).length;
+  const activeProjs = dS.oProjects.filter(p=>p.status!=='final').length;
+  const statsCard = `
+    <div style="background:#fff;border-radius:12px;border:1px solid #EDE9E3;padding:13px 14px;margin-top:8px">
+      ${[['项目数',totalProjs],['口播剧本',doneProjs],['进行中',activeProjs]].map(([l,v],i,arr)=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;${i<arr.length-1?'border-bottom:1px solid #F7F5F1':''}">
+          <span style="font-size:12.5px;color:#6E6860">${l}</span>
+          <span style="font-size:14px;font-weight:700;color:#1A1614">${v}</span>
+        </div>`).join('')}
+    </div>`;
 
   const content = dS.oLoaded ? `
     <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start">
@@ -2987,6 +3014,7 @@ function dOHome(){
       <div style="position:sticky;top:20px">
         ${darkSkillCard}
         ${toolEntries}
+        ${statsCard}
       </div>
     </div>` : `<div class="do-empty">加载中…</div>`;
 
@@ -3079,7 +3107,14 @@ function dOMsgHtml(m){
     else if(m.sync_done==='skipped') sync = `<div class="do-sync-card" style="color:#9E9890;font-size:12px">已忽略：${esc(m.sync_label)}</div>`;
     else sync = `<div class="do-sync-card"><div style="font-size:12px;color:#6E6860;margin-bottom:7px">发现规律：<b style="color:#1A1614">${esc(m.sync_label)}</b></div><div style="display:flex;gap:7px"><button class="do-btn do-btn-pri" style="padding:5px 12px;font-size:11px" onclick="dOSyncRule(${m.id})">沉淀到 Skill</button><button class="do-btn do-btn-gho" style="padding:5px 12px;font-size:11px" onclick="dOSkipSync(${m.id})">忽略</button></div></div>`;
   }
-  return `<div class="do-msg ${isUser?'user':'ai'}"><div class="do-bubble ${isUser?'user':'ai'}">${esc(m.content)}</div>${extra}${sync}</div>`;
+  const aiBadge = isUser ? '' : `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+      <div style="width:19px;height:19px;border-radius:50%;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 6 6 1-4 5 1 6-6-3-6 3 1-6-4-5 6-1z" fill="rgba(255,184,119,0.9)"/></svg>
+      </div>
+      <span style="font-size:10px;color:#9E9890;font-weight:600">原创工坊 · Skill ${esc(dS.oSkill?(dS.oSkill.version||'v1.0'):'v1.0')}</span>
+    </div>`;
+  return `<div class="do-msg ${isUser?'user':'ai'}">${aiBadge}<div class="do-bubble ${isUser?'user':'ai'}">${esc(m.content)}</div>${extra}${sync}</div>`;
 }
 
 function dOWorkspace(){
@@ -3104,7 +3139,7 @@ function dOWorkspace(){
       : ['换个钩子开头','更口语化','加个反差点','检查禁区词'];
   const leftCol = `
     <div class="do-col">
-      <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">当前：${oStageName(stage)}${isFinal?' · 已定稿':''}</div></div></div>
+      <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">已加载 Skill ${esc(dS.oSkill?(dS.oSkill.version||'v1.0'):'v1.0')} · ${(()=>{const st=oSkillStats(dS.oSkill);return st.rules+st.kw+st.fb;})()}条规则生效</div></div></div>
       <div class="do-col-body" id="doChatBody">${intro}${msgs}${busy}</div>
       <div class="do-chat-foot">
         <div class="do-quick">${quick.map(q=>`<span class="do-quick-chip" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
@@ -3165,12 +3200,28 @@ function dOWorkspace(){
           ? `<button class="do-btn do-btn-ok" ${dS.oStageBusy?'disabled':''} onclick="dOAdvance()">✓ 完成定稿</button>`
           : `<button class="do-btn do-btn-pri" ${dS.oStageBusy?'disabled':''} onclick="dOAdvance()">${dS.oStageBusy?'生成中…':'确认'+oStageShort(stage)+'，写'+oStageShort(nextKey)}</button>`);
     const backBtn = (inFlow && idx>0 && !isFinal) ? `<button class="do-btn do-btn-gho" ${dS.oStageBusy?'disabled':''} onclick="dOBack()">← 上一步</button>` : '';
+    const docTitle = isFinal ? '口播剧本 · 已定稿' : (inFlow?('当前文案 · '+oStageName(stage)):'当前文案 · 活文档');
+    const docWordCount = (p.doc||'').replace(/\s/g,'').length;
     rightCol = `<div class="do-col">
-      <div class="do-col-head"><div><div class="do-col-h-title">${inFlow?('当前 · '+oStageName(stage)):'口播剧本'}</div><div class="do-col-h-sub">可直接编辑，下方保存</div></div><span style="font-size:11px;color:#9E9890">${isFinal?'已定稿':'第 '+(p.turns||0)+' 轮'}</span></div>
-      <textarea class="do-doc-edit" placeholder="这一阶段还没有内容，去左边和创作助手聊聊，让它先生成草稿…" oninput="dS.oProject.doc=this.value">${esc(p.doc||'')}</textarea>
+      <div class="do-col-head">
+        <div style="min-width:0;flex:1">
+          <div class="do-col-h-title">${docTitle}</div>
+          <div class="do-col-h-sub">${isFinal?'已定稿，可导出':'每轮对话后自动覆盖更新'}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="do-btn do-btn-gho" style="padding:5px 10px;font-size:12px" onclick="navigator.clipboard.writeText(document.getElementById('doDocEdit').value||'').then(()=>dToast('已复制'))">复制全文</button>
+          <button class="do-btn do-btn-gho" style="padding:5px 10px;font-size:12px" onclick="dOExportDoc()">导出</button>
+        </div>
+      </div>
+      <textarea id="doDocEdit" class="do-doc-edit" placeholder="这一阶段还没有内容，去左边和创作助手聊聊，让它先生成草稿…" oninput="dS.oProject.doc=this.value">${esc(p.doc||'')}</textarea>
       <div class="do-doc-foot">
-        <div class="do-doc-stat">${(p.doc||'').length} 字</div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <span class="do-doc-stat">约 ${docWordCount} 字</span>
+          <span style="color:#E8E4DF;font-size:11px">·</span>
+          <span style="font-size:11px;color:#C0B8B0">第 ${p.turns||0} 轮对话</span>
+          <button class="do-btn" style="padding:0;background:none;border:none;font-size:11px;color:#F5762A;font-weight:600" onclick="dOSkillHistoryFromDoc()">版本历史</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
           ${backBtn}
           <button class="do-btn do-btn-gho" ${dS.oSaving?'disabled':''} onclick="dOSaveDoc()">${dS.oSaving?'保存中…':'保存'}</button>
           ${advBtn}
@@ -3264,6 +3315,23 @@ async function dOSendMsg(){
     dToast(r.msg||'生成失败，请重试');
   }
   dRender(); dOScrollChat();
+}
+function dOExportDoc(){
+  const p = dS.oProject;
+  if(!p) return;
+  const content = (p.doc||'').trim() || '（无内容）';
+  const title = (p.title||'口播剧本').replace(/[/\\:*?"<>|]/g,'_');
+  const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = title + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  dToast('已导出');
+}
+function dOSkillHistoryFromDoc(){
+  // 打开 Skill 历史记录弹窗（复用已有逻辑）
+  dS.oSkillHistoryOpen = true; dRender();
 }
 async function dOSaveDoc(silent){
   if(!dS.oProject) return;
