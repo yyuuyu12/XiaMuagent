@@ -49,7 +49,7 @@ html, body {
   display:flex; align-items:center; gap:9px;
   padding:9px 10px; border-radius:10px;
   font-size:13px; font-weight:500; color:#6E6860;
-  cursor:pointer; transition:all 0.15s; margin-bottom:2px;
+  cursor:pointer; transition:background 0.15s, color 0.15s; margin-bottom:2px;
   user-select:none;
 }
 .d-nav-item:hover { background:#F7F5F1; color:#1A1614; }
@@ -382,9 +382,9 @@ html, body {
 .chip.is-active { background:#FFF3E8; color:#F5762A; border-color:#FFD4B8; }
 
 /* sw — 颜色色板 */
-.sw { width:22px; height:22px; border-radius:50%; cursor:pointer; transition:transform 0.12s; border:2px solid #EDE9E3; box-sizing:border-box; }
-.sw:hover { transform:scale(1.08); }
-.sw.is-active { border-color:#F5762A; transform:scale(1.1); box-shadow:0 2px 8px rgba(245,118,42,0.25); }
+.sw { width:22px; height:22px; border-radius:50%; cursor:pointer; transition:border-color 0.12s, box-shadow 0.12s; border:2px solid #EDE9E3; box-sizing:border-box; }
+.sw:hover { border-color:#C4BEB8; box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
+.sw.is-active { border-color:#F5762A; box-shadow:0 2px 8px rgba(245,118,42,0.25); }
 
 /* sld — 滑块 v2 */
 .sld { position:relative; height:18px; display:flex; align-items:center; }
@@ -421,7 +421,7 @@ html, body {
 .do-chip.muted{background:#F5F3EF;color:#9E9890}
 
 .do-proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.do-proj-card{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:16px 18px;cursor:pointer;transition:all .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
+.do-proj-card{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:16px 18px;cursor:pointer;transition:border-color .15s,box-shadow .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
 .do-proj-card:hover{border-color:rgba(245,118,42,0.3);box-shadow:0 4px 18px rgba(245,96,42,0.1)}
 .do-stage-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px}
 .do-stage-tag.s-direction{background:#FEF3E2;color:#D97706}
@@ -492,13 +492,13 @@ html, body {
 .do-empty{text-align:center;padding:50px 20px;color:#B0AA9F;font-size:13px}
 /* 原创工坊补齐：素材库/学习中心/选题/Skill编辑 */
 .do-entry-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
-.do-entry{flex:1;min-width:200px;background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:15px 17px;cursor:pointer;transition:all .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px}
+.do-entry{flex:1;min-width:200px;background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:14px;padding:15px 17px;cursor:pointer;transition:border-color .15s,box-shadow .15s;box-shadow:0 2px 10px rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px}
 .do-entry:hover{box-shadow:0 6px 18px rgba(0,0,0,0.08);border-color:rgba(0,0,0,0.1)}
 .do-entry-ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .do-seg{display:flex;background:#F0EDE8;border-radius:11px;padding:3px;gap:2px}
 .do-seg-i{flex:1;text-align:center;padding:8px 0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;color:#9E9890}
 .do-seg-i.on{background:#fff;color:#1A1614;box-shadow:0 1px 5px rgba(0,0,0,0.08)}
-.do-topic-card{background:#fff;border:1px solid #F0EDE8;border-radius:13px;padding:14px 16px;cursor:pointer;transition:all .15s}
+.do-topic-card{background:#fff;border:1px solid #F0EDE8;border-radius:13px;padding:14px 16px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .do-topic-card:hover{border-color:#F5762A;box-shadow:0 4px 14px rgba(245,118,42,0.12)}
 .do-topic-card.on{border-color:#F5762A;background:#FFFaf5;box-shadow:0 4px 14px rgba(245,118,42,0.12)}
 .do-rule-card{background:#FAF8F5;border:1.5px solid transparent;border-radius:11px;padding:11px 13px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;transition:all .12s}
@@ -2947,7 +2947,7 @@ function dOHome(){
       icon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2L15 8L21 9L17 14L18 20L12 17L6 20L7 14L3 9L9 8L12 2Z" stroke="#F59E0B" stroke-width="1.8" stroke-linejoin="round"/></svg>',
       bg:'#FFFBEB' },
   ].map(e=>`
-    <div onclick="dOSetView('${e.view}')" class="hov-tool-entry" style="background:#fff;border-radius:12px;border:1px solid #EDE9E3;padding:13px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .15s;margin-bottom:8px">
+    <div onclick="dOSetView('${e.view}')" class="hov-tool-entry" style="background:#fff;border-radius:12px;border:1px solid #EDE9E3;padding:13px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .15s,box-shadow .15s;margin-bottom:8px">
       <div style="width:34px;height:34px;border-radius:9px;background:${e.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">${e.icon}</div>
       <div style="flex:1">
         <div style="font-size:13.5px;font-weight:700;color:#1A1614;margin-bottom:1px">${e.title}</div>
@@ -2962,7 +2962,7 @@ function dOHome(){
     : dS.oProjects.map(p=>{
         const stg = p.status==='final' ? 'final' : (p.stage||'script');
         const tag = p.status==='final' ? '已定稿' : oStageName(p.stage||'script');
-        return `<div class="scard hov-proj-item" style="padding:14px 16px;cursor:pointer;transition:all .15s;margin-bottom:9px"
+        return `<div class="scard hov-proj-item" style="padding:14px 16px;cursor:pointer;transition:border-color .15s,box-shadow .15s;margin-bottom:9px"
           onclick="dOOpenProject(${p.id})">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
             <div style="font-size:13.5px;font-weight:700;color:#1A1614;line-height:1.4;flex:1">${esc(p.title||'未命名项目')}</div>
