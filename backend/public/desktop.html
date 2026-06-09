@@ -2811,6 +2811,7 @@ function dLogout() {
 Object.assign(dS, {
   oView: 'home',          // home | workspace | new
   oLoaded: false,
+  oProjectLoading: false,
   oSkill: null,
   oProjects: [],
   oProject: null,         // 详情 {id,title,brief,status,stage,doc,turns,artifacts,meta}
@@ -2893,7 +2894,8 @@ async function dBindOriginal(){
     if(rs.code===200) dS.oSkill = rs.data;
     if(rp.code===200) dS.oProjects = rp.data || [];
     dS.oLoaded = true;
-    if(dS.oView==='home') dRender();
+    // 首次加载才重建 DOM；后台静默刷新只更新数据，不触发 DOM 重建（避免 hover 闪烁）
+    if(dS.oView==='home' && !wasLoaded) dRender();
   }
   if((dS.oView==='materials' || dS.oView==='learning') && !dS.oMaterialsLoaded){
     await dOLoadMaterials(true);
@@ -3047,15 +3049,23 @@ function dOPickTopic(i){
 
 /* ---------- 打开项目 ---------- */
 async function dOOpenProject(id){
-  dToast('加载项目…');
+  if(dS.oProjectLoading) return; // 防止重复点击发起多个并发请求
+  dS.oProjectLoading = true;
+  // 立刻从本地缓存中找项目数据，秒跳工作台（不等 API）
+  const cached = (dS.oProjects||[]).find(p=>p.id===id);
+  dS.oProject = cached ? {...cached, artifacts:{}} : {id, title:'加载中…', stage:'script', artifacts:{}};
+  dS.oMessages = []; dS.oBound = [];
+  dS.oRight = 'doc'; dS.oInput = ''; dS.oView = 'workspace';
+  dRender(); dOScrollChat(); // 立即进入工作台，用户不会感知等待
+  // 后台拉取完整数据（消息记录、绑定素材等）
   const r = await dHttp.get('/original/projects/'+id);
+  dS.oProjectLoading = false;
   if(r.code!==200){ dToast(r.msg||'加载失败'); return; }
   dS.oProject = r.data.project || null;
   if(dS.oProject) dS.oProject.artifacts = dS.oProject.artifacts || {};
   dS.oMessages = r.data.messages || [];
   dS.oBound = r.data.boundMaterials || [];
-  dS.oRight = 'doc'; dS.oInput=''; dS.oView='workspace';
-  dRender(); dOScrollChat();
+  if(dS.oView==='workspace') { dRender(); dOScrollChat(); }
 }
 
 /* ---------- 工作台（三栏） ---------- */
