@@ -3567,7 +3567,7 @@ async function enterFeaturedMode() {
 async function loadFeaturedIndustries() {
   if (!S.featuredIndustriesList || S.featuredIndustriesList.length === 0) S.featuredIndustriesLoading = true;
   try {
-    const r = await fetch('/api/industry-videos/industries').then(x => x.json());
+    const r = await api.get('/industry-videos/industries');
     if (r.code === 200 && Array.isArray(r.data)) {
       setState({ featuredIndustriesList: r.data, featuredIndustriesLoading: false });
       render();
@@ -3659,7 +3659,7 @@ async function featuredSelectIndustry(ind) {
   setState({ featuredIndustry: ind, featuredPage: 'content', featuredSelectedIdx: null, featuredDetailIdx: null, featuredVideos: [], featuredLoading: true, featuredErr: '' });
   render();
   try {
-    const r = await fetch(`/api/industry-videos?industry=${encodeURIComponent(ind)}&limit=15`).then(x => x.json());
+    const r = await api.get(`/industry-videos?industry=${encodeURIComponent(ind)}&limit=15`);
     if (r.code === 200) {
       setState({ featuredVideos: r.data || [], featuredLoading: false });
     } else {
@@ -3734,7 +3734,7 @@ async function featuredConfirm() {
   setState({ featuredPage: 'content', featuredVideos: [], featuredLoading: true, featuredErr: '', featuredSelectedIdx: null });
   render();
   try {
-    const r = await fetch(`/api/industry-videos?industry=${encodeURIComponent(S.featuredIndustry)}&limit=15`).then(x => x.json());
+    const r = await api.get(`/industry-videos?industry=${encodeURIComponent(S.featuredIndustry)}&limit=15`);
     setState({ featuredVideos: r.code === 200 ? (r.data || []) : [], featuredLoading: false, featuredErr: r.code !== 200 ? (r.msg || '加载失败') : '' });
   } catch(e) {
     setState({ featuredErr: '网络错误，请重试', featuredLoading: false });
@@ -8757,7 +8757,7 @@ async function toggleBenchmarkMaterial(id) {
   const pid = S.originalProject.id;
   try {
     if (isOn) {
-      await fetch(`/api/original/projects/${pid}/materials/${id}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + S.token } });
+      await api.del(`/original/projects/${pid}/materials/${id}`);
       setState({ originalBoundMaterials: bound.filter(m => m.id !== id) });
     } else {
       const r = await api.post(`/original/projects/${pid}/materials`, { materialIds: [id] });
@@ -8813,8 +8813,7 @@ async function loadMaterials() {
   if (S.originalMaterialsLoading) return;
   setState({ originalMaterialsLoading: true });
   try {
-    const r = await fetch('/api/original/materials', { headers: { Authorization: 'Bearer ' + S.token } });
-    const j = await r.json();
+    const j = await api.get('/original/materials');
     setState({ originalMaterials: j.data || [], originalMaterialsLoaded: true, originalMaterialsLoading: false });
   } catch(e) {
     setState({ originalMaterialsLoading: false });
@@ -8839,7 +8838,7 @@ function _toggleMaterialLearn(id) {
 
 async function deleteMaterial(id) {
   if (!confirm('确认删除这条素材？')) return;
-  await fetch(`/api/original/materials/${id}`, { method:'DELETE', headers:{ Authorization:'Bearer '+S.token }});
+  await api.del(`/original/materials/${id}`);
   setState({
     originalMaterials: (S.originalMaterials||[]).filter(m=>m.id!==id),
     originalMaterialsSelected: (S.originalMaterialsSelected||[]).filter(x=>x!==id)
@@ -8851,12 +8850,7 @@ async function saveMaterialText() {
   const title = (document.getElementById('mat-title')?.value || S.originalExtractTitle || '').trim();
   const content = (document.getElementById('mat-content')?.value || S.originalExtractContent || '').trim();
   if (!content) return;
-  const r = await fetch('/api/original/materials', {
-    method: 'POST',
-    headers: { 'Content-Type':'application/json', Authorization:'Bearer '+S.token },
-    body: JSON.stringify({ title: title||null, rawContent: content, sourceType: 'text' })
-  });
-  const j = await r.json();
+  const j = await api.post('/original/materials', { title: title||null, rawContent: content, sourceType: 'text' });
   if (j.code === 200) {
     setState({ originalView:'materials', originalExtractContent:'', originalExtractTitle:'' });
     await loadMaterials();
@@ -8871,12 +8865,7 @@ async function extractMaterialUrl() {
   setState({ originalExtractUrlLoading: true, originalExtractUrlResult: null });
   render();
   try {
-    const r = await fetch('/api/original/learning/extract', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json', Authorization:'Bearer '+S.token },
-      body: JSON.stringify({ url, type: 'video' })
-    });
-    const j = await r.json();
+    const j = await api.post('/original/learning/extract', { url, type: 'video' });
     if (j.code===200 && j.data?.items?.[0]) {
       const v = j.data.items[0];
       setState({ originalExtractUrlResult: { title: v.desc||'', script: v.script||'', sourceUrl: url }, originalExtractUrlLoading: false });
@@ -8895,12 +8884,7 @@ async function saveMaterialFromUrl() {
   const result = S.originalExtractUrlResult;
   if (!result) return;
   const content = (document.getElementById('mat-url-content')?.value || result.script || '').trim();
-  const r = await fetch('/api/original/materials', {
-    method: 'POST',
-    headers: { 'Content-Type':'application/json', Authorization:'Bearer '+S.token },
-    body: JSON.stringify({ title: result.title||null, rawContent: content, sourceUrl: result.sourceUrl, sourceType: 'video' })
-  });
-  const j = await r.json();
+  const j = await api.post('/original/materials', { title: result.title||null, rawContent: content, sourceUrl: result.sourceUrl, sourceType: 'video' });
   if (j.code === 200) {
     setState({ originalView:'materials', originalExtractUrlResult:null, originalExtractUrl:'' });
     await loadMaterials();
@@ -8925,12 +8909,7 @@ async function analyzeFromMaterials() {
   setState({ originalLearningLoading: true, originalLearningResult: null });
   render();
   try {
-    const r = await fetch('/api/original/learning/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json', Authorization:'Bearer '+S.token },
-      body: JSON.stringify({ materialIds: sel, scope })
-    });
-    const j = await r.json();
+    const j = await api.post('/original/learning/analyze', { materialIds: sel, scope });
     if (j.code===200) {
       setState({ originalLearningResult: j.data, originalLearningPhase:'result', originalLearningLoading:false });
     } else {
