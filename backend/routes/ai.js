@@ -750,6 +750,60 @@ router.get('/video/health', requireAuth, async (req, res) => {
   }
 });
 
+// ==================== 本地算力服务状态聚合（离线友好降级）====================
+// 并行探测 数字人(video) / 语音识别(asr) / 声音克隆(tts/IndexTTS) 三个本地服务，
+// 每个 3 秒超时，结果缓存 60 秒，避免每个用户进口播工坊都触发跨境探活。
+let _servicesStatusCache = { data: null, expires: 0 };
+const SERVICES_STATUS_TTL = 60 * 1000;
+
+async function _probeHealth(url, path = '/health', timeoutMs = 3000) {
+  if (!url) return 'down';
+  const httpUrl = normalizeServiceUrl(url).replace(/^https:\/\//i, 'http://');
+  try {
+    const resp = await fetch(`${httpUrl}${path}`, {
+      headers: VIDEO_FETCH_HEADERS,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!resp.ok) return 'down';
+    const ct = resp.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return 'down';
+    const data = await resp.json().catch(() => null);
+    if (data && (data.status === 'ok' || data.ok === true)) return 'up';
+    return 'down';
+  } catch {
+    return 'down';
+  }
+}
+
+router.get('/services-status', requireAuth, async (req, res) => {
+  const now = Date.now();
+  if (_servicesStatusCache.data && _servicesStatusCache.expires > now) {
+    return res.json({ code: 200, data: _servicesStatusCache.data, cached: true });
+  }
+  try {
+    const { rows } = await db.query(
+      "SELECT config_key, value FROM system_config WHERE config_key IN ('asr_url','video_url')"
+    );
+    const cfg = {};
+    rows.forEach(r => { cfg[r.config_key] = normalizeServiceUrl(r.value); });
+    const asrUrl = cfg.asr_url || '';
+    const videoUrl = cfg.video_url || asrUrl; // video_url 空时降级用 asr_url
+
+    // 三路并行探测：video → video_url/health，asr → asr_url/health，tts → asr_url/tts/indextts/health
+    const [video, asr, tts] = await Promise.all([
+      _probeHealth(videoUrl, '/health'),
+      _probeHealth(asrUrl, '/health'),
+      _probeHealth(asrUrl, '/tts/indextts/health'),
+    ]);
+
+    const data = { video, asr, tts };
+    _servicesStatusCache = { data, expires: now + SERVICES_STATUS_TTL };
+    res.json({ code: 200, data });
+  } catch (e) {
+    res.json({ code: 500, msg: e.message });
+  }
+});
+
 // ==================== 声音库 ====================
 router.get('/voices', requireAuth, async (req, res) => {
   try {
@@ -1034,6 +1088,21 @@ router.post('/video/postprocess', requireAuth, async (req, res) => {
   } catch (e) {
     const isTimeout = e.message && (e.message.includes('timeout') || e.message.includes('aborted'));
     return res.json({ code: 500, msg: isTimeout ? '字幕烧录超时，视频较长时请重试' : `字幕烧录失败: ${e.message}` });
+  }
+});
+
+// 音频代理：服务端下载 OSS URL 返回 base64，解决浏览器直请求 OSS CORS 问题
+router.post('/proxy-audio', requireAuth, async (req, res) => {
+  const { url } = req.body;
+  if (!url || typeof url !== 'string') return res.json({ code: 400, msg: 'url 不能为空' });
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!resp.ok) return res.json({ code: 500, msg: `音频下载失败: HTTP ${resp.status}` });
+    const buf = await resp.arrayBuffer();
+    const audio = Buffer.from(buf).toString('base64');
+    return res.json({ code: 200, data: { audio } });
+  } catch (e) {
+    return res.json({ code: 500, msg: `音频代理失败: ${e.message}` });
   }
 });
 

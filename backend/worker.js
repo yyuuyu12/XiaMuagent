@@ -386,6 +386,32 @@ async function processCloneRewritePhase(taskId, existing) {
 
 const TASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 分钟上限
 
+// 判断错误是否属于「本地渲染算力离线」（ASR/IndexTTS/数字人 未启动或 frp 穿透断开）
+// 这类错误是可恢复的：服务恢复后任务应自动续跑，而不是直接判失败让用户重来。
+function isRenderOfflineError(msg) {
+  if (!msg) return false;
+  const m = String(msg);
+  return /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|fetch failed|未启动|连接失败|连接超时|穿透|本地ASR提交失败|\b50[234]\b|frp/i.test(m)
+    && /asr|ASR|本地|whisper|tts|indextts|数字人|穿透|frp/i.test(m);
+}
+
+const PAUSED_REASON = '渲染服务离线，恢复后自动继续';
+
+// 探测本地 ASR 是否在线（auto-resume 用），3 秒超时
+async function probeAsrOnline() {
+  try {
+    const { rows } = await db.query("SELECT value FROM system_config WHERE config_key='asr_url'");
+    let url = (rows[0]?.value || '').trim().replace(/\/+$/, '').replace(/^https:\/\//i, 'http://');
+    if (!url) return false;
+    const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
+    if (!resp.ok) return false;
+    const ct = resp.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return false;
+    const data = await resp.json().catch(() => null);
+    return !!(data && data.status === 'ok');
+  } catch { return false; }
+}
+
 // ===== 注册任务处理器 =====
 taskRunner.setHandler(async (job) => {
   const { taskId, type } = job;
@@ -406,6 +432,15 @@ taskRunner.setHandler(async (job) => {
     await Promise.race([processPromise, timeoutPromise]);
     console.log(`[Worker] 任务完成: ${taskId}`);
   } catch (err) {
+    // 本地渲染算力离线 → 标记 paused（不是 failed），服务恢复后自动续跑
+    if (isRenderOfflineError(err.message)) {
+      console.warn(`[Worker] 任务暂停（渲染服务离线）: ${taskId} — ${err.message}`);
+      await db.query(
+        'UPDATE tasks SET status = $1, error_msg = $2, updated_at = NOW() WHERE id = $3',
+        ['paused', PAUSED_REASON, taskId]
+      ).catch(() => {});
+      return; // 不抛出，避免 TaskRunner 视作致命失败
+    }
     console.error(`[Worker] 任务失败: ${taskId}`, err.message);
     await db.query(
       'UPDATE tasks SET status = $1, error_msg = $2, updated_at = NOW() WHERE id = $3',
@@ -414,6 +449,30 @@ taskRunner.setHandler(async (job) => {
     throw err;
   }
 });
+
+// ===== 暂停任务自动恢复：每 30 秒探测 ASR，恢复后重新入队 paused 任务 =====
+(function scheduleResumePaused() {
+  const taskRunner = require('./taskRunner');
+  setInterval(async () => {
+    try {
+      const { rows } = await db.query("SELECT id, type FROM tasks WHERE status = 'paused'");
+      if (!rows.length) return;
+      const online = await probeAsrOnline();
+      if (!online) return;
+      for (const t of rows) {
+        // 复位为 pending 再入队，避免 processCloneVideo 的 done/failed 早退判断误拦
+        await db.query(
+          "UPDATE tasks SET status='pending', error_msg='', updated_at=NOW() WHERE id=$1 AND status='paused'",
+          [t.id]
+        ).catch(() => {});
+        console.log(`[Worker] 渲染服务已恢复，重新入队任务 ${t.id} (${t.type})`);
+        taskRunner.enqueue({ taskId: t.id, type: t.type });
+      }
+    } catch (e) {
+      console.error('[Worker] 恢复暂停任务异常:', e.message);
+    }
+  }, 30000);
+})();
 
 // ===== 启动时清理卡住的任务 =====
 (async () => {

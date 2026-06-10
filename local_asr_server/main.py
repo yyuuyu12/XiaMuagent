@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 import whisper
 import ffmpeg
 import tempfile
@@ -200,6 +201,19 @@ async def tts_indextts_proxy(payload: dict):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/tts/indextts/health")
+async def tts_indextts_health():
+    """探测 IndexTTS 服务（端口 8766）是否在线，供云端 /services-status 聚合调用"""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(f"{INDEXTTS_URL}/health")
+            if resp.status_code == 200:
+                return {"status": "ok"}
+    except Exception:
+        pass
+    raise HTTPException(status_code=503, detail="IndexTTS 服务未启动")
 
 
 @app.post("/tts/indextts/register_voice")

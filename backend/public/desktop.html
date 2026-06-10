@@ -682,6 +682,8 @@ const dS = {
   videoUrl: '', extractPlatform: 'douyin',
   extractedScript: '', extractLoading: false, extractErr: '',
   rewrittenScript: '', rewriteStyle: '', rewriteLoading: false, rewriteErr: '',
+  // 本地算力服务状态（离线友好降级）：{ video, asr, tts } | null
+  svcStatus: null, svcProbing: false, _svcAt: 0,
   // TTS —— 系统声音硬编码，不调 voices 接口
   ttsAudioUrl: null, ttsAudioB64: null,
   ttsVoiceId: 'xiaoxiao', ttsEmotion: 'neutral', ttsIntensity: 0.7,
@@ -741,6 +743,7 @@ function dGoPage(page) {
   document.querySelectorAll('.d-nav-item').forEach(el => el.classList.remove('active'));
   const navMap = { home:'dNavHome', tasks:'dNavTasks', voices:'dNavVoices', avatars:'dNavAvatars', original:'dNavOriginal', profile:'' };
   if (navMap[page]) document.getElementById(navMap[page])?.classList.add('active');
+  if (page === 'home') dProbeServices();
   dRender();
 }
 
@@ -896,6 +899,8 @@ function dRenderHome() {
     </div>
 
     ${stepBar}
+
+    ${dSvcBanner()}
 
     <!-- 2列网格，3行各2个卡片 -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -1856,7 +1861,40 @@ function dResetAvatar() {
 /* ① 提取 —— 和手机端完全相同：先 clone-start，再轮询 /tasks/:id */
 let _dExtractPoller = null;
 
+// ===== 本地算力服务状态探测（离线友好降级）=====
+async function dProbeServices(force) {
+  if (dS.svcProbing) return;
+  if (!force && dS.svcStatus && Date.now() - (dS._svcAt || 0) < 60000) return;
+  dS.svcProbing = true;
+  try {
+    const r = await dHttp.get('/ai/services-status');
+    if (r.code === 200 && r.data) { dS.svcStatus = r.data; dS._svcAt = Date.now(); }
+  } catch {}
+  dS.svcProbing = false;
+  dRender();
+}
+// 操作前预检：对应服务离线则拦截。返回 true = 已拦截
+function dSvcBlocked(kind) {
+  if (dS.svcStatus && dS.svcStatus[kind] === 'down') {
+    dToast('渲染服务维护中，请稍后再试');
+    return true;
+  }
+  return false;
+}
+// 渲染服务离线提示横幅 HTML（口播工坊页用）
+function dSvcBanner() {
+  const s = dS.svcStatus;
+  if (!s) return '';
+  const down = [];
+  if (s.asr === 'down') down.push('语音识别');
+  if (s.tts === 'down') down.push('声音克隆');
+  if (s.video === 'down') down.push('数字人');
+  if (!down.length) return '';
+  return `<div style="background:#FFF4E5;border:1px solid #FFD9A8;border-radius:12px;padding:12px 16px;margin-bottom:16px;color:#7A5A2E;font-size:13px;line-height:1.6">⚠️ <b>${down.join('、')}</b>服务正在维护中，相关步骤暂时不可用，已生成的内容不受影响。请稍后再试。</div>`;
+}
+
 async function dHandleExtract() {
+  if (dSvcBlocked('asr')) return;
   const url = document.getElementById('dVideoUrl')?.value?.trim() || dS.videoUrl;
   if (!url) { dToast('请输入视频链接'); return; }
   dS.videoUrl = url;
@@ -1894,6 +1932,10 @@ function _dStartExtractPoller(taskId) {
         clearInterval(_dExtractPoller); _dExtractPoller = null;
         dS.extractLoading = false;
         dS.extractErr = task.error_msg || '提取失败';
+        dRender();
+      } else if (task.status === 'paused') {
+        // 渲染服务离线：保持轮询，恢复后任务会自动续跑（worker 自动 resume）
+        dS.extractErr = '渲染服务离线，恢复后自动继续';
         dRender();
       }
       // pending / running 继续等
@@ -1953,6 +1995,7 @@ function _dWaitRewrite(taskId) {
 
 /* ③ TTS —— 与手机端对齐：统一字段 voice，IndexTTS 异步轮询 */
 async function dHandleTTS() {
+  if (dSvcBlocked('tts')) return;
   const voiceId = document.getElementById('dTtsVoice')?.value || dS.ttsVoiceId;
   if (!voiceId) { dToast('请选择声音'); return; }
   const text = dS.rewrittenScript || dS.extractedScript;
@@ -2164,6 +2207,7 @@ let _dAvatarPoller = null;
 let _dAvatarRunSeq = 0;
 
 async function dHandleAvatarGenerate() {
+  if (dSvcBlocked('video')) return;
   if (!dS.avatarSrcBlobUrl) { dToast('请先上传参考视频'); return; }
   if (!dS.avatarSrcVideoB64) { dToast('视频正在加载中，请稍等…'); return; }
   if (!dS.ttsAudioB64 && !dS.ttsAudioUrl) { dToast('请先完成语音合成（步骤③）'); return; }
@@ -2280,8 +2324,9 @@ function dRenderTasks() {
     : filteredTasks.map(t => {
         const steps = dTaskSteps(t);
         const cur = steps.findIndex(s => s !== 'done');
-        const nextLabel = cur >= 0 ? `去${STEP_LABELS[cur]}` : '已完成';
-        const nextColor = cur >= 0 ? '#F5762A' : '#22C55E';
+        const isPaused = t.status === 'paused';
+        const nextLabel = isPaused ? '等待服务恢复' : (cur >= 0 ? `去${STEP_LABELS[cur]}` : '已完成');
+        const nextColor = isPaused ? '#B0860B' : (cur >= 0 ? '#F5762A' : '#22C55E');
         return `
         <tr onclick="dOpenTask('${t.id}')" style="cursor:pointer">
           <td><div style="font-size:13px;font-weight:500;color:#1A1614;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title || t.videoTitle || '无标题')}</div></td>

@@ -1367,6 +1367,8 @@ const S = {
   wsCodeInput: '', wsCodeMsg: '', wsCodeOk: false, wsCodeLoading: false,
   // 进阶开通引导弹层
   showPremiumGate: false,
+  // 本地算力服务状态（离线友好降级）：{ video:'up'|'down', asr, tts } | null
+  svcStatus: null, svcProbing: false,
 };
 let inspireController = null;
 let extractController = null;
@@ -2025,6 +2027,7 @@ function tHomeTaskSection() {
     const stage = t.stage || '';
     const savedStep = cloneStepOf(t);
     if (t.status === 'failed') return { step: savedStep, phase: 'failed' };
+    if (t.status === 'paused') return { step: savedStep, phase: 'paused' };
     if (t.status === 'pending') {
       if (stage === 'rewrite' || stage === 'extracted') return { step: 2, phase: 'rewrite_pending' };
       return { step: 1, phase: 'pending' };
@@ -2042,6 +2045,7 @@ function tHomeTaskSection() {
   const cloneStatusText = t => {
     const info = clonePhaseOf(t);
     if (info.phase === 'failed') return '失败';
+    if (info.phase === 'paused') return '已暂停';
     if (info.phase === 'pending') return '排队中';
     if (info.phase === 'rewrite_pending') return '等待改写';
     if (info.phase === 'extracting') return '提取中';
@@ -2054,6 +2058,7 @@ function tHomeTaskSection() {
   const cloneHintText = t => {
     const info = clonePhaseOf(t);
     if (info.phase === 'failed') return friendlyError(t.error_msg);
+    if (info.phase === 'paused') return '渲染服务离线，恢复后自动继续';
     if (info.phase === 'pending') return '文案提取排队中';
     if (info.phase === 'rewrite_pending') return '改写任务排队中，请稍候';
     if (info.phase === 'extracting') return t.thinking || '正在提取视频文案，请稍候';
@@ -2072,7 +2077,7 @@ function tHomeTaskSection() {
   };
   const statusText = t => {
     if (t.type === 'clone_video') return cloneStatusText(t);
-    return ({ pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败' }[t.status] || t.status);
+    return ({ pending:'排队中', running:'进行中', extracted:'改写', done:'已完成', failed:'失败', paused:'已暂停' }[t.status] || t.status);
   };
   // 进度条 = 当前阶段的进展，不是总进展（避免与"后台生成"实时进度冲突）
   const bigProgress = t => {
@@ -2099,6 +2104,7 @@ function tHomeTaskSection() {
   const cloneBadgeCls = t => {
     const info = clonePhaseOf(t);
     if (info.phase === 'failed') return 'htc-badge-failed';
+    if (info.phase === 'paused') return 'htc-badge-pending';
     if (info.phase === 'pending') return 'htc-badge-pending';
     if (info.phase === 'extracting' || info.phase === 'rewrite_pending' || info.phase === 'rewriting' || info.phase === 'extracted') return 'htc-badge-extracted';
     return 'htc-badge-done';
@@ -2108,6 +2114,7 @@ function tHomeTaskSection() {
     if (t.type === 'clone_video') {
       const info = clonePhaseOf(t);
       if (info.phase === 'failed') return '查看详情 ›';
+      if (info.phase === 'paused') return '等待服务恢复 ›';
       if (info.phase === 'pending' || info.phase === 'extracting') return '查看提取进展 ›';
       if (info.phase === 'rewrite_pending' || info.phase === 'rewriting') return '查看改写进展 ›';
       if (info.phase === 'extracted') return '查看提取结果 ›';  // step1：文案已提取，待改写
@@ -4440,12 +4447,13 @@ function switchTab(tab) {
     if (!S.cloneHistoryLoaded) loadCloneHistory();
     loadTasks();
   }
-  if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
+  if (tab === 'extract') { if (!S.extractHistoryLoaded) loadExtractHistory(); probeServices(); }
   if (tab === 'agents') loadAgents();
   if (tab === 'workshop') {
     loadPremiumStatus();
     if (!S.cloneHistoryLoaded) loadCloneHistory();
     loadTasks();
+    probeServices();
   }
 }
 function goBack() {
@@ -4498,6 +4506,7 @@ async function loadIndustries() {
 // ===== EXTRACT =====
 async function handleExtract() {
   if (!ensureLoggedIn()) return;
+  if (svcBlocked('asr')) return;
   if (!S.videoUrl.trim() || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   try {
@@ -4711,6 +4720,7 @@ async function handleWorkshopActivateGate() {
 
 async function handleTTSGenerate() {
   if (!ensureLoggedIn()) return;
+  if (svcBlocked('tts')) return;
   const text = (S.rewrittenScript || '').trim();
   // 有音频说明文案曾存在（可能 session 恢复途中临时为空），允许继续
   if (!text && !(S.ttsAudioUrl || S.ttsAudioB64)) { showToast('请先完成文案改写'); setState({ extractStep: 2 }); return; }
@@ -5229,6 +5239,7 @@ function _startBgTTSPoller(ttsJobId, ownerTaskId) {
 }
 
 async function handleAvatarGenerate() {
+  if (svcBlocked('video')) return;
   if (!S.ttsAudioUrl && !S.ttsAudioB64) { showToast('请先完成步骤3语音合成'); return; }
   if (!S.avatarSrcVideoB64 && !S.avatarLibKey) { showToast('请先上传或选择人脸视频'); return; }
   if (S.avatarGenerating) return;
@@ -6894,6 +6905,7 @@ function tHistory() {
   const clonePhaseOfH = t => {
     const savedStep = cloneStepOfH(t);
     if (t.status === 'failed') return { step: savedStep, phase: 'failed' };
+    if (t.status === 'paused') return { step: savedStep, phase: 'paused' };
     if (t.status === 'pending') return { step: savedStep <= 2 ? 1 : savedStep, phase: 'pending' };
     if (t.status === 'running') return { step: savedStep <= 2 ? 1 : savedStep, phase: 'running' };
     if (t.status === 'extracted') return savedStep > 1 ? { step: savedStep, phase: 'step_done' } : { step: 1, phase: 'extracted' };
@@ -6915,6 +6927,7 @@ function tHistory() {
     if (t.type === 'clone_video') {
       const info = clonePhaseOfH(t);
       if (info.phase === 'failed') return '查看详情 ›';
+      if (info.phase === 'paused') return '等待服务恢复 ›';
       if (info.phase === 'pending' || info.phase === 'running') return '查看提取进展 ›';
       if (info.phase === 'extracted') return '查看提取结果 ›';  // step1：文案已提取，待改写
       if (info.phase === 'step_done' || info.phase === 'published') {
@@ -9342,6 +9355,7 @@ function tWorkshopLanding() {
       <div style="font-size:18px;font-weight:700;color:#1A1614">口播工坊</div>
       <span style="background:linear-gradient(135deg,#FFD9A8,#FFB877);color:#7A3D12;font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;display:flex;align-items:center;gap:4px">${crown}进阶版</span>
     </div>
+    ${_svcMaintBanner()}
     <div class="section-label" style="margin-bottom:6px">开始制作</div>
     <div style="font-size:12.5px;color:#9E9890;line-height:1.6;margin-bottom:12px">口播视频从一段文案开始。选择一条已生成的文案，或先去创作新文案。</div>
     <div style="display:flex;flex-direction:column;gap:10px">
@@ -9654,6 +9668,52 @@ async function loadPremiumStatus() {
   } catch {
     setState({ premiumLoaded: true });
   }
+}
+
+// 探测本地算力服务状态（数字人/ASR/IndexTTS），结果用于灰显不可用步骤
+async function probeServices(force) {
+  if (S.svcProbing) return;
+  // 已有结果且非强制：60 秒内不重复探测（后端也有 60 秒缓存）
+  if (!force && S.svcStatus && Date.now() - (S._svcAt || 0) < 60000) return;
+  setState({ svcProbing: true });
+  try {
+    const r = await api.get('/ai/services-status');
+    if (r.code === 200 && r.data) {
+      S._svcAt = Date.now();
+      setState({ svcStatus: r.data, svcProbing: false });
+    } else {
+      setState({ svcProbing: false });
+    }
+  } catch {
+    setState({ svcProbing: false });
+  }
+  render();
+}
+// 渲染服务离线提示横幅（口播工坊落地页用）
+function _svcMaintBanner() {
+  const s = S.svcStatus;
+  if (!s) return '';
+  const down = [];
+  if (s.asr === 'down') down.push('语音识别');
+  if (s.tts === 'down') down.push('声音克隆');
+  if (s.video === 'down') down.push('数字人');
+  if (!down.length) return '';
+  return `<div style="background:#FFF4E5;border:1px solid #FFD9A8;border-radius:14px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">
+    <span style="flex-shrink:0;font-size:15px">⚠️</span>
+    <div style="flex:1;font-size:12.5px;color:#7A5A2E;line-height:1.6">
+      <b>${down.join('、')}</b>服务正在维护中，相关步骤暂时不可用，已生成的内容不受影响。请稍后再试。
+    </div>
+  </div>`;
+}
+
+// 操作前服务预检：若对应服务离线则拦截并提示。返回 true = 已拦截
+function svcBlocked(kind) {
+  const s = S.svcStatus;
+  if (s && s[kind] === 'down') {
+    showToast('渲染服务维护中，请稍后再试');
+    return true;
+  }
+  return false;
 }
 
 // ===== INIT =====
