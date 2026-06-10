@@ -239,9 +239,13 @@ function formatRulesForPrompt(skill) {
   const structLines = [];
   const rules = skill.rules || {};
   for (const [group, arr] of Object.entries(rules)) {
+    // 关键约束：待确认（pending）的规则未经用户采纳，绝不进入生成 prompt
+    if (group === '待确认') continue;
     if (Array.isArray(arr) && arr.length > 0) {
+      const visible = arr.filter(r => !(r && typeof r === 'object' && r.pending));
+      if (!visible.length) continue;
       structLines.push(`【${group}】`);
-      arr.forEach(r => structLines.push(`- ${typeof r === 'string' ? r : r.text}`));
+      visible.forEach(r => structLines.push(`- ${typeof r === 'string' ? r : r.text}`));
     }
   }
   if ((skill.keywords || []).length > 0) {
@@ -256,6 +260,91 @@ function formatRulesForPrompt(skill) {
   }
   if (freeText) return freeText;
   return structLines.length > 0 ? structLines.join('\n') : '（暂无规则）';
+}
+
+// 统一的"自动学到的规则"入口：写入 cw_skills.rules 的 '待确认' 分组，等用户在前端逐条采纳/忽略。
+// 关键：pending 规则不会进入生成 prompt（formatRulesForPrompt 已跳过）。
+// 去重：与全部分组现有条目按"去空格文本"比对；'待确认' 分组上限 10 条，满则移除最旧。
+async function addPendingRule(userId, text, sourceType, source) {
+  const clean = (text || '').trim();
+  if (!clean) return false;
+  try {
+    const skill = await getOrCreateSkill(userId);
+    const rules = skill.rules || {};
+    // 全分组去重
+    const key = clean.replace(/\s+/g, '');
+    for (const arr of Object.values(rules)) {
+      if (Array.isArray(arr) && arr.some(r => {
+        const t = typeof r === 'string' ? r : (r && r.text) || '';
+        return t.replace(/\s+/g, '') === key;
+      })) return false; // 已存在，跳过
+    }
+    if (!Array.isArray(rules['待确认'])) rules['待确认'] = [];
+    rules['待确认'].push({ text: clean, source: source || '', sourceType: sourceType || 'auto', uses: 0, pending: true, at: Date.now() });
+    // 上限 10，移除最旧
+    if (rules['待确认'].length > 10) rules['待确认'] = rules['待确认'].slice(-10);
+    await db.query('UPDATE cw_skills SET rules = ? WHERE user_id = ?', [JSON.stringify(rules), userId]);
+    return true;
+  } catch (e) {
+    console.warn('[addPendingRule] 失败:', e.message);
+    return false;
+  }
+}
+
+// 定稿触发：对比 AI 最后一版（artifacts._aiBaseline）与用户终版（project.doc），提炼写作偏好规则进待确认池。
+// 异步调用、不阻塞响应；失败仅 warn。
+async function extractEditDiffRules(project, userId) {
+  try {
+    const artifacts = parseArtifacts(project);
+    const baseline = artifacts._aiBaseline;
+    const userFinal = (project.doc || '').trim();
+    if (!baseline || baseline.stage !== 'script') return;
+    const aiDoc = (baseline.doc || '').trim();
+    if (!aiDoc || !userFinal) return;
+    if (aiDoc.replace(/\s+/g, '') === userFinal.replace(/\s+/g, '')) return;
+    // 差异门槛：字符级差异量 / 终版长度 < 8% 不学习（只改错别字不值得）
+    const diffAmount = Math.abs(aiDoc.length - userFinal.length)
+      + levenshteinLite(aiDoc.slice(0, 800), userFinal.slice(0, 800));
+    if (userFinal.length > 0 && (diffAmount / userFinal.length) < 0.08) return;
+
+    const prompt = `你是写作风格分析师。下面是 AI 生成的口播剧本初稿和用户亲手修改后的定稿。
+【AI 初稿】${aiDoc.slice(0, 800)}
+【用户定稿】${userFinal.slice(0, 800)}
+任务：对比两版差异，提炼用户的写作偏好，输出 1-3 条可复用的写作规则。
+要求：
+- 每条说清楚「什么情况下，怎么写」，要具体到写法，不要空洞结论
+- 每条 20-50 字，一行一条，以 - 开头
+- 差异若只是错别字或事实修正，输出 SKIP
+只输出规则行或 SKIP。`;
+    const raw = (await callAI(prompt, { temperature: 0.3, maxTokens: 300 })).trim();
+    if (!raw || /^SKIP/i.test(raw)) return;
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.startsWith('-'));
+    for (const line of lines) {
+      const ruleText = line.replace(/^-\s*/, '').trim();
+      if (ruleText && !/^SKIP/i.test(ruleText)) {
+        await addPendingRule(userId, ruleText, 'diff', `项目#${project.id}定稿对比`);
+      }
+    }
+  } catch (e) {
+    console.warn('[extractEditDiffRules] 失败:', e.message);
+  }
+}
+
+// 轻量编辑距离（仅用于差异量估算，限长避免性能问题）
+function levenshteinLite(a, b) {
+  a = a || ''; b = b || '';
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
 }
 
 /* ═══════════════════════════════════════
@@ -610,12 +699,18 @@ router.patch('/projects/:id', requireAuth, async (req, res) => {
     const project = await getProject(projectId, req.userId);
     if (!project) return res.status(404).json({ code: 404, msg: '项目不存在' });
 
-    if (status) {
-      await db.query('UPDATE cw_original_projects SET status = ? WHERE id = ?', [status, projectId]);
-    }
-    // 手动保存当前阶段活文档（PC 编辑器保存按钮）
+    // 手动保存当前阶段活文档（PC 编辑器保存按钮）——先于定稿判断写入，确保 diff 用到最新终版
     if (typeof doc === 'string') {
       await db.query('UPDATE cw_original_projects SET doc = ? WHERE id = ?', [doc, projectId]);
+    }
+    if (status) {
+      await db.query('UPDATE cw_original_projects SET status = ? WHERE id = ?', [status, projectId]);
+      // 定稿触发 diff 学习（异步，不阻塞响应）
+      if (status === 'final') {
+        getProject(projectId, req.userId)
+          .then(p => p && extractEditDiffRules(p, req.userId))
+          .catch(e => console.warn('[extractEditDiffRules] PATCH final:', e.message));
+      }
     }
     if (msgId && syncDone) {
       await db.query('UPDATE cw_original_messages SET sync_done = ? WHERE id = ? AND project_id = ?', [syncDone, msgId, projectId]);
@@ -808,16 +903,20 @@ ${history}`;
       // 历史阶段编辑 → 更新 artifacts 字段，不动 project.doc
       const currentArtifacts = parseArtifacts(project);
       currentArtifacts[effectiveStage] = newDoc;
+      // 记录 AI 基线供定稿 diff 学习（_ 开头为内部数据，前端跳过渲染）
+      currentArtifacts._aiBaseline = { stage: effectiveStage, doc: newDoc, at: Date.now() };
       await db.query(
         'UPDATE cw_original_projects SET artifacts = ?, turns = turns + 1 WHERE id = ?',
         [JSON.stringify(currentArtifacts), projectId]
       );
       artifactKey = effectiveStage;
     } else if (hasDocUpdate) {
-      // 当前阶段生成 → 更新活文档
+      // 当前阶段生成 → 更新活文档，同步记录 AI 基线
+      const currentArtifacts = parseArtifacts(project);
+      currentArtifacts._aiBaseline = { stage: effectiveStage, doc: newDoc, at: Date.now() };
       await db.query(
-        'UPDATE cw_original_projects SET doc = ?, turns = turns + 1 WHERE id = ?',
-        [newDoc, projectId]
+        'UPDATE cw_original_projects SET doc = ?, artifacts = ?, turns = turns + 1 WHERE id = ?',
+        [newDoc, JSON.stringify(currentArtifacts), projectId]
       );
     } else {
       await db.query('UPDATE cw_original_projects SET turns = turns + 1 WHERE id = ?', [projectId]);
@@ -882,6 +981,10 @@ router.post('/projects/:id/stage/advance', requireAuth, async (req, res) => {
     if (!nextStage) {
       // 已是最后一步：标记完成
       await db.query("UPDATE cw_original_projects SET status = 'final' WHERE id = ?", [projectId]);
+      // 定稿触发 diff 学习（异步，不阻塞响应）
+      getProject(projectId, req.userId)
+        .then(p => p && extractEditDiffRules(p, req.userId))
+        .catch(e => console.warn('[extractEditDiffRules] advance done:', e.message));
       return res.json({ code: 200, data: { done: true, stage, status: 'final' } });
     }
     const curDraft = (project.doc || '').trim();
@@ -914,7 +1017,10 @@ router.post('/projects/:id/stage/advance', requireAuth, async (req, res) => {
     });
 
     if (gen.hasDocUpdate) {
-      await db.query('UPDATE cw_original_projects SET doc = ?, turns = turns + 1 WHERE id = ?', [gen.newDoc, projectId]);
+      // 记录 AI 基线供定稿 diff 学习
+      const advArtifacts = parseArtifacts(freshProject);
+      advArtifacts._aiBaseline = { stage: nextStage, doc: gen.newDoc, at: Date.now() };
+      await db.query('UPDATE cw_original_projects SET doc = ?, artifacts = ?, turns = turns + 1 WHERE id = ?', [gen.newDoc, JSON.stringify(advArtifacts), projectId]);
     }
     const { rows: ins } = await db.query(
       "INSERT INTO cw_original_messages (project_id, role, content, has_doc_update, sync_label, sync_done, stage) VALUES (?, 'ai', ?, ?, ?, NULL, ?)",
