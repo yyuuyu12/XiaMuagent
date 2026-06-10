@@ -34,6 +34,12 @@ async function getTikhubKey() {
   return rows?.[0]?.value || '';
 }
 
+// 读取单个 system_config 配置值
+async function getConfigVal(key) {
+  const { rows } = await db.query('SELECT value FROM system_config WHERE config_key = ?', [key]);
+  return rows?.[0]?.value || '';
+}
+
 // 从用户输入（可能是分享文本、短链、完整链接）中提取可用的抖音视频 URL
 function extractDouyinVideoUrl(input) {
   const text = input.trim();
@@ -413,7 +419,11 @@ async function generateStageReply({ project, skill, stage, boundMaterials, histo
   const artifacts = parseArtifacts(project);
   const currentDraft = currentDraftOverride !== undefined ? currentDraftOverride : (project.doc || '');
   const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft });
-  const aiRaw = await callAI(systemPrompt + '\n\n用户：' + userMessage, { maxTokens: 4000, temperature: 0.85 });
+  // 写稿环节用一线模型（管理后台 ai_model_creation 配置；留空走默认）；bypassCap 避免长稿被中转站默认上限砍断
+  const creationModel = (await getConfigVal('ai_model_creation')).trim();
+  const callOpts = { maxTokens: 4000, temperature: 0.65, bypassCap: true };
+  if (creationModel) callOpts.model = creationModel;
+  const aiRaw = await callAI(systemPrompt + '\n\n用户：' + userMessage, callOpts);
 
   const tag = STAGE_META[stage].tag;
   const parsed = extractStageDoc(aiRaw, stage);
@@ -425,6 +435,21 @@ async function generateStageReply({ project, skill, stage, boundMaterials, histo
     hasDocUpdate = 1;
     const before = aiRaw.split(`【${tag}】`)[0].trim();
     aiSummary = before || `已更新${STAGE_META[stage].name}。`;
+  } else {
+    // 截断检测：有开标签但缺闭标签 → 视为被砍断，取残稿（残稿也比不更新强）
+    const openTag = `【${tag}】`;
+    const openIdx = aiRaw.indexOf(openTag);
+    if (openIdx !== -1 && !aiRaw.includes(`【/${tag}】`)) {
+      const partial = aiRaw.slice(openIdx + openTag.length).trim();
+      if (partial) {
+        newDoc = partial;
+        hasDocUpdate = 1;
+        const before = aiRaw.slice(0, openIdx).trim();
+        aiSummary = (before || `已更新${STAGE_META[stage].name}。`)
+          + '（本次输出可能不完整，建议点重新生成，或在设置里缩短目标时长）';
+        console.warn('[Truncated]', stage, project.id);
+      }
+    }
   }
 
   // sync_label 仅在剧本阶段提炼（与原逻辑一致）

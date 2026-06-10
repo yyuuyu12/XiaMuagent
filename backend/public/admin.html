@@ -238,6 +238,19 @@
             <input id="max_tokens_cap" placeholder="0" style="max-width:160px" />
             <div class="hint">第三方中转服务有限制时填写（如 xcode.best gpt-5.5 填 1200）；官方 OpenAI / DeepSeek 填 0 或留空表示不限制</div>
           </div>
+          <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <label>创作专用模型（ai_model_creation）</label>
+            <input id="ai_model_creation" placeholder="留空用默认模型，如 deepseek-chat" />
+            <div class="hint">原创工坊写稿环节（方向/粗纲/细纲/剧本）专用模型；聊天、提取等便宜任务仍走默认模型。建议配一线模型（如 deepseek-chat / Claude Sonnet）控制成本又保证质量。</div>
+          </div>
+          <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <label>剧本质检开关（critic_enabled）</label>
+            <select id="critic_enabled" style="max-width:160px">
+              <option value="0">关闭</option>
+              <option value="1">开启</option>
+            </select>
+            <div class="hint">开启后剧本阶段生成完会自动按禁区词/字数/钩子/口语化自查一遍，不合格自动重写一轮（单次生成耗时增加约 8→20 秒）。</div>
+          </div>
           <button class="btn-primary" onclick="saveKeys()">保存 AI 配置</button>
         </div>
 
@@ -576,6 +589,8 @@ async function loadKeys() {
   document.getElementById('deepseek_api_key').value = d.deepseek_api_key || '';
   document.getElementById('deepseek_model').value = d.deepseek_model || '';
   document.getElementById('max_tokens_cap').value = d.max_tokens_cap || '';
+  document.getElementById('ai_model_creation').value = d.ai_model_creation || '';
+  document.getElementById('critic_enabled').value = d.critic_enabled || '0';
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
   document.getElementById('asr_url').value = d.asr_url || '';
   document.getElementById('video_url').value = d.video_url || '';
@@ -599,6 +614,8 @@ async function saveKeys() {
     deepseek_api_key: document.getElementById('deepseek_api_key').value,
     deepseek_model: document.getElementById('deepseek_model').value,
     max_tokens_cap: document.getElementById('max_tokens_cap').value,
+    ai_model_creation: document.getElementById('ai_model_creation').value,
+    critic_enabled: document.getElementById('critic_enabled').value,
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
     asr_url: document.getElementById('asr_url').value,
     video_url: document.getElementById('video_url').value,

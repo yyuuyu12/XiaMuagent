@@ -193,6 +193,14 @@ async function initDb() {
   await db.query(
     `INSERT IGNORE INTO system_config (config_key, value) VALUES ('deepseek_model', 'deepseek-chat')`
   );
+  // 创作类任务（方向/粗纲/细纲/剧本）专用模型，留空则用默认模型
+  await db.query(
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('ai_model_creation', '')`
+  );
+  // 剧本质检开关 '1'/'0'（任务5）
+  await db.query(
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('critic_enabled', '0')`
+  );
 
   // tasks 表
   await db.query(`

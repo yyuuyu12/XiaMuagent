@@ -5,7 +5,9 @@ async function getAIConfig() {
     'ai_provider', 'openai_api_key', 'openai_base_url', 'openai_model',
     'claude_api_key', 'claude_model', 'qwen_api_key', 'qwen_model',
     'zhipu_api_key', 'zhipu_model', 'deepseek_api_key', 'deepseek_model',
-    'max_tokens_cap',  // 各服务商的输出 token 上限，0 = 不限制
+    'max_tokens_cap',     // 各服务商的输出 token 上限，0 = 不限制
+    'ai_model_creation',  // 创作类任务（方向/粗纲/细纲/剧本）专用模型，留空用默认
+    'critic_enabled',     // 剧本质检开关 '1'/'0'
   ];
   const cfg = {};
   for (const k of keys) {
@@ -22,12 +24,14 @@ async function callAI(prompt, opts = {}) {
   // 0 或不填 = 不限制；设置了就强制不超过该值
   const configCap = parseInt(cfg.max_tokens_cap || '0') || 0;
   const rawMax = opts.maxTokens || 2000;
-  const maxTokens = configCap > 0 ? Math.min(rawMax, configCap) : rawMax;
+  // opts.bypassCap=true 时忽略全局 max_tokens_cap（用于长稿剧本，避免被中转站默认上限静默砍断）
+  const maxTokens = (configCap > 0 && !opts.bypassCap) ? Math.min(rawMax, configCap) : rawMax;
 
   if (provider === 'openai' || provider === 'qwen') {
     const apiKey = provider === 'openai' ? cfg.openai_api_key : cfg.qwen_api_key;
     const baseUrl = cfg.openai_base_url || 'https://api.openai.com/v1';
-    const model = provider === 'openai' ? (cfg.openai_model || 'gpt-3.5-turbo') : (cfg.qwen_model || 'qwen-turbo');
+    // opts.model 覆盖配置中的默认模型名（用于给写稿环节单配一线模型）
+    const model = opts.model || (provider === 'openai' ? (cfg.openai_model || 'gpt-3.5-turbo') : (cfg.qwen_model || 'qwen-turbo'));
     if (!apiKey) throw new Error('AI Key 未配置，请联系管理员');
 
     const body = { model, messages: [{ role: 'user', content: prompt }], temperature: opts.temperature || 0.8, max_tokens: maxTokens };
@@ -45,7 +49,7 @@ async function callAI(prompt, opts = {}) {
 
   if (provider === 'claude') {
     const apiKey = cfg.claude_api_key;
-    const model = cfg.claude_model || 'claude-3-5-haiku-20241022';
+    const model = opts.model || cfg.claude_model || 'claude-3-5-haiku-20241022';
     if (!apiKey) throw new Error('Claude Key 未配置');
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -61,12 +65,12 @@ async function callAI(prompt, opts = {}) {
 
   if (provider === 'zhipu' || provider === 'glm') {
     const apiKey = cfg.zhipu_api_key;
-    const model = cfg.zhipu_model || 'glm-4-flash';
+    const model = opts.model || cfg.zhipu_model || 'glm-4-flash';
     if (!apiKey) throw new Error('智谱 AI Key 未配置');
     const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: opts.temperature || 0.8, max_tokens: maxTokens }),
     });
     if (!response.ok) throw new Error(`智谱接口错误: ${await response.text()}`);
     const data = await response.json();
@@ -77,7 +81,7 @@ async function callAI(prompt, opts = {}) {
 
   if (provider === 'deepseek') {
     const apiKey = cfg.deepseek_api_key;
-    const model = cfg.deepseek_model || 'deepseek-chat';
+    const model = opts.model || cfg.deepseek_model || 'deepseek-chat';
     if (!apiKey) throw new Error('DeepSeek Key 未配置，请在后台填写 deepseek_api_key');
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
