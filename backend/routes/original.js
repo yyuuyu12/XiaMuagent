@@ -227,27 +227,42 @@ async function getProject(projectId, userId) {
   return p;
 }
 
+// 遍历"可见"结构化规则（跳过 待确认 分组与所有 pending 条目），按稳定顺序返回。
+// 返回 [{ group, idx, text }]，下标 i 对应规则编号 [R(i+1)]。
+// 关键：formatRulesForPrompt 编号与 incrementRuleUses 写回必须共用此函数，确保编号-条目一一对应。
+function iterateVisibleRules(skill) {
+  const out = [];
+  const rules = (skill && skill.rules) || {};
+  for (const [group, arr] of Object.entries(rules)) {
+    if (group === '待确认') continue;           // pending 分组整体跳过
+    if (!Array.isArray(arr)) continue;
+    arr.forEach((r, idx) => {
+      if (r && typeof r === 'object' && r.pending) return; // 单条 pending 跳过
+      const text = typeof r === 'string' ? r : (r && r.text) || '';
+      if (!text) return;
+      out.push({ group, idx, text });
+    });
+  }
+  return out;
+}
+
 // 把 rules 对象格式化成文本供 AI 读取
 // 若用户写了 freeText（自由编辑模式），优先使用它；结构化规则作为补充追加
+// 结构化规则带稳定编号 [R1][R2]…（按 iterateVisibleRules 顺序），用于 USED 使用回执
 function formatRulesForPrompt(skill) {
   if (!skill) return '（暂无规则）';
 
   // 自由文本优先
   const freeText = (skill.freeText || '').trim();
 
-  // 结构化规则
+  // 结构化规则（带编号）
   const structLines = [];
-  const rules = skill.rules || {};
-  for (const [group, arr] of Object.entries(rules)) {
-    // 关键约束：待确认（pending）的规则未经用户采纳，绝不进入生成 prompt
-    if (group === '待确认') continue;
-    if (Array.isArray(arr) && arr.length > 0) {
-      const visible = arr.filter(r => !(r && typeof r === 'object' && r.pending));
-      if (!visible.length) continue;
-      structLines.push(`【${group}】`);
-      visible.forEach(r => structLines.push(`- ${typeof r === 'string' ? r : r.text}`));
-    }
-  }
+  const visible = iterateVisibleRules(skill);
+  let curGroup = null;
+  visible.forEach((v, i) => {
+    if (v.group !== curGroup) { structLines.push(`【${v.group}】`); curGroup = v.group; }
+    structLines.push(`- [R${i + 1}] ${v.text}`);
+  });
   if ((skill.keywords || []).length > 0) {
     structLines.push(`【高频词】${skill.keywords.join('、')}`);
   }
@@ -260,6 +275,45 @@ function formatRulesForPrompt(skill) {
   }
   if (freeText) return freeText;
   return structLines.length > 0 ? structLines.join('\n') : '（暂无规则）';
+}
+
+// 按编号给规则 uses +1 写回。ruleNumbers 为 USED 行解析出的编号数组（1-based）。
+// 字符串型规则会就地升级为 { text, uses } 对象。解析/写回失败静默。
+async function incrementRuleUses(userId, skill, ruleNumbers) {
+  if (!ruleNumbers || !ruleNumbers.length) return;
+  try {
+    const visible = iterateVisibleRules(skill);
+    const rules = skill.rules || {};
+    let changed = false;
+    for (const n of ruleNumbers) {
+      const v = visible[n - 1];
+      if (!v) continue;
+      const arr = rules[v.group];
+      if (!Array.isArray(arr) || arr[v.idx] === undefined) continue;
+      let entry = arr[v.idx];
+      if (typeof entry === 'string') { entry = { text: entry, uses: 0 }; arr[v.idx] = entry; }
+      entry.uses = (entry.uses || 0) + 1;
+      changed = true;
+    }
+    if (changed) await db.query('UPDATE cw_skills SET rules = ? WHERE user_id = ?', [JSON.stringify(rules), userId]);
+  } catch (e) {
+    console.warn('[incrementRuleUses] 失败:', e.message);
+  }
+}
+
+// 从 AI 原始输出解析 USED 行的规则编号（去重）
+function parseUsedRuleNumbers(raw) {
+  const m = (raw || '').match(/USED\s*[:：]\s*([^\n]*)/i);
+  if (!m) return [];
+  const nums = [];
+  const re = /R(\d+)/gi; let mm;
+  while ((mm = re.exec(m[1])) !== null) nums.push(parseInt(mm[1], 10));
+  return [...new Set(nums)];
+}
+
+// 从任意文本剥离 USED 行（用户不应看到使用回执）
+function stripUsedLine(text) {
+  return (text || '').replace(/^[ \t]*USED\s*[:：].*$/gim, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // 统一的"自动学到的规则"入口：写入 cw_skills.rules 的 '待确认' 分组，等用户在前端逐条采纳/忽略。
@@ -505,11 +559,20 @@ ${common}
 - 台词是主体，口语化，不是读稿；画面标注不超过段落的 1/3
 - 强钩子开场 → 内容主体 → 结尾引导
 - 严格控制时长：${durationLabel}
-- 不用"首先其次最后"等书面框架词`;
+- 不用"首先其次最后"等书面框架词
+
+## 规则使用回执
+输出的最后另起一行写 USED:R编号列表（本次实际遵循的规则，如 USED:R1,R3；没有则写 USED:无）。此行不属于剧本内容，用户不会看到。`;
+}
+
+// 目标时长标签（critic 与 prompt 共用）
+function getDurationLabel(meta) {
+  const durationMap = { '30s': '30秒（约75字）', '1min': '1分钟（约150字）', '3min': '3分钟（约450字）' };
+  return durationMap[(meta || {}).duration] || '1分钟';
 }
 
 // 统一的阶段生成：构建 prompt → 调 AI → 解析产出。返回 { aiSummary, newDoc, hasDocUpdate, syncLabel }
-async function generateStageReply({ project, skill, stage, boundMaterials, history, userMessage, currentDraftOverride }) {
+async function generateStageReply({ userId, project, skill, stage, boundMaterials, history, userMessage, currentDraftOverride }) {
   const artifacts = parseArtifacts(project);
   const currentDraft = currentDraftOverride !== undefined ? currentDraftOverride : (project.doc || '');
   const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft });
@@ -543,6 +606,60 @@ async function generateStageReply({ project, skill, stage, boundMaterials, histo
           + '（本次输出可能不完整，建议点重新生成，或在设置里缩短目标时长）';
         console.warn('[Truncated]', stage, project.id);
       }
+    }
+  }
+
+  // ── 规则使用回执（仅 script 阶段）：解析 USED 行 → 给规则 uses+1 → 从用户可见文本剥离 ──
+  if (stage === 'script' && hasDocUpdate) {
+    try {
+      const usedNums = parseUsedRuleNumbers(aiRaw);
+      // 不论是否解析到编号，都把 USED 行从摘要与文档中剥离，避免用户看到
+      aiSummary = stripUsedLine(aiSummary);
+      newDoc = stripUsedLine(newDoc);
+      if (usedNums.length && userId) await incrementRuleUses(userId, skill, usedNums);
+    } catch (e) {
+      console.warn('[USED] 解析失败:', e.message);
+    }
+  }
+
+  // ── critic 质检（仅 script 阶段，critic_enabled='1'）：不合格自动重写一轮（最多一次）──
+  if (stage === 'script' && hasDocUpdate) {
+    try {
+      const criticOn = (await getConfigVal('critic_enabled')).trim();
+      if (criticOn === '1') {
+        const durationLabel = getDurationLabel(project.meta);
+        const forbiddenList = (skill && skill.forbidden && skill.forbidden.length) ? skill.forbidden.join('、') : '无';
+        const checkExtra = (skill && skill.checkPrompt && skill.checkPrompt.trim())
+          ? `\n【用户自定义验收标准】${skill.checkPrompt.trim()}` : '';
+        const criticPrompt = `你是短视频口播剧本的质检员。按以下标准审查剧本，只输出 JSON。
+【剧本】${newDoc}
+【硬性标准】
+1. 字数符合目标：${durationLabel}（允许 ±20%）
+2. 不出现以下禁区内容：${forbiddenList}
+3. 开场前两句必须有钩子（数字/反差/悬念/动作之一），不得自我介绍
+4. 口语化：不出现"首先/其次/综上所述"等书面框架词${checkExtra}
+输出：{"pass": true/false, "issues": ["不通过的具体问题，每条≤30字"]}`;
+        const criticRaw = await callAI(criticPrompt, { temperature: 0.2, maxTokens: 500, bypassCap: true });
+        let verdict = null;
+        const jm = criticRaw.match(/\{[\s\S]*\}/);
+        if (jm) { try { verdict = JSON.parse(jm[0]); } catch { verdict = null; } }
+        if (verdict && verdict.pass === false && Array.isArray(verdict.issues) && verdict.issues.length) {
+          const issues = verdict.issues.slice(0, 8);
+          const rewritePrompt = systemPrompt
+            + `\n\n## 质检反馈（必须全部修正）\n上一版存在以下问题，必须全部修正后重新输出完整剧本：\n${issues.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+            + '\n\n用户：' + userMessage;
+          const reRaw = await callAI(rewritePrompt, callOpts);
+          const reParsed = extractStageDoc(reRaw, stage);
+          if (reParsed !== null) {
+            newDoc = stripUsedLine(reParsed);
+            const before = reRaw.split(`【${tag}】`)[0].trim();
+            aiSummary = (before || `已更新${STAGE_META[stage].name}。`);
+          }
+          aiSummary += `（已按 ${issues.length} 条质检意见自动修正）`;
+        }
+      }
+    } catch (e) {
+      console.warn('[Critic] 质检跳过:', e.message);
     }
   }
 
@@ -1035,6 +1152,7 @@ ${history}`;
       // 历史阶段编辑时，currentDraft 用该阶段的已确认快照（不是 project.doc）
       const currentDraftOverride = isCrossStageEdit ? (artifacts[effectiveStage] || '') : undefined;
       const gen = await generateStageReply({
+        userId: req.userId,
         project, skill, stage: effectiveStage, boundMaterials, history,
         userMessage: message.trim(), currentDraftOverride,
       });
@@ -1156,6 +1274,7 @@ router.post('/projects/:id/stage/advance', requireAuth, async (req, res) => {
     const boundMaterials = await getBoundMaterials(projectId);
     const freshProject = await getProject(projectId, req.userId); // doc 已清空、stage 已更新
     const gen = await generateStageReply({
+      userId: req.userId,
       project: freshProject, skill, stage: nextStage, boundMaterials, history: '',
       userMessage: `请根据已确认的内容，直接写出这一阶段（${stageTipName}）的初稿。`,
     });
