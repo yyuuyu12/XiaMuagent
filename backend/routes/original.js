@@ -246,13 +246,33 @@ function iterateVisibleRules(skill) {
   return out;
 }
 
+// ── 阶段路由：分组名 → 适用阶段 ─────────────────────────────
+// 命中某阶段关键词的分组只在该阶段注入；一个分组可命中多个阶段；
+// 不命中任何模式的分组（如「自动学习」「通用」）视为全阶段通用，始终注入——
+// 未知分组行为与旧版一致，向后兼容。
+const STAGE_GROUP_PATTERNS = {
+  direction: /选题|方向|定位|人群|赛道|题材|标题/,
+  outline:   /结构|粗纲|大纲|框架|逻辑|展开|内容|节奏|转折/,
+  detail:    /结构|粗纲|大纲|框架|逻辑|展开|内容|节奏|转折|案例/,
+  script:    /钩子|开场|开头|结尾|引导|语言|风格|口语|句式|用词|文风|表达|台词|节奏|转折/,
+};
+function groupMatchesStage(group, stage) {
+  if (!stage || !STAGE_GROUP_PATTERNS[stage]) return true; // 未指定阶段：全量（兼容旧调用）
+  const hit = Object.entries(STAGE_GROUP_PATTERNS)
+    .filter(([, re]) => re.test(group)).map(([k]) => k);
+  if (hit.length === 0) return true; // 通用分组，始终注入
+  return hit.includes(stage);
+}
+
 // 把 rules 对象格式化成文本供 AI 读取
 // 若用户写了 freeText（自由编辑模式），优先使用它；结构化规则作为补充追加
 // 结构化规则带稳定编号 [R1][R2]…（按 iterateVisibleRules 顺序），用于 USED 使用回执
-function formatRulesForPrompt(skill) {
+// 传入 stage 时按阶段路由过滤分组；编号保持全局序（可不连续），
+// 这样 incrementRuleUses 的编号映射不受过滤影响。
+function formatRulesForPrompt(skill, stage) {
   if (!skill) return '（暂无规则）';
 
-  // 自由文本优先
+  // 自由文本优先（用户手写整体文档，不参与路由）
   const freeText = (skill.freeText || '').trim();
 
   // 结构化规则（带编号）
@@ -260,6 +280,7 @@ function formatRulesForPrompt(skill) {
   const visible = iterateVisibleRules(skill);
   let curGroup = null;
   visible.forEach((v, i) => {
+    if (!groupMatchesStage(v.group, stage)) return; // 路由过滤，保留全局编号
     if (v.group !== curGroup) { structLines.push(`【${v.group}】`); curGroup = v.group; }
     structLines.push(`- [R${i + 1}] ${v.text}`);
   });
@@ -385,6 +406,55 @@ async function extractEditDiffRules(project, userId) {
 }
 
 // 轻量编辑距离（仅用于差异量估算，限长避免性能问题）
+// ── 范例库（golden examples）────────────────────────────────
+// 定稿即范例：项目完成定稿时把终版剧本存为范例；写剧本时检索 1 条
+// 题材最相近的注入 prompt（show > tell，模仿文风而非照抄）。
+
+// 定稿保存（同一项目重复定稿则覆盖；每用户保留最近 20 条）
+async function saveGoldenExample(project, userId) {
+  try {
+    const content = (project.doc || '').trim();
+    if (!content || content.length < 80) return; // 过短不具备范例价值
+    await db.query(
+      `INSERT INTO cw_golden_examples (user_id, project_id, title, content)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content), created_at = NOW()`,
+      [userId, project.id, (project.title || '').slice(0, 200), content.slice(0, 5000)]
+    );
+    await db.query(
+      `DELETE FROM cw_golden_examples WHERE user_id = ? AND id NOT IN (
+         SELECT id FROM (SELECT id FROM cw_golden_examples WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 20) t
+       )`,
+      [userId, userId]
+    );
+  } catch (e) { console.warn('[saveGoldenExample]', e.message); }
+}
+
+// 检索：取最近 10 条，按「项目标题+简介 vs 范例标题」二元字组重合度选最相近的 1 条
+async function pickGoldenExample(userId, project) {
+  try {
+    const { rows } = await db.query(
+      'SELECT project_id, title, content FROM cw_golden_examples WHERE user_id = ? AND project_id != ? ORDER BY created_at DESC, id DESC LIMIT 10',
+      [userId, project.id]
+    );
+    if (!rows || !rows.length) return null;
+    const grams = (s) => {
+      const g = new Set(); const t = String(s || '').replace(/\s/g, '');
+      for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2));
+      return g;
+    };
+    const bg = grams(`${project.title || ''} ${project.brief || ''}`);
+    let best = rows[0], bestScore = -1;
+    for (const r of rows) {
+      const rg = grams(r.title);
+      let hit = 0; rg.forEach(g => { if (bg.has(g)) hit++; });
+      const score = rg.size ? hit / rg.size : 0;
+      if (score > bestScore) { bestScore = score; best = r; }
+    }
+    return best;
+  } catch (e) { console.warn('[pickGoldenExample]', e.message); return null; }
+}
+
 function levenshteinLite(a, b) {
   a = a || ''; b = b || '';
   const m = a.length, n = b.length;
@@ -442,7 +512,7 @@ function extractStageDoc(raw, stage) {
 }
 
 // 构建某阶段的 system prompt（含决策树分支 + 对标素材 + 前序产出）
-function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft }) {
+function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample }) {
   const meta = project.meta || {};
   const durationMap = { '30s': '30秒（约75字）', '1min': '1分钟（约150字）', '3min': '3分钟（约450字）' };
   const styleMap = { informative: '干货讲解', story: '故事叙事', contrast: '对比反差', twist: '悬念反转' };
@@ -450,7 +520,7 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
   const durationLabel = durationMap[meta.duration] || '1分钟';
   const styleLabel = styleMap[meta.style] || '干货讲解';
   const platformLabel = platformMap[meta.platform] || '抖音';
-  const rulesText = formatRulesForPrompt(skill);
+  const rulesText = formatRulesForPrompt(skill, stage); // 阶段路由：只注入当前阶段相关分组+通用分组
 
   // 对标素材区块（项目级对标：只参考绑定的素材，参考写法而非照抄）
   let benchmarkBlock = '';
@@ -459,6 +529,12 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
       `【对标${i + 1}·${m.title || '素材'}】\n${(m.raw_content || '').slice(0, 600)}`
     ).join('\n\n');
     benchmarkBlock = `\n## 对标素材（学习其结构/钩子/节奏，绝不照抄原句）\n${list}\n`;
+  }
+
+  // 范例区块（你过去满意的定稿，few-shot：模仿写法，不抄内容）
+  let goldenBlock = '';
+  if (goldenExample && goldenExample.content) {
+    goldenBlock = `\n## 用户过去满意的定稿范例（模仿其文风/节奏/口吻；题材不同也只学写法，严禁照搬内容）\n【${goldenExample.title || '范例'}】\n${String(goldenExample.content).slice(0, 800)}\n`;
   }
 
   // 前序阶段已确认产出
@@ -484,7 +560,7 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
     : '';
 
   const tag = STAGE_META[stage].tag;
-  const common = `${skillBlock}\n${projectRulesBlock}\n${projInfo}\n${benchmarkBlock}${priorBlock}${draftBlock}${histBlock}`;
+  const common = `${skillBlock}\n${projectRulesBlock}\n${projInfo}\n${benchmarkBlock}${goldenBlock}${priorBlock}${draftBlock}${histBlock}`;
 
   // ── 决策树：是否已有明确方向 ──
   const hasDirection = !!(meta.angle || project.brief || artifacts.direction);
@@ -575,7 +651,9 @@ function getDurationLabel(meta) {
 async function generateStageReply({ userId, project, skill, stage, boundMaterials, history, userMessage, currentDraftOverride }) {
   const artifacts = parseArtifacts(project);
   const currentDraft = currentDraftOverride !== undefined ? currentDraftOverride : (project.doc || '');
-  const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft });
+  // 仅写剧本阶段注入范例（few-shot 对台词文风收益最大，其余阶段省 token）
+  const goldenExample = stage === 'script' ? await pickGoldenExample(userId, project) : null;
+  const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample });
   // 写稿环节用一线模型（管理后台 ai_model_creation 配置；留空走默认）；bypassCap 避免长稿被中转站默认上限砍断
   const creationModel = (await getConfigVal('ai_model_creation')).trim();
   const callOpts = { maxTokens: 4000, temperature: 0.65, bypassCap: true };
@@ -982,11 +1060,11 @@ router.patch('/projects/:id', requireAuth, async (req, res) => {
     }
     if (status) {
       await db.query('UPDATE cw_original_projects SET status = ? WHERE id = ?', [status, projectId]);
-      // 定稿触发 diff 学习（异步，不阻塞响应）
+      // 定稿触发 diff 学习 + 存入范例库（异步，不阻塞响应）
       if (status === 'final') {
         getProject(projectId, req.userId)
-          .then(p => p && extractEditDiffRules(p, req.userId))
-          .catch(e => console.warn('[extractEditDiffRules] PATCH final:', e.message));
+          .then(p => { if (p) { extractEditDiffRules(p, req.userId); saveGoldenExample(p, req.userId); } })
+          .catch(e => console.warn('[finalize hooks] PATCH final:', e.message));
       }
     }
     if (msgId && syncDone) {
@@ -1243,10 +1321,10 @@ router.post('/projects/:id/stage/advance', requireAuth, async (req, res) => {
     if (!nextStage) {
       // 已是最后一步：标记完成
       await db.query("UPDATE cw_original_projects SET status = 'final' WHERE id = ?", [projectId]);
-      // 定稿触发 diff 学习（异步，不阻塞响应）
+      // 定稿触发 diff 学习 + 存入范例库（异步，不阻塞响应）
       getProject(projectId, req.userId)
-        .then(p => p && extractEditDiffRules(p, req.userId))
-        .catch(e => console.warn('[extractEditDiffRules] advance done:', e.message));
+        .then(p => { if (p) { extractEditDiffRules(p, req.userId); saveGoldenExample(p, req.userId); } })
+        .catch(e => console.warn('[finalize hooks] advance done:', e.message));
       return res.json({ code: 200, data: { done: true, stage, status: 'final' } });
     }
     const curDraft = (project.doc || '').trim();

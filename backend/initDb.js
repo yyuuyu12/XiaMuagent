@@ -543,6 +543,20 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // cw_golden_examples 表：范例库（定稿即范例，写剧本时检索 1 条题材相近的注入 prompt）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_golden_examples (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      user_id     INT NOT NULL,
+      project_id  INT NOT NULL,
+      title       VARCHAR(200) NOT NULL DEFAULT '',
+      content     MEDIUMTEXT,
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_proj (project_id),
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // cw_original_projects 表：补 meta 列（存时长/风格/平台等）
   try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN meta JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.meta:', e.message||e); }
   // cw_original_projects 表：补 stage 列（分阶段创作：direction→outline→detail→script）
