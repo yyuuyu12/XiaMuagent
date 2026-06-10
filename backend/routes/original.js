@@ -330,13 +330,18 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
 时长：${durationLabel} · 风格：${styleLabel} · 平台：${platformLabel}${meta.angle ? `\n用户初始观点：${meta.angle}` : ''}`;
 
   const skillBlock = `## 用户 Skill 规则（始终遵守）\n${rulesText}`;
+  // 本项目专属规律（仅本项目生效，与全局 Skill 冲突时以本区块为准）
+  const projectRules = Array.isArray(meta.projectRules) ? meta.projectRules.filter(t => t && String(t).trim()) : [];
+  const projectRulesBlock = projectRules.length
+    ? `\n## 本项目专属规律（仅本项目生效，与全局 Skill 冲突时以本区块为准）\n${projectRules.map(t => `- ${t}`).join('\n')}\n`
+    : '';
   const histBlock = history ? `\n## 最近对话\n${history}\n` : '';
   const draftBlock = currentDraft && currentDraft.trim()
     ? `\n## 本阶段当前草稿（在此基础上改）\n---\n${currentDraft}\n---\n`
     : '';
 
   const tag = STAGE_META[stage].tag;
-  const common = `${skillBlock}\n\n${projInfo}\n${benchmarkBlock}${priorBlock}${draftBlock}${histBlock}`;
+  const common = `${skillBlock}\n${projectRulesBlock}\n${projInfo}\n${benchmarkBlock}${priorBlock}${draftBlock}${histBlock}`;
 
   // ── 决策树：是否已有明确方向 ──
   const hasDirection = !!(meta.angle || project.brief || artifacts.direction);
@@ -1267,9 +1272,37 @@ router.post('/learning/write', requireAuth, async (req, res) => {
   const { insights, scope = 'global', projectId } = req.body;
   if (!insights || !insights.length) return res.status(400).json({ code: 400, msg: '没有选中规律' });
 
-  // 仅用于本项目：不改全局 Skill，对话时作为上下文参考
+  // 仅用于本项目：真实写入该项目 meta.projectRules，之后本项目对话生成都会带上
   if (scope !== 'global') {
-    return res.json({ code: 200, msg: '规律已记录，本项目对话时会参考' });
+    try {
+      if (!projectId) return res.status(400).json({ code: 400, msg: '缺少 projectId' });
+      const project = await getProject(projectId, req.userId);
+      if (!project) return res.status(400).json({ code: 400, msg: '项目不存在或无权访问' });
+
+      const meta = project.meta || {};
+      const existing = Array.isArray(meta.projectRules) ? meta.projectRules.slice() : [];
+      const seen = new Set(existing.map(t => String(t).replace(/\s+/g, '')));
+      for (const ins of insights) {
+        const text = (ins && ins.text ? String(ins.text) : '').trim();
+        if (!text) continue;
+        const key = text.replace(/\s+/g, '');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        existing.push(text);
+      }
+      // 上限 20 条，超出移除最旧的
+      const projectRules = existing.slice(-20);
+      meta.projectRules = projectRules;
+
+      await db.query(
+        'UPDATE cw_original_projects SET meta = ? WHERE id = ? AND user_id = ?',
+        [JSON.stringify(meta), projectId, req.userId]
+      );
+      return res.json({ code: 200, msg: '规律已记录，本项目对话时会参考', data: { projectRules } });
+    } catch (err) {
+      console.error('/original/learning/write (project) error:', err.message);
+      return res.status(500).json({ code: 500, msg: err.message });
+    }
   }
 
   try {
