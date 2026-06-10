@@ -186,8 +186,9 @@ async function initDb() {
   await db.query(
     `INSERT IGNORE INTO system_config (config_key, value) VALUES ('ai_provider', 'deepseek')`
   );
+  // ⚠️ 安全：不再硬编码 Key，留空由管理后台 system_config 配置页填入
   await db.query(
-    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('deepseek_api_key', 'sk-49991c5474b14a2aa47f60541765f04d')`
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('deepseek_api_key', '')`
   );
   await db.query(
     `INSERT IGNORE INTO system_config (config_key, value) VALUES ('deepseek_model', 'deepseek-chat')`
