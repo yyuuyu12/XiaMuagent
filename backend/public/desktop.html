@@ -521,6 +521,131 @@ html, body {
 .hov-avatar-del:hover { background:#F0EDE8 !important; color:#E5534B !important; }
 .hov-logout-btn:hover { background:#FFF5F5 !important; }
 .hov-nav-item:hover   { background:#F7F5F1; }
+
+/* ============================================================
+   CSS · V3 精致化动效层（纯视觉覆盖，零功能改动）
+   设计基准：爆款工坊_桌面版_V2 设计稿 · 在还原之上增加灵动微交互
+   ============================================================ */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --shadow-card: 0 1px 2px rgba(28,22,16,0.04), 0 6px 18px rgba(28,22,16,0.04);
+  --shadow-card-hover: 0 2px 4px rgba(28,22,16,0.05), 0 10px 28px rgba(28,22,16,0.09);
+}
+
+/* 全局质感 */
+::selection { background:rgba(245,118,42,0.18); color:#1A1614; }
+body { animation:pageIn 0.4s ease-out; }
+@keyframes pageIn { from { opacity:0; } to { opacity:1; } }
+.d-content::-webkit-scrollbar-thumb:hover { background:#D0CAC2; }
+
+/* 卡片：设计稿双层阴影 + 描边统一 */
+.d-card {
+  border-color:#EFEAE2;
+  box-shadow:var(--shadow-card);
+  transition:box-shadow 0.22s var(--ease-out), border-color 0.22s;
+}
+.d-step-bar { border-color:#EFEAE2; box-shadow:var(--shadow-card); }
+
+/* 按钮：hover 上浮（设计稿 b-primary 行为补到旧体系） */
+.d-btn { transition:all 0.16s var(--ease-out); }
+.d-btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 6px 18px rgba(245,96,42,0.42); }
+.d-btn-lg:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 24px rgba(245,96,42,0.46); }
+.d-btn-ghost:hover { border-color:#D8D2CA; }
+.b-primary:hover:not(:disabled) { transform:translateY(-1px); }
+.do-btn-pri:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 6px 18px rgba(245,96,42,0.38); }
+.d-btn:focus-visible, .b:focus-visible, .do-btn:focus-visible { outline:2px solid rgba(245,118,42,0.5); outline-offset:2px; }
+
+/* 输入控件：对齐设计稿底色（#FBFAF7 更轻盈），聚焦光晕已有 */
+.d-input, .d-textarea, .d-select { background:#FBFAF7; }
+.d-input:hover:not(:focus), .d-textarea:hover:not(:focus), .d-select:hover:not(:focus) { border-color:#DDD7CF; }
+.inp:hover:not(:focus), .txa:hover:not(:focus), .sel:hover:not(:focus) { border-color:#DDD7CF; }
+
+/* 步骤进度：当前步呼吸光晕（克隆 6 步 + 原创阶段通用） */
+.d-step-circle.active { animation:stepGlow 2.4s ease-in-out infinite; }
+@keyframes stepGlow {
+  0%,100% { box-shadow:0 4px 14px rgba(245,96,42,0.4); }
+  50%     { box-shadow:0 4px 22px rgba(245,96,42,0.62); }
+}
+.d-step-circle, .d-step-line { transition:background 0.3s, color 0.3s; }
+
+/* 进度条：流光质感 */
+.d-progress-fill { position:relative; overflow:hidden; }
+.d-progress-fill::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.38),transparent);
+  animation:shimmer 1.8s var(--ease-out) infinite;
+}
+@keyframes shimmer { from { transform:translateX(-100%); } to { transform:translateX(100%); } }
+.do-bar-fill { position:relative; overflow:hidden; }
+.do-bar-fill::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent);
+  animation:shimmer 2.2s var(--ease-out) infinite;
+}
+
+/* chip / 标签 / 筛选：按压回弹 */
+.chip, .d-platform-tab, .d-emotion, .filter-tab, .do-quick-chip { transition:all 0.16s var(--ease-out); }
+.chip:active, .d-platform-tab:active, .d-emotion:active, .filter-tab:active, .do-quick-chip:active { transform:scale(0.94); }
+
+/* 色板：设计稿的 hover 放大回弹 */
+.sw { transition:transform 0.15s var(--ease-spring), border-color 0.12s, box-shadow 0.12s; }
+.sw:hover { transform:scale(1.1); }
+.sw.is-active { transform:scale(1.12); }
+
+/* 表格：行 hover 平滑 */
+.d-table td { transition:background 0.13s; }
+
+/* 项目卡 / 工具入口：hover 微上浮（设计稿 B 方案行为） */
+.do-proj-card { transition:border-color 0.18s, box-shadow 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+.do-proj-card:hover { transform:translateY(-2px); }
+.do-entry { transition:border-color 0.18s, box-shadow 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+.do-entry:hover { transform:translateY(-1px); }
+.do-topic-card { transition:border-color 0.15s, box-shadow 0.18s var(--ease-out), transform 0.18s var(--ease-out); }
+.do-topic-card:hover { transform:translateY(-1px); }
+
+/* 弹窗：弹入动画（输入不触发重渲染，安全） */
+.d-modal-overlay { animation:overlayIn 0.2s ease-out; }
+.d-modal { animation:modalIn 0.28s var(--ease-out); }
+@keyframes overlayIn { from { opacity:0; } to { opacity:1; } }
+@keyframes modalIn {
+  from { opacity:0; transform:scale(0.965) translateY(10px); }
+  to   { opacity:1; transform:none; }
+}
+
+/* Toast：下落淡入 */
+.d-toast {
+  transform:translateX(-50%) translateY(-10px);
+  transition:opacity 0.28s var(--ease-out), transform 0.28s var(--ease-out);
+  box-shadow:0 8px 28px rgba(0,0,0,0.22);
+  backdrop-filter:blur(8px);
+}
+.d-toast.show { transform:translateX(-50%) translateY(0); }
+
+/* 对话气泡：AI 打字点（dotpulse 已有），气泡阴影更柔 */
+.do-bubble.user { box-shadow:0 2px 8px rgba(245,96,42,0.22); }
+.do-bubble.ai { box-shadow:0 1px 4px rgba(0,0,0,0.05); }
+
+/* 侧边导航：active 左侧渐显指示（不占布局） */
+.d-nav-item { position:relative; }
+.d-nav-item.active::before {
+  content:''; position:absolute; left:-10px; top:50%; transform:translateY(-50%);
+  width:3px; height:16px; border-radius:0 3px 3px 0;
+  background:linear-gradient(180deg,#FF8040,#F5602A);
+}
+
+/* 开关：按压手感 */
+.tg:active::after, .d-toggle:active .d-toggle-ball { transform:scale(0.9); }
+.tg::after { transition:left 0.2s var(--ease-spring), transform 0.15s; }
+.d-toggle-ball { transition:left 0.2s var(--ease-spring), transform 0.15s; }
+
+/* 滑块拇指：拖动手感 */
+.sld-thumb, .d-slider-thumb { transition:box-shadow 0.15s; }
+.sld:hover .sld-thumb, .d-slider-wrap:hover .d-slider-thumb { box-shadow:0 2px 10px rgba(245,118,42,0.5), 0 0 0 4px rgba(245,118,42,0.12); }
+
+/* 上传区 / 空状态：hover 引导 */
+.do-mat-row { transition:border-color 0.15s, background 0.15s, box-shadow 0.18s var(--ease-out); }
+.do-mat-row:hover { box-shadow:0 3px 12px rgba(0,0,0,0.06); }
 </style>
 </head>
 <body>
@@ -1043,7 +1168,7 @@ function dCardRewrite() {
     </div>
     <div class="scard-foot">
       <button class="b b-md ${dS.rewrittenScript?'b-secondary':'b-primary'} b-full" onclick="dHandleRewrite()" ${dS.rewriteLoading||!dS.extractedScript?'disabled':''}>
-        ${dS.rewriteLoading?'改写中...':dS.rewrittenScript?'重新改写':'✨ AI 改写'}
+        ${dS.rewriteLoading?'改写中...':dS.rewrittenScript?'重新改写':'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px"><path d="M12 3L13.6 9.2C13.8 9.9 14.1 10.2 14.8 10.4L21 12L14.8 13.6C14.1 13.8 13.8 14.1 13.6 14.8L12 21L10.4 14.8C10.2 14.1 9.9 13.8 9.2 13.6L3 12L9.2 10.4C9.9 10.2 10.2 9.9 10.4 9.2L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> AI 改写'}
       </button>
     </div>
   </div>`;
@@ -1487,7 +1612,7 @@ function dCardPublish() {
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
           <div style="display:flex;align-items:center;justify-content:flex-end">
             <button onclick="dHandlePublishGen('all')" class="b b-sm b-primary" ${(!dS.rewrittenScript&&!dS.extractedScript)||dS.publishTitleLoading?'disabled':''}>
-              ${dS.publishTitleLoading?'生成中...':'✨ 一键生成'}
+              ${dS.publishTitleLoading?'生成中...':'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px"><path d="M12 3L13.6 9.2C13.8 9.9 14.1 10.2 14.8 10.4L21 12L14.8 13.6C14.1 13.8 13.8 14.1 13.6 14.8L12 21L10.4 14.8C10.2 14.1 9.9 13.8 9.2 13.6L3 12L9.2 10.4C9.9 10.2 10.2 9.9 10.4 9.2L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> 一键生成'}
             </button>
           </div>
           <div>
@@ -1890,7 +2015,7 @@ function dSvcBanner() {
   if (s.tts === 'down') down.push('声音克隆');
   if (s.video === 'down') down.push('数字人');
   if (!down.length) return '';
-  return `<div style="background:#FFF4E5;border:1px solid #FFD9A8;border-radius:12px;padding:12px 16px;margin-bottom:16px;color:#7A5A2E;font-size:13px;line-height:1.6">⚠️ <b>${down.join('、')}</b>服务正在维护中，相关步骤暂时不可用，已生成的内容不受影响。请稍后再试。</div>`;
+  return `<div style="background:#FFF4E5;border:1px solid #FFD9A8;border-radius:12px;padding:12px 16px;margin-bottom:16px;color:#7A5A2E;font-size:13px;line-height:1.6"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px"><path d="M12 4L2.5 20H21.5L12 4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10.5V14.5M12 17V17.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> <b>${down.join('、')}</b>服务正在维护中，相关步骤暂时不可用，已生成的内容不受影响。请稍后再试。</div>`;
 }
 
 async function dHandleExtract() {
@@ -2319,7 +2444,7 @@ function dRenderTasks() {
 
   const rows = filteredTasks.length === 0
     ? `<tr><td colspan="4" style="text-align:center;padding:40px;color:#B0AA9F;font-size:13px">
-        ${dS.tasksLoaded ? (filter==='all'?'暂无任务，去克隆第一条视频吧 🎬':'暂无符合条件的任务') : '加载中...'}
+        ${dS.tasksLoaded ? (filter==='all'?'暂无任务，去克隆第一条视频吧':'暂无符合条件的任务') : '加载中...'}
        </td></tr>`
     : filteredTasks.map(t => {
         const steps = dTaskSteps(t);
@@ -2581,7 +2706,7 @@ function dRenderVoices() {
           ${dS.voiceCloneErr?`<div class="d-err">${esc(dS.voiceCloneErr)}</div>`:''}
         </div>
         <div style="background:#F7F5F1;border-radius:12px;padding:14px;font-size:11px;color:#9E9890;line-height:1.8">
-          <div style="font-weight:600;color:#6E6860;margin-bottom:6px">💡 使用说明</div>
+          <div style="font-weight:600;color:#6E6860;margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="vertical-align:-1.5px"><path d="M9 21H15M12 3C8.7 3 6 5.7 6 9C6 11.2 7.2 13.2 9 14.2V17H15V14.2C16.8 13.2 18 11.2 18 9C18 5.7 15.3 3 12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> 使用说明</div>
           <div>• 上传 30~120 秒清晰人声音频</div>
           <div>• 支持 MP3 / WAV / M4A 格式</div>
           <div>• 环境安静、无背景音效果最佳</div>
@@ -2720,12 +2845,12 @@ function dRenderAvatars() {
         </div>
         <!-- 右：提示 -->
         <div style="background:#F7F5F1;border-radius:12px;padding:14px;font-size:11px;color:#9E9890;line-height:1.8">
-          <div style="font-weight:600;color:#6E6860;margin-bottom:6px">💡 参考视频说明</div>
+          <div style="font-weight:600;color:#6E6860;margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="vertical-align:-1.5px"><path d="M9 21H15M12 3C8.7 3 6 5.7 6 9C6 11.2 7.2 13.2 9 14.2V17H15V14.2C16.8 13.2 18 11.2 18 9C18 5.7 15.3 3 12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> 参考视频说明</div>
           <div>• 人物正脸、光线均匀的视频</div>
           <div>• 5~30 秒真人说话视频效果最佳</div>
           <div>• 建议分辨率 720p 以上</div>
           <div>• 视频会保存在本地浏览器中</div>
-          <div style="color:#F5762A;margin-top:6px">⚠ 视频较大时可能占用较多存储空间</div>
+          <div style="color:#F5762A;margin-top:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px"><path d="M12 4L2.5 20H21.5L12 4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10.5V14.5M12 17V17.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> 视频较大时可能占用较多存储空间</div>
         </div>
       </div>
     </div>
@@ -3018,7 +3143,7 @@ function dOPendingCard(){
   const open = dS.oPendingOpen;
   const head = `<div onclick="dS.oPendingOpen=${!open};dRender()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:17px">✨</span>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M12 3L13.6 9.2C13.8 9.9 14.1 10.2 14.8 10.4L21 12L14.8 13.6C14.1 13.8 13.8 14.1 13.6 14.8L12 21L10.4 14.8C10.2 14.1 9.9 13.8 9.2 13.6L3 12L9.2 10.4C9.9 10.2 10.2 9.9 10.4 9.2L12 3Z" stroke="#B45309" stroke-width="1.7" stroke-linejoin="round"/></svg>
       <span style="font-size:14px;font-weight:700;color:#92400E">我从你的反馈/修改中学到了 ${pending.length} 条新写法</span>
     </div>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${open?90:0}deg);transition:transform .2s"><polyline points="9 18 15 12 9 6"/></svg>
@@ -3142,7 +3267,7 @@ function dOHome(){
   if(!dS.oLoaded){
     projHtml = `<div class="do-empty">加载中…</div>`;
   } else if(!dS.oProjects.length){
-    projHtml = `<div class="do-empty" style="margin-top:16px;padding:40px 0">还没有项目<br><span style="font-size:12px">点「+ 新建」开始第一条原创口播 ✏️</span></div>`;
+    projHtml = `<div class="do-empty" style="margin-top:16px;padding:40px 0">还没有项目<br><span style="font-size:12px">点「+ 新建」开始第一条原创口播</span></div>`;
   } else if(sort==='stage'){
     const ORDER = ['direction','outline','detail','script','final'];
     const SLABEL = { direction:'选题方向', outline:'内容粗纲', detail:'细化大纲', script:'口播剧本', final:'已定稿' };
@@ -3248,7 +3373,7 @@ async function dOOpenProject(id){
 function dOMsgHtml(m){
   const isUser = m.role==='user';
   let extra='';
-  if(!isUser && m.has_doc_update) extra += `<div class="do-doc-flag">✎ 已更新${oStageName(m.stage||(dS.oProject&&dS.oProject.stage))} ›</div>`;
+  if(!isUser && m.has_doc_update) extra += `<div class="do-doc-flag"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" style="vertical-align:-1px"><path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25ZM20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C17.98 2.9 17.35 2.9 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg> 已更新${oStageName(m.stage||(dS.oProject&&dS.oProject.stage))} ›</div>`;
   let sync='';
   if(!isUser && m.sync_label){
     if(m.sync_done==='synced') sync = `<div class="do-sync-card" style="color:#16A34A;font-size:12px;font-weight:600">✓ 已沉淀到 Skill：${esc(m.sync_label)}</div>`;
@@ -3286,11 +3411,11 @@ function dOWorkspace(){
       const disabled = i>idx;
       const dimStyle = disabled?'opacity:.4;cursor:default':'';
       const clickFn = disabled?'':(`dOSetActiveStage('${s.key}')`);
-      return `<div class="do-nav-i ${actCls}" style="${dimStyle}" ${clickFn?`onclick="${clickFn}"`:''}><span class="do-step-c ${state}">${i<idx?'✓':(i+1)}</span><span>${s.name}</span>${isOpTarget?`<span style="margin-left:auto;font-size:9px;color:#F5762A;font-weight:700;flex-shrink:0">✏</span>`:''}</div>`;
+      return `<div class="do-nav-i ${actCls}" style="${dimStyle}" ${clickFn?`onclick="${clickFn}"`:''}><span class="do-step-c ${state}">${i<idx?'✓':(i+1)}</span><span>${s.name}</span>${isOpTarget?`<span style="margin-left:auto;font-size:9px;color:#F5762A;font-weight:700;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25ZM20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C17.98 2.9 17.35 2.9 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>`:''}</div>`;
     }).join('');
   } else {
     const actCls = (dS.oRight==='doc'||activeStage==='script')?'active':'';
-    stageNavHtml = `<div class="do-nav-i ${actCls}" onclick="dOSetActiveStage('script')"><span class="do-step-c cur">✎</span><span>口播剧本</span>${activeStage==='script'?`<span style="margin-left:auto;font-size:9px;color:#F5762A;font-weight:700;flex-shrink:0">✏</span>`:''}</div>`;
+    stageNavHtml = `<div class="do-nav-i ${actCls}" onclick="dOSetActiveStage('script')"><span class="do-step-c cur"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25ZM20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C17.98 2.9 17.35 2.9 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span><span>口播剧本</span>${activeStage==='script'?`<span style="margin-left:auto;font-size:9px;color:#F5762A;font-weight:700;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25ZM20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C17.98 2.9 17.35 2.9 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>`:''}</div>`;
   }
   const navCol = `
     <div class="do-col">
@@ -3301,7 +3426,7 @@ function dOWorkspace(){
         <div class="do-nav-grp">对标</div>
         <div class="do-nav-i ${dS.oRight==='bench'?'active':''}" onclick="dOSetRight('bench')"><span class="do-step-c" style="background:#FFF3E8;color:#F5762A">◎</span><span>对标参考 (${dS.oBound.length})</span></div>
         <div class="do-nav-grp">沉淀</div>
-        <div class="do-nav-i ${dS.oRight==='skill'?'active':''}" onclick="dOSetRight('skill')"><span class="do-step-c" style="background:#FDE9D8;color:#F5762A">★</span><span>我的 Skill</span></div>
+        <div class="do-nav-i ${dS.oRight==='skill'?'active':''}" onclick="dOSetRight('skill')"><span class="do-step-c" style="background:#FDE9D8;color:#F5762A"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.5 9.5H22L16.5 14L18.5 21L12 17L5.5 21L7.5 14L2 9.5H9.5L12 2Z"/></svg></span><span>我的 Skill</span></div>
         <div class="do-nav-grp">信息</div>
         <div class="do-nav-i ${dS.oRight==='info'?'active':''}" onclick="dOSetRight('info')"><span class="do-step-c">i</span><span>项目简介</span></div>
       </div>
@@ -3316,7 +3441,7 @@ function dOWorkspace(){
 
   // 操作阶段选择器（null=自由聊天，key=操作该阶段）
   const stageOpts = [
-    { key:null, label:'💬 自由聊天', tip:'仅聊天，AI 不会修改文案' },
+    { key:null, label:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="vertical-align:-1.5px"><path d="M21 12C21 16.4 17 20 12 20C10.8 20 9.6 19.8 8.5 19.4L3 20L4.6 16C3.6 14.8 3 13.5 3 12C3 7.6 7 4 12 4C17 4 21 7.6 21 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg> 自由聊天', tip:'仅聊天，AI 不会修改文案' },
     ...O_STAGES.map(s=>({ key:s.key, label:s.name, tip:`AI 将针对「${s.name}」修改` }))
   ];
   const picker = `<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 12px 4px;border-top:1px solid #F2EFEA">
@@ -3547,10 +3672,10 @@ async function dOAdvance(){
   const r = await dHttp.post('/original/projects/'+dS.oProject.id+'/stage/advance', {});
   dS.oStageBusy=false;
   if(r.code!==200){ dToast(r.msg||'操作失败'); dRender(); return; }
-  if(r.data.done){ dS.oProject.status='final'; dToast('已完成定稿 🎉'); dRender(); return; }
+  if(r.data.done){ dS.oProject.status='final'; dToast('已完成定稿'); dRender(); return; }
   dS.oProject.artifacts = dS.oProject.artifacts || {};
   dS.oProject.artifacts[r.data.prevStage] = dS.oProject.doc || dS.oProject.artifacts[r.data.prevStage] || '';
-  dS.oMessages.push({ role:'ai', content:'✅ '+oStageName(r.data.prevStage)+'已确认。进入下一步：'+r.data.tipName+'。' });
+  dS.oMessages.push({ role:'ai', content:'✓ '+oStageName(r.data.prevStage)+'已确认。进入下一步：'+r.data.tipName+'。' });
   if(r.data.message) dS.oMessages.push(r.data.message);
   dS.oProject.stage = r.data.stage; dS.oProject.doc = r.data.doc; dS.oProject.turns = r.data.turns;
   dS.oRight='doc';
@@ -3935,7 +4060,7 @@ function dOLearnVideoCard(v, showHead){
   const head = showHead?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:13.5px;font-weight:700;color:#1A1614;flex:1;line-height:1.4">${esc(v.desc||'未命名视频')}</span><span style="font-size:11px;color:#B0AA9F;flex-shrink:0">赞${v.likes||0}</span></div>`:'';
   return `<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid #F0EDE8">
     ${head}
-    ${v.summary?`<div style="background:linear-gradient(135deg,#FFF3E8,#FDE8D4);border:1px solid #F8C8A0;border-radius:12px;padding:11px 13px;margin-bottom:12px"><div style="font-size:11px;color:#C2410C;font-weight:700;margin-bottom:3px">💡 套路一句话</div><div style="font-size:13.5px;color:#1A1614;line-height:1.55;font-weight:500">${esc(v.summary)}</div></div>`:''}
+    ${v.summary?`<div style="background:linear-gradient(135deg,#FFF3E8,#FDE8D4);border:1px solid #F8C8A0;border-radius:12px;padding:11px 13px;margin-bottom:12px"><div style="font-size:11px;color:#C2410C;font-weight:700;margin-bottom:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="vertical-align:-1.5px"><path d="M9 21H15M12 3C8.7 3 6 5.7 6 9C6 11.2 7.2 13.2 9 14.2V17H15V14.2C16.8 13.2 18 11.2 18 9C18 5.7 15.3 3 12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> 套路一句话</div><div style="font-size:13.5px;color:#1A1614;line-height:1.55;font-weight:500">${esc(v.summary)}</div></div>`:''}
     ${blueprint}
     <div style="font-size:11.5px;font-weight:700;color:#9E6B3A;margin-bottom:7px">原文逐句拆解</div>
     <div style="background:#FAF8F5;border-radius:10px;padding:13px;font-size:14px;color:#2A241E;line-height:2.05">${annotated||'—'}</div>
