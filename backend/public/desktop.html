@@ -3552,7 +3552,7 @@ function dOWorkspace(){
   return `
     ${breadcrumb}
     <div class="do-ws" style="height:calc(100vh - 150px)">${navCol}${chatCol}${rightCol}</div>
-    ${dS.oSkillQuickModal?dOQuickModalHtml():''}`;
+    ${dS.oSkillQuickModal?dOQuickModalHtml():''}${dS.oPackEdit?dOPackModalHtml():''}`;
 }
 
 function dOBenchPanel(){
@@ -3604,7 +3604,24 @@ function dOSkillPanel(){
 
 function dOInfoPanel(p){
   const meta = p.meta || {};
+  if(!dS.oPacksLoaded){ dS.oPacksLoaded = true; dOLoadPacks(); }
   const row = (k,v)=>`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #F2EFEA;font-size:13px"><span style="color:#9E9890">${k}</span><span style="color:#1A1614;font-weight:600">${esc(v||'—')}</span></div>`;
+  const curPackId = parseInt(meta.packId)||0;
+  const packOpts = ['<option value="0">不挂载（只用全局 Skill）</option>']
+    .concat((dS.oPacks||[]).map(pk=>`<option value="${pk.id}" ${pk.id===curPackId?'selected':''}>${esc(pk.name)}</option>`)).join('');
+  const packBlock = `
+    <div style="margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:700;color:#1A1614">题材包</span>
+        <span class="do-link" style="font-size:12px" onclick="dOOpenPackEdit(null)">+ 新建</span>
+      </div>
+      <select class="sel" onchange="dOMountPack(this.value)" style="margin-bottom:8px">${packOpts}</select>
+      ${curPackId && (dS.oPacks||[]).some(pk=>pk.id===curPackId)
+        ? `<div style="display:flex;gap:8px;margin-bottom:8px">
+            <button class="do-btn do-btn-gho" style="flex:1;padding:6px;font-size:12px" onclick="dOOpenPackEdit(${curPackId})">编辑此包</button>
+           </div>` : ''}
+      <div style="font-size:11.5px;color:#B0AA9F;line-height:1.6">不同题材用不同规则包：讲 AI 工具和讲二手包的爆款套路不一样。挂载后，本项目写作时会注入该包的规则（优先级高于全局 Skill）。</div>
+    </div>`;
   return `<div class="do-col">
     <div class="do-col-head"><div class="do-col-h-title">项目简介</div></div>
     <div class="do-col-body">
@@ -3615,6 +3632,87 @@ function dOInfoPanel(p){
       ${row('时长定位', meta.duration||'—')}
       ${row('平台', meta.platform||'—')}
       ${row('风格', meta.style||'—')}
+      ${packBlock}
+    </div>
+  </div>`;
+}
+
+/* ---------- 题材包：加载/挂载/编辑 ---------- */
+async function dOLoadPacks(){
+  const r = await dHttp.get('/original/packs');
+  if(r.code===200){ dS.oPacks = r.data||[]; dRender(); }
+}
+async function dOMountPack(packId){
+  if(!dS.oProject) return;
+  const r = await dApi('PATCH','/original/projects/'+dS.oProject.id, { packId: parseInt(packId)||0 });
+  if(r.code===200){
+    dS.oProject.meta = dS.oProject.meta||{};
+    dS.oProject.meta.packId = parseInt(packId)||0;
+    dToast(parseInt(packId)?'已挂载题材包':'已卸载题材包');
+  } else dToast(r.msg||'操作失败');
+  dRender();
+}
+function dOOpenPackEdit(id){
+  if(id){
+    const pk = (dS.oPacks||[]).find(x=>x.id===id);
+    if(!pk) return;
+    dS.oPackEdit = { id: pk.id, name: pk.name||'', content: pk.content||'' };
+  } else {
+    dS.oPackEdit = { id: null, name: '', content: '## 人群与痛点\n- \n\n## 这个题材的爆款钩子\n- \n\n## 行业黑话与说法\n- \n\n## 禁忌\n- ' };
+  }
+  dRender();
+}
+async function dOSavePack(){
+  const pe = dS.oPackEdit;
+  if(!pe) return;
+  const nameEl = document.getElementById('dPackName');
+  const contentEl = document.getElementById('dPackContent');
+  const name = nameEl ? nameEl.value : pe.name;
+  const content = contentEl ? contentEl.value : pe.content;
+  if(!name.trim()){ dToast('请填写题材包名称'); return; }
+  const r = pe.id
+    ? await dApi('PUT','/original/packs/'+pe.id, { name, content })
+    : await dHttp.post('/original/packs', { name, content });
+  if(r.code===200){
+    dToast('已保存');
+    dS.oPackEdit = null;
+    const newId = (!pe.id && r.data && r.data.id) ? r.data.id : null;
+    await dOLoadPacks();
+    if(newId) dOMountPack(newId); // 新建的包直接挂到当前项目
+  } else dToast(r.msg||'保存失败');
+  dRender();
+}
+async function dODeletePack(){
+  const pe = dS.oPackEdit;
+  if(!pe || !pe.id) return;
+  if(!confirm('删除题材包「'+pe.name+'」？挂载它的项目会回落到全局 Skill。')) return;
+  const r = await dApi('DELETE','/original/packs/'+pe.id, {});
+  if(r.code===200){
+    dToast('已删除');
+    if(dS.oProject && dS.oProject.meta && parseInt(dS.oProject.meta.packId)===pe.id) dS.oProject.meta.packId = 0;
+    dS.oPackEdit = null;
+    await dOLoadPacks();
+  } else dToast(r.msg||'删除失败');
+  dRender();
+}
+function dOPackModalHtml(){
+  const pe = dS.oPackEdit;
+  return `<div class="d-modal-overlay" onclick="if(event.target===this){dS.oPackEdit=null;dRender();}">
+    <div class="d-modal" style="width:560px;padding:26px 28px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:17px;font-weight:700;color:#1A1614">${pe.id?'编辑题材包':'新建题材包'}</div>
+        <div onclick="dS.oPackEdit=null;dRender()" style="width:28px;height:28px;border-radius:50%;background:#F0EDE8;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6E6860;font-size:14px">✕</div>
+      </div>
+      <div class="flbl" style="margin-bottom:5px">题材包名称</div>
+      <input id="dPackName" class="inp" placeholder="如：AI工具 / 二手奢侈品 / 汽车知识" value="${esc(pe.name)}" style="margin-bottom:12px">
+      <div class="flbl" style="margin-bottom:5px">题材规则（Markdown，写这个题材专属的人群/钩子/黑话/禁忌）</div>
+      <textarea id="dPackContent" class="txa" style="height:260px;margin-bottom:16px;font-size:12.5px">${esc(pe.content)}</textarea>
+      <div style="display:flex;gap:8px">
+        ${pe.id?'<button class="do-btn" style="background:#FFF0EF;color:#E5534B" onclick="dODeletePack()">删除</button>':''}
+        <div style="flex:1"></div>
+        <button class="do-btn do-btn-gho" onclick="dS.oPackEdit=null;dRender()">取消</button>
+        <button class="do-btn do-btn-pri" onclick="dOSavePack()">保存</button>
+      </div>
     </div>
   </div>`;
 }

@@ -557,6 +557,22 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // cw_skill_packs 表：题材包（不同题材用不同规则包，项目通过 meta.packId 挂载）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_skill_packs (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      user_id     INT NOT NULL,
+      name        VARCHAR(100) NOT NULL DEFAULT '',
+      content     MEDIUMTEXT,
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // cw_skills 表：补 last_reflect_at 列（月度反思上次执行时间）
+  try { await db.query('ALTER TABLE cw_skills ADD COLUMN last_reflect_at DATETIME DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_skills.last_reflect_at:', e.message||e); }
+
   // cw_original_projects 表：补 meta 列（存时长/风格/平台等）
   try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN meta JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.meta:', e.message||e); }
   // cw_original_projects 表：补 stage 列（分阶段创作：direction→outline→detail→script）

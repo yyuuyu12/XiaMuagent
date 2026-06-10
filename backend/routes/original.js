@@ -227,9 +227,13 @@ async function getProject(projectId, userId) {
   return p;
 }
 
-// 遍历"可见"结构化规则（跳过 待确认 分组与所有 pending 条目），按稳定顺序返回。
+// 规则效能分：负反馈累计到 -2 进入休眠（不再注入 prompt，数据保留可人工复活）
+const RULE_DORMANT_SCORE = -2;
+
+// 遍历"可见"结构化规则（跳过 待确认 分组、pending 条目、休眠条目），按稳定顺序返回。
 // 返回 [{ group, idx, text }]，下标 i 对应规则编号 [R(i+1)]。
-// 关键：formatRulesForPrompt 编号与 incrementRuleUses 写回必须共用此函数，确保编号-条目一一对应。
+// 关键：formatRulesForPrompt 编号与 incrementRuleUses 写回必须共用此函数，确保编号-条目一一对应
+//（编号映射发生在同一次请求内，休眠过滤不会造成错位）。
 function iterateVisibleRules(skill) {
   const out = [];
   const rules = (skill && skill.rules) || {};
@@ -238,12 +242,37 @@ function iterateVisibleRules(skill) {
     if (!Array.isArray(arr)) continue;
     arr.forEach((r, idx) => {
       if (r && typeof r === 'object' && r.pending) return; // 单条 pending 跳过
+      if (r && typeof r === 'object' && (r.score || 0) <= RULE_DORMANT_SCORE) return; // 休眠跳过
       const text = typeof r === 'string' ? r : (r && r.text) || '';
       if (!text) return;
       out.push({ group, idx, text });
     });
   }
   return out;
+}
+
+// 效能分写回：对上一次生成实际使用的规则（[{group,idx}]）按反馈加减分。
+// 正反馈 +1，负反馈 -1；降到休眠线的规则下次生成自动停用。失败静默。
+async function scoreUsedRules(userId, usedRules, delta) {
+  if (!Array.isArray(usedRules) || !usedRules.length || !delta) return;
+  try {
+    const skill = await getOrCreateSkill(userId);
+    const rules = skill.rules || {};
+    let changed = false; let dormant = 0;
+    for (const u of usedRules) {
+      const arr = rules[u.group];
+      if (!Array.isArray(arr) || arr[u.idx] === undefined) continue;
+      let entry = arr[u.idx];
+      if (typeof entry === 'string') { entry = { text: entry, uses: 0 }; arr[u.idx] = entry; }
+      entry.score = (entry.score || 0) + delta;
+      if (entry.score <= RULE_DORMANT_SCORE) dormant++;
+      changed = true;
+    }
+    if (changed) {
+      await db.query('UPDATE cw_skills SET rules = ? WHERE user_id = ?', [JSON.stringify(rules), userId]);
+      if (dormant) console.log(`[RuleScore] 用户${userId}：${dormant} 条规则进入休眠`);
+    }
+  } catch (e) { console.warn('[scoreUsedRules]', e.message); }
 }
 
 // ── 阶段路由：分组名 → 适用阶段 ─────────────────────────────
@@ -406,6 +435,51 @@ async function extractEditDiffRules(project, userId) {
 }
 
 // 轻量编辑距离（仅用于差异量估算，限长避免性能问题）
+// ── 月度反思：AI 复盘规则效能，提出修订提案进待确认池 ──────────
+// 懒触发：用户打开项目列表时检查距上次反思是否满 30 天；满足则异步执行。
+// 提案走 addPendingRule（来源「月度反思」），复用现有采纳/忽略 UI，不自动改规则。
+const REFLECT_INTERVAL_MS = 30 * 24 * 3600 * 1000;
+async function maybeReflectSkill(userId) {
+  try {
+    const { rows } = await db.query('SELECT last_reflect_at FROM cw_skills WHERE user_id = ?', [userId]);
+    if (!rows || !rows.length) return;
+    const last = rows[0].last_reflect_at ? new Date(rows[0].last_reflect_at).getTime() : 0;
+    if (Date.now() - last < REFLECT_INTERVAL_MS) return;
+    // 先占位，防止并发/失败重复触发（失败也等下个周期，避免反复烧 AI 调用）
+    await db.query('UPDATE cw_skills SET last_reflect_at = NOW() WHERE user_id = ?', [userId]);
+
+    const skill = await getOrCreateSkill(userId);
+    const rules = skill.rules || {};
+    const lines = [];
+    for (const [group, arr] of Object.entries(rules)) {
+      if (group === '待确认' || !Array.isArray(arr)) continue;
+      arr.forEach(r => {
+        if (r && typeof r === 'object' && r.pending) return;
+        const text = typeof r === 'string' ? r : (r && r.text) || '';
+        if (!text) return;
+        const uses = (r && typeof r === 'object' && r.uses) || 0;
+        const score = (r && typeof r === 'object' && r.score) || 0;
+        lines.push(`[${group}] ${text}（使用${uses}次，反馈分${score}${score <= RULE_DORMANT_SCORE ? '，已休眠' : ''}）`);
+      });
+    }
+    if (lines.length < 8) return; // 规则太少没必要反思
+
+    const prompt = `你是创作 Skill 的策展人。下面是用户的写作规则清单，附使用次数与反馈分（正分=用户夸过相关产出，负分=被批评，已休眠=连续负反馈被停用）。
+${lines.join('\n')}
+
+任务：找出问题规则（空洞执行不了 / 长期 0 使用 / 互相重复 / 已休眠但方向有价值），提出最多 3 条【修订提案】。每条提案是一句可直接执行的新规则（30-60字），用于替代或合并问题规则，并在末尾用括号注明（替代：原规则前8个字…）。
+若规则整体健康无需修订，只输出：SKIP
+否则每行一条提案，以"-"开头，不要其他文字。`;
+    const out = (await callAI(prompt, { temperature: 0.3, maxTokens: 400 })).trim();
+    if (!out || out.startsWith('SKIP')) return;
+    const proposals = out.split('\n').map(s => s.replace(/^[-\s]+/, '').trim()).filter(s => s.length >= 10).slice(0, 3);
+    for (const p of proposals) {
+      await addPendingRule(userId, p, 'reflect', '月度反思');
+    }
+    if (proposals.length) console.log(`[Reflect] 用户${userId}：${proposals.length} 条修订提案进待确认池`);
+  } catch (e) { console.warn('[maybeReflectSkill]', e.message); }
+}
+
 // ── 范例库（golden examples）────────────────────────────────
 // 定稿即范例：项目完成定稿时把终版剧本存为范例；写剧本时检索 1 条
 // 题材最相近的注入 prompt（show > tell，模仿文风而非照抄）。
@@ -512,7 +586,7 @@ function extractStageDoc(raw, stage) {
 }
 
 // 构建某阶段的 system prompt（含决策树分支 + 对标素材 + 前序产出）
-function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample }) {
+function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack }) {
   const meta = project.meta || {};
   const durationMap = { '30s': '30秒（约75字）', '1min': '1分钟（约150字）', '3min': '3分钟（约450字）' };
   const styleMap = { informative: '干货讲解', story: '故事叙事', contrast: '对比反差', twist: '悬念反转' };
@@ -549,6 +623,10 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
 时长：${durationLabel} · 风格：${styleLabel} · 平台：${platformLabel}${meta.angle ? `\n用户初始观点：${meta.angle}` : ''}`;
 
   const skillBlock = `## 用户 Skill 规则（始终遵守）\n${rulesText}`;
+  // 题材包区块（项目挂载的题材专属规则，优先级高于全局 Skill）
+  const packBlock = (topicPack && topicPack.content)
+    ? `\n## 题材包「${topicPack.name || '未命名'}」（本项目题材专属规则，与全局 Skill 冲突时以本区块为准）\n${String(topicPack.content).slice(0, 2500)}\n`
+    : '';
   // 本项目专属规律（仅本项目生效，与全局 Skill 冲突时以本区块为准）
   const projectRules = Array.isArray(meta.projectRules) ? meta.projectRules.filter(t => t && String(t).trim()) : [];
   const projectRulesBlock = projectRules.length
@@ -560,7 +638,7 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
     : '';
 
   const tag = STAGE_META[stage].tag;
-  const common = `${skillBlock}\n${projectRulesBlock}\n${projInfo}\n${benchmarkBlock}${goldenBlock}${priorBlock}${draftBlock}${histBlock}`;
+  const common = `${skillBlock}\n${packBlock}${projectRulesBlock}\n${projInfo}\n${benchmarkBlock}${goldenBlock}${priorBlock}${draftBlock}${histBlock}`;
 
   // ── 决策树：是否已有明确方向 ──
   const hasDirection = !!(meta.angle || project.brief || artifacts.direction);
@@ -653,7 +731,16 @@ async function generateStageReply({ userId, project, skill, stage, boundMaterial
   const currentDraft = currentDraftOverride !== undefined ? currentDraftOverride : (project.doc || '');
   // 仅写剧本阶段注入范例（few-shot 对台词文风收益最大，其余阶段省 token）
   const goldenExample = stage === 'script' ? await pickGoldenExample(userId, project) : null;
-  const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample });
+  // 题材包：项目挂载了哪个包就注入哪个（全阶段有效——题材知识从选题到剧本都用得上）
+  let topicPack = null;
+  const packId = parseInt((project.meta || {}).packId) || 0;
+  if (packId) {
+    try {
+      const { rows } = await db.query('SELECT name, content FROM cw_skill_packs WHERE id = ? AND user_id = ?', [packId, userId]);
+      if (rows && rows[0] && (rows[0].content || '').trim()) topicPack = rows[0];
+    } catch (e) { console.warn('[topicPack]', e.message); }
+  }
+  const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack });
   // 写稿环节用一线模型（管理后台 ai_model_creation 配置；留空走默认）；bypassCap 避免长稿被中转站默认上限砍断
   const creationModel = (await getConfigVal('ai_model_creation')).trim();
   const callOpts = { maxTokens: 4000, temperature: 0.65, bypassCap: true };
@@ -688,13 +775,20 @@ async function generateStageReply({ userId, project, skill, stage, boundMaterial
   }
 
   // ── 规则使用回执（仅 script 阶段）：解析 USED 行 → 给规则 uses+1 → 从用户可见文本剥离 ──
+  let usedRules = null; // [{group,idx}] 本次实际使用的规则身份，供反馈效能分归因
   if (stage === 'script' && hasDocUpdate) {
     try {
       const usedNums = parseUsedRuleNumbers(aiRaw);
       // 不论是否解析到编号，都把 USED 行从摘要与文档中剥离，避免用户看到
       aiSummary = stripUsedLine(aiSummary);
       newDoc = stripUsedLine(newDoc);
-      if (usedNums.length && userId) await incrementRuleUses(userId, skill, usedNums);
+      if (usedNums.length && userId) {
+        await incrementRuleUses(userId, skill, usedNums);
+        // 编号 → 规则身份（group+idx），编号映射与 incrementRuleUses 同源
+        const visible = iterateVisibleRules(skill);
+        usedRules = usedNums.map(n => visible[n - 1]).filter(Boolean)
+          .map(v => ({ group: v.group, idx: v.idx }));
+      }
     } catch (e) {
       console.warn('[USED] 解析失败:', e.message);
     }
@@ -751,8 +845,57 @@ async function generateStageReply({ userId, project, skill, stage, boundMaterial
       if (kw) syncLabel = kw[0];
     }
   }
-  return { aiSummary, newDoc, hasDocUpdate, syncLabel };
+  return { aiSummary, newDoc, hasDocUpdate, syncLabel, usedRules };
 }
+
+/* ═══════════════════════════════════════
+   题材包接口（cw_skill_packs）
+   不同题材用不同规则包，项目通过 meta.packId 挂载
+═══════════════════════════════════════ */
+
+// GET /api/original/packs — 我的题材包列表
+router.get('/packs', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, name, content, updated_at FROM cw_skill_packs WHERE user_id = ? ORDER BY updated_at DESC, id DESC',
+      [req.userId]
+    );
+    res.json({ code: 200, data: rows || [] });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// POST /api/original/packs — 新建
+router.post('/packs', requireAuth, async (req, res) => {
+  const { name, content } = req.body;
+  if (!name || !String(name).trim()) return res.status(400).json({ code: 400, msg: '请填写题材包名称' });
+  try {
+    const { rows } = await db.query(
+      'INSERT INTO cw_skill_packs (user_id, name, content) VALUES (?, ?, ?)',
+      [req.userId, String(name).trim().slice(0, 100), String(content || '').slice(0, 20000)]
+    );
+    res.json({ code: 200, msg: '已创建', data: { id: rows?.[0]?.id } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// PUT /api/original/packs/:id — 更新
+router.put('/packs/:id', requireAuth, async (req, res) => {
+  const { name, content } = req.body;
+  try {
+    await db.query(
+      'UPDATE cw_skill_packs SET name = ?, content = ?, updated_at = NOW() WHERE id = ? AND user_id = ?',
+      [String(name || '').trim().slice(0, 100), String(content || '').slice(0, 20000), parseInt(req.params.id), req.userId]
+    );
+    res.json({ code: 200, msg: '已保存' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// DELETE /api/original/packs/:id — 删除（已挂载它的项目自动回落到全局 Skill）
+router.delete('/packs/:id', requireAuth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM cw_skill_packs WHERE id = ? AND user_id = ?', [parseInt(req.params.id), req.userId]);
+    res.json({ code: 200, msg: '已删除' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
 
 /* ═══════════════════════════════════════
    SKILL 接口
@@ -982,6 +1125,7 @@ router.get('/projects', requireAuth, async (req, res) => {
       'SELECT id, title, brief, status, stage, turns, created_at, updated_at FROM cw_original_projects WHERE user_id = ? ORDER BY updated_at DESC',
       [req.userId]
     );
+    maybeReflectSkill(req.userId).catch(() => {}); // 月度反思懒触发，不阻塞响应
     res.json({ code: 200, data: rows || [] });
   } catch (err) {
     console.error('/original/projects GET error:', err.message);
@@ -1057,6 +1201,12 @@ router.patch('/projects/:id', requireAuth, async (req, res) => {
     // 手动保存当前阶段活文档（PC 编辑器保存按钮）——先于定稿判断写入，确保 diff 用到最新终版
     if (typeof doc === 'string') {
       await db.query('UPDATE cw_original_projects SET doc = ? WHERE id = ?', [doc, projectId]);
+    }
+    // 挂载/卸载题材包（packId=0 或 null 为卸载）
+    if (req.body.packId !== undefined) {
+      const meta = project.meta || {};
+      meta.packId = parseInt(req.body.packId) || 0;
+      await db.query('UPDATE cw_original_projects SET meta = ? WHERE id = ?', [JSON.stringify(meta), projectId]);
     }
     if (status) {
       await db.query('UPDATE cw_original_projects SET status = ? WHERE id = ?', [status, projectId]);
@@ -1142,6 +1292,18 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
     const feedbackPattern = /好多了|更好了|好了|对了|就这个|这版.*好|对味|不错了|棒|可以了|喜欢这|AI味|机器味|太.*了|还是.*味|生硬|套话|太模板|太套路|不够真实|感觉.*假|不对味|腔|太官方/;
     const hasFeedback = feedbackPattern.test(message) && message.trim().length < 60;
 
+    // ── 规则效能分：反馈归因到上一次生成实际使用的规则 ──
+    // 正反馈 +1 / 负反馈 -1；降到 -2 的规则自动休眠（不再注入）。异步不阻塞。
+    if (hasFeedback) {
+      const negPattern = /AI味|机器味|生硬|套话|太模板|太套路|不够真实|假|不对味|腔|太官方|难听|太差|不行|别扭/;
+      const posPattern = /好多了|更好了|不错|可以了|喜欢|对味|棒|完美|就这个|对了|这版.*好/;
+      const delta = negPattern.test(message) ? -1 : (posPattern.test(message) ? 1 : 0);
+      const lastUsed = (parseArtifacts(project) || {})._lastUsedRules;
+      if (delta && Array.isArray(lastUsed) && lastUsed.length) {
+        scoreUsedRules(req.userId, lastUsed, delta).catch(() => {});
+      }
+    }
+
     if (hasFeedback) {
       try {
         // 找上一条有文案更新的 AI 消息（摘要）+ 该消息前用户的修改要求
@@ -1209,6 +1371,7 @@ ${docSnippet}
     const isCrossStageEdit = (!isFreeChatMode && effectiveStage !== projectStage);
 
     let aiSummary, newDoc, hasDocUpdate, syncLabel;
+    let usedRulesFromGen = null; // 本次生成实际使用的规则身份，写入 artifacts 供下轮反馈归因
 
     if (isFreeChatMode) {
       // 自由聊天：不操作文案，只自然回答
@@ -1235,6 +1398,7 @@ ${history}`;
         userMessage: message.trim(), currentDraftOverride,
       });
       ({ aiSummary, newDoc, hasDocUpdate, syncLabel } = gen);
+      usedRulesFromGen = gen.usedRules || null;
     }
 
     // ── 更新数据库 ────────────────────────────────────────────────
@@ -1245,6 +1409,7 @@ ${history}`;
       currentArtifacts[effectiveStage] = newDoc;
       // 记录 AI 基线供定稿 diff 学习（_ 开头为内部数据，前端跳过渲染）
       currentArtifacts._aiBaseline = { stage: effectiveStage, doc: newDoc, at: Date.now() };
+      if (usedRulesFromGen) currentArtifacts._lastUsedRules = usedRulesFromGen; // 供下轮反馈效能归因
       await db.query(
         'UPDATE cw_original_projects SET artifacts = ?, turns = turns + 1 WHERE id = ?',
         [JSON.stringify(currentArtifacts), projectId]
@@ -1254,6 +1419,7 @@ ${history}`;
       // 当前阶段生成 → 更新活文档，同步记录 AI 基线
       const currentArtifacts = parseArtifacts(project);
       currentArtifacts._aiBaseline = { stage: effectiveStage, doc: newDoc, at: Date.now() };
+      if (usedRulesFromGen) currentArtifacts._lastUsedRules = usedRulesFromGen; // 供下轮反馈效能归因
       await db.query(
         'UPDATE cw_original_projects SET doc = ?, artifacts = ?, turns = turns + 1 WHERE id = ?',
         [newDoc, JSON.stringify(currentArtifacts), projectId]
@@ -1361,6 +1527,7 @@ router.post('/projects/:id/stage/advance', requireAuth, async (req, res) => {
       // 记录 AI 基线供定稿 diff 学习
       const advArtifacts = parseArtifacts(freshProject);
       advArtifacts._aiBaseline = { stage: nextStage, doc: gen.newDoc, at: Date.now() };
+      if (gen.usedRules) advArtifacts._lastUsedRules = gen.usedRules;
       await db.query('UPDATE cw_original_projects SET doc = ?, artifacts = ?, turns = turns + 1 WHERE id = ?', [gen.newDoc, JSON.stringify(advArtifacts), projectId]);
     }
     const { rows: ins } = await db.query(
