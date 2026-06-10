@@ -430,7 +430,7 @@ html, body {
 .do-stage-tag.s-script{background:#ECFDF5;color:#059669}
 .do-stage-tag.s-final{background:#1A1614;color:#fff}
 
-.do-ws{display:grid;grid-template-columns:200px 1fr 380px;gap:14px;height:calc(100vh - 96px)}
+.do-ws{display:grid;grid-template-columns:200px 400px 1fr;gap:14px;height:calc(100vh - 96px)}
 .do-col{background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.05)}
 .do-col-head{padding:13px 16px;border-bottom:1px solid #F2EFEA;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .do-col-h-title{font-size:13px;font-weight:700;color:#1A1614}
@@ -455,6 +455,11 @@ html, body {
 .do-quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 .do-quick-chip{font-size:11px;padding:4px 10px;border-radius:18px;background:#F5F3EF;color:#6E6860;cursor:pointer;border:1px solid transparent;transition:all .12s}
 .do-quick-chip:hover{background:#FFF3E8;color:#F5762A;border-color:rgba(245,118,42,0.25)}
+.do-quick-chip.ghost{background:transparent;border:1px dashed #DDD6CD;color:#9E9890}
+.do-quick-chip.ghost:hover{background:#FFF8F3;color:#F5762A;border-color:rgba(245,118,42,0.45)}
+.do-op-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;user-select:none;border:1px solid #EDEAE4;background:transparent;color:#A09890}
+.do-op-chip:hover{border-color:#D8D2C9;color:#6E6860}
+.do-op-chip.on{background:#F5762A;border-color:#F5762A;color:#fff;box-shadow:0 2px 8px rgba(245,118,42,0.3)}
 
 .do-nav-grp{font-size:10px;font-weight:600;color:#B0AA9F;letter-spacing:.5px;margin:14px 0 6px}
 .do-nav-grp:first-child{margin-top:0}
@@ -3444,11 +3449,12 @@ function dOWorkspace(){
     { key:null, label:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="vertical-align:-1.5px"><path d="M21 12C21 16.4 17 20 12 20C10.8 20 9.6 19.8 8.5 19.4L3 20L4.6 16C3.6 14.8 3 13.5 3 12C3 7.6 7 4 12 4C17 4 21 7.6 21 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg> 自由聊天', tip:'仅聊天，AI 不会修改文案' },
     ...O_STAGES.map(s=>({ key:s.key, label:s.name, tip:`AI 将针对「${s.name}」修改` }))
   ];
-  const picker = `<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 12px 4px;border-top:1px solid #F2EFEA">
+  const picker = `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+    <span style="font-size:10px;color:#B0AA9F;font-weight:700;letter-spacing:0.5px;flex-shrink:0;user-select:none" title="选择这条消息让 AI 做什么：自由聊天不动文案，选中阶段则定向修改该阶段">操作</span>
     ${stageOpts.map(opt=>{
       const isAct = activeStage===opt.key;
       const clickJs = opt.key===null ? `dS.oActiveStage=null;dRender()` : `dOSetActiveStage('${opt.key}')`;
-      return `<span title="${opt.tip}" onclick="${clickJs}" style="padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid ${isAct?'#F5762A':'#EDEAE4'};background:${isAct?'#FFF0E4':'transparent'};color:${isAct?'#F5762A':'#A09890'};user-select:none">${opt.label}</span>`;
+      return `<span title="${opt.tip}" onclick="${clickJs}" class="do-op-chip ${isAct?'on':''}">${opt.label}</span>`;
     }).join('')}
   </div>`;
 
@@ -3461,11 +3467,14 @@ function dOWorkspace(){
 
   const chatCol = `
     <div class="do-col">
-      <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">已加载 Skill ${esc(dS.oSkill?(dS.oSkill.version||'v1.0'):'v1.0')} · ${(()=>{const st=oSkillStats(dS.oSkill);return st.rules+st.kw+st.fb;})()}条规则生效</div></div></div>
+      <div class="do-col-head"><div><div class="do-col-h-title">创作助手</div><div class="do-col-h-sub">已加载 Skill ${esc(dS.oSkill?(dS.oSkill.version||'v1.0'):'v1.0')} · ${(()=>{const st=oSkillStats(dS.oSkill);return st.rules+st.kw+st.fb;})()}条规则生效</div></div><span class="sb sb-active" style="flex-shrink:0;cursor:help" title="自动学习已开启，三种方式：
+① 对话里直接评价，如「这版好多了」「太生硬」「别用套话」——我会提炼成写法规则，放进首页待确认池，你采纳后生效；
+② 每次点「确认进下一阶段」时，我会对比你手动修改过的内容，自动学习你的偏好；
+③ 想主动喂爆款素材，去 学习中心 选素材分析规律写入 Skill。"><span class="dot"></span>自动学习中</span></div>
       <div class="do-col-body" id="doChatBody">${intro}${msgs}${busy}</div>
       <div class="do-chat-foot">
+        <div class="do-quick" style="align-items:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M13 2L4 14H11L10 22L20 9H13L13 2Z" stroke="#C8C3BC" stroke-width="1.8" stroke-linejoin="round"/></svg>${quick.map(q=>`<span class="do-quick-chip ghost" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
         ${picker}
-        <div class="do-quick">${quick.map(q=>`<span class="do-quick-chip" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
         <div style="display:flex;gap:8px;align-items:flex-end">
           <textarea class="do-chat-input" id="doInput" rows="2" style="flex:1;min-width:0" placeholder="${placeholderText}" oninput="dS.oInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dOSendMsg();}">${esc(dS.oInput)}</textarea>
           <button class="do-btn do-btn-pri" style="padding:9px 18px;white-space:nowrap;flex-shrink:0" ${dS.oBusy?'disabled':''} onclick="dOSendMsg()">发送</button>
@@ -3532,7 +3541,7 @@ function dOWorkspace(){
     : `<span style="font-size:10px;padding:2px 8px;border-radius:6px;background:#F4F1EC;color:#9E9890;font-weight:600;margin-left:2px;flex-shrink:0">草稿</span>`;
   const breadcrumb = `
     <div style="background:#fff;border:1px solid rgba(0,0,0,0.05);border-radius:12px;padding:9px 18px;margin-bottom:10px;display:flex;align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,0.04);flex-shrink:0">
-      <span class="do-link" onclick="dOBackHome()" style="font-size:15px;font-weight:700;color:#9E9890;line-height:1;flex-shrink:0">‹</span>
+      <div onclick="dOBackHome()" class="hov-back-btn" title="返回项目列表" style="width:30px;height:30px;border-radius:9px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="#6E6860" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <span style="font-size:13.5px;font-weight:700;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px">${esc(titleShort)}</span>
       ${statusBadge}
       <span style="color:#E8E4DF;font-size:11px;flex-shrink:0">·</span>
