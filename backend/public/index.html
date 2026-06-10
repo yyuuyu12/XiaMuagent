@@ -1312,6 +1312,9 @@ const S = {
   originalView: 'home',      // 'home'|'skill'|'learning'|'new'|'chat'
   originalProject: null,     // 当前项目 {id,title,status,turns,doc}
   originalSkill: null,       // 当前 skill 对象
+  originalPending: [],       // 待确认规则列表（学习提议制）[{idx,text,source,sourceType,...}]
+  originalPendingOpen: false,// 待确认卡片是否展开
+  originalCompacting: false, // 整理自动学习记录进行中
   originalProjects: [],      // 项目列表
   originalMessages: [],      // 当前项目消息列表
   originalChatTab: 'chat',   // 'chat'|'doc'
@@ -7453,13 +7456,15 @@ async function enterOriginal() {
   setState({ currentTab: 'original', originalView: 'home', originalLoading: true });
   render();
   try {
-    const [rSkill, rProj] = await Promise.all([
+    const [rSkill, rProj, rPending] = await Promise.all([
       api.get('/original/skill'),
       api.get('/original/projects'),
+      api.get('/original/skill/pending'),
     ]);
     setState({
       originalSkill: rSkill.code === 200 ? rSkill.data : null,
       originalProjects: rProj.code === 200 ? rProj.data : [],
+      originalPending: rPending.code === 200 ? (rPending.data || []) : [],
       originalLoading: false,
     });
   } catch { setState({ originalLoading: false }); }
@@ -7475,6 +7480,97 @@ function tOriginal() {
   if (v === 'new')       return tOriginalNew();
   if (v === 'chat')      return tOriginalChat();
   return tOriginalHome();
+}
+
+// 待确认规则来源标签
+function _pendingSourceLabel(sourceType) {
+  if (sourceType === 'diff') return '来自你的定稿修改';
+  if (sourceType === 'feedback') return '来自对话反馈';
+  return '来自自动学习';
+}
+
+// 顶部"学习提议"卡片：展示 AI 待确认学到的写法，逐条采纳/忽略
+function _tOriginalPendingCard() {
+  const pending = S.originalPending || [];
+  if (!pending.length) return '';
+  const open = S.originalPendingOpen;
+  const header = `<div onclick="setState({originalPendingOpen:${!open}});render()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;-webkit-tap-highlight-color:transparent">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">✨</span>
+      <span style="font-size:14px;font-weight:700;color:#92400E">我从你的反馈/修改中学到了 ${pending.length} 条新写法</span>
+    </div>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${open?90:0}deg);transition:transform .2s">
+      <polyline points="9 18 15 12 9 6"/></svg>
+  </div>`;
+  const items = open ? pending.map(p => `
+    <div style="background:#fff;border:1px solid #FDE68A;border-radius:12px;padding:12px 13px;margin-top:10px">
+      <div style="font-size:13.5px;color:#1A1614;line-height:1.5">${esc(p.text || '')}</div>
+      <div style="font-size:11px;color:#B45309;margin-top:6px">${esc(_pendingSourceLabel(p.sourceType))}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button onclick="confirmPendingRule(${p.idx})" style="flex:1;background:#F5602A;color:#fff;border:none;border-radius:9px;padding:8px 0;font-size:13px;font-weight:600;cursor:pointer">采纳</button>
+        <button onclick="dismissPendingRule(${p.idx})" style="flex:1;background:#fff;color:#9E9890;border:1px solid #E5E0D8;border-radius:9px;padding:8px 0;font-size:13px;font-weight:600;cursor:pointer">忽略</button>
+      </div>
+    </div>`).join('') : '';
+  return `<div style="margin:0 16px 14px;background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border:1px solid #FCD34D;border-radius:18px;padding:14px 16px">
+    ${header}
+    ${items}
+  </div>`;
+}
+
+// 采纳一条待确认规则 → 移入「自动学习」分组，刷新 skill + pending
+async function confirmPendingRule(idx) {
+  try {
+    const r = await api.post('/original/skill/pending/' + idx + '/confirm', {});
+    if (r.code === 200) {
+      const rPending = await api.get('/original/skill/pending');
+      setState({
+        originalSkill: r.data || S.originalSkill,
+        originalPending: rPending.code === 200 ? (rPending.data || []) : [],
+      });
+      showToast('已采纳，纳入你的 Skill');
+    } else {
+      showToast(r.msg || '操作失败');
+    }
+  } catch { showToast('网络错误'); }
+  render();
+}
+
+// 忽略一条待确认规则 → 删除
+async function dismissPendingRule(idx) {
+  try {
+    const r = await api.post('/original/skill/pending/' + idx + '/dismiss', {});
+    if (r.code === 200) {
+      const rPending = await api.get('/original/skill/pending');
+      setState({ originalPending: rPending.code === 200 ? (rPending.data || []) : [] });
+      showToast('已忽略');
+    } else {
+      showToast(r.msg || '操作失败');
+    }
+  } catch { showToast('网络错误'); }
+  render();
+}
+
+// 整理自动学习记录（compact free_text）
+async function compactOriginalSkill() {
+  if (S.originalCompacting) return;
+  setState({ originalCompacting: true });
+  render();
+  try {
+    const r = await api.post('/original/skill/compact', {});
+    if (r.code === 200) {
+      const rSkill = await api.get('/original/skill');
+      setState({
+        originalSkill: rSkill.code === 200 ? rSkill.data : S.originalSkill,
+        originalSkillFreeTextDraft: null,
+        originalCompacting: false,
+      });
+      showToast(r.msg || '整理完成');
+    } else {
+      setState({ originalCompacting: false });
+      showToast(r.msg || '整理失败');
+    }
+  } catch { setState({ originalCompacting: false }); showToast('网络错误'); }
+  render();
 }
 
 function tOriginalHome() {
@@ -7514,6 +7610,7 @@ function tOriginalHome() {
   }).join('');
 
   return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 24px">
+    ${_tOriginalPendingCard()}
     <!-- Skill 卡（品牌橙） -->
     <div onclick="setState({originalView:'skill',originalSkillFreeTextDraft:null,originalSkillHistoryOpen:false});render()" style="margin:0 16px 14px;background:linear-gradient(135deg,#FF7A35,#F5602A);border-radius:22px;padding:18px 20px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 28px rgba(245,96,42,0.28)">
       <div style="position:absolute;top:-30px;right:-20px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,0.08)"></div>
@@ -7616,9 +7713,13 @@ function tOriginalSkill() {
       </div>
     </div>` : '';
 
+  const compacting = S.originalCompacting;
   return `<div style="background:#FAF9F6;min-height:100%;padding:8px 0 32px">
-    <div style="padding:0 16px 6px">
-      <div style="font-size:12px;color:#B0AA9F;line-height:1.6">Markdown / 纯文本，AI 创作时优先读取。</div>
+    <div style="padding:0 16px 6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div style="font-size:12px;color:#B0AA9F;line-height:1.6;flex:1">Markdown / 纯文本，AI 创作时优先读取。</div>
+      <button onclick="compactOriginalSkill()" ${compacting?'disabled':''} style="flex-shrink:0;background:#FFF3E8;color:${compacting?'#C9A98C':'#F5602A'};border:1px solid #FBD9BE;border-radius:8px;padding:6px 11px;font-size:12px;font-weight:600;cursor:${compacting?'default':'pointer'};-webkit-tap-highlight-color:transparent;white-space:nowrap">
+        ${compacting ? '整理中…' : '整理自动学习记录'}
+      </button>
     </div>
     <div style="padding:0 16px 80px">
       <textarea id="_skill_free_ta"

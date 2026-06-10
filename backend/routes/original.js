@@ -617,6 +617,166 @@ router.put('/skill', requireAuth, async (req, res) => {
 });
 
 /* ═══════════════════════════════════════
+   待确认规则（学习提议制）接口
+═══════════════════════════════════════ */
+
+// Skill 版本号 minor +1（复用 PUT/PATCH 现成自增写法）
+function bumpSkillVersion(curVer) {
+  const parts = (curVer || 'v1.0').replace('v', '').split('.').map(Number);
+  parts[1] = (parts[1] || 0) + 1;
+  return `v${parts[0]}.${parts[1]}`;
+}
+
+// GET /api/original/skill/pending — 待确认列表（带索引）
+router.get('/skill/pending', requireAuth, async (req, res) => {
+  try {
+    const skill = await getOrCreateSkill(req.userId);
+    const pendingArr = (skill.rules?.['待确认'] || []).filter(r => r && typeof r === 'object' && r.pending);
+    // 带原始索引返回，便于前端调 confirm/dismiss
+    const list = (skill.rules?.['待确认'] || []).map((r, idx) => ({ idx, ...r }))
+      .filter(r => r.pending);
+    res.json({ code: 200, data: list, count: pendingArr.length });
+  } catch (err) {
+    console.error('/original/skill/pending GET error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/original/skill/pending/:idx/confirm — 采纳：pending=false 并移入「自动学习」分组
+router.post('/skill/pending/:idx/confirm', requireAuth, async (req, res) => {
+  try {
+    const idx = parseInt(req.params.idx, 10);
+    const skill = await getOrCreateSkill(req.userId);
+    const rules = skill.rules || {};
+    const pendingGroup = rules['待确认'] || [];
+    if (!Array.isArray(pendingGroup) || idx < 0 || idx >= pendingGroup.length || !pendingGroup[idx]) {
+      return res.status(404).json({ code: 404, msg: '待确认规则不存在' });
+    }
+    const item = pendingGroup[idx];
+    // 从待确认移除
+    pendingGroup.splice(idx, 1);
+    rules['待确认'] = pendingGroup;
+    // 移入「自动学习」分组，去 pending 标记
+    if (!Array.isArray(rules['自动学习'])) rules['自动学习'] = [];
+    rules['自动学习'].push({
+      text: item.text,
+      source: item.source || '',
+      sourceType: item.sourceType || 'auto',
+      uses: item.uses || 0,
+      at: item.at || Date.now(),
+    });
+    const newVer = bumpSkillVersion(skill.version);
+    await db.query('UPDATE cw_skills SET rules = ?, version = ? WHERE user_id = ?',
+      [JSON.stringify(rules), newVer, req.userId]);
+    const updated = await getOrCreateSkill(req.userId);
+    res.json({ code: 200, msg: '已采纳', data: updated });
+  } catch (err) {
+    console.error('/original/skill/pending confirm error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/original/skill/pending/:idx/dismiss — 忽略：删除该条
+router.post('/skill/pending/:idx/dismiss', requireAuth, async (req, res) => {
+  try {
+    const idx = parseInt(req.params.idx, 10);
+    const skill = await getOrCreateSkill(req.userId);
+    const rules = skill.rules || {};
+    const pendingGroup = rules['待确认'] || [];
+    if (!Array.isArray(pendingGroup) || idx < 0 || idx >= pendingGroup.length || !pendingGroup[idx]) {
+      return res.status(404).json({ code: 404, msg: '待确认规则不存在' });
+    }
+    pendingGroup.splice(idx, 1);
+    rules['待确认'] = pendingGroup;
+    await db.query('UPDATE cw_skills SET rules = ? WHERE user_id = ?',
+      [JSON.stringify(rules), req.userId]);
+    res.json({ code: 200, msg: '已忽略' });
+  } catch (err) {
+    console.error('/original/skill/pending dismiss error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+// POST /api/original/skill/compact — 整理自动学习记录：合并去重 free_text 的「## 自动学习」区块
+router.post('/skill/compact', requireAuth, async (req, res) => {
+  try {
+    await getOrCreateSkill(req.userId);
+    const { rows } = await db.query('SELECT free_text, free_text_history, version FROM cw_skills WHERE user_id = ?', [req.userId]);
+    const oldText = rows?.[0]?.free_text || '';
+    if (!oldText.trim()) {
+      return res.json({ code: 200, msg: '暂无可整理内容', data: { before: 0, after: 0 } });
+    }
+
+    // 提取所有「## 自动学习」区块下的条目
+    const lines = oldText.split('\n');
+    const autoItems = [];
+    let inAuto = false;
+    const keptLines = []; // 非自动学习区块原样保留
+    for (const line of lines) {
+      const isHeader = /^#{1,6}\s*自动学习/.test(line.trim());
+      if (isHeader) { inAuto = true; continue; }
+      // 新的二级及以上标题结束自动学习区块
+      if (inAuto && /^#{1,6}\s/.test(line.trim()) && !isHeader) { inAuto = false; }
+      if (inAuto) {
+        const t = line.trim().replace(/^[-*]\s*/, '').trim();
+        if (t) autoItems.push(t);
+      } else {
+        keptLines.push(line);
+      }
+    }
+
+    const before = autoItems.length;
+    if (before === 0) {
+      return res.json({ code: 200, msg: '没有「自动学习」条目需要整理', data: { before: 0, after: 0 } });
+    }
+
+    const prompt = `下面是一份口播文案写作 Skill 中「自动学习」区块累积的写作规则条目，可能存在重复、矛盾、过于琐碎的情况。
+请合并去重、删除矛盾项、精炼措辞，输出一份干净的规则列表（每条一行，以"- "开头），保留所有关键写作偏好，不要丢失重要信息，也不要无中生有添加新规则。
+
+【原始条目】
+${autoItems.map(t => '- ' + t).join('\n')}
+
+只输出整理后的条目列表，不要任何解释。`;
+
+    let merged = [];
+    try {
+      const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 800 });
+      merged = (raw || '').split('\n')
+        .map(l => l.trim().replace(/^[-*]\s*/, '').trim())
+        .filter(l => l.length > 0 && !/^[#【]/.test(l));
+    } catch (e) {
+      console.warn('[compact] callAI 失败:', e.message);
+      return res.status(500).json({ code: 500, msg: 'AI 整理失败：' + e.message });
+    }
+    if (!merged.length) merged = autoItems; // 兜底：模型没返回有效内容则保持原样
+
+    const after = merged.length;
+
+    // 重建 free_text：保留非自动学习内容 + 单个整理后的「## 自动学习」区块
+    const head = keptLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    const autoBlock = `## 自动学习\n${merged.map(t => '- ' + t).join('\n')}`;
+    const newText = head ? `${head}\n\n${autoBlock}` : autoBlock;
+
+    // 旧 free_text 推入 history（遵循现有历史结构，保证可还原）
+    const rawHist = rows?.[0]?.free_text_history;
+    let history = rawHist ? (typeof rawHist === 'string' ? JSON.parse(rawHist) : rawHist) : [];
+    history.unshift({ text: oldText, savedAt: new Date().toISOString() });
+    if (history.length > 10) history = history.slice(0, 10);
+
+    const newVer = bumpSkillVersion(rows?.[0]?.version);
+    await db.query(
+      'UPDATE cw_skills SET free_text = ?, free_text_history = ?, version = ? WHERE user_id = ?',
+      [newText, JSON.stringify(history), newVer, req.userId]
+    );
+
+    res.json({ code: 200, msg: `已合并 ${before} 条 → ${after} 条`, data: { before, after } });
+  } catch (err) {
+    console.error('/original/skill/compact error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
+/* ═══════════════════════════════════════
    PROJECT 接口
 ═══════════════════════════════════════ */
 
@@ -827,25 +987,9 @@ ${docSnippet}
 
           if (extracted && !extracted.startsWith('SKIP') && (extracted.startsWith('-') || extracted.length > 5)) {
             autoLearnRule = extracted.startsWith('-') ? extracted.slice(1).trim() : extracted;
-            // 追加到 Skill freeText（同天的合并到同一个 ## 自动学习 区块）
-            const skill = await getOrCreateSkill(req.userId);
-            const existing = skill.freeText || '';
-            const today = new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
-            const sectionHeader = `## 自动学习（${today}）`;
-            let newFreeText;
-            if (existing.includes(sectionHeader)) {
-              // 同一天：在该区块末尾追加一条
-              newFreeText = existing.replace(
-                new RegExp(`(${sectionHeader.replace(/[()]/g, '\\$&')}[\\s\\S]*?)(\n##|$)`),
-                (_, block, tail) => `${block.trimEnd()}\n- ${autoLearnRule}${tail}`
-              );
-            } else {
-              newFreeText = existing.trim()
-                ? `${existing}\n\n${sectionHeader}\n- ${autoLearnRule}`
-                : `${sectionHeader}\n- ${autoLearnRule}`;
-            }
-            await db.query('UPDATE cw_skills SET free_text = ? WHERE user_id = ?', [newFreeText, req.userId]);
-            console.log(`[AutoLearn] 已提炼规则: ${autoLearnRule}`);
+            // 不再静默写入 free_text：进"待确认"池，等用户在首页逐条采纳/忽略
+            await addPendingRule(req.userId, autoLearnRule, 'feedback', '对话反馈');
+            console.log(`[AutoLearn] 已提炼规则进待确认池: ${autoLearnRule}`);
           }
         }
       } catch (e) {

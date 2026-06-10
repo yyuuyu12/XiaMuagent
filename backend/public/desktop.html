@@ -2904,6 +2904,8 @@ Object.assign(dS, {
   oLearnResult:null, oLearnBusy:false, oLearnWriting:false,
   // 智能选题
   oTopics:[], oTopicsBusy:false,
+  // 学习提议制（待确认规则）
+  oPending:[], oPendingOpen:false, oCompacting:false,
   // Skill 自由编辑
   oSkillDraft:null, oSkillSaving:false, oSkillHistoryOpen:false, oSkillEditMode:false,
   oSkillQuickModal:false, oSkillQuickText:'', oSkillQuickSaving:false,
@@ -2936,9 +2938,10 @@ async function dBindOriginal(){
   if(dS.oView==='home'){
     // 已加载过则用缓存秒开，后台静默刷新；首次进入才显示「加载中」
     const wasLoaded = dS.oLoaded;
-    const [rs, rp] = await Promise.all([ dHttp.get('/original/skill'), dHttp.get('/original/projects') ]);
+    const [rs, rp, rpend] = await Promise.all([ dHttp.get('/original/skill'), dHttp.get('/original/projects'), dHttp.get('/original/skill/pending') ]);
     if(rs.code===200) dS.oSkill = rs.data;
     if(rp.code===200) dS.oProjects = rp.data || [];
+    if(rpend.code===200) dS.oPending = rpend.data || [];
     dS.oLoaded = true;
     // 首次加载才重建 DOM；后台静默刷新只更新数据，不触发 DOM 重建（避免 hover 闪烁）
     if(dS.oView==='home' && !wasLoaded) dRender();
@@ -2957,6 +2960,66 @@ function dOSetView(v){
 }
 function dOBackHome(){ dS.oView='home'; dS.oProject=null; dRender(); }
 function dOScrollChat(){ setTimeout(()=>{ const el=document.getElementById('doChatBody'); if(el) el.scrollTop=el.scrollHeight; },0); }
+
+/* ---------- 学习提议制：待确认规则卡片 ---------- */
+function dOPendingSourceLabel(t){
+  if(t==='diff') return '来自你的定稿修改';
+  if(t==='feedback') return '来自对话反馈';
+  return '来自自动学习';
+}
+function dOPendingCard(){
+  const pending = dS.oPending || [];
+  if(!pending.length) return '';
+  const open = dS.oPendingOpen;
+  const head = `<div onclick="dS.oPendingOpen=${!open};dRender()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:17px">✨</span>
+      <span style="font-size:14px;font-weight:700;color:#92400E">我从你的反馈/修改中学到了 ${pending.length} 条新写法</span>
+    </div>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${open?90:0}deg);transition:transform .2s"><polyline points="9 18 15 12 9 6"/></svg>
+  </div>`;
+  const items = open ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">${pending.map(p=>`
+    <div style="background:#fff;border:1px solid #FDE68A;border-radius:12px;padding:13px 14px;display:flex;flex-direction:column">
+      <div style="font-size:13px;color:#1A1614;line-height:1.55;flex:1">${esc(p.text||'')}</div>
+      <div style="font-size:11px;color:#B45309;margin-top:7px">${esc(dOPendingSourceLabel(p.sourceType))}</div>
+      <div style="display:flex;gap:8px;margin-top:11px">
+        <button onclick="dOConfirmPending(${p.idx})" style="flex:1;background:#F5762A;color:#fff;border:none;border-radius:8px;padding:7px 0;font-size:12.5px;font-weight:600;cursor:pointer">采纳</button>
+        <button onclick="dODismissPending(${p.idx})" style="flex:1;background:#fff;color:#9E9890;border:1px solid #E5E0D8;border-radius:8px;padding:7px 0;font-size:12.5px;font-weight:600;cursor:pointer">忽略</button>
+      </div>
+    </div>`).join('')}</div>` : '';
+  return `<div style="background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border:1px solid #FCD34D;border-radius:16px;padding:15px 18px;margin-bottom:18px">${head}${items}</div>`;
+}
+async function dOConfirmPending(idx){
+  const r = await dHttp.post('/original/skill/pending/'+idx+'/confirm', {});
+  if(r.code===200){
+    if(r.data) dS.oSkill = r.data;
+    const rp = await dHttp.get('/original/skill/pending');
+    dS.oPending = rp.code===200 ? (rp.data||[]) : [];
+    dToast('已采纳，纳入你的 Skill');
+  } else dToast(r.msg||'操作失败');
+  dRender();
+}
+async function dODismissPending(idx){
+  const r = await dHttp.post('/original/skill/pending/'+idx+'/dismiss', {});
+  if(r.code===200){
+    const rp = await dHttp.get('/original/skill/pending');
+    dS.oPending = rp.code===200 ? (rp.data||[]) : [];
+    dToast('已忽略');
+  } else dToast(r.msg||'操作失败');
+  dRender();
+}
+async function dOCompactSkill(){
+  if(dS.oCompacting) return;
+  dS.oCompacting = true; dRender();
+  const r = await dHttp.post('/original/skill/compact', {});
+  if(r.code===200){
+    const rs = await dHttp.get('/original/skill');
+    if(rs.code===200) dS.oSkill = rs.data;
+    dS.oSkillDraft = null;
+    dToast(r.msg||'整理完成');
+  } else dToast(r.msg||'整理失败');
+  dS.oCompacting = false; dRender();
+}
 
 /* ---------- 首页（Skill卡顶部 + 工具行 + 日期分组项目网格） ---------- */
 function dOHome(){
@@ -3050,6 +3113,7 @@ function dOHome(){
   <div class="do-page-head">
     <div><div class="do-page-title">原创工坊</div><div class="do-page-sub">选题方向 → 粗纲 → 细纲 → 口播剧本</div></div>
   </div>
+  ${dOPendingCard()}
   ${topRow}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <div style="font-size:15px;font-weight:700;color:#1A1614">我的项目${dS.oLoaded&&cnt?` <span style="font-size:13px;color:#B0AA9F;font-weight:500">${cnt}</span>`:''}</div>
@@ -4019,6 +4083,7 @@ function dOSkillPage(){
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
+        ${cur.id==='main'?`<button class="do-btn do-btn-gho" ${dS.oCompacting?'disabled':''} onclick="dOCompactSkill()">${dS.oCompacting?'整理中…':'整理自动学习记录'}</button>`:''}
         ${cur.id==='main'?`<button class="do-btn do-btn-gho" onclick="dS.oSkillHistoryOpen=true;dRender()">历史记录</button>`:''}
         ${isEditMode
           ? `<button class="do-btn do-btn-gho" style="color:#9E9890" onclick="dS.oSkillEditMode=false;dS.oSkillDraft=null;dRender()">取消</button>
