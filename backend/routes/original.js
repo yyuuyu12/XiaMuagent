@@ -898,6 +898,58 @@ router.delete('/packs/:id', requireAuth, async (req, res) => {
 });
 
 /* ═══════════════════════════════════════
+   效果统计 & 范例库接口
+═══════════════════════════════════════ */
+
+// GET /api/original/skill-stats — Skill 体系综合效果面板数据
+router.get('/skill-stats', requireAuth, async (req, res) => {
+  try {
+    const skill = await getOrCreateSkill(req.userId);
+    const rules = skill.rules || {};
+    let total = 0, dormant = 0, zeroUse = 0, pendingCount = 0;
+    const flat = [];
+    for (const [group, arr] of Object.entries(rules)) {
+      if (!Array.isArray(arr)) continue;
+      if (group === '待确认') { pendingCount += arr.filter(r => r && typeof r === 'object' && r.pending).length; continue; }
+      arr.forEach(r => {
+        const text = typeof r === 'string' ? r : (r && r.text) || '';
+        if (!text) return;
+        if (r && typeof r === 'object' && r.pending) return;
+        const uses = (r && typeof r === 'object' && r.uses) || 0;
+        const score = (r && typeof r === 'object' && r.score) || 0;
+        total++;
+        if (score <= RULE_DORMANT_SCORE) dormant++;
+        else if (uses === 0) zeroUse++;
+        flat.push({ group, text, uses, score, dormant: score <= RULE_DORMANT_SCORE });
+      });
+    }
+    flat.sort((a, b) => (b.uses - a.uses) || (b.score - a.score));
+    const [{ rows: examples }, { rows: packs }] = await Promise.all([
+      db.query('SELECT id, title, created_at FROM cw_golden_examples WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 20', [req.userId]),
+      db.query('SELECT COUNT(*) AS c FROM cw_skill_packs WHERE user_id = ?', [req.userId]),
+    ]);
+    res.json({
+      code: 200,
+      data: {
+        total, active: total - dormant, dormant, zeroUse, pendingCount,
+        packCount: packs?.[0]?.c || 0,
+        topRules: flat.slice(0, 10),
+        examples: examples || [],
+        lastReflectAt: skill.last_reflect_at || null,
+      }
+    });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// DELETE /api/original/examples/:id — 删除一条范例（不想再被模仿的定稿）
+router.delete('/examples/:id', requireAuth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM cw_golden_examples WHERE id = ? AND user_id = ?', [parseInt(req.params.id), req.userId]);
+    res.json({ code: 200, msg: '已删除' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+/* ═══════════════════════════════════════
    SKILL 接口
 ═══════════════════════════════════════ */
 

@@ -3640,7 +3640,7 @@ function dOInfoPanel(p){
 /* ---------- 题材包：加载/挂载/编辑 ---------- */
 async function dOLoadPacks(){
   const r = await dHttp.get('/original/packs');
-  if(r.code===200){ dS.oPacks = r.data||[]; dRender(); }
+  if(r.code===200){ dS.oPacks = r.data||[]; dS.oSkillList=null; dRender(); }
 }
 async function dOMountPack(packId){
   if(!dS.oProject) return;
@@ -3695,6 +3695,74 @@ async function dODeletePack(){
   } else dToast(r.msg||'删除失败');
   dRender();
 }
+async function dODeletePackById(packId){
+  const pk = (dS.oPacks||[]).find(x=>x.id===packId);
+  if(!pk) return;
+  if(!confirm('删除题材包「'+(pk.name||'')+'」？挂载它的项目会回落到全局 Skill。')) return;
+  const r = await dApi('DELETE','/original/packs/'+packId, {});
+  if(r.code===200){
+    dToast('已删除');
+    if(dS.oProject && dS.oProject.meta && parseInt(dS.oProject.meta.packId)===packId) dS.oProject.meta.packId = 0;
+    if(dS.oSkillCurId==='pack_'+packId){ dS.oSkillCurId='main'; dS.oSkillDraft=null; dS.oSkillEditMode=false; }
+    await dOLoadPacks();
+  } else dToast(r.msg||'删除失败');
+  dRender();
+}
+
+/* ---------- 效果数据面板 ---------- */
+async function dOOpenStats(){
+  dS.oStatsOpen = true; dS.oStats = null; dRender();
+  const r = await dHttp.get('/original/skill-stats');
+  if(r.code===200) dS.oStats = r.data;
+  else dToast(r.msg||'加载失败');
+  dRender();
+}
+async function dODeleteExample(id){
+  if(!confirm('删除这条范例？删除后写剧本时不再参考它。')) return;
+  const r = await dApi('DELETE','/original/examples/'+id, {});
+  if(r.code===200 && dS.oStats){ dS.oStats.examples = (dS.oStats.examples||[]).filter(e=>e.id!==id); dToast('已删除'); }
+  else if(r.code!==200) dToast(r.msg||'删除失败');
+  dRender();
+}
+function dOStatsModalHtml(){
+  const st = dS.oStats;
+  const statCard = (num,lab,c)=>`<div style="flex:1;background:#FBFAF7;border:1px solid #EDE9E3;border-radius:11px;padding:12px 0;text-align:center"><div style="font-size:20px;font-weight:700;color:${c||'#1A1614'}">${num}</div><div style="font-size:11px;color:#9E9890;margin-top:2px">${lab}</div></div>`;
+  const body = !st ? `<div class="do-empty">加载中…</div>` : `
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      ${statCard(st.active,'生效规则','#F5762A')}
+      ${statCard(st.dormant,'已休眠',st.dormant>0?'#E5534B':'#1A1614')}
+      ${statCard(st.zeroUse,'从未被用')}
+      ${statCard(st.pendingCount,'待确认')}
+      ${statCard((st.examples||[]).length,'范例','#16A34A')}
+    </div>
+    <div style="font-size:12px;color:#B0AA9F;line-height:1.6;margin-bottom:16px">「从未被用」多 = 规则太空洞 AI 用不上，建议改写或删除；「已休眠」= 连续负反馈被自动停用；范例 = 你定稿的成品，写剧本时 AI 会模仿其文风。</div>
+    <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">规则使用排行（Top 10）</div>
+    ${(st.topRules||[]).length===0?`<div class="do-empty" style="padding:20px">还没有使用数据。写几次剧本后这里会显示哪些规则真正在被 AI 使用。</div>`
+      :(st.topRules||[]).map(r=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F2EFEA">
+        <div style="flex:1;min-width:0;font-size:12.5px;color:${r.dormant?'#C0B8B0':'#3D362F'};${r.dormant?'text-decoration:line-through;':''}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.text)}">${esc(r.text)}</div>
+        <span style="font-size:11px;color:#9E9890;flex-shrink:0">用${r.uses}次</span>
+        <span style="font-size:11px;font-weight:700;flex-shrink:0;color:${r.score>0?'#16A34A':r.score<0?'#E5534B':'#B0AA9F'}">${r.score>0?'+':''}${r.score}分</span>
+      </div>`).join('')}
+    <div style="font-size:13px;font-weight:700;color:#1A1614;margin:18px 0 8px">范例库（定稿自动收录，写剧本时模仿文风）</div>
+    ${(st.examples||[]).length===0?`<div class="do-empty" style="padding:20px">还没有范例。完成任意项目的定稿后，终版剧本会自动收录到这里。</div>`
+      :(st.examples||[]).map(e=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F2EFEA">
+        <div style="flex:1;min-width:0;font-size:12.5px;color:#3D362F;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.title||'未命名')}</div>
+        <span style="font-size:11px;color:#B0AA9F;flex-shrink:0">${dFmtTime(e.created_at)}</span>
+        <span class="do-link" style="font-size:11px;color:#E5534B;flex-shrink:0" onclick="dODeleteExample(${e.id})">删除</span>
+      </div>`).join('')}`;
+  return `<div class="d-modal-overlay" onclick="if(event.target===this){dS.oStatsOpen=false;dRender();}">
+    <div class="d-modal" style="width:620px;max-height:78vh;overflow-y:auto;padding:26px 28px;text-align:left">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="font-size:17px;font-weight:700;color:#1A1614">Skill 效果数据</div>
+        <div onclick="dS.oStatsOpen=false;dRender()" style="width:28px;height:28px;border-radius:50%;background:#F0EDE8;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6E6860;font-size:14px">✕</div>
+      </div>
+      ${body}
+    </div>
+  </div>`;
+}
+
 function dOPackModalHtml(){
   const pe = dS.oPackEdit;
   return `<div class="d-modal-overlay" onclick="if(event.target===this){dS.oPackEdit=null;dRender();}">
@@ -4250,10 +4318,16 @@ function dOGetSkillList(){
     content: (dS.oSkill&&dS.oSkill.freeText)||'',
     updatedAt: dS.oSkill&&dS.oSkill.updated_at ? dFmtTime(dS.oSkill.updated_at) : '—',
   };
-  // 从 localStorage 加载额外 Skills
+  // 题材包（后端，写作时按项目挂载注入）
+  const packs = (dS.oPacks||[]).map(pk=>({
+    id:'pack_'+pk.id, packId:pk.id, name:pk.name||'未命名题材包',
+    version:'题材包', content:pk.content||'',
+    updatedAt: pk.updated_at ? dFmtTime(pk.updated_at) : '—',
+  }));
+  // 从 localStorage 加载旧版本地 Skills（历史兼容，仅本地不生效）
   let extra = [];
   try { extra = JSON.parse(localStorage.getItem('wf_extra_skills')||'[]'); } catch{}
-  dS.oSkillList = [main, ...extra];
+  dS.oSkillList = [main, ...packs, ...extra];
   return dS.oSkillList;
 }
 function dOGetCurSkill(){
@@ -4290,8 +4364,10 @@ function dOSkillEnterEdit(){
 }
 
 function dOSkillPage(){
+  if(!dS.oPacksLoaded){ dS.oPacksLoaded = true; dOLoadPacks(); }
   const list = dOGetSkillList();
   const cur = dOGetCurSkill();
+  const isPack = String(cur.id).indexOf('pack_')===0;
   const isEditMode = dS.oSkillEditMode===true;
   // 阅读模式展示 cur.content（已保存内容）；编辑模式展示 draft（草稿）
   const savedContent = cur.content||'';
@@ -4330,9 +4406,9 @@ function dOSkillPage(){
           </div>
           <span style="font-size:12px;font-weight:700;color:#9E9890;letter-spacing:0.3px">我的 Skill</span>
         </div>
-        <button onclick="dOSkillAddNew()" class="hov-add-skill" style="width:100%;padding:7px 0;border-radius:8px;border:1.5px dashed #D8D2C9;background:transparent;color:#9E9890;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s">
+        <button onclick="dOOpenPackEdit(null)" class="hov-add-skill" style="width:100%;padding:7px 0;border-radius:8px;border:1.5px dashed #D8D2C9;background:transparent;color:#9E9890;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-          新建 Skill
+          新建题材包
         </button>
       </div>
       <div style="flex:1;overflow-y:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:3px">
@@ -4354,14 +4430,18 @@ function dOSkillPage(){
         <div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:0">
           <span style="font-size:15px;font-weight:700;color:#1A1614;margin-right:7px">${esc(cur.name)}</span>
           <span style="font-size:11px;color:#F5762A;font-weight:600;background:#FFF3E8;padding:1px 7px;border-radius:5px;margin-right:8px">${esc(ver)}</span>
-          <span style="font-size:11px;color:#B0AA9F">· Markdown · AI写作时自动遵循 · </span>
+          ${isPack
+            ? `<span style="font-size:11px;color:#B0AA9F">· Markdown · 在项目简介里挂载到项目后，写作时注入（优先级高于全局 Skill） · </span><span style="font-size:11px;color:#F5762A;font-weight:600;margin-left:3px">${ruleCount}条规则</span>`
+            : `<span style="font-size:11px;color:#B0AA9F">· Markdown · AI写作时自动遵循 · </span>
           <span style="font-size:11px;color:#F5762A;font-weight:600;margin-left:3px">${ruleCount}条规则</span>
-          <span style="font-size:11px;color:#B0AA9F"> · 高频词${kwCount} · 禁区${fbCount}</span>
+          <span style="font-size:11px;color:#B0AA9F"> · 高频词${kwCount} · 禁区${fbCount}</span>`}
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
+        ${cur.id==='main'?`<button class="do-btn do-btn-gho" onclick="dOOpenStats()">效果数据</button>`:''}
         ${cur.id==='main'?`<button class="do-btn do-btn-gho" ${dS.oCompacting?'disabled':''} onclick="dOCompactSkill()">${dS.oCompacting?'整理中…':'整理自动学习记录'}</button>`:''}
         ${cur.id==='main'?`<button class="do-btn do-btn-gho" onclick="dS.oSkillHistoryOpen=true;dRender()">历史记录</button>`:''}
+        ${isPack?`<button class="do-btn" style="background:#FFF0EF;color:#E5534B" onclick="dODeletePackById(${cur.packId})">删除此包</button>`:''}
         ${isEditMode
           ? `<button class="do-btn do-btn-gho" style="color:#9E9890" onclick="dS.oSkillEditMode=false;dS.oSkillDraft=null;dRender()">取消</button>
              <button class="do-btn do-btn-pri" ${dS.oSkillSaving?'disabled':''} onclick="dOSkillSave()">${dS.oSkillSaving?'保存中…':'保存'}</button>`
@@ -4386,7 +4466,7 @@ function dOSkillPage(){
     <div style="display:flex;height:calc(100vh - 120px);border-radius:16px;overflow:hidden;border:1px solid #EFEAE2;box-shadow:0 2px 16px rgba(0,0,0,0.06)">
       ${sidebar}${editor}
     </div>
-    ${historySheet}`;
+    ${historySheet}${dS.oStatsOpen?dOStatsModalHtml():''}${dS.oPackEdit?dOPackModalHtml():''}`;
 }
 async function dOSkillSave(){
   if(dS.oSkillSaving) return;
@@ -4404,8 +4484,18 @@ async function dOSkillSave(){
       dS.oSkillDraft=null; dS.oSkillEditMode=false;
       dToast('已保存 ✓');
     } else dToast(r.msg||'保存失败');
+  } else if(String(cur.id).indexOf('pack_')===0){
+    // 题材包 → 同步后端（名称不变，只存内容）
+    const r = await dApi('PUT','/original/packs/'+cur.packId, { name: cur.name, content: text });
+    dS.oSkillSaving=false;
+    if(r.code===200){
+      if(dS.oSkillList){ const s=dS.oSkillList.find(s=>s.id===cur.id); if(s){ s.content=text; s.updatedAt='刚刚'; } }
+      const pk=(dS.oPacks||[]).find(x=>x.id===cur.packId); if(pk) pk.content=text;
+      dS.oSkillDraft=null; dS.oSkillEditMode=false;
+      dToast('已保存 ✓');
+    } else dToast(r.msg||'保存失败');
   } else {
-    // 额外 Skill → 仅本地，保存后返回阅读模式
+    // 旧版本地 Skill → 仅本地，保存后返回阅读模式
     if(dS.oSkillList){ const s=dS.oSkillList.find(s=>s.id===cur.id); if(s){ s.content=text; s.updatedAt='刚刚'; } }
     dOSaveExtraSkills();
     dS.oSkillSaving=false;
