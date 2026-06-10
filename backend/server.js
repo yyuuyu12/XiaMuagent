@@ -7,7 +7,28 @@ const initDb = require('./initDb');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE'], allowedHeaders: ['Content-Type','Authorization'] }));
+// CORS 白名单：正式域名 + 本地调试，经环境变量 CORS_ORIGINS 配置（逗号分隔）
+// 未配置时默认放行，避免误伤现有部署；配置后仅白名单内来源可跨域
+const _corsWhitelist = (process.env.CORS_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+const _corsDefaultAllow = [
+  'http://localhost:3001', 'http://127.0.0.1:3001',
+  'http://localhost:5173', 'http://127.0.0.1:5173',
+];
+app.use(cors({
+  origin(origin, cb) {
+    // 同源请求 / 服务器到服务器（无 origin 头）一律放行
+    if (!origin) return cb(null, true);
+    // 未配置白名单 → 兼容旧行为，全部放行
+    if (_corsWhitelist.length === 0) return cb(null, true);
+    if (_corsWhitelist.includes(origin) || _corsDefaultAllow.includes(origin)) {
+      return cb(null, true);
+    }
+    return cb(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET','POST','PUT','DELETE','PATCH'],
+  allowedHeaders: ['Content-Type','Authorization'],
+}));
 app.use(express.json({ limit: '80mb' })); // 视频生成需要传 base64 视频+音频（视频可达50MB+）
 
 const { router: authRouter } = require('./routes/auth');
