@@ -45,6 +45,17 @@ html, body {
   font-size:10px; color:#B0AA9F; font-weight:600;
   letter-spacing:0.5px; padding:0 8px; margin-bottom:6px;
 }
+/* 场景化二级分组（短视频创作 / 小说创作） */
+.d-nav-group { margin-top:18px; }
+.d-nav-group:first-of-type { margin-top:4px; }
+.d-nav-group-title { font-size:12.5px; color:#1A1614; font-weight:700; letter-spacing:0.2px; padding:0 8px; margin-bottom:8px; }
+/* 数字人口播页内 Tab 栏 */
+.koubo-tabs { display:flex; gap:2px; border-bottom:1px solid #EDE9E3; }
+.koubo-tab { padding:9px 16px; font-size:13.5px; font-weight:600; color:#9E9890; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; display:flex; align-items:center; gap:6px; white-space:nowrap; user-select:none; }
+.koubo-tab.active { color:#F5762A; border-bottom-color:#F5762A; }
+.koubo-tab:hover:not(.active) { color:#6E6860; }
+.koubo-tab-badge { font-size:10px; font-weight:700; background:#F0EDE8; color:#9E9890; padding:1px 6px; border-radius:10px; }
+.koubo-tab.active .koubo-tab-badge { background:#FFF3E8; color:#F5762A; }
 .d-nav-item {
   display:flex; align-items:center; gap:9px;
   padding:9px 10px; border-radius:10px;
@@ -710,29 +721,23 @@ body { animation:pageIn 0.4s ease-out; }
       <span class="d-logo-text">爆款文案工坊</span>
     </div>
     <div class="d-nav-section">
-      <div class="d-nav-label">主要功能</div>
-      <div class="d-nav-item active" id="dNavHome" onclick="dGoPage('home')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 12L12 5L19 12V20C19 20.55 18.55 21 18 21H15V16H9V21H6C5.45 21 5 20.55 5 20V12Z" fill="#F5762A" stroke="#F5762A" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        <span>克隆流程</span>
+      <div class="d-nav-group">
+        <div class="d-nav-group-title">短视频创作</div>
+        <div class="d-nav-item active" id="dNavHome" onclick="dGoPage('home')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.8"/><path d="M4 20C4 16.69 7.13 14 12 14C16.87 14 20 16.69 20 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M15.5 3.5C16.5 4.5 16.5 6 15.5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span>数字人口播</span>
+        </div>
+        <div class="d-nav-item" id="dNavOriginal" onclick="dOEnter()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 20L4 16L15 5L19 9L8 20L4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 7L17 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>原创文案</span>
+        </div>
       </div>
-      <div class="d-nav-item" id="dNavTasks" onclick="dGoPage('tasks')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2.5" stroke="#9E9890" stroke-width="1.8"/><path d="M9 8H15M9 12H15M9 16H12" stroke="#9E9890" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <span>我的任务</span>
-      </div>
-      <div class="d-nav-item" id="dNavOriginal" onclick="dOEnter()">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 20L4 16L15 5L19 9L8 20L4 20Z" stroke="#9E9890" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 7L17 11" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span>原创工坊</span>
-      </div>
-    </div>
-    <div class="d-nav-section">
-      <div class="d-nav-label">资源管理</div>
-      <div class="d-nav-item" id="dNavVoices" onclick="dGoPage('voices')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3C10.34 3 9 4.34 9 6V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V6C15 4.34 13.66 3 12 3Z" stroke="#9E9890" stroke-width="1.8"/><path d="M5 11C5 14.87 8.13 18 12 18C15.87 18 19 14.87 19 11" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/><path d="M12 18V21M9 21H15" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span>声音管理</span>
-      </div>
-      <div class="d-nav-item" id="dNavAvatars" onclick="dGoPage('avatars')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#9E9890" stroke-width="1.8"/><path d="M4 20C4 16.69 7.58 14 12 14C16.42 14 20 16.69 20 20" stroke="#9E9890" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span>数字人管理</span>
+      <div class="d-nav-group">
+        <div class="d-nav-group-title">小说创作</div>
+        <div class="d-nav-item" id="dNavNovel" onclick="dGoPage('novel')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 19.5C4 18.12 5.12 17 6.5 17H20V3H6.5C5.12 3 4 4.12 4 5.5V19.5ZM4 19.5C4 20.88 5.12 22 6.5 22H20" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>AI 写小说</span>
+        </div>
       </div>
     </div>
     <div class="d-sidebar-bottom">
@@ -854,24 +859,58 @@ const dS = {
 /* ============================================================
    JS · 渲染入口
    ============================================================ */
+/* 数字人口播 · 页内 Tab 栏（制作/任务/声音库/数字人库 同属口播区） */
+function dKouboTabbar(active) {
+  const running = (dS.tasks || []).filter(t => t.status !== 'done' && t.status !== 'failed').length;
+  const tabs = [
+    ['make', '制作', 'home'],
+    ['tasks', '任务', 'tasks'],
+    ['voices', '声音库', 'voices'],
+    ['avatars', '数字人库', 'avatars'],
+  ];
+  return `<div style="margin-bottom:18px">
+    <div style="margin-bottom:12px">
+      <div style="font-size:18px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">数字人口播</div>
+      <div style="font-size:12px;color:#9E9890;margin-top:3px">克隆声音 + 数字人形象，一键把文案做成口播视频</div>
+    </div>
+    <div class="koubo-tabs">
+      ${tabs.map(([k, label, page]) => `<div class="koubo-tab ${active === k ? 'active' : ''}" onclick="dGoPage('${page}')">${label}${k === 'tasks' && running ? `<span class="koubo-tab-badge">${running}</span>` : ''}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* AI 写小说 · 占位页（小说创作独立成区，即将上线） */
+function dRenderNovel() {
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center">
+    <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M4 19.5C4 18.12 5.12 17 6.5 17H20V3H6.5C5.12 3 4 4.12 4 5.5V19.5ZM4 19.5C4 20.88 5.12 22 6.5 22H20" stroke="#FFB877" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </div>
+    <div style="font-size:20px;font-weight:700;color:#1A1614;margin-bottom:8px">AI 写小说</div>
+    <div style="font-size:13.5px;color:#9E9890;line-height:1.7;max-width:380px;margin-bottom:8px">面向网文/长篇写作的智能体，支持世界观设定、章节大纲、角色卡与逐章续写。和短视频是不同的创作场景，独立成区。</div>
+    <span style="font-size:12px;font-weight:700;color:#C85A10;background:#FFF0E0;border:1px solid #FFD9B8;padding:5px 14px;border-radius:20px;margin-top:10px">即将上线</span>
+  </div>`;
+}
+
 function dRender() {
   const el = document.getElementById('dMainContent');
   if (!el) return;
   switch (dS.page) {
-    case 'home':    el.innerHTML = dRenderHome(); dBindHome(); break;
-    case 'tasks':   el.innerHTML = dRenderTasks(); dBindTasks(); break;
-    case 'voices':  el.innerHTML = dRenderVoices(); break;
-    case 'avatars': el.innerHTML = dRenderAvatars(); break;
+    case 'home':    el.innerHTML = dKouboTabbar('make') + dRenderHome(); dBindHome(); break;
+    case 'tasks':   el.innerHTML = dKouboTabbar('tasks') + dRenderTasks(); dBindTasks(); break;
+    case 'voices':  el.innerHTML = dKouboTabbar('voices') + dRenderVoices(); break;
+    case 'avatars': el.innerHTML = dKouboTabbar('avatars') + dRenderAvatars(); break;
+    case 'novel':   el.innerHTML = dRenderNovel(); break;
     case 'original': el.innerHTML = dRenderOriginal(); dBindOriginal(); break;
     case 'profile': el.innerHTML = dRenderProfile(); dBindProfile(); break;
-    default:        el.innerHTML = dRenderHome(); dBindHome();
+    default:        el.innerHTML = dKouboTabbar('make') + dRenderHome(); dBindHome();
   }
 }
 
 function dGoPage(page) {
   dS.page = page;
   document.querySelectorAll('.d-nav-item').forEach(el => el.classList.remove('active'));
-  const navMap = { home:'dNavHome', tasks:'dNavTasks', voices:'dNavVoices', avatars:'dNavAvatars', original:'dNavOriginal', profile:'' };
+  // 口播区四个页面（制作/任务/声音库/数字人库）侧边栏统一高亮「数字人口播」
+  const navMap = { home:'dNavHome', tasks:'dNavHome', voices:'dNavHome', avatars:'dNavHome', novel:'dNavNovel', original:'dNavOriginal', profile:'' };
   if (navMap[page]) document.getElementById(navMap[page])?.classList.add('active');
   if (page === 'home') dProbeServices();
   dRender();
@@ -1013,7 +1052,7 @@ function dRenderHome() {
     <!-- 顶部信息栏 -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
-        <div style="font-size:20px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">克隆流程</div>
+        <div style="font-size:15px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">克隆流程</div>
         <div style="font-size:12px;color:#9E9890;margin-top:3px">从一条爆款视频，6 步生成你的版本</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
@@ -2484,7 +2523,7 @@ function dRenderTasks() {
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
-        <div style="font-size:18px;font-weight:700;color:#1A1614">我的任务</div>
+        <div style="font-size:15px;font-weight:700;color:#1A1614">任务列表</div>
         <div style="font-size:12px;color:#9E9890;margin-top:3px">保存的克隆流程，随时继续</div>
       </div>
       <button class="b b-sm b-primary" onclick="dGoPage('home')" style="gap:5px">
@@ -2679,7 +2718,7 @@ function dRenderVoices() {
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <div>
-        <div style="font-size:18px;font-weight:700;color:#1A1614">声音管理</div>
+        <div style="font-size:15px;font-weight:700;color:#1A1614">我的声音</div>
         <div style="font-size:12px;color:#B0AA9F;margin-top:3px">共 ${voices.length} 个克隆声音</div>
       </div>
     </div>
@@ -2808,7 +2847,7 @@ function dRenderAvatars() {
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <div>
-        <div style="font-size:18px;font-weight:700;color:#1A1614">数字人管理</div>
+        <div style="font-size:15px;font-weight:700;color:#1A1614">我的数字人</div>
         <div style="font-size:12px;color:#B0AA9F;margin-top:3px">共 ${avatars.length} 个形象</div>
       </div>
     </div>
