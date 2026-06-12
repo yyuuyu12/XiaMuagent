@@ -366,22 +366,34 @@ function stripUsedLine(text) {
   return (text || '').replace(/^[ \t]*USED\s*[:：].*$/gim, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+// 二元字组相似度（0~1）：近似去重用，措辞略变的重复规则也能识别
+function bigramSimilarity(a, b) {
+  const grams = (s) => {
+    const g = new Set(); const t = String(s || '').replace(/\s+/g, '');
+    for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2));
+    return g;
+  };
+  const ga = grams(a), gb = grams(b);
+  if (!ga.size || !gb.size) return 0;
+  let hit = 0; ga.forEach(g => { if (gb.has(g)) hit++; });
+  return hit / Math.min(ga.size, gb.size);
+}
+
 // 统一的"自动学到的规则"入口：写入 cw_skills.rules 的 '待确认' 分组，等用户在前端逐条采纳/忽略。
 // 关键：pending 规则不会进入生成 prompt（formatRulesForPrompt 已跳过）。
-// 去重：与全部分组现有条目按"去空格文本"比对；'待确认' 分组上限 10 条，满则移除最旧。
+// 去重：与全部分组现有条目做近似比对（二元字组相似度≥0.65 视为重复）；'待确认' 上限 10 条，满则移除最旧。
 async function addPendingRule(userId, text, sourceType, source) {
   const clean = (text || '').trim();
   if (!clean) return false;
   try {
     const skill = await getOrCreateSkill(userId);
     const rules = skill.rules || {};
-    // 全分组去重
-    const key = clean.replace(/\s+/g, '');
+    // 全分组近似去重
     for (const arr of Object.values(rules)) {
       if (Array.isArray(arr) && arr.some(r => {
         const t = typeof r === 'string' ? r : (r && r.text) || '';
-        return t.replace(/\s+/g, '') === key;
-      })) return false; // 已存在，跳过
+        return t && bigramSimilarity(t, clean) >= 0.65;
+      })) return false; // 已存在近似规则，跳过
     }
     if (!Array.isArray(rules['待确认'])) rules['待确认'] = [];
     rules['待确认'].push({ text: clean, source: source || '', sourceType: sourceType || 'auto', uses: 0, pending: true, at: Date.now() });
@@ -411,16 +423,18 @@ async function extractEditDiffRules(project, userId) {
       + levenshteinLite(aiDoc.slice(0, 800), userFinal.slice(0, 800));
     if (userFinal.length > 0 && (diffAmount / userFinal.length) < 0.08) return;
 
-    const prompt = `你是写作风格分析师。下面是 AI 生成的口播剧本初稿和用户亲手修改后的定稿。
+    const prompt = `你是写作教练。下面是 AI 生成的口播剧本初稿和用户亲手修改后的定稿，差异里藏着用户的写作偏好。
 【AI 初稿】${aiDoc.slice(0, 800)}
 【用户定稿】${userFinal.slice(0, 800)}
-任务：对比两版差异，提炼用户的写作偏好，输出 1-3 条可复用的写作规则。
-要求：
-- 每条说清楚「什么情况下，怎么写」，要具体到写法，不要空洞结论
-- 每条 20-50 字，一行一条，以 - 开头
+任务：对比差异，提炼 1-3 条【下次写别的题材也能直接执行】的通用写作规则。
+每条必须满足：
+1. 固定句式：「写……（场景，用题材类型/环节描述）时，……（怎么做），而不是……（怎么做不对）」
+2. 泛化：把改动抽象成"模式"，严禁引用本篇的具体短语、数字、案例名（脱离本篇就看不懂的指代一律不许出现）
+3. 自检：没看过这两版的人能照着执行才算合格，不合格的不要输出
+4. 每条 40~80 字，一行一条，以 - 开头
 - 差异若只是错别字或事实修正，输出 SKIP
 只输出规则行或 SKIP。`;
-    const raw = (await callAI(prompt, { temperature: 0.3, maxTokens: 300 })).trim();
+    const raw = (await callAI(prompt, { temperature: 0.3, maxTokens: 450 })).trim();
     if (!raw || /^SKIP/i.test(raw)) return;
     const lines = raw.split('\n').map(l => l.trim()).filter(l => l.startsWith('-'));
     for (const line of lines) {
@@ -467,7 +481,13 @@ async function maybeReflectSkill(userId) {
     const prompt = `你是创作 Skill 的策展人。下面是用户的写作规则清单，附使用次数与反馈分（正分=用户夸过相关产出，负分=被批评，已休眠=连续负反馈被停用）。
 ${lines.join('\n')}
 
-任务：找出问题规则（空洞执行不了 / 长期 0 使用 / 互相重复 / 已休眠但方向有价值），提出最多 3 条【修订提案】。每条提案是一句可直接执行的新规则（30-60字），用于替代或合并问题规则，并在末尾用括号注明（替代：原规则前8个字…）。
+任务：找出问题规则，提出最多 3 条【修订提案】。问题规则的典型特征（按优先级）：
+1. 黑话规则：引用了某次对话的具体短语/数字/步骤名（如"改哪3处""生成10版"），脱离当时语境根本看不懂 → 改写成「写……时，……，而不是……」的通用模式
+2. 空洞规则：只有结论没有做法（如"语言要口语化"），执行不了 → 补上具体写法
+3. 重复规则：多条说同一件事 → 合并成一条更完整的
+4. 已休眠但方向有价值的 → 换个写法重提
+
+每条提案是一句可直接执行的新规则（40-80字），格式「写……（场景）时，……（怎么做），而不是……」，末尾用括号注明（替代：原规则前8个字…）。
 若规则整体健康无需修订，只输出：SKIP
 否则每行一条提案，以"-"开头，不要其他文字。`;
     const out = (await callAI(prompt, { temperature: 0.3, maxTokens: 400 })).trim();
@@ -1370,29 +1390,34 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
         const lastChange = lastAiRows?.[0]?.content || '';
         const lastUserReq = lastAiRows?.[0]?.user_req || '';
 
-        // 同时拿上一条文案的前200字（存在 project.doc 里已是最新版，取倒数第二次doc更新前的内容不易拿，用lastChange摘要+当前doc片段）
-        const docSnippet = (project.doc || '').slice(0, 200);
+        // 取较完整的文案片段，让提炼者有足够背景做"泛化"而不是引用细节
+        const docSnippet = (project.doc || '').slice(0, 450);
 
         if (lastChange) {
-          const extractPrompt = `你是一个写作风格分析师。
+          const extractPrompt = `你是一个写作教练。用户刚对 AI 写的口播文案给了一句反馈，你要把这次反馈背后的偏好，提炼成一条【下次写别的题材也能直接执行】的通用写作规则。
 
-【本次文案片段（前200字）】
+【本次文案片段】
 ${docSnippet}
 
-【上一次修改方向】${lastUserReq.slice(0, 60)}
-【AI修改摘要】${lastChange.slice(0, 80)}
+【上一次修改方向】${lastUserReq.slice(0, 100)}
+【AI修改摘要】${lastChange.slice(0, 100)}
 【用户此刻反馈】${message}
 
-任务：判断这条反馈是否说明某种写法"更好"或"有问题"，并提炼成一条可复用的写作规则。
-要求：
-- 规则要结合上面的内容背景，说清楚「什么情况下，怎么写比较好/不好」
-- 不要说空洞结论（如"语言要口语化"），要说具体写法（如"写副业选题时开头别用'你是不是也...'，改成直接抛出真实数字"）
-- 长度30-50字，以"-"开头
-- 如果反馈只是新的修改指令，而非质量评价 → 只输出：SKIP
+规则必须满足（缺一不可）：
+1. 固定句式：「写……（场景，用题材类型/环节描述，如"讲工具教程的操作环节"）时，……（怎么做），而不是……（怎么做不对）」
+2. 泛化：把本次的具体内容抽象成"模式"。严禁把本次文案里的具体短语、数字、步骤名直接放进规则（如"改哪3处""生成10版"这种只有看过本次对话才懂的指代，一律不许出现）
+3. 自检：写完后自问——一个没看过这次对话的人，拿到这条规则能不能照着写出下一篇？不能就输出 SKIP
+4. 长度 40~80 字，以"-"开头
 
+反例（不合格，引用了本次细节，外人看不懂）：
+- 写AI改视频脚本时，别堆留存转化数据，先用"改哪3处、怎么生成10版"讲清操作
+正例（合格，模式化，任何题材可执行）：
+- 写工具类脚本的功能讲解时，先讲具体操作步骤和直接产出，效果数据只在结尾收束时给一次，而不是通篇堆指标
+
+如果反馈只是新的修改指令而非质量评价 → 只输出：SKIP
 只输出一行规则或SKIP，不要其他文字。`;
 
-          const extracted = (await callAI(extractPrompt, { maxTokens: 120, temperature: 0.3 })).trim();
+          const extracted = (await callAI(extractPrompt, { maxTokens: 200, temperature: 0.3 })).trim();
 
           if (extracted && !extracted.startsWith('SKIP') && (extracted.startsWith('-') || extracted.length > 5)) {
             autoLearnRule = extracted.startsWith('-') ? extracted.slice(1).trim() : extracted;
