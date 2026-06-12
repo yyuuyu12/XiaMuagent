@@ -879,16 +879,336 @@ function dKouboTabbar(active) {
   </div>`;
 }
 
-/* AI 写小说 · 占位页（小说创作独立成区，即将上线） */
+/* ============================================================
+   JS · AI 写小说（nv 前缀）
+   架构见 docs/AI写小说-架构设计v2.md：书架 → 设定卡 → 大纲/细纲 → 写章
+   ============================================================ */
 function dRenderNovel() {
-  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center">
-    <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;margin-bottom:20px">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M4 19.5C4 18.12 5.12 17 6.5 17H20V3H6.5C5.12 3 4 4.12 4 5.5V19.5ZM4 19.5C4 20.88 5.12 22 6.5 22H20" stroke="#FFB877" stroke-width="1.6" stroke-linejoin="round"/></svg>
+  if (dS.nvView === 'project' && dS.nvProject) return dNvProjectView();
+  return dNvShelf();
+}
+
+/* ---------- 书架 ---------- */
+function dNvShelf() {
+  if (!dS.nvProjectsLoaded) { dS.nvProjectsLoaded = true; dNvLoadProjects(); }
+  const list = dS.nvProjects || [];
+  const cards = list.map(p => {
+    const pct = p.target_words ? Math.min(100, Math.round((p.words_written || 0) / p.target_words * 100)) : 0;
+    return `<div class="do-proj-card" onclick="dNvOpenProject(${p.id})">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:38px;height:50px;border-radius:6px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="color:#FFB877;font-size:14px;font-weight:700">${esc((p.title||'书')[0])}</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.title)}</div>
+          <div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(p.genre||'未分类')} · ${p.chapter_done||0}/${p.chapter_total||0} 章 · ${Math.round((p.words_written||0)/100)/100}万字</div>
+        </div>
+      </div>
+      <div class="d-progress-bar" style="height:4px"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#FF8040,#F5602A);border-radius:4px"></div></div>
+    </div>`;
+  }).join('');
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">AI 写小说</div>
+        <div style="font-size:12px;color:#9E9890;margin-top:3px">世界观设定 · 章节大纲 · 逐章续写，写到几百章不崩设定</div>
+      </div>
+      <button class="do-btn do-btn-pri" onclick="dNvOpenNew()">＋ 新建小说</button>
     </div>
-    <div style="font-size:20px;font-weight:700;color:#1A1614;margin-bottom:8px">AI 写小说</div>
-    <div style="font-size:13.5px;color:#9E9890;line-height:1.7;max-width:380px;margin-bottom:8px">面向网文/长篇写作的智能体，支持世界观设定、章节大纲、角色卡与逐章续写。和短视频是不同的创作场景，独立成区。</div>
-    <span style="font-size:12px;font-weight:700;color:#C85A10;background:#FFF0E0;border:1px solid #FFD9B8;padding:5px 14px;border-radius:20px;margin-top:10px">即将上线</span>
+    ${list.length === 0
+      ? `<div class="do-empty" style="padding:90px 20px">书架还是空的。点右上角「新建小说」，一句话设定 10 分钟开写。</div>`
+      : `<div class="do-proj-grid">${cards}</div>`}
+    ${dS.nvNewModal ? dNvNewModalHtml() : ''}`;
+}
+async function dNvLoadProjects() {
+  const r = await dHttp.get('/novel/projects');
+  if (r.code === 200) { dS.nvProjects = r.data || []; dRender(); }
+}
+
+/* ---------- 新建向导 ---------- */
+function dNvOpenNew() { dS.nvNewModal = true; dS.nvNewBusy = false; dRender(); }
+function dNvNewModalHtml() {
+  const genres = ['玄幻修仙','都市异能','都市日常','悬疑灵异','规则怪谈','科幻末世','历史古代','古言','现言甜宠','系统流','无限流','电竞','其他'];
+  return `<div class="d-modal-overlay" onclick="if(event.target===this&&!dS.nvNewBusy){dS.nvNewModal=false;dRender();}">
+    <div class="d-modal" style="width:520px;padding:26px 28px;text-align:left">
+      <div style="font-size:17px;font-weight:700;color:#1A1614;margin-bottom:18px">新建小说</div>
+      <div class="flbl" style="margin-bottom:5px">书名</div>
+      <input id="nvNewTitle" class="inp" placeholder="可以先起个临时名" style="margin-bottom:12px">
+      <div class="flbl" style="margin-bottom:5px">题材</div>
+      <select id="nvNewGenre" class="sel" style="margin-bottom:12px">${genres.map(g=>`<option value="${g}">${g}</option>`).join('')}</select>
+      <div class="flbl" style="margin-bottom:5px">一句话设定（越具体越好：谁 + 金手指/困境 + 要做什么）</div>
+      <textarea id="nvNewBrief" class="txa" style="height:80px;margin-bottom:12px" placeholder="例：外卖员意外绑定差评系统，给谁差评谁倒霉，他决定先给前老板来一单…"></textarea>
+      <div style="display:flex;gap:12px;margin-bottom:18px">
+        <div style="flex:1"><div class="flbl" style="margin-bottom:5px">目标字数</div>
+          <select id="nvNewTarget" class="sel"><option value="100000">10 万（短篇）</option><option value="300000" selected>30 万</option><option value="1000000">100 万（长篇）</option></select></div>
+        <div style="flex:1"><div class="flbl" style="margin-bottom:5px">每章字数</div>
+          <select id="nvNewChWords" class="sel"><option value="2000">2000</option><option value="3000" selected>3000</option><option value="4000">4000</option></select></div>
+      </div>
+      <button class="do-btn do-btn-pri" style="width:100%;padding:11px" ${dS.nvNewBusy?'disabled':''} onclick="dNvCreate()">${dS.nvNewBusy?'正在生成设定卡（约30秒）…':'创建并生成设定卡'}</button>
+    </div>
   </div>`;
+}
+async function dNvCreate() {
+  const title = (document.getElementById('nvNewTitle')||{}).value || '';
+  if (!title.trim()) { dToast('请填写书名'); return; }
+  const body = {
+    title, genre: (document.getElementById('nvNewGenre')||{}).value || '',
+    brief: (document.getElementById('nvNewBrief')||{}).value || '',
+    targetWords: (document.getElementById('nvNewTarget')||{}).value,
+    chapterWords: (document.getElementById('nvNewChWords')||{}).value,
+  };
+  dS.nvNewBusy = true; dRender();
+  const r = await dHttp.post('/novel/projects', body);
+  if (r.code !== 200) { dS.nvNewBusy = false; dToast(r.msg||'创建失败'); dRender(); return; }
+  const pid = r.data.id;
+  await dHttp.post('/novel/projects/'+pid+'/kb/bootstrap', {}); // 设定卡初稿（失败也可手动补）
+  dS.nvNewModal = false; dS.nvNewBusy = false; dS.nvProjectsLoaded = false;
+  dToast('已创建，设定卡初稿已生成');
+  dNvOpenProject(pid);
+}
+
+/* ---------- 项目工作区 ---------- */
+async function dNvOpenProject(id) {
+  const r = await dHttp.get('/novel/projects/'+id);
+  if (r.code !== 200) { dToast(r.msg||'加载失败'); return; }
+  dS.nvProject = r.data; dS.nvView = 'project';
+  dS.nvChapter = null; dS.nvRight = (r.data.chapters||[]).length ? 'doc' : 'outline';
+  dS.nvInput = ''; dRender();
+}
+function dNvBackShelf() { dS.nvView = 'shelf'; dS.nvProject = null; dS.nvChapter = null; dS.nvProjectsLoaded = false; dRender(); }
+
+function dNvProjectView() {
+  const P = dS.nvProject; const proj = P.project;
+  /* 左栏：章节树 */
+  const vols = {};
+  (P.chapters||[]).forEach(c => { (vols[c.volume] = vols[c.volume] || []).push(c); });
+  const tree = Object.keys(vols).sort((a,b)=>a-b).map(v => `
+    <div class="do-nav-grp">第 ${v} 卷</div>
+    ${vols[v].map(c => {
+      const cur = dS.nvChapter && dS.nvChapter.chapter.id === c.id;
+      const dot = c.status==='final' ? '#16A34A' : c.status==='drafted' ? '#F5762A' : '#D8D2C9';
+      return `<div class="do-nav-i ${cur?'active':''}" onclick="dNvOpenChapter(${c.id})" title="${esc(c.outline||'')}">
+        <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">第${c.seq}章 ${esc(c.title)}</span>
+      </div>`;
+    }).join('')}`).join('');
+  const navCol = `<div class="do-col" style="width:230px;flex-shrink:0">
+    <div class="do-col-head">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0">
+        <div onclick="dNvBackShelf()" class="hov-back-btn" style="width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6E6860;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="font-size:13px;font-weight:700;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.title)}</div>
+      </div>
+    </div>
+    <div class="do-col-body" style="padding:10px 10px">
+      <div class="do-nav-i ${dS.nvRight==='outline'?'active':''}" onclick="dS.nvRight='outline';dRender()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 6H20M4 12H20M4 18H13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>全书大纲</div>
+      <div class="do-nav-i ${dS.nvRight==='cards'?'active':''}" onclick="dS.nvRight='cards';dRender()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 9H16M8 13H13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>设定集（${(P.cards||[]).length}）</div>
+      ${tree || '<div style="font-size:12px;color:#B0AA9F;padding:12px 8px;line-height:1.6">还没有章节。先生成全书大纲，再生成章节细纲。</div>'}
+      <button class="do-btn do-btn-gho" style="width:100%;margin-top:10px;font-size:12px" ${dS.nvTocBusy?'disabled':''} onclick="dNvGenToc()">${dS.nvTocBusy?'规划中…':'＋ 续写 10 章细纲'}</button>
+    </div>
+    <div style="padding:10px 12px;border-top:1px solid #F2EFEA;flex-shrink:0">
+      <button class="do-btn do-btn-gho" style="width:100%;font-size:12px" onclick="dNvExport()">导出全书 TXT</button>
+    </div>
+  </div>`;
+
+  /* 中栏：创作对话 */
+  const ch = dS.nvChapter;
+  const msgs = ch ? (ch.messages||[]).map(m => `
+    <div class="do-msg ${m.role==='user'?'user':'ai'}"><div class="do-bubble ${m.role==='user'?'user':'ai'}">${esc(m.content)}</div></div>`).join('') : '';
+  const chatCol = `<div class="do-col" style="width:340px;flex-shrink:0">
+    <div class="do-col-head"><div><div class="do-col-h-title">创作搭档</div><div class="do-col-h-sub">${ch?('第'+ch.chapter.seq+'章 · 讨论剧情或让它改正文'):'选择左侧章节后可对话'}</div></div></div>
+    <div class="do-col-body" id="nvChatBody">${ch?(msgs||'<div style="font-size:12px;color:#B0AA9F;line-height:1.7">这一章想怎么写？可以：<br>· 点右侧「生成本章」直接出稿<br>· 先在这聊剧情方向<br>· 出稿后说「打斗再激烈点」之类直接改</div>'):''}${dS.nvBusy?'<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">思考中…</div></div>':''}</div>
+    <div class="do-chat-foot">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <textarea class="do-chat-input" id="nvInput" rows="2" style="flex:1;min-width:0" placeholder="${ch?'说说你的想法…':'先选择一个章节'}" ${ch?'':'disabled'} oninput="dS.nvInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dNvChat();}">${esc(dS.nvInput||'')}</textarea>
+        <button class="do-btn do-btn-pri" style="padding:9px 16px;flex-shrink:0" ${(!ch||dS.nvBusy)?'disabled':''} onclick="dNvChat()">发送</button>
+      </div>
+    </div>
+  </div>`;
+
+  /* 右栏：正文 / 大纲 / 设定集 */
+  let rightCol;
+  if (dS.nvRight === 'outline') {
+    rightCol = `<div class="do-col" style="flex:1;min-width:0">
+      <div class="do-col-head"><div><div class="do-col-h-title">全书大纲</div><div class="do-col-h-sub">卷级结构，章节细纲据此生成</div></div>
+        <button class="do-btn do-btn-pri" style="padding:6px 14px;font-size:12px" ${dS.nvOutlineBusy?'disabled':''} onclick="dNvGenOutline()">${dS.nvOutlineBusy?'生成中…':((proj.outline||'').trim()?'重新生成':'生成大纲')}</button></div>
+      <textarea class="do-doc-edit" placeholder="点右上角生成全书大纲，或自己写。" oninput="dS.nvProject.project.outline=this.value">${esc(proj.outline||'')}</textarea>
+      <div class="do-doc-foot"><div style="flex:1"></div><button class="do-btn do-btn-gho" onclick="dNvSaveOutline()">保存大纲</button></div>
+    </div>`;
+  } else if (dS.nvRight === 'cards') {
+    const kindLabel = { world:'世界观', character:'角色', faction:'势力', style:'文风' };
+    rightCol = `<div class="do-col" style="flex:1;min-width:0">
+      <div class="do-col-head"><div><div class="do-col-h-title">设定集</div><div class="do-col-h-sub">写作时自动注入，改这里=改世界</div></div>
+        <button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" onclick="dNvAddCard()">＋ 新建卡</button></div>
+      <div class="do-col-body">
+        ${(P.cards||[]).map(c => `<div class="d-card" style="padding:14px 16px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span class="do-chip" style="margin:0">${kindLabel[c.kind]||c.kind}</span>
+            <input class="inp" style="height:30px;font-size:13px;font-weight:700;flex:1" value="${esc(c.title)}" onchange="dNvCardField(${c.id},'title',this.value)">
+            <span class="do-link" style="color:#E5534B;font-size:11px" onclick="dNvDelCard(${c.id})">删除</span>
+          </div>
+          <textarea class="txa" style="height:110px;font-size:12.5px" onchange="dNvCardField(${c.id},'content',this.value)">${esc(c.content||'')}</textarea>
+          <div style="text-align:right;margin-top:6px"><button class="do-btn do-btn-gho" style="padding:4px 12px;font-size:11px" onclick="dNvSaveCard(${c.id})">保存此卡</button></div>
+        </div>`).join('') || '<div class="do-empty">没有设定卡。新建，或回书架重建项目自动生成。</div>'}
+      </div>
+    </div>`;
+  } else {
+    const c = ch ? ch.chapter : null;
+    const genBtn = c ? (dS.nvGenTaskId
+      ? `<button class="do-btn do-btn-pri" disabled>生成中 ${dS.nvGenPct||0}%…</button>`
+      : `<button class="do-btn do-btn-pri" style="padding:6px 14px;font-size:12px" onclick="dNvGenerate()">${(c.content||'').trim()?'重新生成':'生成本章'}</button>`) : '';
+    rightCol = `<div class="do-col" style="flex:1;min-width:0">
+      <div class="do-col-head">
+        <div style="min-width:0;flex:1"><div class="do-col-h-title">${c?('第'+c.seq+'章 '+esc(c.title)):'正文'}</div>
+          <div class="do-col-h-sub">${c?esc((c.outline||'').split('\n')[0]).slice(0,60):'从左侧选择章节'}</div></div>
+        <div style="display:flex;gap:6px;flex-shrink:0">${genBtn}
+          ${c?`<button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" onclick="dNvSaveDoc()">保存</button>
+          <button class="do-btn ${c.status==='final'?'do-btn-gho':'do-btn-ok'}" style="padding:6px 12px;font-size:12px" ${c.status==='final'?'disabled':''} onclick="dNvFinalize()">${c.status==='final'?'已定稿':'定稿'}</button>`:''}</div>
+      </div>
+      ${c
+        ? `<textarea id="nvDocEdit" class="do-doc-edit" placeholder="点「生成本章」让 AI 按细纲出稿，或自己开写…" oninput="dS.nvChapter.chapter.content=this.value">${esc(c.content||'')}</textarea>
+           <div class="do-doc-foot"><span class="do-doc-stat">约 ${(c.content||'').replace(/\s/g,'').length} 字 · 目标 ${proj.chapter_words||3000} 字</span><div style="flex:1"></div></div>`
+        : `<div class="do-empty" style="flex:1;display:flex;align-items:center;justify-content:center">${(P.chapters||[]).length?'从左侧选择章节开始写作':'先生成大纲和章节细纲'}</div>`}
+    </div>`;
+  }
+
+  return `<div style="display:flex;gap:14px;height:calc(100vh - 110px)">${navCol}${chatCol}${rightCol}</div>`;
+}
+
+/* ---------- 大纲 / 细纲 ---------- */
+async function dNvGenOutline() {
+  dS.nvOutlineBusy = true; dRender();
+  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/outline', {});
+  dS.nvOutlineBusy = false;
+  if (r.code === 200) { dS.nvProject.project.outline = r.data.outline; dToast('大纲已生成'); }
+  else dToast(r.msg||'生成失败');
+  dRender();
+}
+async function dNvSaveOutline() {
+  const r = await dApi('PATCH', '/novel/projects/'+dS.nvProject.project.id, { outline: dS.nvProject.project.outline||'' });
+  dToast(r.code===200?'已保存':(r.msg||'保存失败'));
+}
+async function dNvGenToc() {
+  if (!(dS.nvProject.project.outline||'').trim()) { dToast('先生成全书大纲'); dS.nvRight='outline'; dRender(); return; }
+  dS.nvTocBusy = true; dRender();
+  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/toc', { count: 10 });
+  dS.nvTocBusy = false;
+  if (r.code === 200) { dS.nvProject.chapters = r.data; dToast(r.msg||'细纲已生成'); }
+  else dToast(r.msg||'生成失败');
+  dRender();
+}
+
+/* ---------- 章节 ---------- */
+async function dNvOpenChapter(id) {
+  const r = await dHttp.get('/novel/chapters/'+id);
+  if (r.code !== 200) { dToast(r.msg||'加载失败'); return; }
+  dS.nvChapter = r.data; dS.nvRight = 'doc'; dRender();
+  const el = document.getElementById('nvChatBody'); if (el) el.scrollTop = el.scrollHeight;
+}
+async function dNvSaveDoc(silent) {
+  const c = dS.nvChapter && dS.nvChapter.chapter; if (!c) return;
+  const r = await dApi('PATCH', '/novel/chapters/'+c.id, { content: c.content||'' });
+  if (!silent) dToast(r.code===200?'已保存':(r.msg||'保存失败'));
+}
+async function dNvFinalize() {
+  const c = dS.nvChapter && dS.nvChapter.chapter; if (!c) return;
+  if (!(c.content||'').trim()) { dToast('本章还没有正文'); return; }
+  if (!confirm('定稿本章？定稿后会自动更新前情提要和角色状态。')) return;
+  await dNvSaveDoc(true);
+  const r = await dApi('PATCH', '/novel/chapters/'+c.id, { status: 'final' });
+  if (r.code === 200) {
+    c.status = 'final';
+    const li = (dS.nvProject.chapters||[]).find(x=>x.id===c.id); if (li) li.status='final';
+    dToast('已定稿 ✓');
+  } else dToast(r.msg||'操作失败');
+  dRender();
+}
+
+/* ---------- 写章（异步轮询） ---------- */
+async function dNvGenerate() {
+  const c = dS.nvChapter && dS.nvChapter.chapter; if (!c || dS.nvGenTaskId) return;
+  const r = await dHttp.post('/novel/chapters/'+c.id+'/generate', {});
+  if (r.code !== 200) { dToast(r.msg||'提交失败'); return; }
+  dS.nvGenTaskId = r.data.taskId; dS.nvGenPct = 5; dRender();
+  const chapterId = c.id;
+  const timer = setInterval(async () => {
+    const t = await dHttp.get('/tasks/'+dS.nvGenTaskId);
+    if (t.code !== 200 || !t.data) return;
+    dS.nvGenPct = t.data.progress || 10;
+    if (t.data.status === 'done') {
+      clearInterval(timer); dS.nvGenTaskId = null;
+      const cr = await dHttp.get('/novel/chapters/'+chapterId);
+      if (cr.code === 200 && dS.nvChapter && dS.nvChapter.chapter.id === chapterId) {
+        dS.nvChapter = cr.data;
+        const li = (dS.nvProject.chapters||[]).find(x=>x.id===chapterId);
+        if (li) { li.status = cr.data.chapter.status; li.word_count = cr.data.chapter.word_count; }
+        dToast('本章已生成 ✓');
+      }
+      dRender();
+    } else if (t.data.status === 'failed') {
+      clearInterval(timer); dS.nvGenTaskId = null;
+      dToast('生成失败：' + (t.data.error_msg||'请重试')); dRender();
+    } else { dRender(); }
+  }, 3000);
+}
+
+/* ---------- 对话修改 ---------- */
+async function dNvChat() {
+  const c = dS.nvChapter && dS.nvChapter.chapter;
+  const v = (dS.nvInput||'').trim();
+  if (!c || !v || dS.nvBusy) return;
+  dS.nvChapter.messages.push({ role:'user', content:v });
+  dS.nvInput = ''; dS.nvBusy = true; dRender();
+  const el = document.getElementById('nvChatBody'); if (el) el.scrollTop = el.scrollHeight;
+  const r = await dHttp.post('/novel/chapters/'+c.id+'/chat', { message: v });
+  dS.nvBusy = false;
+  if (r.code === 200) {
+    dS.nvChapter.messages.push(r.data.message);
+    if (r.data.content !== null && r.data.content !== undefined) {
+      dS.nvChapter.chapter.content = r.data.content;
+      dS.nvChapter.chapter.word_count = r.data.content.replace(/\s/g,'').length;
+    }
+  } else dToast(r.msg||'失败，请重试');
+  dRender();
+  const el2 = document.getElementById('nvChatBody'); if (el2) el2.scrollTop = el2.scrollHeight;
+}
+
+/* ---------- 设定卡 ---------- */
+function dNvCardField(id, field, value) {
+  const card = (dS.nvProject.cards||[]).find(x=>x.id===id);
+  if (card) card[field] = value;
+}
+async function dNvSaveCard(id) {
+  const card = (dS.nvProject.cards||[]).find(x=>x.id===id); if (!card) return;
+  const r = await dApi('PUT', '/novel/kb/'+id, { title: card.title, content: card.content });
+  dToast(r.code===200?'已保存':(r.msg||'保存失败'));
+}
+async function dNvAddCard() {
+  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/kb', { kind:'character', title:'新设定', content:'' });
+  if (r.code === 200) {
+    const pr = await dHttp.get('/novel/projects/'+dS.nvProject.project.id);
+    if (pr.code === 200) dS.nvProject = pr.data;
+    dRender();
+  }
+}
+async function dNvDelCard(id) {
+  if (!confirm('删除这张设定卡？')) return;
+  const r = await dApi('DELETE', '/novel/kb/'+id, {});
+  if (r.code === 200) { dS.nvProject.cards = (dS.nvProject.cards||[]).filter(x=>x.id!==id); dRender(); }
+}
+
+/* ---------- 导出 ---------- */
+async function dNvExport() {
+  const p = dS.nvProject.project;
+  const res = await fetch(API_BASE + '/novel/projects/'+p.id+'/export', { headers: { Authorization: 'Bearer ' + dGetToken() } });
+  if (!res.ok) { dToast('导出失败'); return; }
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (p.title||'小说') + '.txt';
+  a.click(); URL.revokeObjectURL(a.href);
+  dToast('已导出');
 }
 
 function dRender() {

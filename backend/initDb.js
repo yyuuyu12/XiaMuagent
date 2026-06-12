@@ -573,6 +573,89 @@ async function initDb() {
   // cw_skills 表：补 last_reflect_at 列（月度反思上次执行时间）
   try { await db.query('ALTER TABLE cw_skills ADD COLUMN last_reflect_at DATETIME DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_skills.last_reflect_at:', e.message||e); }
 
+  // ============ AI 写小说（nv_ 前缀） ============
+  // nv_projects：小说项目（state=世界基石动态事实源，outline=全书卷级大纲）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_projects (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      user_id      INT NOT NULL,
+      title        VARCHAR(200) NOT NULL DEFAULT '',
+      genre        VARCHAR(50)  DEFAULT '',
+      brief        TEXT,
+      persona      TEXT,
+      target_words INT DEFAULT 200000,
+      chapter_words INT DEFAULT 3000,
+      status       VARCHAR(20) DEFAULT 'active',
+      state        JSON DEFAULT NULL,
+      outline      MEDIUMTEXT,
+      pack_id      INT DEFAULT 0,
+      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // nv_kb_cards：设定卡（world/character/faction/style）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_kb_cards (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      project_id  INT NOT NULL,
+      kind        VARCHAR(20) NOT NULL DEFAULT 'world',
+      title       VARCHAR(200) NOT NULL DEFAULT '',
+      content     MEDIUMTEXT,
+      sort        INT DEFAULT 0,
+      updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project (project_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // nv_chapters：章节（outline=本章细纲蓝图，prev_content=上一版回滚）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_chapters (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      project_id   INT NOT NULL,
+      volume       INT DEFAULT 1,
+      seq          INT NOT NULL,
+      title        VARCHAR(200) DEFAULT '',
+      outline      TEXT,
+      content      MEDIUMTEXT,
+      prev_content MEDIUMTEXT,
+      word_count   INT DEFAULT 0,
+      status       VARCHAR(20) DEFAULT 'todo',
+      updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project (project_id),
+      INDEX idx_proj_seq (project_id, volume, seq)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // nv_foreshadowing：伏笔台账（embedded→advanced→resolved）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_foreshadowing (
+      id               INT AUTO_INCREMENT PRIMARY KEY,
+      project_id       INT NOT NULL,
+      title            VARCHAR(200) NOT NULL DEFAULT '',
+      detail           TEXT,
+      setup_chapter    INT DEFAULT 0,
+      expected_chapter INT DEFAULT 0,
+      status           VARCHAR(20) DEFAULT 'embedded',
+      updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project (project_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // nv_messages：章节内创作对话
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_messages (
+      id             INT AUTO_INCREMENT PRIMARY KEY,
+      chapter_id     INT NOT NULL,
+      role           VARCHAR(10) NOT NULL,
+      content        MEDIUMTEXT,
+      has_doc_update TINYINT DEFAULT 0,
+      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_chapter (chapter_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // cw_original_projects 表：补 meta 列（存时长/风格/平台等）
   try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN meta JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.meta:', e.message||e); }
   // cw_original_projects 表：补 stage 列（分阶段创作：direction→outline→detail→script）

@@ -44,6 +44,7 @@ const { router: industryVideosRouter } = require('./routes/industryVideos');
 const { router: creditsRouter }        = require('./routes/credits');
 const agentsRouter                     = require('./routes/agents');
 const originalRouter                   = require('./routes/original');
+const { router: novelRouter }          = require('./routes/novel');
 
 app.use('/api/auth',             authRouter);
 app.use('/api/config',           configRouter);
@@ -58,6 +59,7 @@ app.use('/api/industry-videos',  industryVideosRouter);
 app.use('/api/credits',          creditsRouter);
 app.use('/api/agents',           agentsRouter);
 app.use('/api/original',         originalRouter);
+app.use('/api/novel',            novelRouter);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/health', (req, res) => res.json({ code: 200, msg: 'ok', time: new Date().toISOString() }));
