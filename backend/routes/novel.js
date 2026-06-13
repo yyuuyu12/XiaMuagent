@@ -525,17 +525,35 @@ async function commitChapter(chapterId, userId) {
 输出格式（严格 JSON）：
 {
   "summary": "更新后的全书前情提要，250字内，覆盖到本章为止的主线进展",
-  "character_updates": [{ "name": "角色名(尽量用已登记的)", "status": "一句话当前状态：能力/处境的最新情况" }],
+  "new_characters": [{ "name": "新角色名", "role_type": "supporting/love/antagonist 之一", "identity": "身份一句话", "persona": "性格底色/行为逻辑（正文够则写，不够则简短）" }],
+  "character_updates": [{ "name": "已登记角色名", "status": "一句话当前状态：能力/处境的最新情况" }],
   "relation_updates": [{ "from": "角色A", "to": "角色B", "rel_type": "盟友/仇敌/师徒/爱慕/…", "affinity": 0到100的整数, "note": "本章这段关系发生了什么变化" }]
 }
-只写本章真正有变化的角色和关系；没有就给空数组。`;
+规则：
+- new_characters：只登记【本章首次出场】且【有名字、对剧情有实际作用】的角色。一次性提到的路人、群众、龙套、无名氏一律不要登记。已在【已登记角色】里的，不要再放进 new_characters。
+- relation_updates 的 from/to 可以用 new_characters 里刚出现的新角色名。
+- 都只写本章真正发生的，没有就给空数组。`;
   try {
-    const raw = await callAI(prompt, { temperature: 0.2, maxTokens: 1000 });
+    const raw = await callAI(prompt, { temperature: 0.2, maxTokens: 1200 });
     const jm = raw.match(/\{[\s\S]*\}/);
     if (!jm) return;
     const patch = JSON.parse(jm[0]);
     // 1) 前情提要 → state
     if (patch.summary) { state.summary = String(patch.summary).slice(0, 800); await db.query('UPDATE nv_projects SET state = ? WHERE id = ?', [JSON.stringify(state), ch.pid]); }
+    // 1.5) 新角色自动登记 → nv_characters（加入 nameToId，供后续关系建立）
+    let added = 0;
+    for (const nc of (patch.new_characters || [])) {
+      const nm = nc && nc.name ? String(nc.name).trim() : '';
+      if (!nm || nameToId[nm]) continue; // 无名或已存在跳过
+      const idx = Object.keys(nameToId).length + added;
+      const rt = ['supporting', 'love', 'antagonist', 'lead'].includes(nc.role_type) ? nc.role_type : 'supporting';
+      const { rows: ins } = await db.query(
+        'INSERT INTO nv_characters (project_id, name, role_type, identity, persona, first_chapter, color, sort) VALUES (?,?,?,?,?,?,?,?)',
+        [ch.pid, nm.slice(0, 100), rt, String(nc.identity || '').slice(0, 255), String(nc.persona || ''), ch.seq, CHAR_COLORS[idx % CHAR_COLORS.length], idx]
+      ).catch(() => ({ rows: [] }));
+      if (ins?.[0]?.id) { nameToId[nm] = ins[0].id; added++; }
+    }
+    if (added) console.log(`[Novel] 第${ch.seq}章自动登记 ${added} 个新角色`);
     // 2) 角色状态 → nv_characters.status（按名字匹配已登记角色）
     for (const u of (patch.character_updates || [])) {
       if (u && u.name && nameToId[u.name]) {

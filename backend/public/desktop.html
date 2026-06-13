@@ -1137,13 +1137,15 @@ async function dNvSaveDoc(silent) {
 async function dNvFinalize() {
   const c = dS.nvChapter && dS.nvChapter.chapter; if (!c) return;
   if (!(c.content||'').trim()) { dToast('本章还没有正文'); return; }
-  if (!confirm('定稿本章？定稿后会自动更新前情提要和角色状态。')) return;
+  if (!confirm('定稿本章？定稿后 AI 会自动更新前情提要、登记本章新出场的角色和关系变化。')) return;
   await dNvSaveDoc(true);
   const r = await dApi('PATCH', '/novel/chapters/'+c.id, { status: 'final' });
   if (r.code === 200) {
     c.status = 'final';
     const li = (dS.nvProject.chapters||[]).find(x=>x.id===c.id); if (li) li.status='final';
-    dToast('已定稿 ✓');
+    dToast('已定稿 ✓ AI 正在登记本章新角色/关系，稍后自动刷新');
+    // commitChapter 后台异步跑（提取+建档约 5-15 秒），延迟拉一次最新角色/关系
+    setTimeout(() => { if (dS.nvProject && dS.nvProject.project.id === c.project_id) dNvReloadProject(); }, 12000);
   } else dToast(r.msg||'操作失败');
   dRender();
 }
