@@ -1227,41 +1227,65 @@ async function dNvDelCard(id) {
 const NV_ROLE_LABEL = { lead:'主角', antagonist:'反派', supporting:'配角', love:'感情线' };
 
 // 环形布局 SVG 关系图谱：节点=角色，有向边=关系，边色按亲密度(绿=高/红=低)
-function dNvGraphSvg(chars, facs, rels) {
-  const nodes = [
-    ...chars.map(c => ({ key:'c'+c.id, kind:'char', name:c.name, color:c.color||'#F5762A' })),
-    ...facs.map(f => ({ key:'f'+f.id, kind:'fac', name:f.name, color:f.color||'#6E6860' })),
-  ];
-  if (!nodes.length) return '<div class="do-empty" style="padding:30px">还没有角色/组织，下方添加或点「AI 识别」后这里会自动画出关系网。</div>';
-  const W = 520, H = 300, cx = W/2, cy = H/2, R = Math.min(118, 38 + nodes.length*11);
-  const pos = {};
-  nodes.forEach((n, i) => { const ang = (Math.PI*2*i/nodes.length) - Math.PI/2; pos[n.key] = { x: cx + R*Math.cos(ang), y: cy + R*Math.sin(ang) }; });
-  const edgeColor = a => a >= 60 ? '#16A34A' : a <= 30 ? '#E5534B' : '#9E9890';
-  const edges = rels.map(r => {
+function dNvSetFocus(key) { dS.nvFocus = key; dRender(); }
+
+// 单节点圆/方 SVG（big=中心节点）
+function dNvNodeSvg(n, x, y, big) {
+  const click = `onclick="dNvSetFocus('${n.key}')" style="cursor:pointer"`;
+  const stroke = big ? 'stroke="#1A1614" stroke-width="2.5"' : '';
+  if (n.kind === 'fac') {
+    const w = big ? 44 : 36, h = big ? 34 : 28;
+    return `<g ${click}><rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="6" fill="${n.color}" ${stroke}/>
+      <text x="${x}" y="${y+4}" text-anchor="middle" font-size="${big?12:10}" fill="#fff" font-weight="700">${esc((n.name||'?')[0])}</text>
+      <text x="${x}" y="${y+h/2+13}" text-anchor="middle" font-size="10" fill="#3D362F" font-weight="600">${esc((n.name||'').slice(0,7))}</text></g>`;
+  }
+  const r = big ? 22 : 16;
+  return `<g ${click}><circle cx="${x}" cy="${y}" r="${r}" fill="${n.color}" ${stroke}/>
+    <text x="${x}" y="${y+4}" text-anchor="middle" font-size="${big?13:11}" fill="#fff" font-weight="700">${esc((n.name||'?')[0])}</text>
+    <text x="${x}" y="${y+r+13}" text-anchor="middle" font-size="10" fill="#3D362F" font-weight="600">${esc((n.name||'').slice(0,7))}</text></g>`;
+}
+
+// 聚焦图（ego graph）：中心 = focus 节点，环绕 = 与它直接相连的节点，边放射不交叉。点任意节点切换中心。
+function dNvGraphSvg(chars, facs, rels, focusKey) {
+  const nodeOf = key => {
+    if (!key) return null;
+    const id = parseInt(key.slice(1));
+    if (key[0] === 'f') { const f = facs.find(x => x.id === id); return f && { key, kind:'fac', name:f.name, color:f.color||'#6E6860' }; }
+    const c = chars.find(x => x.id === id); return c && { key, kind:'char', name:c.name, color:c.color||'#F5762A' };
+  };
+  const focus = nodeOf(focusKey);
+  if (!focus) return '<div class="do-empty" style="padding:30px">还没有角色/组织，下方添加或点「AI 识别」后自动画出关系网。</div>';
+  const seen = {}; const neigh = [];
+  (rels || []).forEach(r => {
     const fk = (r.from_type==='faction'?'f':'c') + r.from_id, tk = (r.to_type==='faction'?'f':'c') + r.to_id;
-    const a = pos[fk], b = pos[tk]; if (!a || !b) return '';
-    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2, col = edgeColor(r.affinity);
-    const dash = (r.from_type==='char' && r.to_type==='faction') ? 'stroke-dasharray="4 3"' : '';
-    return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="1.5" opacity="0.5" ${dash} marker-end="url(#nvArrow)"/>
-      <rect x="${mx-22}" y="${my-8}" width="44" height="15" rx="7" fill="#fff" opacity="0.9"/>
-      <text x="${mx}" y="${my+3}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${esc(r.rel_type||'').slice(0,4)}</text>`;
-  }).join('');
-  const nodeSvg = nodes.map(n => {
-    const p = pos[n.key];
-    if (n.kind === 'fac') {
-      return `<g><rect x="${p.x-18}" y="${p.y-14}" width="36" height="28" rx="5" fill="${n.color}"/>
-        <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">${esc((n.name||'?')[0])}</text>
-        <text x="${p.x}" y="${p.y+28}" text-anchor="middle" font-size="9.5" fill="#3D362F" font-weight="600">${esc((n.name||'').slice(0,6))}</text></g>`;
-    }
-    return `<g><circle cx="${p.x}" cy="${p.y}" r="16" fill="${n.color}"/>
-      <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">${esc((n.name||'?')[0])}</text>
-      <text x="${p.x}" y="${p.y+29}" text-anchor="middle" font-size="9.5" fill="#3D362F" font-weight="600">${esc((n.name||'').slice(0,6))}</text></g>`;
-  }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:300px">
+    let nk = null, dir = null;
+    if (fk === focusKey) { nk = tk; dir = 'out'; } else if (tk === focusKey) { nk = fk; dir = 'in'; }
+    if (!nk || seen[nk]) return;
+    const nn = nodeOf(nk); if (!nn) return; seen[nk] = 1;
+    neigh.push({ node:nn, relType:r.rel_type, affinity:r.affinity, dir, membership:(r.from_type==='char'&&r.to_type==='faction') });
+  });
+  const W = 560, H = 320, cx = W/2, cy = H/2;
+  const edgeColor = a => a >= 60 ? '#16A34A' : a <= 30 ? '#E5534B' : '#9E9890';
+  const R = Math.min(128, 60 + neigh.length*6);
+  let edges = '', nodeSvg = '';
+  neigh.forEach((nb, i) => {
+    const ang = (Math.PI*2*i/Math.max(neigh.length,1)) - Math.PI/2;
+    const x = cx + R*Math.cos(ang), y = cy + R*Math.sin(ang);
+    const col = edgeColor(nb.affinity), dash = nb.membership ? 'stroke-dasharray="4 3"' : '';
+    const x1 = nb.dir==='out'?cx:x, y1 = nb.dir==='out'?cy:y, x2 = nb.dir==='out'?x:cx, y2 = nb.dir==='out'?y:cy;
+    const mx = (cx+x)/2, my = (cy+y)/2;
+    edges += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1.6" opacity="0.6" ${dash} marker-end="url(#nvArrow)"/>
+      <rect x="${mx-25}" y="${my-8}" width="50" height="15" rx="7" fill="#fff" opacity="0.92"/>
+      <text x="${mx}" y="${my+3}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${esc(nb.relType||'').slice(0,5)}</text>`;
+    nodeSvg += dNvNodeSvg(nb.node, x, y, false);
+  });
+  nodeSvg += dNvNodeSvg(focus, cx, cy, true);
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:320px">
     <defs><marker id="nvArrow" markerWidth="8" markerHeight="8" refX="21" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9E9890"/></marker></defs>
     ${edges}${nodeSvg}
   </svg>
-  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#9E9890;padding:4px 0 2px"><span>● 角色</span><span>■ 组织</span><span style="color:#16A34A">— 亲密</span><span style="color:#E5534B">— 敌对</span><span>┄ 隶属</span></div>`;
+  ${neigh.length===0 ? `<div style="text-align:center;font-size:12px;color:#B0AA9F;padding:6px">「${esc(focus.name)}」还没有关系，点上方其他名字查看，或在下方加关系</div>` : ''}
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#9E9890;padding:4px 0 2px"><span>点节点可切换中心 ·</span><span>● 角色</span><span>■ 组织</span><span style="color:#16A34A">— 亲密</span><span style="color:#E5534B">— 敌对</span><span>┄ 隶属</span></div>`;
 }
 
 function dNvCharactersView(P) {
@@ -1269,6 +1293,18 @@ function dNvCharactersView(P) {
   const facs = P.factions || [];
   const rels = P.relations || [];
   const relName = (id, type) => type==='faction' ? ((facs.find(f=>f.id===id)||{}).name||'?') : ((chars.find(c=>c.id===id)||{}).name||'?');
+  // 聚焦节点（默认主角→第一个角色→第一个组织）；图谱只画它的直接关系
+  const allKeys = [...chars.map(c=>'c'+c.id), ...facs.map(f=>'f'+f.id)];
+  let focusKey = dS.nvFocus;
+  if (!focusKey || !allKeys.includes(focusKey)) {
+    const lead = chars.find(c=>c.role_type==='lead');
+    focusKey = lead ? 'c'+lead.id : (chars[0] ? 'c'+chars[0].id : (facs[0] ? 'f'+facs[0].id : null));
+  }
+  const focusChips = allKeys.length ? `<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+    <span style="font-size:11px;color:#9E9890;flex-shrink:0">聚焦</span>
+    ${chars.map(c=>`<span onclick="dNvSetFocus('c${c.id}')" style="cursor:pointer;font-size:11px;padding:3px 9px;border-radius:12px;${focusKey==='c'+c.id?'background:'+(c.color||'#F5762A')+';color:#fff;font-weight:700':'background:#F0EDE8;color:#6E6860'}">${esc(c.name)}</span>`).join('')}
+    ${facs.map(f=>`<span onclick="dNvSetFocus('f${f.id}')" style="cursor:pointer;font-size:11px;padding:3px 9px;border-radius:5px;${focusKey==='f'+f.id?'background:'+(f.color||'#6E6860')+';color:#fff;font-weight:700':'background:#F0EDE8;color:#6E6860'}">${esc(f.name)}</span>`).join('')}
+  </div>` : '';
   const nodeOpts = () => {
     const cg = chars.map(c=>`<option value="c${c.id}">${esc(c.name)}</option>`).join('');
     const fg = facs.map(f=>`<option value="f${f.id}">${esc(f.name)}·${esc(f.kind)}</option>`).join('');
@@ -1340,7 +1376,7 @@ function dNvCharactersView(P) {
         <button class="do-btn do-btn-gho" style="padding:6px 10px;font-size:12px" onclick="dNvAddFac()">＋ 组织</button>
       </div></div>
     <div class="do-col-body">
-      <div class="d-card" style="padding:8px;margin-bottom:14px;background:#FBFAF7">${dNvGraphSvg(chars, facs, rels)}</div>
+      <div class="d-card" style="padding:8px;margin-bottom:14px;background:#FBFAF7">${focusChips}${dNvGraphSvg(chars, facs, rels, focusKey)}</div>
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">角色（${chars.length}）</div>
       ${charCards}
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 8px">组织 · 宗门/家族（${facs.length}）</div>
