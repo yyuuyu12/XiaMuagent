@@ -35,7 +35,7 @@ const AI_SLOP_WORDS = ['不禁', '不由得', '心中一凛', '眼中闪过一�
 
 // 最简记忆包（MVP 规则版）：只注入"不知道就写错"的信息
 // 设定卡全量（MVP 卡少）+ 世界基石状态 + 本卷大纲段 + 上一章结尾
-async function buildMemoryPack(project, chapter) {
+async function buildMemoryPack(project, chapter, extraText) {
   // 设定卡（世界观/势力/文风，不含角色——角色走独立表）
   const cards = await getCards(project.id);
   const cardBlock = cards.map(c => {
@@ -43,9 +43,9 @@ async function buildMemoryPack(project, chapter) {
     return `【${kindLabel}·${c.title}】\n${(c.content || '').slice(0, 1200)}`;
   }).join('\n\n');
 
-  // ── 角色 + 关系：裁剪式注入（只取本章细纲点名的角色 + 主角 + 他们之间的关系）──
+  // ── 角色 + 关系：裁剪式注入（本章细纲点名 + 主角 + extraText 命中的角色；extraText 用于对话改稿时纳入当前正文/用户指名的角色）──
   const { rows: allChars } = await db.query('SELECT * FROM nv_characters WHERE project_id = ? ORDER BY sort, id', [project.id]);
-  const outlineText = chapter.outline || '';
+  const outlineText = (chapter.outline || '') + ' ' + (extraText || '');
   // 命中规则：主角始终带上；其余角色名出现在本章细纲里才带
   const involved = (allChars || []).filter(c => c.role_type === 'lead' || (c.name && outlineText.includes(c.name)));
   const involvedIds = new Set(involved.map(c => c.id));
@@ -852,9 +852,13 @@ router.post('/chapters/:id/chat', requireAuth, async (req, res) => {
 
     const { rows: pRows } = await db.query('SELECT * FROM nv_projects WHERE id = ?', [ch.project_id]);
     const p = pRows?.[0] || {};
+    let pState = {}; try { pState = typeof p.state === 'string' ? JSON.parse(p.state) : (p.state || {}); } catch {}
+    // 注入角色/关系记忆包（含当前正文+用户消息里指名的角色，保证改稿时 AI 知道烙印与关系）
+    const memoryPack = await buildMemoryPack({ id: ch.project_id, state: pState }, ch, (ch.content || '') + ' ' + message);
     const hasContent = (ch.content || '').trim().length > 50;
     const prompt = `你是网文写作搭档，正在和作者讨论《${p.title}》第${ch.seq}章「${ch.title}」。
 【本章细纲】${ch.outline || '（无）'}
+${memoryPack ? '\n' + memoryPack + '\n' : ''}
 ${hasContent ? `【当前正文】\n${ch.content.slice(0, 6000)}` : '【当前还没有正文】'}
 
 ${NOVEL_EDICTS}
