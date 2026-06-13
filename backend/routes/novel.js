@@ -142,12 +142,10 @@ router.delete('/projects/:id', requireAuth, async (req, res) => {
 
 /* ═══════════ 设定卡 ═══════════ */
 
-// 一句话设定 → AI 生成 世界观卡 + 主角卡 + 反派/对手卡 初稿
-router.post('/projects/:id/kb/bootstrap', requireAuth, async (req, res) => {
-  try {
-    const p = await getProject(parseInt(req.params.id), req.userId);
-    if (!p) return res.status(404).json({ code: 404, msg: '项目不存在' });
-    const prompt = `你是资深网文主编。根据下面的小说设定，生成三张设定卡初稿。只输出 JSON。
+// ── 异步生成内部逻辑：设定卡/大纲/细纲都统一走 tasks 队列，避免同步 AI 几十秒被网关超时返 504 HTML ──
+
+async function _genBootstrap(p) {
+  const prompt = `你是资深网文主编。根据下面的小说设定，生成三张设定卡初稿。只输出 JSON。
 【书名】${p.title}
 【题材】${p.genre || '未指定'}
 【一句话设定】${p.brief || '（未填写，请按书名和题材合理虚构）'}
@@ -158,22 +156,103 @@ router.post('/projects/:id/kb/bootstrap', requireAuth, async (req, res) => {
   "protagonist": { "title": "主角名", "content": "身份与处境、性格底色（含缺陷）、核心欲望与恐惧、说话方式特征、开篇时的能力边界。250-400字" },
   "antagonist": { "title": "反派/对手名", "content": "与主角的核心冲突、行事逻辑（要让人理解他为什么这么做）、优势与软肋。200-300字" }
 }`;
-    const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 2000, bypassCap: true });
-    const jm = raw.match(/\{[\s\S]*\}/);
-    if (!jm) return res.status(500).json({ code: 500, msg: 'AI 输出解析失败，请重试' });
-    const data = JSON.parse(jm[0]);
-    const inserts = [
-      ['world', data.world], ['character', data.protagonist], ['character', data.antagonist],
-    ];
-    for (let i = 0; i < inserts.length; i++) {
-      const [kind, card] = inserts[i];
-      if (card && card.content) {
-        await db.query('INSERT INTO nv_kb_cards (project_id, kind, title, content, sort) VALUES (?,?,?,?,?)',
-          [p.id, kind, (card.title || '未命名').slice(0, 200), card.content, i]);
-      }
+  const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 2000, bypassCap: true });
+  const jm = raw.match(/\{[\s\S]*\}/);
+  if (!jm) throw new Error('AI 输出解析失败');
+  const data = JSON.parse(jm[0]);
+  const inserts = [['world', data.world], ['character', data.protagonist], ['character', data.antagonist]];
+  for (let i = 0; i < inserts.length; i++) {
+    const [kind, card] = inserts[i];
+    if (card && card.content) {
+      await db.query('INSERT INTO nv_kb_cards (project_id, kind, title, content, sort) VALUES (?,?,?,?,?)',
+        [p.id, kind, (card.title || '未命名').slice(0, 200), card.content, i]);
     }
-    const cards = await getCards(p.id);
-    res.json({ code: 200, msg: '设定卡已生成', data: cards });
+  }
+}
+
+async function _genOutline(p) {
+  const cards = await getCards(p.id);
+  const cardText = cards.filter(c => c.kind !== 'style').map(c => `【${c.title}】${(c.content || '').slice(0, 600)}`).join('\n');
+  const volumes = Math.max(2, Math.round((p.target_words || 200000) / 80000));
+  const prompt = `你是资深网文主编。基于设定生成全书卷级大纲。
+【书名】${p.title}【题材】${p.genre}【目标字数】约${Math.round((p.target_words || 200000) / 10000)}万字，建议分 ${volumes} 卷
+【设定】
+${cardText}
+${p.brief ? `【作者意图】${p.brief}` : ''}
+
+要求：
+- 每卷给出：卷名、本卷主线（2-3句）、开卷钩子、卷末高潮与转折、主角成长/获得、留给下一卷的悬念
+- 整体要有递进：势力/舞台逐卷扩大，每卷结尾比开头的赌注更大
+- 第一卷前三章必须能立住主角和核心冲突
+- 用 Markdown 输出，## 第N卷·卷名 作为标题`;
+  const outline = await callAI(prompt, { temperature: 0.7, maxTokens: 3000, bypassCap: true });
+  await db.query('UPDATE nv_projects SET outline = ? WHERE id = ?', [outline, p.id]);
+}
+
+async function _genToc(p, params) {
+  const volume = parseInt(params.volume) || 1;
+  const count = Math.min(parseInt(params.count) || 10, 20);
+  const { rows: existRows } = await db.query('SELECT MAX(seq) AS maxSeq FROM nv_chapters WHERE project_id = ?', [p.id]);
+  const startSeq = (existRows?.[0]?.maxSeq || 0) + 1;
+  const { rows: recentRows } = await db.query(
+    'SELECT seq, title, outline FROM nv_chapters WHERE project_id = ? ORDER BY seq DESC LIMIT 5', [p.id]);
+  const recentBlock = (recentRows || []).reverse().map(r => `第${r.seq}章 ${r.title}：${r.outline}`).join('\n');
+  const prompt = `你是资深网文主编。基于全书大纲，为第 ${volume} 卷规划第 ${startSeq} 到 ${startSeq + count - 1} 章的细纲。只输出 JSON 数组。
+【全书大纲】
+${(p.outline || '').slice(0, 3000)}
+${recentBlock ? `【已有章节（必须延续，不要重复剧情）】\n${recentBlock}` : '【这是全书开头，第一章必须快速进入核心冲突】'}
+
+每章要求：
+- outline 包含：本章发生什么（2-4句，具体到场景和动作）+ 章末钩子是什么
+- 节奏：每 3-4 章一个小高潮，本批最后一章留较大悬念
+- hook 字段单独写出章末钩子（一句话）
+
+输出格式（严格 JSON 数组，不要其他文字）：
+[{ "seq": ${startSeq}, "title": "章名", "outline": "细纲…", "hook": "章末钩子" }]`;
+  const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 3500, bypassCap: true });
+  const jm = raw.match(/\[[\s\S]*\]/);
+  if (!jm) throw new Error('AI 输出解析失败');
+  const list = JSON.parse(jm[0]);
+  for (const ch of list) {
+    if (!ch || !ch.outline) continue;
+    await db.query('INSERT INTO nv_chapters (project_id, volume, seq, title, outline, status) VALUES (?,?,?,?,?,?)',
+      [p.id, volume, parseInt(ch.seq) || startSeq, String(ch.title || `第${ch.seq}章`).slice(0, 200),
+       String(ch.outline) + (ch.hook ? `\n章末钩子：${ch.hook}` : ''), 'todo']);
+  }
+}
+
+// worker 调用：统一处理设定卡/大纲/细纲的异步生成
+async function processNovelGen(taskId) {
+  const { rows } = await db.query('SELECT * FROM tasks WHERE id = ?', [taskId]);
+  const task = rows?.[0];
+  if (!task || ['done', 'failed'].includes(task.status)) return;
+  const input = typeof task.input_data === 'string' ? JSON.parse(task.input_data) : (task.input_data || {});
+  try {
+    await db.query("UPDATE tasks SET status = 'running', progress = 30, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
+    const { rows: pRows } = await db.query('SELECT * FROM nv_projects WHERE id = ?', [input.projectId]);
+    const p = pRows?.[0];
+    if (!p) throw new Error('项目不存在');
+    if (input.action === 'bootstrap') await _genBootstrap(p);
+    else if (input.action === 'outline') await _genOutline(p);
+    else if (input.action === 'toc') await _genToc(p, input.params || {});
+    else throw new Error('未知生成类型: ' + input.action);
+    await db.query("UPDATE tasks SET status = 'done', progress = 100, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
+  } catch (e) {
+    console.error('[processNovelGen]', input.action, e.message);
+    await db.query('UPDATE tasks SET status = ?, error_msg = ?, updated_at = NOW() WHERE id = ?', ['failed', e.message, taskId]).catch(() => {});
+  }
+}
+
+// 一句话设定 → AI 生成设定卡（异步任务）
+router.post('/projects/:id/kb/bootstrap', requireAuth, async (req, res) => {
+  try {
+    const p = await getProject(parseInt(req.params.id), req.userId);
+    if (!p) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const taskId = crypto.randomUUID();
+    await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+      [taskId, req.userId, 'novel_gen', `生成设定卡：${p.title}`.slice(0, 200), 'pending', 0, JSON.stringify({ projectId: p.id, action: 'bootstrap' })]);
+    taskRunner.enqueue({ taskId, type: 'novel_gen' });
+    res.json({ code: 200, data: { taskId } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
@@ -213,72 +292,31 @@ router.delete('/kb/:cardId', requireAuth, async (req, res) => {
 
 /* ═══════════ 大纲 / 细纲 ═══════════ */
 
-// 全书大纲（卷级）
+// 全书大纲（卷级）— 异步任务
 router.post('/projects/:id/outline', requireAuth, async (req, res) => {
   try {
     const p = await getProject(parseInt(req.params.id), req.userId);
     if (!p) return res.status(404).json({ code: 404, msg: '项目不存在' });
-    const cards = await getCards(p.id);
-    const cardText = cards.filter(c => c.kind !== 'style').map(c => `【${c.title}】${(c.content || '').slice(0, 600)}`).join('\n');
-    const volumes = Math.max(2, Math.round((p.target_words || 200000) / 80000));
-    const prompt = `你是资深网文主编。基于设定生成全书卷级大纲。
-【书名】${p.title}【题材】${p.genre}【目标字数】约${Math.round((p.target_words || 200000) / 10000)}万字，建议分 ${volumes} 卷
-【设定】
-${cardText}
-${p.brief ? `【作者意图】${p.brief}` : ''}
-
-要求：
-- 每卷给出：卷名、本卷主线（2-3句）、开卷钩子、卷末高潮与转折、主角成长/获得、留给下一卷的悬念
-- 整体要有递进：势力/舞台逐卷扩大，每卷结尾比开头的赌注更大
-- 第一卷前三章必须能立住主角和核心冲突
-- 用 Markdown 输出，## 第N卷·卷名 作为标题`;
-    const outline = await callAI(prompt, { temperature: 0.7, maxTokens: 3000, bypassCap: true });
-    await db.query('UPDATE nv_projects SET outline = ? WHERE id = ?', [outline, p.id]);
-    res.json({ code: 200, data: { outline } });
+    const taskId = crypto.randomUUID();
+    await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+      [taskId, req.userId, 'novel_gen', `生成大纲：${p.title}`.slice(0, 200), 'pending', 0, JSON.stringify({ projectId: p.id, action: 'outline' })]);
+    taskRunner.enqueue({ taskId, type: 'novel_gen' });
+    res.json({ code: 200, data: { taskId } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
-// 批量章节细纲（每批 ≤20 章），AI 输出 JSON 数组入库
+// 批量章节细纲（每批 ≤20 章）— 异步任务
 router.post('/projects/:id/toc', requireAuth, async (req, res) => {
   try {
     const p = await getProject(parseInt(req.params.id), req.userId);
     if (!p) return res.status(404).json({ code: 404, msg: '项目不存在' });
     if (!(p.outline || '').trim()) return res.status(400).json({ code: 400, msg: '请先生成全书大纲' });
-    const volume = parseInt(req.body.volume) || 1;
-    const count = Math.min(parseInt(req.body.count) || 10, 20);
-    const { rows: existRows } = await db.query(
-      'SELECT MAX(seq) AS maxSeq FROM nv_chapters WHERE project_id = ?', [p.id]);
-    const startSeq = (existRows?.[0]?.maxSeq || 0) + 1;
-    // 已有章节的最近细纲，保证延续
-    const { rows: recentRows } = await db.query(
-      'SELECT seq, title, outline FROM nv_chapters WHERE project_id = ? ORDER BY seq DESC LIMIT 5', [p.id]);
-    const recentBlock = (recentRows || []).reverse().map(r => `第${r.seq}章 ${r.title}：${r.outline}`).join('\n');
-
-    const prompt = `你是资深网文主编。基于全书大纲，为第 ${volume} 卷规划第 ${startSeq} 到 ${startSeq + count - 1} 章的细纲。只输出 JSON 数组。
-【全书大纲】
-${(p.outline || '').slice(0, 3000)}
-${recentBlock ? `【已有章节（必须延续，不要重复剧情）】\n${recentBlock}` : '【这是全书开头，第一章必须快速进入核心冲突】'}
-
-每章要求：
-- outline 包含：本章发生什么（2-4句，具体到场景和动作）+ 章末钩子是什么
-- 节奏：每 3-4 章一个小高潮，本批最后一章留较大悬念
-- hook 字段单独写出章末钩子（一句话）
-
-输出格式（严格 JSON 数组，不要其他文字）：
-[{ "seq": ${startSeq}, "title": "章名", "outline": "细纲…", "hook": "章末钩子" }]`;
-    const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 3500, bypassCap: true });
-    const jm = raw.match(/\[[\s\S]*\]/);
-    if (!jm) return res.status(500).json({ code: 500, msg: 'AI 输出解析失败，请重试' });
-    const list = JSON.parse(jm[0]);
-    for (const ch of list) {
-      if (!ch || !ch.outline) continue;
-      await db.query('INSERT INTO nv_chapters (project_id, volume, seq, title, outline, status) VALUES (?,?,?,?,?,?)',
-        [p.id, volume, parseInt(ch.seq) || startSeq, String(ch.title || `第${ch.seq}章`).slice(0, 200),
-         String(ch.outline) + (ch.hook ? `\n章末钩子：${ch.hook}` : ''), 'todo']);
-    }
-    const { rows: chapters } = await db.query(
-      'SELECT id, volume, seq, title, outline, status, word_count FROM nv_chapters WHERE project_id = ? ORDER BY volume, seq', [p.id]);
-    res.json({ code: 200, msg: `已生成 ${list.length} 章细纲`, data: chapters });
+    const taskId = crypto.randomUUID();
+    await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+      [taskId, req.userId, 'novel_gen', `规划细纲：${p.title}`.slice(0, 200), 'pending', 0,
+       JSON.stringify({ projectId: p.id, action: 'toc', params: { volume: req.body.volume, count: req.body.count } })]);
+    taskRunner.enqueue({ taskId, type: 'novel_gen' });
+    res.json({ code: 200, data: { taskId } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
@@ -513,4 +551,4 @@ router.get('/projects/:id/export', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
-module.exports = { router, processNovelChapter };
+module.exports = { router, processNovelChapter, processNovelGen };

@@ -426,6 +426,7 @@ taskRunner.setHandler(async (job) => {
     else if (type === 'single_video_analyze') await processSingleVideoAnalyze(taskId);
     else if (type === 'clone_video') await processCloneVideo(taskId);
     else if (type === 'novel_chapter') await require('./routes/novel').processNovelChapter(taskId);
+    else if (type === 'novel_gen') await require('./routes/novel').processNovelGen(taskId);
     else throw new Error(`未知任务类型: ${type}`);
   })();
 

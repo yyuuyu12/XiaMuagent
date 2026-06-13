@@ -961,10 +961,13 @@ async function dNvCreate() {
   const r = await dHttp.post('/novel/projects', body);
   if (r.code !== 200) { dS.nvNewBusy = false; dToast(r.msg||'创建失败'); dRender(); return; }
   const pid = r.data.id;
-  await dHttp.post('/novel/projects/'+pid+'/kb/bootstrap', {}); // 设定卡初稿（失败也可手动补）
-  dS.nvNewModal = false; dS.nvNewBusy = false; dS.nvProjectsLoaded = false;
-  dToast('已创建，设定卡初稿已生成');
-  dNvOpenProject(pid);
+  const enter = (msg) => { dS.nvNewModal = false; dS.nvNewBusy = false; dS.nvProjectsLoaded = false; dToast(msg); dNvOpenProject(pid); };
+  const br = await dHttp.post('/novel/projects/'+pid+'/kb/bootstrap', {});
+  if (br.code !== 200) { enter('已创建（设定卡可在设定集手动生成）'); return; }
+  // 轮询设定卡生成完成再进项目
+  dNvPollTask(br.data.taskId,
+    () => enter('已创建，设定卡已生成'),
+    () => enter('已创建（设定卡生成失败，可在设定集手动补）'));
 }
 
 /* ---------- 项目工作区 ---------- */
@@ -1076,14 +1079,27 @@ function dNvProjectView() {
   return `<div style="display:flex;gap:14px;height:calc(100vh - 110px)">${navCol}${chatCol}${rightCol}</div>`;
 }
 
+/* ---------- 通用：异步生成任务轮询（设定卡/大纲/细纲共用，避免同步超时） ---------- */
+function dNvPollTask(taskId, onDone, onFail) {
+  const timer = setInterval(async () => {
+    const t = await dHttp.get('/tasks/' + taskId);
+    if (t.code !== 200 || !t.data) return;
+    if (t.data.status === 'done') { clearInterval(timer); onDone(t.data); }
+    else if (t.data.status === 'failed') { clearInterval(timer); (onFail || function(){})(t.data.error_msg || '请重试'); }
+  }, 3000);
+}
+
 /* ---------- 大纲 / 细纲 ---------- */
 async function dNvGenOutline() {
   dS.nvOutlineBusy = true; dRender();
   const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/outline', {});
-  dS.nvOutlineBusy = false;
-  if (r.code === 200) { dS.nvProject.project.outline = r.data.outline; dToast('大纲已生成'); }
-  else dToast(r.msg||'生成失败');
-  dRender();
+  if (r.code !== 200) { dS.nvOutlineBusy = false; dToast(r.msg||'提交失败'); dRender(); return; }
+  const pid = dS.nvProject.project.id;
+  dNvPollTask(r.data.taskId, async () => {
+    const pr = await dHttp.get('/novel/projects/'+pid);
+    if (pr.code === 200 && dS.nvProject && dS.nvProject.project.id === pid) dS.nvProject = pr.data;
+    dS.nvOutlineBusy = false; dToast('大纲已生成'); dRender();
+  }, (msg) => { dS.nvOutlineBusy = false; dToast('生成失败：'+msg); dRender(); });
 }
 async function dNvSaveOutline() {
   const r = await dApi('PATCH', '/novel/projects/'+dS.nvProject.project.id, { outline: dS.nvProject.project.outline||'' });
@@ -1093,10 +1109,13 @@ async function dNvGenToc() {
   if (!(dS.nvProject.project.outline||'').trim()) { dToast('先生成全书大纲'); dS.nvRight='outline'; dRender(); return; }
   dS.nvTocBusy = true; dRender();
   const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/toc', { count: 10 });
-  dS.nvTocBusy = false;
-  if (r.code === 200) { dS.nvProject.chapters = r.data; dToast(r.msg||'细纲已生成'); }
-  else dToast(r.msg||'生成失败');
-  dRender();
+  if (r.code !== 200) { dS.nvTocBusy = false; dToast(r.msg||'提交失败'); dRender(); return; }
+  const pid = dS.nvProject.project.id;
+  dNvPollTask(r.data.taskId, async () => {
+    const pr = await dHttp.get('/novel/projects/'+pid);
+    if (pr.code === 200 && dS.nvProject && dS.nvProject.project.id === pid) dS.nvProject = pr.data;
+    dS.nvTocBusy = false; dToast('细纲已生成'); dRender();
+  }, (msg) => { dS.nvTocBusy = false; dToast('生成失败：'+msg); dRender(); });
 }
 
 /* ---------- 章节 ---------- */
