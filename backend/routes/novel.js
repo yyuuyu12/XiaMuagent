@@ -257,6 +257,63 @@ ${recentBlock ? `【已有章节（必须延续，不要重复剧情）】\n${re
   }
 }
 
+// AI 识别角色：扫描现有设定卡+大纲+已写章节，提取角色与关系，批量建档（去重已有）
+async function _genExtractChars(p) {
+  const { rows: existing } = await db.query('SELECT name FROM nv_characters WHERE project_id = ?', [p.id]);
+  const existNames = new Set((existing || []).map(c => c.name));
+  const cards = await getCards(p.id);
+  const cardText = cards.map(c => `【${c.kind}·${c.title}】${(c.content || '').slice(0, 800)}`).join('\n');
+  const { rows: chs } = await db.query(
+    "SELECT seq, title, content FROM nv_chapters WHERE project_id = ? AND content IS NOT NULL AND content != '' ORDER BY seq LIMIT 12", [p.id]);
+  const chapterText = (chs || []).map(c => `第${c.seq}章 ${c.title}：${(c.content || '').slice(0, 1500)}`).join('\n\n');
+  const material = `${cardText}\n\n${(p.outline || '').slice(0, 1500)}\n\n${chapterText}`.trim();
+  if (material.replace(/\s/g, '').length < 50) throw new Error('没有可分析的设定或正文，请先生成设定卡/大纲或写几章');
+
+  const prompt = `你是小说设定管理员。从下面的设定与正文中，提取所有【有名字、对剧情有实际作用】的角色，以及他们之间的关系。排除路人、群众、龙套、无名氏。只输出 JSON。
+【素材】
+${material.slice(0, 13000)}
+${existNames.size ? `【已登记角色，不要重复输出】${[...existNames].join('、')}` : ''}
+
+输出格式（严格 JSON）：
+{
+  "characters": [{ "name":"角色名", "role_type":"lead/antagonist/supporting/love 之一", "identity":"身份一句话", "persona":"性格底色/灵魂烙印", "goals":"欲望与恐惧", "abilities":"能力/特长" }],
+  "relations": [{ "from":"角色A", "to":"角色B", "rel_type":"盟友/仇敌/师徒/爱慕/亲属/…", "affinity":0到100整数, "description":"关系现状" }]
+}
+全书最多 1 个 lead（主角）。关系 from/to 用角色名。`;
+  const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 2500, bypassCap: true });
+  const jm = raw.match(/\{[\s\S]*\}/);
+  if (!jm) throw new Error('AI 输出解析失败');
+  const data = JSON.parse(jm[0]);
+  // 建角色（去重）
+  const nameToId = {};
+  (existing || []).forEach(() => {}); // existing 只有 name，没 id；下面重查带 id
+  const { rows: existFull } = await db.query('SELECT id, name FROM nv_characters WHERE project_id = ?', [p.id]);
+  (existFull || []).forEach(c => { nameToId[c.name] = c.id; });
+  let added = 0; let hasLead = (existFull || []).some(() => false);
+  for (const c of (data.characters || [])) {
+    const nm = c && c.name ? String(c.name).trim() : '';
+    if (!nm || nameToId[nm]) continue;
+    let rt = ['lead', 'antagonist', 'supporting', 'love'].includes(c.role_type) ? c.role_type : 'supporting';
+    if (rt === 'lead' && hasLead) rt = 'supporting'; else if (rt === 'lead') hasLead = true;
+    const idx = Object.keys(nameToId).length;
+    const { rows: ins } = await db.query(
+      'INSERT INTO nv_characters (project_id, name, role_type, identity, persona, goals, abilities, color, sort) VALUES (?,?,?,?,?,?,?,?,?)',
+      [p.id, nm.slice(0, 100), rt, String(c.identity || '').slice(0, 255), String(c.persona || ''), String(c.goals || ''), String(c.abilities || ''), CHAR_COLORS[idx % CHAR_COLORS.length], idx]
+    ).catch(() => ({ rows: [] }));
+    if (ins?.[0]?.id) { nameToId[nm] = ins[0].id; added++; }
+  }
+  // 建关系（两端都已知，去重已存在的 from-to）
+  for (const r of (data.relations || [])) {
+    const fromId = r && nameToId[r.from], toId = r && nameToId[r.to];
+    if (!fromId || !toId || fromId === toId) continue;
+    const { rows: ex } = await db.query('SELECT id FROM nv_relations WHERE project_id = ? AND from_id = ? AND to_id = ?', [p.id, fromId, toId]);
+    if (ex?.length) continue;
+    await db.query('INSERT INTO nv_relations (project_id, from_id, to_id, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?)',
+      [p.id, fromId, toId, String(r.rel_type || '关系').slice(0, 40), Math.max(0, Math.min(100, parseInt(r.affinity) || 50)), String(r.description || '').slice(0, 500), 0]).catch(() => {});
+  }
+  console.log(`[Novel] AI 识别角色：新增 ${added} 个`);
+}
+
 // worker 调用：统一处理设定卡/大纲/细纲的异步生成
 async function processNovelGen(taskId) {
   const { rows } = await db.query('SELECT * FROM tasks WHERE id = ?', [taskId]);
@@ -271,6 +328,7 @@ async function processNovelGen(taskId) {
     if (input.action === 'bootstrap') await _genBootstrap(p);
     else if (input.action === 'outline') await _genOutline(p);
     else if (input.action === 'toc') await _genToc(p, input.params || {});
+    else if (input.action === 'extract_chars') await _genExtractChars(p);
     else throw new Error('未知生成类型: ' + input.action);
     await db.query("UPDATE tasks SET status = 'done', progress = 100, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
   } catch (e) {
@@ -339,6 +397,19 @@ async function ownByChar(charId, userId) {
   const { rows } = await db.query('SELECT c.id, c.project_id FROM nv_characters c JOIN nv_projects p ON c.project_id = p.id WHERE c.id = ? AND p.user_id = ?', [charId, userId]);
   return rows?.[0] || null;
 }
+
+// AI 识别角色（异步任务）：从已有设定/正文一键提取角色与关系
+router.post('/projects/:id/characters/extract', requireAuth, async (req, res) => {
+  try {
+    const pid = await ownProject(parseInt(req.params.id), req.userId);
+    if (!pid) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const taskId = crypto.randomUUID();
+    await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+      [taskId, req.userId, 'novel_gen', 'AI 识别角色', 'pending', 0, JSON.stringify({ projectId: pid, action: 'extract_chars' })]);
+    taskRunner.enqueue({ taskId, type: 'novel_gen' });
+    res.json({ code: 200, data: { taskId } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
 
 // 新增角色
 router.post('/projects/:id/characters', requireAuth, async (req, res) => {

@@ -1307,7 +1307,10 @@ function dNvCharactersView(P) {
 
   return `<div class="do-col" style="flex:1;min-width:0">
     <div class="do-col-head"><div><div class="do-col-h-title">人物关系</div><div class="do-col-h-sub">角色烙印 + 关系网，写章时按本章出场角色自动注入</div></div>
-      <button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" onclick="dNvAddChar()">＋ 添加角色</button></div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="do-btn do-btn-pri" style="padding:6px 12px;font-size:12px" ${dS.nvExtractBusy?'disabled':''} onclick="dNvExtractChars()">${dS.nvExtractBusy?'识别中…':'✦ AI 识别角色'}</button>
+        <button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" onclick="dNvAddChar()">＋ 添加角色</button>
+      </div></div>
     <div class="do-col-body">
       <div class="d-card" style="padding:8px;margin-bottom:14px;background:#FBFAF7">${dNvGraphSvg(chars, rels)}</div>
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">角色（${chars.length}）</div>
@@ -1334,6 +1337,14 @@ async function dNvSaveChar(id) {
 async function dNvAddChar() {
   const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/characters', { name:'新角色', role_type:'supporting' });
   if (r.code === 200) dNvReloadProject(); else dToast(r.msg||'添加失败');
+}
+async function dNvExtractChars() {
+  if (dS.nvExtractBusy) return;
+  dS.nvExtractBusy = true; dRender();
+  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/characters/extract', {});
+  if (r.code !== 200) { dS.nvExtractBusy = false; dToast(r.msg||'提交失败'); dRender(); return; }
+  dNvPollTask(r.data.taskId, () => { dS.nvExtractBusy = false; dToast('已识别并登记角色'); dNvReloadProject(); },
+    (msg) => { dS.nvExtractBusy = false; dToast('识别失败：'+msg); dRender(); });
 }
 async function dNvDelChar(id) {
   if (!confirm('删除这个角色？与它相关的关系也会一并删除。')) return;
