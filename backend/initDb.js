@@ -677,18 +677,39 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
-  // nv_relations：角色关系（有向边）。affinity 借天命关系向量量化(0-100)
+  // nv_relations：关系（有向边）。affinity 借天命关系向量量化(0-100)
+  // from_type/to_type: 'char'(角色) | 'faction'(组织)，支持 角色↔角色 / 角色↔组织 / 组织↔组织
   await db.query(`
     CREATE TABLE IF NOT EXISTS nv_relations (
       id           INT AUTO_INCREMENT PRIMARY KEY,
       project_id   INT NOT NULL,
       from_id      INT NOT NULL,
       to_id        INT NOT NULL,
+      from_type    VARCHAR(10) DEFAULT 'char',
+      to_type      VARCHAR(10) DEFAULT 'char',
       rel_type     VARCHAR(40) DEFAULT '',
       affinity     INT DEFAULT 50,
       description  TEXT,
       updated_chapter INT DEFAULT 0,
       updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project (project_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  // 老库补列
+  try { await db.query("ALTER TABLE nv_relations ADD COLUMN from_type VARCHAR(10) DEFAULT 'char'"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] nv_relations.from_type:', e.message||e); }
+  try { await db.query("ALTER TABLE nv_relations ADD COLUMN to_type VARCHAR(10) DEFAULT 'char'"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] nv_relations.to_type:', e.message||e); }
+
+  // nv_factions：组织（宗门/家族/势力）——关系网的第二类节点
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_factions (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      project_id  INT NOT NULL,
+      name        VARCHAR(100) NOT NULL DEFAULT '',
+      kind        VARCHAR(20) DEFAULT '宗门',
+      description TEXT,
+      color       VARCHAR(16) DEFAULT '#6E6860',
+      sort        INT DEFAULT 0,
+      updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_project (project_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);

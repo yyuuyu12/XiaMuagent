@@ -1227,40 +1227,53 @@ async function dNvDelCard(id) {
 const NV_ROLE_LABEL = { lead:'主角', antagonist:'反派', supporting:'配角', love:'感情线' };
 
 // 环形布局 SVG 关系图谱：节点=角色，有向边=关系，边色按亲密度(绿=高/红=低)
-function dNvGraphSvg(chars, rels) {
-  if (!chars.length) return '<div class="do-empty" style="padding:30px">还没有角色，下方添加后这里会自动画出关系网。</div>';
-  const W = 520, H = 300, cx = W/2, cy = H/2, R = Math.min(110, 40 + chars.length*12);
+function dNvGraphSvg(chars, facs, rels) {
+  const nodes = [
+    ...chars.map(c => ({ key:'c'+c.id, kind:'char', name:c.name, color:c.color||'#F5762A' })),
+    ...facs.map(f => ({ key:'f'+f.id, kind:'fac', name:f.name, color:f.color||'#6E6860' })),
+  ];
+  if (!nodes.length) return '<div class="do-empty" style="padding:30px">还没有角色/组织，下方添加或点「AI 识别」后这里会自动画出关系网。</div>';
+  const W = 520, H = 300, cx = W/2, cy = H/2, R = Math.min(118, 38 + nodes.length*11);
   const pos = {};
-  chars.forEach((c, i) => {
-    const ang = (Math.PI*2*i/chars.length) - Math.PI/2;
-    pos[c.id] = { x: cx + R*Math.cos(ang), y: cy + R*Math.sin(ang) };
-  });
+  nodes.forEach((n, i) => { const ang = (Math.PI*2*i/nodes.length) - Math.PI/2; pos[n.key] = { x: cx + R*Math.cos(ang), y: cy + R*Math.sin(ang) }; });
   const edgeColor = a => a >= 60 ? '#16A34A' : a <= 30 ? '#E5534B' : '#9E9890';
   const edges = rels.map(r => {
-    const a = pos[r.from_id], b = pos[r.to_id]; if (!a || !b) return '';
-    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
-    const col = edgeColor(r.affinity);
-    return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="1.5" opacity="0.55" marker-end="url(#nvArrow)"/>
-      <rect x="${mx-22}" y="${my-8}" width="44" height="15" rx="7" fill="#fff" opacity="0.92"/>
+    const fk = (r.from_type==='faction'?'f':'c') + r.from_id, tk = (r.to_type==='faction'?'f':'c') + r.to_id;
+    const a = pos[fk], b = pos[tk]; if (!a || !b) return '';
+    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2, col = edgeColor(r.affinity);
+    const dash = (r.from_type==='char' && r.to_type==='faction') ? 'stroke-dasharray="4 3"' : '';
+    return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="1.5" opacity="0.5" ${dash} marker-end="url(#nvArrow)"/>
+      <rect x="${mx-22}" y="${my-8}" width="44" height="15" rx="7" fill="#fff" opacity="0.9"/>
       <text x="${mx}" y="${my+3}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${esc(r.rel_type||'').slice(0,4)}</text>`;
   }).join('');
-  const nodes = chars.map(c => {
-    const p = pos[c.id];
-    return `<g><circle cx="${p.x}" cy="${p.y}" r="17" fill="${c.color||'#F5762A'}"/>
-      <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">${esc((c.name||'?')[0])}</text>
-      <text x="${p.x}" y="${p.y+30}" text-anchor="middle" font-size="10" fill="#3D362F" font-weight="600">${esc((c.name||'').slice(0,6))}</text></g>`;
+  const nodeSvg = nodes.map(n => {
+    const p = pos[n.key];
+    if (n.kind === 'fac') {
+      return `<g><rect x="${p.x-18}" y="${p.y-14}" width="36" height="28" rx="5" fill="${n.color}"/>
+        <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">${esc((n.name||'?')[0])}</text>
+        <text x="${p.x}" y="${p.y+28}" text-anchor="middle" font-size="9.5" fill="#3D362F" font-weight="600">${esc((n.name||'').slice(0,6))}</text></g>`;
+    }
+    return `<g><circle cx="${p.x}" cy="${p.y}" r="16" fill="${n.color}"/>
+      <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">${esc((n.name||'?')[0])}</text>
+      <text x="${p.x}" y="${p.y+29}" text-anchor="middle" font-size="9.5" fill="#3D362F" font-weight="600">${esc((n.name||'').slice(0,6))}</text></g>`;
   }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:300px">
-    <defs><marker id="nvArrow" markerWidth="8" markerHeight="8" refX="22" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9E9890"/></marker></defs>
-    ${edges}${nodes}
-  </svg>`;
+    <defs><marker id="nvArrow" markerWidth="8" markerHeight="8" refX="21" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9E9890"/></marker></defs>
+    ${edges}${nodeSvg}
+  </svg>
+  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#9E9890;padding:4px 0 2px"><span>● 角色</span><span>■ 组织</span><span style="color:#16A34A">— 亲密</span><span style="color:#E5534B">— 敌对</span><span>┄ 隶属</span></div>`;
 }
 
 function dNvCharactersView(P) {
   const chars = P.characters || [];
+  const facs = P.factions || [];
   const rels = P.relations || [];
-  const nameOf = id => (chars.find(c=>c.id===id)||{}).name || '?';
-  const opts = (sel) => chars.map(c=>`<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('');
+  const relName = (id, type) => type==='faction' ? ((facs.find(f=>f.id===id)||{}).name||'?') : ((chars.find(c=>c.id===id)||{}).name||'?');
+  const nodeOpts = () => {
+    const cg = chars.map(c=>`<option value="c${c.id}">${esc(c.name)}</option>`).join('');
+    const fg = facs.map(f=>`<option value="f${f.id}">${esc(f.name)}·${esc(f.kind)}</option>`).join('');
+    return `<optgroup label="角色">${cg}</optgroup>${fg?`<optgroup label="组织">${fg}</optgroup>`:''}`;
+  };
 
   const charCards = chars.map(c => `
     <div class="d-card" style="padding:13px 15px;margin-bottom:10px">
@@ -1278,43 +1291,60 @@ function dNvCharactersView(P) {
         <textarea class="txa" style="height:42px;font-size:12px;flex:1" placeholder="欲望与恐惧" onchange="dNvCharField(${c.id},'goals',this.value)">${esc(c.goals||'')}</textarea>
         <textarea class="txa" style="height:42px;font-size:12px;flex:1" placeholder="能力/金手指" onchange="dNvCharField(${c.id},'abilities',this.value)">${esc(c.abilities||'')}</textarea>
       </div>
-      ${c.status?`<div style="font-size:11px;color:#16A34A;margin-top:6px">📍 当前：${esc(c.status)}</div>`:''}
+      ${c.status?`<div style="font-size:11px;color:#16A34A;margin-top:6px">当前：${esc(c.status)}</div>`:''}
       <div style="text-align:right;margin-top:6px"><button class="do-btn do-btn-gho" style="padding:4px 12px;font-size:11px" onclick="dNvSaveChar(${c.id})">保存</button></div>
-    </div>`).join('') || '<div class="do-empty" style="padding:20px">还没有角色。下方「＋ 添加角色」，或回书架重建项目自动生成主角/反派。</div>';
+    </div>`).join('') || '<div class="do-empty" style="padding:20px">还没有角色。下方「＋ 添加角色」，或点上方「AI 识别角色」。</div>';
+
+  const facCards = facs.map(f => `
+    <div class="d-card" style="padding:12px 15px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="width:10px;height:10px;border-radius:3px;background:${f.color||'#6E6860'};flex-shrink:0"></span>
+        <input class="inp" style="height:30px;font-size:13px;font-weight:700;width:130px" value="${esc(f.name)}" onchange="dNvFacField(${f.id},'name',this.value)">
+        <select class="sel" style="height:30px;font-size:12px;width:90px" onchange="dNvFacField(${f.id},'kind',this.value)">
+          ${['宗门','家族','势力','朝廷','帮派','组织'].map(k=>`<option value="${k}" ${f.kind===k?'selected':''}>${k}</option>`).join('')}
+        </select>
+        <input class="inp" style="height:30px;font-size:12px;flex:1" placeholder="宗旨/势力范围/特点" value="${esc(f.description||'')}" onchange="dNvFacField(${f.id},'description',this.value)">
+        <button class="do-btn do-btn-gho" style="padding:3px 10px;font-size:11px" onclick="dNvSaveFac(${f.id})">存</button>
+        <span class="do-link" style="color:#E5534B;font-size:11px;flex-shrink:0" onclick="dNvDelFac(${f.id})">删</span>
+      </div>
+    </div>`).join('') || '<div style="font-size:12px;color:#B0AA9F;padding:8px 0">还没有组织。点「＋ 组织」添加宗门/家族，或「AI 识别角色」会一并提取。</div>';
 
   const relRows = rels.map(r => `
     <div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid #F2EFEA;font-size:12px;flex-wrap:wrap">
-      <span style="font-weight:600">${esc(nameOf(r.from_id))}</span>
-      <span style="color:#B0AA9F">→</span>
-      <span style="font-weight:600">${esc(nameOf(r.to_id))}</span>
-      <input class="inp" style="height:28px;width:80px;font-size:12px" value="${esc(r.rel_type||'')}" onchange="dNvRelField(${r.id},'rel_type',this.value)">
+      <span style="font-weight:600">${esc(relName(r.from_id, r.from_type))}</span>
+      <span style="color:#B0AA9F">${(r.from_type==='char'&&r.to_type==='faction')?'隶属→':'→'}</span>
+      <span style="font-weight:600">${esc(relName(r.to_id, r.to_type))}</span>
+      <input class="inp" style="height:28px;width:78px;font-size:12px" value="${esc(r.rel_type||'')}" onchange="dNvRelField(${r.id},'rel_type',this.value)">
       <span style="color:#9E9890">亲密</span>
-      <input type="number" class="inp" style="height:28px;width:56px;font-size:12px" min="0" max="100" value="${r.affinity}" onchange="dNvRelField(${r.id},'affinity',this.value)">
-      <input class="inp" style="height:28px;flex:1;min-width:100px;font-size:12px" placeholder="关系描述/现状" value="${esc(r.description||'')}" onchange="dNvRelField(${r.id},'description',this.value)">
+      <input type="number" class="inp" style="height:28px;width:54px;font-size:12px" min="0" max="100" value="${r.affinity}" onchange="dNvRelField(${r.id},'affinity',this.value)">
+      <input class="inp" style="height:28px;flex:1;min-width:90px;font-size:12px" placeholder="描述/现状" value="${esc(r.description||'')}" onchange="dNvRelField(${r.id},'description',this.value)">
       <button class="do-btn do-btn-gho" style="padding:3px 10px;font-size:11px" onclick="dNvSaveRel(${r.id})">存</button>
       <span class="do-link" style="color:#E5534B;font-size:11px" onclick="dNvDelRel(${r.id})">删</span>
     </div>`).join('') || '<div style="font-size:12px;color:#B0AA9F;padding:10px 0">还没有关系。下方添加，或写章定稿时 AI 会自动登记关系变化。</div>';
 
-  const addRel = chars.length >= 2 ? `
+  const addRel = (chars.length + facs.length) >= 2 ? `
     <div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:10px;background:#FBFAF7;border-radius:10px;flex-wrap:wrap">
-      <select class="sel" id="nvRelFrom" style="height:30px;width:100px;font-size:12px">${opts()}</select>
+      <select class="sel" id="nvRelFrom" style="height:30px;width:120px;font-size:12px">${nodeOpts()}</select>
       <span style="color:#B0AA9F">→</span>
-      <select class="sel" id="nvRelTo" style="height:30px;width:100px;font-size:12px">${opts(chars[1]?.id)}</select>
-      <input class="inp" id="nvRelType" style="height:30px;width:90px;font-size:12px" placeholder="如:盟友">
-      <input type="number" class="inp" id="nvRelAff" style="height:30px;width:56px;font-size:12px" placeholder="50" value="50" min="0" max="100">
+      <select class="sel" id="nvRelTo" style="height:30px;width:120px;font-size:12px">${nodeOpts()}</select>
+      <input class="inp" id="nvRelType" style="height:30px;width:84px;font-size:12px" placeholder="如:盟友/隶属">
+      <input type="number" class="inp" id="nvRelAff" style="height:30px;width:54px;font-size:12px" placeholder="50" value="50" min="0" max="100">
       <button class="do-btn do-btn-pri" style="padding:5px 14px;font-size:12px" onclick="dNvAddRel()">＋ 加关系</button>
     </div>` : '';
 
   return `<div class="do-col" style="flex:1;min-width:0">
-    <div class="do-col-head"><div><div class="do-col-h-title">人物关系</div><div class="do-col-h-sub">角色烙印 + 关系网，写章时按本章出场角色自动注入</div></div>
+    <div class="do-col-head"><div><div class="do-col-h-title">人物关系</div><div class="do-col-h-sub">角色烙印 + 宗门/家族 + 关系网，写章时按本章出场自动注入</div></div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="do-btn do-btn-pri" style="padding:6px 12px;font-size:12px" ${dS.nvExtractBusy?'disabled':''} onclick="dNvExtractChars()">${dS.nvExtractBusy?'识别中…':'✦ AI 识别角色'}</button>
-        <button class="do-btn do-btn-gho" style="padding:6px 12px;font-size:12px" onclick="dNvAddChar()">＋ 添加角色</button>
+        <button class="do-btn do-btn-pri" style="padding:6px 12px;font-size:12px" ${dS.nvExtractBusy?'disabled':''} onclick="dNvExtractChars()">${dS.nvExtractBusy?'识别中…':'✦ AI 识别'}</button>
+        <button class="do-btn do-btn-gho" style="padding:6px 10px;font-size:12px" onclick="dNvAddChar()">＋ 角色</button>
+        <button class="do-btn do-btn-gho" style="padding:6px 10px;font-size:12px" onclick="dNvAddFac()">＋ 组织</button>
       </div></div>
     <div class="do-col-body">
-      <div class="d-card" style="padding:8px;margin-bottom:14px;background:#FBFAF7">${dNvGraphSvg(chars, rels)}</div>
+      <div class="d-card" style="padding:8px;margin-bottom:14px;background:#FBFAF7">${dNvGraphSvg(chars, facs, rels)}</div>
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">角色（${chars.length}）</div>
       ${charCards}
+      <div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 8px">组织 · 宗门/家族（${facs.length}）</div>
+      ${facCards}
       <div style="font-size:13px;font-weight:700;color:#1A1614;margin:16px 0 4px">关系（${rels.length}）</div>
       ${relRows}
       ${addRel}
@@ -1358,16 +1388,33 @@ async function dNvSaveRel(id) {
   if (res.code === 200) { dToast('已保存'); dRender(); } else dToast(res.msg||'保存失败');
 }
 async function dNvAddRel() {
-  const from_id = parseInt((document.getElementById('nvRelFrom')||{}).value);
-  const to_id = parseInt((document.getElementById('nvRelTo')||{}).value);
+  const parse = v => ({ type: v && v[0]==='f' ? 'faction' : 'char', id: parseInt((v||'').slice(1)) });
+  const f = parse((document.getElementById('nvRelFrom')||{}).value);
+  const t = parse((document.getElementById('nvRelTo')||{}).value);
   const rel_type = (document.getElementById('nvRelType')||{}).value || '关系';
   const affinity = (document.getElementById('nvRelAff')||{}).value || 50;
-  if (from_id === to_id) { dToast('请选择两个不同的角色'); return; }
-  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/relations', { from_id, to_id, rel_type, affinity });
+  if (!f.id || !t.id || (f.id===t.id && f.type===t.type)) { dToast('请选择两个不同的节点'); return; }
+  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/relations', { from_id:f.id, from_type:f.type, to_id:t.id, to_type:t.type, rel_type, affinity });
   if (r.code === 200) dNvReloadProject(); else dToast(r.msg||'添加失败');
 }
 async function dNvDelRel(id) {
   const r = await dApi('DELETE', '/novel/relations/'+id, {});
+  if (r.code === 200) dNvReloadProject(); else dToast(r.msg||'删除失败');
+}
+/* 组织（宗门/家族） */
+async function dNvAddFac() {
+  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/factions', { name:'新组织', kind:'宗门' });
+  if (r.code === 200) dNvReloadProject(); else dToast(r.msg||'添加失败');
+}
+function dNvFacField(id, field, value) { const f = (dS.nvProject.factions||[]).find(x=>x.id===id); if (f) f[field] = value; }
+async function dNvSaveFac(id) {
+  const f = (dS.nvProject.factions||[]).find(x=>x.id===id); if (!f) return;
+  const r = await dApi('PUT', '/novel/factions/'+id, { name:f.name, kind:f.kind, description:f.description });
+  dToast(r.code===200?'已保存':(r.msg||'保存失败'));
+}
+async function dNvDelFac(id) {
+  if (!confirm('删除这个组织？与它相关的关系也会一并删除。')) return;
+  const r = await dApi('DELETE', '/novel/factions/'+id, {});
   if (r.code === 200) dNvReloadProject(); else dToast(r.msg||'删除失败');
 }
 

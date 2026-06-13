@@ -57,14 +57,36 @@ async function buildMemoryPack(project, chapter) {
       return `· ${c.name}（${c.identity || c.role_type}）烙印：${(c.persona || '').slice(0, 120)}｜欲望/恐惧：${(c.goals || '').slice(0, 80)}${cur}`;
     }).join('\n');
   }
-  // 关系边：两端都在本章相关角色里才注入
+  // 组织 + 关系边（裁剪：角色↔角色都出场才注入；角色→组织归属带出该组织；相关组织间关系）
+  const { rows: allFacs } = await db.query('SELECT * FROM nv_factions WHERE project_id = ?', [project.id]);
+  const facById = {}; (allFacs || []).forEach(f => { facById[f.id] = f; });
   const { rows: rels } = await db.query('SELECT * FROM nv_relations WHERE project_id = ?', [project.id]);
-  const relLines = (rels || []).filter(r => involvedIds.has(r.from_id) && involvedIds.has(r.to_id)).map(r => {
-    const a = charById[r.from_id], b = charById[r.to_id];
-    if (!a || !b) return null;
-    return `· ${a.name} → ${b.name}：${r.rel_type}（亲密度${r.affinity}/100）${r.description ? '，' + r.description.slice(0, 100) : ''}`;
-  }).filter(Boolean);
-  const relBlock = relLines.length ? '【本章相关角色关系（写对话/冲突时必须符合）】\n' + relLines.join('\n') : '';
+  const relLines = []; const involvedFacIds = new Set();
+  for (const r of (rels || [])) {
+    const ft = r.from_type || 'char', tt = r.to_type || 'char';
+    if (ft === 'char' && tt === 'char') {
+      if (!involvedIds.has(r.from_id) || !involvedIds.has(r.to_id)) continue;
+      const a = charById[r.from_id], b = charById[r.to_id]; if (!a || !b) continue;
+      relLines.push(`· ${a.name} → ${b.name}：${r.rel_type}（亲密度${r.affinity}/100）${r.description ? '，' + r.description.slice(0, 80) : ''}`);
+    } else if (ft === 'char' && tt === 'faction') {
+      if (!involvedIds.has(r.from_id)) continue;
+      const a = charById[r.from_id], f = facById[r.to_id]; if (!a || !f) continue;
+      involvedFacIds.add(f.id);
+      relLines.push(`· ${a.name} 隶属 ${f.name}（${r.rel_type}）`);
+    }
+  }
+  // 相关组织之间的关系
+  for (const r of (rels || [])) {
+    if ((r.from_type === 'faction') && (r.to_type === 'faction') && involvedFacIds.has(r.from_id) && involvedFacIds.has(r.to_id)) {
+      const a = facById[r.from_id], b = facById[r.to_id]; if (!a || !b) continue;
+      relLines.push(`· ${a.name} → ${b.name}：${r.rel_type}${r.description ? '，' + r.description.slice(0, 80) : ''}`);
+    }
+  }
+  const relBlock = relLines.length ? '【本章相关角色/组织关系（写对话、立场、冲突时必须符合）】\n' + relLines.join('\n') : '';
+  // 涉及组织的设定
+  const facBlock = involvedFacIds.size
+    ? '【本章涉及的组织】\n' + [...involvedFacIds].map(id => { const f = facById[id]; return `· ${f.name}（${f.kind}）${(f.description || '').slice(0, 100)}`; }).join('\n')
+    : '';
 
   const state = project.state || {};
   const stateBlock = state.summary ? `【前情提要】\n${state.summary}` : '';
@@ -79,7 +101,7 @@ async function buildMemoryPack(project, chapter) {
     prevTail = `【上一章（第${prevRows[0].seq}章 ${prevRows[0].title}）结尾，必须自然衔接】\n……${prevRows[0].content.slice(-800)}`;
   }
 
-  return [cardBlock, charBlock, relBlock, stateBlock, prevTail].filter(Boolean).join('\n\n');
+  return [cardBlock, charBlock, facBlock, relBlock, stateBlock, prevTail].filter(Boolean).join('\n\n');
 }
 
 // 小说写作戒律（自写，消化商业网文方法论；后续可由题材公式包覆盖补充）
@@ -130,7 +152,8 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
       'SELECT id, volume, seq, title, outline, status, word_count FROM nv_chapters WHERE project_id = ? ORDER BY volume, seq', [p.id]);
     const { rows: characters } = await db.query('SELECT * FROM nv_characters WHERE project_id = ? ORDER BY sort, id', [p.id]);
     const { rows: relations } = await db.query('SELECT * FROM nv_relations WHERE project_id = ?', [p.id]);
-    res.json({ code: 200, data: { project: p, cards, chapters: chapters || [], characters: characters || [], relations: relations || [] } });
+    const { rows: factions } = await db.query('SELECT * FROM nv_factions WHERE project_id = ? ORDER BY sort, id', [p.id]);
+    res.json({ code: 200, data: { project: p, cards, chapters: chapters || [], characters: characters || [], relations: relations || [], factions: factions || [] } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
@@ -258,9 +281,16 @@ ${recentBlock ? `【已有章节（必须延续，不要重复剧情）】\n${re
 }
 
 // AI 识别角色：扫描现有设定卡+大纲+已写章节，提取角色与关系，批量建档（去重已有）
+// 关系去重插入（支持 char/faction 跨类型）
+async function _insertRelOnce(pid, fromId, fromType, toId, toType, relType, aff, desc) {
+  if (!fromId || !toId || (fromId === toId && fromType === toType)) return;
+  const { rows: ex } = await db.query('SELECT id FROM nv_relations WHERE project_id = ? AND from_id = ? AND from_type = ? AND to_id = ? AND to_type = ?', [pid, fromId, fromType, toId, toType]);
+  if (ex?.length) return;
+  await db.query('INSERT INTO nv_relations (project_id, from_id, to_id, from_type, to_type, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?,?,?)',
+    [pid, fromId, toId, fromType, toType, String(relType || '关系').slice(0, 40), Math.max(0, Math.min(100, parseInt(aff) || 50)), String(desc || '').slice(0, 500), 0]).catch(() => {});
+}
+
 async function _genExtractChars(p) {
-  const { rows: existing } = await db.query('SELECT name FROM nv_characters WHERE project_id = ?', [p.id]);
-  const existNames = new Set((existing || []).map(c => c.name));
   const cards = await getCards(p.id);
   const cardText = cards.map(c => `【${c.kind}·${c.title}】${(c.content || '').slice(0, 800)}`).join('\n');
   const { rows: chs } = await db.query(
@@ -269,27 +299,35 @@ async function _genExtractChars(p) {
   const material = `${cardText}\n\n${(p.outline || '').slice(0, 1500)}\n\n${chapterText}`.trim();
   if (material.replace(/\s/g, '').length < 50) throw new Error('没有可分析的设定或正文，请先生成设定卡/大纲或写几章');
 
-  const prompt = `你是小说设定管理员。从下面的设定与正文中，提取所有【有名字、对剧情有实际作用】的角色，以及他们之间的关系。排除路人、群众、龙套、无名氏。只输出 JSON。
+  const { rows: existChars } = await db.query('SELECT name FROM nv_characters WHERE project_id = ?', [p.id]);
+  const { rows: existFacs } = await db.query('SELECT name FROM nv_factions WHERE project_id = ?', [p.id]);
+  const exC = (existChars || []).map(c => c.name), exF = (existFacs || []).map(f => f.name);
+
+  const prompt = `你是小说设定管理员。从下面的设定与正文中，提取角色、组织（宗门/家族/势力）、以及它们之间的关系。排除路人/群众/龙套。只输出 JSON。
 【素材】
 ${material.slice(0, 13000)}
-${existNames.size ? `【已登记角色，不要重复输出】${[...existNames].join('、')}` : ''}
+${exC.length ? `【已登记角色，不要重复】${exC.join('、')}` : ''}
+${exF.length ? `【已登记组织，不要重复】${exF.join('、')}` : ''}
 
 输出格式（严格 JSON）：
 {
-  "characters": [{ "name":"角色名", "role_type":"lead/antagonist/supporting/love 之一", "identity":"身份一句话", "persona":"性格底色/灵魂烙印", "goals":"欲望与恐惧", "abilities":"能力/特长" }],
-  "relations": [{ "from":"角色A", "to":"角色B", "rel_type":"盟友/仇敌/师徒/爱慕/亲属/…", "affinity":0到100整数, "description":"关系现状" }]
+  "characters": [{ "name":"角色名", "role_type":"lead/antagonist/supporting/love", "identity":"身份一句话", "persona":"灵魂烙印", "goals":"欲望与恐惧", "abilities":"能力" }],
+  "factions": [{ "name":"组织名", "kind":"宗门/家族/势力/朝廷/帮派 之一", "description":"宗旨/势力范围/特点 一两句" }],
+  "memberships": [{ "character":"角色名", "faction":"组织名", "role":"掌门/弟子/族长/叛徒/… 一词", "affinity":0到100整数 }],
+  "char_relations": [{ "from":"角色A", "to":"角色B", "rel_type":"盟友/仇敌/师徒/爱慕/亲属", "affinity":0到100整数, "description":"现状" }],
+  "faction_relations": [{ "from":"组织A", "to":"组织B", "rel_type":"联盟/敌对/从属", "affinity":0到100整数, "description":"现状" }]
 }
-全书最多 1 个 lead（主角）。关系 from/to 用角色名。`;
-  const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 2500, bypassCap: true });
+全书最多 1 个 lead。没有的项给空数组。`;
+  const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 3000, bypassCap: true });
   const jm = raw.match(/\{[\s\S]*\}/);
   if (!jm) throw new Error('AI 输出解析失败');
   const data = JSON.parse(jm[0]);
-  // 建角色（去重）
+
+  // 角色（去重）
   const nameToId = {};
-  (existing || []).forEach(() => {}); // existing 只有 name，没 id；下面重查带 id
-  const { rows: existFull } = await db.query('SELECT id, name FROM nv_characters WHERE project_id = ?', [p.id]);
-  (existFull || []).forEach(c => { nameToId[c.name] = c.id; });
-  let added = 0; let hasLead = (existFull || []).some(() => false);
+  const { rows: cFull } = await db.query('SELECT id, name FROM nv_characters WHERE project_id = ?', [p.id]);
+  (cFull || []).forEach(c => { nameToId[c.name] = c.id; });
+  let hasLead = false; let addedC = 0;
   for (const c of (data.characters || [])) {
     const nm = c && c.name ? String(c.name).trim() : '';
     if (!nm || nameToId[nm]) continue;
@@ -300,18 +338,36 @@ ${existNames.size ? `【已登记角色，不要重复输出】${[...existNames]
       'INSERT INTO nv_characters (project_id, name, role_type, identity, persona, goals, abilities, color, sort) VALUES (?,?,?,?,?,?,?,?,?)',
       [p.id, nm.slice(0, 100), rt, String(c.identity || '').slice(0, 255), String(c.persona || ''), String(c.goals || ''), String(c.abilities || ''), CHAR_COLORS[idx % CHAR_COLORS.length], idx]
     ).catch(() => ({ rows: [] }));
-    if (ins?.[0]?.id) { nameToId[nm] = ins[0].id; added++; }
+    if (ins?.[0]?.id) { nameToId[nm] = ins[0].id; addedC++; }
   }
-  // 建关系（两端都已知，去重已存在的 from-to）
-  for (const r of (data.relations || [])) {
-    const fromId = r && nameToId[r.from], toId = r && nameToId[r.to];
-    if (!fromId || !toId || fromId === toId) continue;
-    const { rows: ex } = await db.query('SELECT id FROM nv_relations WHERE project_id = ? AND from_id = ? AND to_id = ?', [p.id, fromId, toId]);
-    if (ex?.length) continue;
-    await db.query('INSERT INTO nv_relations (project_id, from_id, to_id, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?)',
-      [p.id, fromId, toId, String(r.rel_type || '关系').slice(0, 40), Math.max(0, Math.min(100, parseInt(r.affinity) || 50)), String(r.description || '').slice(0, 500), 0]).catch(() => {});
+  // 组织（去重）
+  const facToId = {};
+  const { rows: fFull } = await db.query('SELECT id, name FROM nv_factions WHERE project_id = ?', [p.id]);
+  (fFull || []).forEach(f => { facToId[f.name] = f.id; });
+  let addedF = 0;
+  for (const f of (data.factions || [])) {
+    const nm = f && f.name ? String(f.name).trim() : '';
+    if (!nm || facToId[nm]) continue;
+    const idx = Object.keys(facToId).length;
+    const { rows: ins } = await db.query(
+      'INSERT INTO nv_factions (project_id, name, kind, description, color, sort) VALUES (?,?,?,?,?,?)',
+      [p.id, nm.slice(0, 100), String(f.kind || '宗门').slice(0, 20), String(f.description || ''), FACTION_COLORS[idx % FACTION_COLORS.length], idx]
+    ).catch(() => ({ rows: [] }));
+    if (ins?.[0]?.id) { facToId[nm] = ins[0].id; addedF++; }
   }
-  console.log(`[Novel] AI 识别角色：新增 ${added} 个`);
+  // 角色↔角色
+  for (const r of (data.char_relations || [])) {
+    await _insertRelOnce(p.id, nameToId[r.from], 'char', nameToId[r.to], 'char', r.rel_type, r.affinity, r.description);
+  }
+  // 角色→组织（归属）
+  for (const m of (data.memberships || [])) {
+    await _insertRelOnce(p.id, nameToId[m.character], 'char', facToId[m.faction], 'faction', m.role || '隶属', m.affinity, '');
+  }
+  // 组织↔组织
+  for (const r of (data.faction_relations || [])) {
+    await _insertRelOnce(p.id, facToId[r.from], 'faction', facToId[r.to], 'faction', r.rel_type, r.affinity, r.description);
+  }
+  console.log(`[Novel] AI 识别：新增角色 ${addedC}、组织 ${addedF}`);
 }
 
 // worker 调用：统一处理设定卡/大纲/细纲的异步生成
@@ -450,7 +506,7 @@ router.delete('/characters/:cid', requireAuth, async (req, res) => {
     const own = await ownByChar(parseInt(req.params.cid), req.userId);
     if (!own) return res.status(404).json({ code: 404, msg: '角色不存在' });
     const cid = parseInt(req.params.cid);
-    await db.query('DELETE FROM nv_relations WHERE from_id = ? OR to_id = ?', [cid, cid]);
+    await db.query("DELETE FROM nv_relations WHERE (from_id = ? AND from_type='char') OR (to_id = ? AND to_type='char')", [cid, cid]);
     await db.query('DELETE FROM nv_characters WHERE id = ?', [cid]);
     res.json({ code: 200, msg: '已删除' });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
@@ -463,10 +519,12 @@ router.post('/projects/:id/relations', requireAuth, async (req, res) => {
     if (!pid) return res.status(404).json({ code: 404, msg: '项目不存在' });
     const b = req.body || {};
     const fromId = parseInt(b.from_id), toId = parseInt(b.to_id);
-    if (!fromId || !toId || fromId === toId) return res.status(400).json({ code: 400, msg: '请选择两个不同的角色' });
+    const fromType = b.from_type === 'faction' ? 'faction' : 'char';
+    const toType = b.to_type === 'faction' ? 'faction' : 'char';
+    if (!fromId || !toId || (fromId === toId && fromType === toType)) return res.status(400).json({ code: 400, msg: '请选择两个不同的节点' });
     const { rows } = await db.query(
-      'INSERT INTO nv_relations (project_id, from_id, to_id, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?)',
-      [pid, fromId, toId, String(b.rel_type || '关系').slice(0, 40), Math.max(0, Math.min(100, parseInt(b.affinity) || 50)), String(b.description || ''), 0]);
+      'INSERT INTO nv_relations (project_id, from_id, to_id, from_type, to_type, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?,?,?)',
+      [pid, fromId, toId, fromType, toType, String(b.rel_type || '关系').slice(0, 40), Math.max(0, Math.min(100, parseInt(b.affinity) || 50)), String(b.description || ''), 0]);
     res.json({ code: 200, data: { id: rows?.[0]?.id } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
@@ -490,6 +548,48 @@ router.delete('/relations/:rid', requireAuth, async (req, res) => {
     const { rows } = await db.query('SELECT r.id FROM nv_relations r JOIN nv_projects p ON r.project_id = p.id WHERE r.id = ? AND p.user_id = ?', [parseInt(req.params.rid), req.userId]);
     if (!rows?.length) return res.status(404).json({ code: 404, msg: '关系不存在' });
     await db.query('DELETE FROM nv_relations WHERE id = ?', [parseInt(req.params.rid)]);
+    res.json({ code: 200, msg: '已删除' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+/* ── 组织（宗门/家族/势力）CRUD ── */
+const FACTION_COLORS = ['#6E6860', '#8B5CF6', '#0D9488', '#B45309', '#BE123C', '#1D4ED8'];
+
+router.post('/projects/:id/factions', requireAuth, async (req, res) => {
+  try {
+    const pid = await ownProject(parseInt(req.params.id), req.userId);
+    if (!pid) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const b = req.body || {};
+    const { rows: cntRows } = await db.query('SELECT COUNT(*) AS c FROM nv_factions WHERE project_id = ?', [pid]);
+    const idx = cntRows?.[0]?.c || 0;
+    const { rows } = await db.query(
+      'INSERT INTO nv_factions (project_id, name, kind, description, color, sort) VALUES (?,?,?,?,?,?)',
+      [pid, String(b.name || '新组织').slice(0, 100), String(b.kind || '宗门').slice(0, 20), String(b.description || ''), b.color || FACTION_COLORS[idx % FACTION_COLORS.length], idx]);
+    res.json({ code: 200, data: { id: rows?.[0]?.id } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+router.put('/factions/:fid', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT f.id FROM nv_factions f JOIN nv_projects p ON f.project_id = p.id WHERE f.id = ? AND p.user_id = ?', [parseInt(req.params.fid), req.userId]);
+    if (!rows?.length) return res.status(404).json({ code: 404, msg: '组织不存在' });
+    const b = req.body || {};
+    const fields = []; const vals = [];
+    for (const k of ['name', 'kind', 'description', 'color']) {
+      if (b[k] !== undefined) { fields.push(`${k} = ?`); vals.push(String(b[k])); }
+    }
+    if (fields.length) { vals.push(parseInt(req.params.fid)); await db.query(`UPDATE nv_factions SET ${fields.join(', ')} WHERE id = ?`, vals); }
+    res.json({ code: 200, msg: '已保存' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+router.delete('/factions/:fid', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT f.id FROM nv_factions f JOIN nv_projects p ON f.project_id = p.id WHERE f.id = ? AND p.user_id = ?', [parseInt(req.params.fid), req.userId]);
+    if (!rows?.length) return res.status(404).json({ code: 404, msg: '组织不存在' });
+    const fid = parseInt(req.params.fid);
+    await db.query("DELETE FROM nv_relations WHERE (from_id = ? AND from_type='faction') OR (to_id = ? AND to_type='faction')", [fid, fid]);
+    await db.query('DELETE FROM nv_factions WHERE id = ?', [fid]);
     res.json({ code: 200, msg: '已删除' });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
