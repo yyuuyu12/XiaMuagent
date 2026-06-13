@@ -36,17 +36,38 @@ const AI_SLOP_WORDS = ['不禁', '不由得', '心中一凛', '眼中闪过一�
 // 最简记忆包（MVP 规则版）：只注入"不知道就写错"的信息
 // 设定卡全量（MVP 卡少）+ 世界基石状态 + 本卷大纲段 + 上一章结尾
 async function buildMemoryPack(project, chapter) {
+  // 设定卡（世界观/势力/文风，不含角色——角色走独立表）
   const cards = await getCards(project.id);
   const cardBlock = cards.map(c => {
     const kindLabel = { world: '世界观', character: '角色', faction: '势力', style: '文风' }[c.kind] || c.kind;
     return `【${kindLabel}·${c.title}】\n${(c.content || '').slice(0, 1200)}`;
   }).join('\n\n');
 
+  // ── 角色 + 关系：裁剪式注入（只取本章细纲点名的角色 + 主角 + 他们之间的关系）──
+  const { rows: allChars } = await db.query('SELECT * FROM nv_characters WHERE project_id = ? ORDER BY sort, id', [project.id]);
+  const outlineText = chapter.outline || '';
+  // 命中规则：主角始终带上；其余角色名出现在本章细纲里才带
+  const involved = (allChars || []).filter(c => c.role_type === 'lead' || (c.name && outlineText.includes(c.name)));
+  const involvedIds = new Set(involved.map(c => c.id));
+  const charById = {}; (allChars || []).forEach(c => { charById[c.id] = c; });
+  let charBlock = '';
+  if (involved.length) {
+    charBlock = '【本章相关角色（行为必须符合各自的灵魂烙印）】\n' + involved.map(c => {
+      const cur = c.status ? `；当前：${c.status}` : '';
+      return `· ${c.name}（${c.identity || c.role_type}）烙印：${(c.persona || '').slice(0, 120)}｜欲望/恐惧：${(c.goals || '').slice(0, 80)}${cur}`;
+    }).join('\n');
+  }
+  // 关系边：两端都在本章相关角色里才注入
+  const { rows: rels } = await db.query('SELECT * FROM nv_relations WHERE project_id = ?', [project.id]);
+  const relLines = (rels || []).filter(r => involvedIds.has(r.from_id) && involvedIds.has(r.to_id)).map(r => {
+    const a = charById[r.from_id], b = charById[r.to_id];
+    if (!a || !b) return null;
+    return `· ${a.name} → ${b.name}：${r.rel_type}（亲密度${r.affinity}/100）${r.description ? '，' + r.description.slice(0, 100) : ''}`;
+  }).filter(Boolean);
+  const relBlock = relLines.length ? '【本章相关角色关系（写对话/冲突时必须符合）】\n' + relLines.join('\n') : '';
+
   const state = project.state || {};
   const stateBlock = state.summary ? `【前情提要】\n${state.summary}` : '';
-  const charStates = state.characters && Object.keys(state.characters).length
-    ? '【角色当前状态】\n' + Object.entries(state.characters).map(([n, v]) => `${n}：${v.status || v}`).join('\n')
-    : '';
 
   // 上一章结尾（衔接）
   let prevTail = '';
@@ -58,7 +79,7 @@ async function buildMemoryPack(project, chapter) {
     prevTail = `【上一章（第${prevRows[0].seq}章 ${prevRows[0].title}）结尾，必须自然衔接】\n……${prevRows[0].content.slice(-800)}`;
   }
 
-  return [cardBlock, stateBlock, charStates, prevTail].filter(Boolean).join('\n\n');
+  return [cardBlock, charBlock, relBlock, stateBlock, prevTail].filter(Boolean).join('\n\n');
 }
 
 // 小说写作戒律（自写，消化商业网文方法论；后续可由题材公式包覆盖补充）
@@ -107,7 +128,9 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
     const cards = await getCards(p.id);
     const { rows: chapters } = await db.query(
       'SELECT id, volume, seq, title, outline, status, word_count FROM nv_chapters WHERE project_id = ? ORDER BY volume, seq', [p.id]);
-    res.json({ code: 200, data: { project: p, cards, chapters: chapters || [] } });
+    const { rows: characters } = await db.query('SELECT * FROM nv_characters WHERE project_id = ? ORDER BY sort, id', [p.id]);
+    const { rows: relations } = await db.query('SELECT * FROM nv_relations WHERE project_id = ?', [p.id]);
+    res.json({ code: 200, data: { project: p, cards, chapters: chapters || [], characters: characters || [], relations: relations || [] } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
@@ -145,28 +168,41 @@ router.delete('/projects/:id', requireAuth, async (req, res) => {
 // ── 异步生成内部逻辑：设定卡/大纲/细纲都统一走 tasks 队列，避免同步 AI 几十秒被网关超时返 504 HTML ──
 
 async function _genBootstrap(p) {
-  const prompt = `你是资深网文主编。根据下面的小说设定，生成三张设定卡初稿。只输出 JSON。
+  const prompt = `你是资深网文主编。根据下面的小说设定，生成 1 个世界观 + 2 个角色（主角、主要对手）。只输出 JSON。
 【书名】${p.title}
 【题材】${p.genre || '未指定'}
 【一句话设定】${p.brief || '（未填写，请按书名和题材合理虚构）'}
 
 输出格式（严格 JSON，不要其他文字）：
 {
-  "world": { "title": "世界观名", "content": "力量/规则体系、社会结构、地理舞台、本书核心矛盾的世界根源。300-500字，分行写要点" },
-  "protagonist": { "title": "主角名", "content": "身份与处境、性格底色（含缺陷）、核心欲望与恐惧、说话方式特征、开篇时的能力边界。250-400字" },
-  "antagonist": { "title": "反派/对手名", "content": "与主角的核心冲突、行事逻辑（要让人理解他为什么这么做）、优势与软肋。200-300字" }
+  "world": { "title": "世界观名", "content": "力量/规则体系、社会结构、地理舞台、本书核心矛盾的世界根源。300-500字" },
+  "protagonist": { "name":"主角名", "identity":"身份与处境(一句话)", "persona":"灵魂烙印：性格底色+核心缺陷，决定他一切行为的根源", "goals":"核心欲望与最深恐惧", "abilities":"开篇时的能力边界/金手指" },
+  "antagonist": { "name":"对手名", "identity":"身份(一句话)", "persona":"灵魂烙印+行事逻辑(要让人理解他为何这么做)", "goals":"他要什么", "abilities":"优势与软肋", "rel_to_lead":"与主角的核心冲突是什么" }
 }`;
   const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 2000, bypassCap: true });
   const jm = raw.match(/\{[\s\S]*\}/);
   if (!jm) throw new Error('AI 输出解析失败');
   const data = JSON.parse(jm[0]);
-  const inserts = [['world', data.world], ['character', data.protagonist], ['character', data.antagonist]];
-  for (let i = 0; i < inserts.length; i++) {
-    const [kind, card] = inserts[i];
-    if (card && card.content) {
-      await db.query('INSERT INTO nv_kb_cards (project_id, kind, title, content, sort) VALUES (?,?,?,?,?)',
-        [p.id, kind, (card.title || '未命名').slice(0, 200), card.content, i]);
-    }
+  // 世界观 → 设定卡
+  if (data.world && data.world.content) {
+    await db.query('INSERT INTO nv_kb_cards (project_id, kind, title, content, sort) VALUES (?,?,?,?,?)',
+      [p.id, 'world', (data.world.title || '世界观').slice(0, 200), data.world.content, 0]);
+  }
+  // 主角/反派 → 角色表
+  const ids = {};
+  const chars = [['lead', data.protagonist, '#F5762A', 0], ['antagonist', data.antagonist, '#E5534B', 1]];
+  for (const [roleType, c, color, sort] of chars) {
+    if (!c || !c.name) continue;
+    const { rows } = await db.query(
+      'INSERT INTO nv_characters (project_id, name, role_type, identity, persona, goals, abilities, rel_to_lead, first_chapter, color, sort) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [p.id, String(c.name).slice(0, 100), roleType, String(c.identity || '').slice(0, 255),
+       String(c.persona || ''), String(c.goals || ''), String(c.abilities || ''), String(c.rel_to_lead || ''), 1, color, sort]);
+    ids[roleType] = rows?.[0]?.id;
+  }
+  // 主角 → 反派 建一条初始对立关系，让图谱不空
+  if (ids.lead && ids.antagonist) {
+    await db.query('INSERT INTO nv_relations (project_id, from_id, to_id, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?)',
+      [p.id, ids.lead, ids.antagonist, '宿敌', 15, String(data.antagonist?.rel_to_lead || '核心冲突').slice(0, 500), 0]);
   }
 }
 
@@ -290,6 +326,103 @@ router.delete('/kb/:cardId', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
+/* ═══════════ 角色 & 关系（图谱） ═══════════ */
+
+const CHAR_COLORS = ['#F5762A', '#E5534B', '#5B5FD9', '#16A34A', '#9333EA', '#0891B2', '#CA8A04', '#DB2777'];
+
+async function ownProject(projectId, userId) {
+  const { rows } = await db.query('SELECT id FROM nv_projects WHERE id = ? AND user_id = ?', [projectId, userId]);
+  return rows?.length ? parseInt(projectId) : null;
+}
+// 校验角色/关系归属当前用户
+async function ownByChar(charId, userId) {
+  const { rows } = await db.query('SELECT c.id, c.project_id FROM nv_characters c JOIN nv_projects p ON c.project_id = p.id WHERE c.id = ? AND p.user_id = ?', [charId, userId]);
+  return rows?.[0] || null;
+}
+
+// 新增角色
+router.post('/projects/:id/characters', requireAuth, async (req, res) => {
+  try {
+    const pid = await ownProject(parseInt(req.params.id), req.userId);
+    if (!pid) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const b = req.body || {};
+    const { rows: cntRows } = await db.query('SELECT COUNT(*) AS c FROM nv_characters WHERE project_id = ?', [pid]);
+    const idx = cntRows?.[0]?.c || 0;
+    const { rows } = await db.query(
+      'INSERT INTO nv_characters (project_id, name, role_type, identity, persona, goals, abilities, rel_to_lead, first_chapter, color, sort) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [pid, String(b.name || '新角色').slice(0, 100), String(b.role_type || 'supporting').slice(0, 20),
+       String(b.identity || '').slice(0, 255), String(b.persona || ''), String(b.goals || ''), String(b.abilities || ''),
+       String(b.rel_to_lead || ''), parseInt(b.first_chapter) || 0, b.color || CHAR_COLORS[idx % CHAR_COLORS.length], idx]);
+    res.json({ code: 200, data: { id: rows?.[0]?.id } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// 更新角色
+router.put('/characters/:cid', requireAuth, async (req, res) => {
+  try {
+    const own = await ownByChar(parseInt(req.params.cid), req.userId);
+    if (!own) return res.status(404).json({ code: 404, msg: '角色不存在' });
+    const b = req.body || {};
+    const fields = []; const vals = [];
+    for (const k of ['name', 'role_type', 'identity', 'persona', 'goals', 'abilities', 'rel_to_lead', 'color', 'status']) {
+      if (b[k] !== undefined) { fields.push(`${k} = ?`); vals.push(String(b[k])); }
+    }
+    if (b.first_chapter !== undefined) { fields.push('first_chapter = ?'); vals.push(parseInt(b.first_chapter) || 0); }
+    if (fields.length) { vals.push(parseInt(req.params.cid)); await db.query(`UPDATE nv_characters SET ${fields.join(', ')} WHERE id = ?`, vals); }
+    res.json({ code: 200, msg: '已保存' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// 删除角色（连带删除其关系边）
+router.delete('/characters/:cid', requireAuth, async (req, res) => {
+  try {
+    const own = await ownByChar(parseInt(req.params.cid), req.userId);
+    if (!own) return res.status(404).json({ code: 404, msg: '角色不存在' });
+    const cid = parseInt(req.params.cid);
+    await db.query('DELETE FROM nv_relations WHERE from_id = ? OR to_id = ?', [cid, cid]);
+    await db.query('DELETE FROM nv_characters WHERE id = ?', [cid]);
+    res.json({ code: 200, msg: '已删除' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// 新增/更新关系
+router.post('/projects/:id/relations', requireAuth, async (req, res) => {
+  try {
+    const pid = await ownProject(parseInt(req.params.id), req.userId);
+    if (!pid) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    const b = req.body || {};
+    const fromId = parseInt(b.from_id), toId = parseInt(b.to_id);
+    if (!fromId || !toId || fromId === toId) return res.status(400).json({ code: 400, msg: '请选择两个不同的角色' });
+    const { rows } = await db.query(
+      'INSERT INTO nv_relations (project_id, from_id, to_id, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?)',
+      [pid, fromId, toId, String(b.rel_type || '关系').slice(0, 40), Math.max(0, Math.min(100, parseInt(b.affinity) || 50)), String(b.description || ''), 0]);
+    res.json({ code: 200, data: { id: rows?.[0]?.id } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+router.put('/relations/:rid', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT r.id FROM nv_relations r JOIN nv_projects p ON r.project_id = p.id WHERE r.id = ? AND p.user_id = ?', [parseInt(req.params.rid), req.userId]);
+    if (!rows?.length) return res.status(404).json({ code: 404, msg: '关系不存在' });
+    const b = req.body || {};
+    const fields = []; const vals = [];
+    if (b.rel_type !== undefined) { fields.push('rel_type = ?'); vals.push(String(b.rel_type).slice(0, 40)); }
+    if (b.affinity !== undefined) { fields.push('affinity = ?'); vals.push(Math.max(0, Math.min(100, parseInt(b.affinity) || 50))); }
+    if (b.description !== undefined) { fields.push('description = ?'); vals.push(String(b.description)); }
+    if (fields.length) { vals.push(parseInt(req.params.rid)); await db.query(`UPDATE nv_relations SET ${fields.join(', ')} WHERE id = ?`, vals); }
+    res.json({ code: 200, msg: '已保存' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+router.delete('/relations/:rid', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT r.id FROM nv_relations r JOIN nv_projects p ON r.project_id = p.id WHERE r.id = ? AND p.user_id = ?', [parseInt(req.params.rid), req.userId]);
+    if (!rows?.length) return res.status(404).json({ code: 404, msg: '关系不存在' });
+    await db.query('DELETE FROM nv_relations WHERE id = ?', [parseInt(req.params.rid)]);
+    res.json({ code: 200, msg: '已删除' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
 /* ═══════════ 大纲 / 细纲 ═══════════ */
 
 // 全书大纲（卷级）— 异步任务
@@ -379,30 +512,52 @@ async function commitChapter(chapterId, userId) {
   if (!ch || !(ch.content || '').trim()) return;
   let state = {};
   try { state = typeof ch.state === 'string' ? JSON.parse(ch.state) : (ch.state || {}); } catch {}
-  const prompt = `你是小说设定管理员。阅读本章正文，更新两样东西。只输出 JSON。
+  // 本项目角色名册（供 AI 归因，并按名字回写状态/关系）
+  const { rows: chars } = await db.query('SELECT id, name FROM nv_characters WHERE project_id = ?', [ch.pid]);
+  const nameToId = {}; (chars || []).forEach(c => { nameToId[c.name] = c.id; });
+  const roster = (chars || []).map(c => c.name).join('、') || '（暂无登记角色）';
+  const prompt = `你是小说设定管理员。阅读本章正文，提取设定更新。只输出 JSON。
 【本章】第${ch.seq}章 ${ch.title}
 【正文】${ch.content.slice(0, 5000)}
 【现有前情提要】${state.summary || '（无）'}
-【现有角色状态】${JSON.stringify(state.characters || {})}
+【已登记角色】${roster}
 
 输出格式（严格 JSON）：
 {
   "summary": "更新后的全书前情提要，250字内，覆盖到本章为止的主线进展",
-  "characters": { "角色名": "一句话当前状态（能力/处境/关系的最新情况）" }
+  "character_updates": [{ "name": "角色名(尽量用已登记的)", "status": "一句话当前状态：能力/处境的最新情况" }],
+  "relation_updates": [{ "from": "角色A", "to": "角色B", "rel_type": "盟友/仇敌/师徒/爱慕/…", "affinity": 0到100的整数, "note": "本章这段关系发生了什么变化" }]
 }
-characters 只写本章有变化的角色。`;
+只写本章真正有变化的角色和关系；没有就给空数组。`;
   try {
-    const raw = await callAI(prompt, { temperature: 0.2, maxTokens: 800 });
+    const raw = await callAI(prompt, { temperature: 0.2, maxTokens: 1000 });
     const jm = raw.match(/\{[\s\S]*\}/);
     if (!jm) return;
     const patch = JSON.parse(jm[0]);
-    if (patch.summary) state.summary = String(patch.summary).slice(0, 800);
-    state.characters = state.characters || {};
-    for (const [name, status] of Object.entries(patch.characters || {})) {
-      state.characters[name] = { status: String(status).slice(0, 200), updatedCh: ch.seq };
+    // 1) 前情提要 → state
+    if (patch.summary) { state.summary = String(patch.summary).slice(0, 800); await db.query('UPDATE nv_projects SET state = ? WHERE id = ?', [JSON.stringify(state), ch.pid]); }
+    // 2) 角色状态 → nv_characters.status（按名字匹配已登记角色）
+    for (const u of (patch.character_updates || [])) {
+      if (u && u.name && nameToId[u.name]) {
+        await db.query('UPDATE nv_characters SET status = ? WHERE id = ?', [String(u.status || '').slice(0, 300), nameToId[u.name]]).catch(() => {});
+      }
     }
-    await db.query('UPDATE nv_projects SET state = ? WHERE id = ?', [JSON.stringify(state), ch.pid]);
-    console.log(`[Novel] 第${ch.seq}章已提交，state 已更新`);
+    // 3) 关系变化 → nv_relations（两端都是已登记角色才回写；有则更新，无则新建）
+    for (const r of (patch.relation_updates || [])) {
+      const fromId = r && nameToId[r.from], toId = r && nameToId[r.to];
+      if (!fromId || !toId || fromId === toId) continue;
+      const aff = Math.max(0, Math.min(100, parseInt(r.affinity) || 50));
+      const desc = String(r.note || '').slice(0, 500);
+      const { rows: ex } = await db.query('SELECT id FROM nv_relations WHERE project_id = ? AND from_id = ? AND to_id = ?', [ch.pid, fromId, toId]);
+      if (ex?.length) {
+        await db.query('UPDATE nv_relations SET rel_type = ?, affinity = ?, description = ?, updated_chapter = ? WHERE id = ?',
+          [String(r.rel_type || '关系').slice(0, 40), aff, desc, ch.seq, ex[0].id]).catch(() => {});
+      } else {
+        await db.query('INSERT INTO nv_relations (project_id, from_id, to_id, rel_type, affinity, description, updated_chapter) VALUES (?,?,?,?,?,?,?)',
+          [ch.pid, fromId, toId, String(r.rel_type || '关系').slice(0, 40), aff, desc, ch.seq]).catch(() => {});
+      }
+    }
+    console.log(`[Novel] 第${ch.seq}章已提交，角色/关系已回写`);
   } catch (e) { console.warn('[commitChapter]', e.message); }
 }
 

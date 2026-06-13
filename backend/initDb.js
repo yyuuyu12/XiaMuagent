@@ -656,6 +656,43 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // nv_characters：角色（图节点）。灵魂烙印驱动行为，登场章用于裁剪注入
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_characters (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      project_id    INT NOT NULL,
+      name          VARCHAR(100) NOT NULL DEFAULT '',
+      role_type     VARCHAR(20) DEFAULT 'supporting',
+      identity      VARCHAR(255) DEFAULT '',
+      persona       TEXT,
+      goals         TEXT,
+      abilities     TEXT,
+      rel_to_lead   TEXT,
+      first_chapter INT DEFAULT 0,
+      color         VARCHAR(16) DEFAULT '#F5762A',
+      status        TEXT,
+      sort          INT DEFAULT 0,
+      updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project (project_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // nv_relations：角色关系（有向边）。affinity 借天命关系向量量化(0-100)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS nv_relations (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      project_id   INT NOT NULL,
+      from_id      INT NOT NULL,
+      to_id        INT NOT NULL,
+      rel_type     VARCHAR(40) DEFAULT '',
+      affinity     INT DEFAULT 50,
+      description  TEXT,
+      updated_chapter INT DEFAULT 0,
+      updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project (project_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // cw_original_projects 表：补 meta 列（存时长/风格/平台等）
   try { await db.query('ALTER TABLE cw_original_projects ADD COLUMN meta JSON DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_original_projects.meta:', e.message||e); }
   // cw_original_projects 表：补 stage 列（分阶段创作：direction→outline→detail→script）
