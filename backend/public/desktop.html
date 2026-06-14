@@ -5006,7 +5006,7 @@ function dOLearningResult(){
     const rulesBlock = rules.length?`
       <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div><span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span></div>
-        <div style="font-size:11px;color:#B0AA9F;line-height:1.5;margin-bottom:12px">勾选要沉淀的规律，融进 Skill 后所有项目写作时自动遵循</div>
+        <div style="font-size:11px;color:#B0AA9F;line-height:1.5;margin-bottom:12px">${result.refined?`已把 ${result.rawCount} 条零散规律合并精炼为 ${rules.length} 条。`:''}勾选要沉淀的规律，融进 Skill 后所有项目写作时自动遵循。建议每个维度挑最戳的 2-3 条，少而精。</div>
         <div style="display:flex;flex-direction:column;gap:8px">${ruleCards}</div>
       </div>
       <button class="do-btn do-btn-pri" style="width:100%;padding:13px" ${(checkedCount===0||dS.oLearnWriting)?'disabled':''} onclick="dOLearnWrite()">
