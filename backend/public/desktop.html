@@ -4705,7 +4705,7 @@ function dOMatModalHtml(){
       <div style="font-size:11px;color:#B0AA9F;margin-top:8px;line-height:1.5">逐条提取原文（每条需转录，较慢），建议一次勾 3-5 条。无内置字幕的视频会自动跳过。</div>` : '';
     body = `
       <textarea class="do-input" rows="2" style="resize:none;line-height:1.6" placeholder="粘贴抖音账号主页链接（打开对方主页 → 右上角分享 → 复制链接）…" oninput="dS.oMatAccUrl=this.value">${esc(dS.oMatAccUrl||'')}</textarea>
-      <button class="do-btn ${vids?'do-btn-gho':'do-btn-pri'}" style="width:100%;margin-top:12px;padding:11px" ${(!((dS.oMatAccUrl||'').trim())||dS.oMatAccLoading||dS.oMatAccImporting)?'disabled':''} onclick="dOMatAccFetch()">${dS.oMatAccLoading?'拉取中…':(vids?'重新拉取':'拉取该账号的视频')}</button>
+      <button class="do-btn ${vids?'do-btn-gho':'do-btn-pri'}" style="width:100%;margin-top:12px;padding:11px" ${(dS.oMatAccLoading||dS.oMatAccImporting)?'disabled':''} onclick="dOMatAccFetch()">${dS.oMatAccLoading?'拉取中…':(vids?'重新拉取':'拉取该账号的视频')}</button>
       ${listHtml}`;
   } else {
     const extracted = ur ? `
@@ -4716,7 +4716,7 @@ function dOMatModalHtml(){
       </div>` : '';
     body = `
       <textarea class="do-input" rows="3" style="resize:none;line-height:1.6" placeholder="粘贴抖音视频链接…" oninput="dS.oMatUrl=this.value">${esc(dS.oMatUrl)}</textarea>
-      <button class="do-btn do-btn-pri" style="width:100%;margin-top:12px;padding:11px" ${(!((dS.oMatUrl||'').trim())||dS.oMatUrlLoading)?'disabled':''} onclick="dOMatExtractUrl()">${dS.oMatUrlLoading?'提取中…':'提取原文'}</button>
+      <button class="do-btn do-btn-pri" style="width:100%;margin-top:12px;padding:11px" ${dS.oMatUrlLoading?'disabled':''} onclick="dOMatExtractUrl()">${dS.oMatUrlLoading?'提取中…':'提取原文'}</button>
       ${extracted}`;
   }
   return `<div class="d-modal-overlay" style="display:flex" onclick="if(event.target===this)dOMatCloseModal()">
@@ -4748,7 +4748,7 @@ async function dOMatSaveText(){
 }
 async function dOMatExtractUrl(){
   const url = (dS.oMatUrl||'').trim();
-  if(!url) return;
+  if(!url){ dToast('请先粘贴视频链接'); return; }
   dS.oMatUrlLoading=true; dS.oMatUrlResult=null; dRender();
   const r = await dHttp.post('/original/learning/extract', { url, type:'video' });
   dS.oMatUrlLoading=false;
@@ -4771,7 +4771,7 @@ async function dOMatSaveUrl(){
 }
 /* 账号主页：拉视频列表 → 勾选 → 逐条提取原文入素材库（复用 /learning/extract） */
 async function dOMatAccFetch(){
-  const url = (dS.oMatAccUrl||'').trim(); if(!url) return;
+  const url = (dS.oMatAccUrl||'').trim(); if(!url){ dToast('请先粘贴账号主页链接'); return; }
   dS.oMatAccLoading=true; dS.oMatAccVideos=null; dRender();
   const r = await dHttp.post('/original/learning/extract', { url, type:'account' });
   dS.oMatAccLoading=false;
