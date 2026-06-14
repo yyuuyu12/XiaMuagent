@@ -137,7 +137,7 @@ router.post('/projects', requireAuth, async (req, res) => {
     const { rows } = await db.query(
       'INSERT INTO nv_projects (user_id, title, genre, brief, target_words, chapter_words, state) VALUES (?,?,?,?,?,?,?)',
       [req.userId, String(title).trim().slice(0, 200), String(genre || '').slice(0, 50), String(brief || '').slice(0, 2000),
-       parseInt(targetWords) || 200000, parseInt(chapterWords) || 3000, JSON.stringify({})]
+       parseInt(targetWords) || 200000, parseInt(chapterWords) || 2500, JSON.stringify({})]
     );
     res.json({ code: 200, msg: '已创建', data: { id: rows?.[0]?.id } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
@@ -165,7 +165,7 @@ router.patch('/projects/:id', requireAuth, async (req, res) => {
     for (const [k, col] of [['title','title'],['genre','genre'],['brief','brief'],['persona','persona'],['status','status'],['outline','outline']]) {
       if (req.body[k] !== undefined) { fields.push(`${col} = ?`); vals.push(String(req.body[k])); }
     }
-    if (req.body.chapterWords !== undefined) { fields.push('chapter_words = ?'); vals.push(parseInt(req.body.chapterWords) || 3000); }
+    if (req.body.chapterWords !== undefined) { fields.push('chapter_words = ?'); vals.push(parseInt(req.body.chapterWords) || 2500); }
     if (fields.length) {
       vals.push(p.id);
       await db.query(`UPDATE nv_projects SET ${fields.join(', ')} WHERE id = ?`, vals);
@@ -256,15 +256,17 @@ async function _genToc(p, params) {
   const { rows: recentRows } = await db.query(
     'SELECT seq, title, outline FROM nv_chapters WHERE project_id = ? ORDER BY seq DESC LIMIT 5', [p.id]);
   const recentBlock = (recentRows || []).reverse().map(r => `第${r.seq}章 ${r.title}：${r.outline}`).join('\n');
+  const cw = p.chapter_words || 2500;
   const prompt = `你是资深网文主编。基于全书大纲，为第 ${volume} 卷规划第 ${startSeq} 到 ${startSeq + count - 1} 章的细纲。只输出 JSON 数组。
 【全书大纲】
 ${(p.outline || '').slice(0, 3000)}
 ${recentBlock ? `【已有章节（必须延续，不要重复剧情）】\n${recentBlock}` : '【这是全书开头，第一章必须快速进入核心冲突】'}
 
-每章要求：
-- outline 包含：本章发生什么（2-4句，具体到场景和动作）+ 章末钩子是什么
-- 节奏：每 3-4 章一个小高潮，本批最后一章留较大悬念
-- hook 字段单独写出章末钩子（一句话）
+每章要求（关键——细颗粒度切分）：
+- **每章只承载一个小情节/一个场景/一次冲突**，是 ${cw} 字左右能写完的量。宁可把一段剧情拆成两三章，也不要一章塞多个情节。
+- 不要删剧情、不要跳过情节——只是把同样的故事切得更细、章节更多。相邻章节自然衔接、推进连贯。
+- outline：本章发生什么（2-3句，具体到场景和动作）；hook：章末钩子（一句话）。
+- 节奏：每 3-4 章一个小高潮，本批最后一章留较大悬念。
 
 输出格式（严格 JSON 数组，不要其他文字）：
 [{ "seq": ${startSeq}, "title": "章名", "outline": "细纲…", "hook": "章末钩子" }]`;
@@ -793,7 +795,8 @@ async function processNovelChapter(taskId) {
     await upd('running', 25);
 
     // ② 起草
-    const targetWords = ch.chapter_words || 3000;
+    const targetWords = ch.chapter_words || 2500;
+    const upper = Math.round(targetWords * 1.2);
     const writePrompt = `你是签约多年的网文大神，正在写《${ch.book_title}》（${ch.genre || '网文'}）。
 ${ch.persona ? `【叙事视角/作家人设】${ch.persona}` : ''}
 ${memoryPack}
@@ -801,21 +804,27 @@ ${memoryPack}
 【全书大纲（节选）】
 ${(ch.book_outline || '').slice(0, 1500)}
 
-【本章绝对蓝图（必须严格执行，不许偏移、不许提前写后面的剧情）】
+【本章绝对蓝图（只写这一章的内容，写完即止；严禁把后面章节的剧情提前写进来）】
 第${ch.seq}章 ${ch.title}
 ${ch.outline}
 
 ${NOVEL_EDICTS}
 
-【任务】写出本章完整正文，目标 ${targetWords} 字（允许 ±20%）。直接输出正文，不要任何解释、标题或元信息。`;
-    let content = (await callAI(writePrompt, { temperature: 0.75, maxTokens: Math.min(targetWords * 3, 8000), bypassCap: true, model: (await getConfigVal('ai_model_novel')) || undefined })).trim();
+【字数与节奏（重要）】
+- 目标 ${targetWords} 字，最多不超过 ${upper} 字。宁可短、不要注水拖长。
+- 只完成本章蓝图这一个情节/场景，不要为了凑字数硬塞额外剧情或重复描写。
+- 写到本章该停的钩子处就收尾——后面的事留给下一章。
+
+【任务】写出本章完整正文，约 ${targetWords} 字。直接输出正文，不要任何解释、标题或元信息。`;
+    let content = (await callAI(writePrompt, { temperature: 0.75, maxTokens: Math.min(upper * 3, 7000), bypassCap: true, model: (await getConfigVal('ai_model_novel')) || undefined })).trim();
     await upd('running', 60);
 
-    // ③ critic 审查（blocking：字数偏离>35% / 蓝图偏移 / AI腔严重）→ 不过自动重写一轮
+    // ③ critic 审查（字数过短/过长/AI腔）→ 不过自动重写一轮
     const wc = content.replace(/\s/g, '').length;
     const slopHits = AI_SLOP_WORDS.filter(w => content.includes(w));
     let needRewrite = false; const issues = [];
-    if (wc < targetWords * 0.65) { needRewrite = true; issues.push(`字数严重不足：${wc}/${targetWords}，需要扩写到目标字数`); }
+    if (wc < targetWords * 0.65) { needRewrite = true; issues.push(`字数不足：${wc}/${targetWords}，扩写到目标字数（充实细节，不要换剧情）`); }
+    else if (wc > targetWords * 1.35) { needRewrite = true; issues.push(`字数超标：${wc}，压缩到 ${targetWords} 字左右——删冗余描写和重复，保留剧情主线，只写本章这一段，不要含后续情节`); }
     if (slopHits.length >= 4) { needRewrite = true; issues.push(`AI腔过重，删除这些表达并换成具体动作描写：${slopHits.join('、')}`); }
     if (needRewrite) {
       await upd('running', 70);

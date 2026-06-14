@@ -942,7 +942,7 @@ function dNvNewModalHtml() {
         <div style="flex:1"><div class="flbl" style="margin-bottom:5px">目标字数</div>
           <select id="nvNewTarget" class="sel"><option value="100000">10 万（短篇）</option><option value="300000" selected>30 万</option><option value="1000000">100 万（长篇）</option></select></div>
         <div style="flex:1"><div class="flbl" style="margin-bottom:5px">每章字数</div>
-          <select id="nvNewChWords" class="sel"><option value="2000">2000</option><option value="3000" selected>3000</option><option value="4000">4000</option></select></div>
+          <select id="nvNewChWords" class="sel"><option value="2000">2000</option><option value="2500" selected>2500</option><option value="3000">3000</option></select></div>
       </div>
       <button class="do-btn do-btn-pri" style="width:100%;padding:11px" ${dS.nvNewBusy?'disabled':''} onclick="dNvCreate()">${dS.nvNewBusy?'正在生成设定卡（约30秒）…':'创建并生成设定卡'}</button>
     </div>
