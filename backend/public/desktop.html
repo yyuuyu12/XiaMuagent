@@ -4054,8 +4054,14 @@ function dOWorkspace(){
     </div>`;
 
   /* === 中栏：创作助手（1fr 弹性）=== */
+  const ctaText = stage==='direction' ? '让 AI 帮我想 3 个方向' : (stage==='script' ? '让 AI 写一版剧本' : '让 AI 先写一版');
+  const ctaSend = stage==='direction' ? '帮我想3个方向' : '帮我写一版初稿';
   const intro = dS.oMessages.length===0
-    ? `<div class="do-msg ai"><div class="do-bubble ai">${stage==='direction'?'我们先定 <b>选题方向</b>。说说你想做什么主题、给谁看；没想好也行，让我给你几个方向候选。':'说说你想怎么写，我来帮你打磨这一段文案。'}</div></div>`
+    ? `<div class="do-msg ai"><div class="do-bubble ai">${stage==='direction'?'我们先定 <b>选题方向</b>。说说你想做什么主题、给谁看；没想好也行，点下面按钮让我给你几个方向候选。':'说说你想怎么写，我来帮你打磨这一段文案。'}</div></div>
+       <div style="text-align:center;margin-top:18px">
+         <button class="do-btn do-btn-pri" style="padding:12px 24px;font-size:14px;box-shadow:0 4px 14px rgba(245,118,42,.35)" ${dS.oBusy?'disabled':''} onclick="dOQuick('${ctaSend}')">✨ ${ctaText}</button>
+         <div style="font-size:11px;color:#B0AA9F;margin-top:8px">或在下方输入框直接说你的想法</div>
+       </div>`
     : '';
   const msgs = dS.oMessages.map(dOMsgHtml).join('');
   const busy = dS.oBusy ? `<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">正在创作中…</div></div>` : '';
@@ -4089,7 +4095,7 @@ function dOWorkspace(){
 ③ 想主动喂爆款素材，去 学习中心 选素材分析规律写入 Skill。"><span class="dot"></span>自动学习中</span></div>
       <div class="do-col-body" id="doChatBody">${intro}${msgs}${busy}</div>
       <div class="do-chat-foot">
-        <div class="do-quick" style="align-items:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M13 2L4 14H11L10 22L20 9H13L13 2Z" stroke="#C8C3BC" stroke-width="1.8" stroke-linejoin="round"/></svg>${quick.map(q=>`<span class="do-quick-chip ghost" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
+        <div class="do-quick" style="align-items:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M13 2L4 14H11L10 22L20 9H13L13 2Z" stroke="#F5762A" stroke-width="1.8" stroke-linejoin="round"/></svg>${quick.map((q,i)=>`<span class="do-quick-chip" onclick="dOQuick('${q}')">${q}</span>`).join('')}</div>
         ${picker}
         <div style="display:flex;gap:8px;align-items:flex-end">
           <textarea class="do-chat-input" id="doInput" rows="2" style="flex:1;min-width:0" placeholder="${placeholderText}" oninput="dS.oInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dOSendMsg();}">${esc(dS.oInput)}</textarea>
