@@ -5041,14 +5041,24 @@ async function dOLearnWrite(){
   const scope = dS.oLearnScope||'global';
   dS.oLearnWriting=true; dRender();
   const projectId = scope==='project' && dS.oProject ? dS.oProject.id : null;
+  const n = selected.length;
   const r = await dHttp.post('/original/learning/write', { insights:selected.map(s=>({text:s.text,dim:s.dim,freq:s.freq})), scope, projectId });
-  dS.oLearnWriting=false;
-  if(r.code===200){
-    if(r.data && r.data.skill) dS.oSkill = r.data.skill;
-    dToast(scope==='global'?`已融合 ${selected.length} 条进 Skill ✓`:`已记录 ${selected.length} 条`);
+  if(r.code!==200){ dS.oLearnWriting=false; dToast(r.msg||'写入失败'); dRender(); return; }
+  const finish = () => {
+    dS.oLearnWriting=false; dS.oSkill=null; // 让 Skill 下次重新加载最新
+    dToast(scope==='global'?`已融合 ${n} 项进 Skill ✓`:`已记录 ${n} 项`);
     dS.oLearnResult=null; dS.oLearnPhase='input'; dS.oMatSel=[]; dS.oLoaded=false; dS.oView='home';
     dRender();
-  } else { dToast(r.msg||'写入失败'); dRender(); }
+  };
+  if(r.data && r.data.taskId){
+    // global 异步融合：轮询（AI 重组工作流较慢）
+    const timer = setInterval(async ()=>{
+      const t = await dHttp.get('/tasks/'+r.data.taskId);
+      if(t.code!==200 || !t.data) return;
+      if(t.data.status==='done'){ clearInterval(timer); finish(); }
+      else if(t.data.status==='failed'){ clearInterval(timer); dS.oLearnWriting=false; dToast('写入失败：'+(t.data.error_msg||'请重试')); dRender(); }
+    }, 3000);
+  } else { finish(); } // project 同步已完成
 }
 
 /* ============================================================

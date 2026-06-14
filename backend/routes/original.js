@@ -2044,14 +2044,27 @@ router.post('/learning/write', requireAuth, async (req, res) => {
     }
   }
 
+  // 写入全局 Skill：AI 融合较慢，走异步任务避免网关超时返 504 HTML
   try {
-    const skill = await getOrCreateSkill(req.userId);
-    const currentRules = skill.rules || {};
-    const curText = formatRulesForPrompt(skill);
-    const insightText = insights.map(i => `- ${i.text}`).join('\n');
+    const taskId = crypto.randomUUID();
+    await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+      [taskId, req.userId, 'original_write', 'AI 融合规律进 Skill', 'pending', 0, JSON.stringify({ userId: req.userId, insights })]);
+    taskRunner.enqueue({ taskId, type: 'original_write' });
+    res.json({ code: 200, data: { taskId } });
+  } catch (err) {
+    console.error('/original/learning/write error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
 
-    // 让 AI 把新规律融合进既有工作流：补缺口、改写、归位，而不是堆在末尾
-    const prompt = `你是创作 Skill 工作流的架构师。下面是用户现有的创作 Skill（按创作流程节点分组）以及本次新学到的规律。
+// 融合写入全局 Skill 的核心逻辑（供异步任务调用）
+async function _runLearningWrite(userId, insights) {
+  const skill = await getOrCreateSkill(userId);
+  const currentRules = skill.rules || {};
+  const curText = formatRulesForPrompt(skill);
+  const insightText = insights.map(i => `- ${i.text}`).join('\n');
+
+  const prompt = `你是创作 Skill 工作流的架构师。下面是用户现有的创作 Skill（按创作流程节点分组）以及本次新学到的规律。
 请把新规律【融合】进现有工作流：先判断现有流程缺哪些环节、哪些节点需要补充或改写，再把每条新规律安放到最合适的流程节点中；可以新增节点、改写或合并已有条目，让整体更完整、不重复、像一套从头到尾可执行的工作流。不要简单把新规律堆在最后。
 
 【现有 Skill】
@@ -2075,62 +2088,65 @@ ${insightText}
 - 每条是一句可直接执行的创作指令，不要解释
 - 只输出 JSON`;
 
-    let mergedRules = null;
-    try {
-      const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.4 });
-      const parsed = extractJson(aiResult);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        // AI 返回 {分组: [字符串]}，转成 {分组:[{text,...}]}，并尽量保留旧条目的 uses
-        const oldFlat = {};
-        for (const arr of Object.values(currentRules)) {
-          if (Array.isArray(arr)) arr.forEach(r => { if (r && r.text) oldFlat[r.text.replace(/\s+/g, '')] = r; });
-        }
-        mergedRules = {};
-        for (const [group, arr] of Object.entries(parsed)) {
-          if (!Array.isArray(arr)) continue;
-          const list = [];
-          for (const entry of arr) {
-            const text = typeof entry === 'string' ? entry : (entry && entry.text) || '';
-            if (!text.trim()) continue;
-            const prev = oldFlat[text.replace(/\s+/g, '')];
-            list.push(prev
-              ? { text: text.trim(), source: prev.source || '融合', sourceType: prev.sourceType || 'merge', uses: prev.uses || 0 }
-              : { text: text.trim(), source: '学习融合', sourceType: 'merge', uses: 0 });
-          }
-          if (list.length) mergedRules[group] = list;
-        }
-        if (!Object.keys(mergedRules).length) mergedRules = null;
+  let mergedRules = null;
+  try {
+    const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.4, bypassCap: true });
+    const parsed = extractJson(aiResult);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const oldFlat = {};
+      for (const arr of Object.values(currentRules)) {
+        if (Array.isArray(arr)) arr.forEach(r => { if (r && r.text) oldFlat[r.text.replace(/\s+/g, '')] = r; });
       }
-    } catch (e) {
-      console.warn('[Original] Skill 融合 AI 失败，降级为追加:', e.message);
-    }
-
-    // 降级：AI 融合失败时，退回到「学习中心」分组追加（保证数据不丢）
-    if (!mergedRules) {
-      mergedRules = { ...currentRules };
-      if (!mergedRules['学习中心']) mergedRules['学习中心'] = [];
-      for (const ins of insights) {
-        if (!mergedRules['学习中心'].some(r => r.text === ins.text)) {
-          mergedRules['学习中心'].push({ text: ins.text, source: '学习中心', sourceType: 'feed', uses: 0 });
+      mergedRules = {};
+      for (const [group, arr] of Object.entries(parsed)) {
+        if (!Array.isArray(arr)) continue;
+        const list = [];
+        for (const entry of arr) {
+          const text = typeof entry === 'string' ? entry : (entry && entry.text) || '';
+          if (!text.trim()) continue;
+          const prev = oldFlat[text.replace(/\s+/g, '')];
+          list.push(prev
+            ? { text: text.trim(), source: prev.source || '融合', sourceType: prev.sourceType || 'merge', uses: prev.uses || 0 }
+            : { text: text.trim(), source: '学习融合', sourceType: 'merge', uses: 0 });
         }
+        if (list.length) mergedRules[group] = list;
       }
+      if (!Object.keys(mergedRules).length) mergedRules = null;
     }
-
-    const curVer = skill.version || 'v1.0';
-    const parts = curVer.replace('v', '').split('.').map(Number);
-    parts[1] = (parts[1] || 0) + 1;
-    const newVer = `v${parts[0]}.${parts[1]}`;
-    await db.query(
-      'UPDATE cw_skills SET rules = ?, version = ? WHERE user_id = ?',
-      [JSON.stringify(mergedRules), newVer, req.userId]
-    );
-    const updated = await getOrCreateSkill(req.userId);
-    res.json({ code: 200, data: { skill: updated } });
-  } catch (err) {
-    console.error('/original/learning/write error:', err.message);
-    res.status(500).json({ code: 500, msg: err.message });
+  } catch (e) {
+    console.warn('[Original] Skill 融合 AI 失败，降级为追加:', e.message);
   }
-});
+
+  if (!mergedRules) {
+    mergedRules = { ...currentRules };
+    if (!mergedRules['学习中心']) mergedRules['学习中心'] = [];
+    for (const ins of insights) {
+      if (!mergedRules['学习中心'].some(r => r.text === ins.text)) {
+        mergedRules['学习中心'].push({ text: ins.text, source: '学习中心', sourceType: 'feed', uses: 0 });
+      }
+    }
+  }
+
+  const newVer = bumpSkillVersion(skill.version || 'v1.0');
+  await db.query('UPDATE cw_skills SET rules = ?, version = ? WHERE user_id = ?', [JSON.stringify(mergedRules), newVer, userId]);
+  return { version: newVer };
+}
+
+// worker 调用
+async function processLearningWrite(taskId) {
+  const { rows } = await db.query('SELECT * FROM tasks WHERE id = ?', [taskId]);
+  const task = rows?.[0];
+  if (!task || ['done', 'failed'].includes(task.status)) return;
+  const input = typeof task.input_data === 'string' ? JSON.parse(task.input_data) : (task.input_data || {});
+  try {
+    await db.query("UPDATE tasks SET status = 'running', progress = 30, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
+    const result = await _runLearningWrite(input.userId, input.insights || []);
+    await db.query("UPDATE tasks SET status = 'done', progress = 100, result = ?, updated_at = NOW() WHERE id = ?", [JSON.stringify(result), taskId]).catch(() => {});
+  } catch (e) {
+    console.error('[processLearningWrite]', e.message);
+    await db.query('UPDATE tasks SET status = ?, error_msg = ?, updated_at = NOW() WHERE id = ?', ['failed', e.message, taskId]).catch(() => {});
+  }
+}
 
 /* ═══════════════════════════════════════
    智能选题
@@ -2264,3 +2280,4 @@ router.delete('/materials/:id', requireAuth, async (req, res) => {
 
 module.exports = router;
 module.exports.processLearningAnalyze = processLearningAnalyze;
+module.exports.processLearningWrite = processLearningWrite;

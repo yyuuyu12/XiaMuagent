@@ -428,6 +428,7 @@ taskRunner.setHandler(async (job) => {
     else if (type === 'novel_chapter') await require('./routes/novel').processNovelChapter(taskId);
     else if (type === 'novel_gen') await require('./routes/novel').processNovelGen(taskId);
     else if (type === 'original_analyze') await require('./routes/original').processLearningAnalyze(taskId);
+    else if (type === 'original_write') await require('./routes/original').processLearningWrite(taskId);
     else throw new Error(`未知任务类型: ${type}`);
   })();
 
