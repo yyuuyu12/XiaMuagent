@@ -4998,15 +4998,20 @@ function dOLearningResult(){
     const checkedCount = rules.filter(r=>r.checked).length;
     const legend = `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px">${['hook','turn','point','example','cta'].map(role=>{const m=O_LEARN_ROLE[role];return `<span style="font-size:11px;font-weight:600;color:${m.color};background:${m.bg};border-radius:6px;padding:2px 8px">${m.label}</span>`;}).join('')}</div>`;
     const videoCards = videos.map(v=>dOLearnVideoCard(v,multi)).join('');
+    const isWf = !!result.isWorkflow;
     const ruleCards = rules.map((item,idx)=>`
-      <div class="do-rule-card ${item.checked?'on':''}" onclick="dS.oLearnResult.rules[${idx}].checked=!dS.oLearnResult.rules[${idx}].checked;dRender()">
-        <div class="do-mat-check ${item.checked?'on':''}" style="width:18px;height:18px;border-radius:5px">${item.checked?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
-        <div style="flex:1"><div style="font-size:13px;color:#1A1614;line-height:1.6">${esc(item.text||'')}</div>${item.dim?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.dim)}${item.freq?' · '+esc(item.freq):''}</div>`:''}</div>
+      <div class="do-rule-card ${item.checked?'on':''}" style="align-items:flex-start" onclick="dS.oLearnResult.rules[${idx}].checked=!dS.oLearnResult.rules[${idx}].checked;dRender()">
+        <div class="do-mat-check ${item.checked?'on':''}" style="width:18px;height:18px;border-radius:5px;margin-top:1px">${item.checked?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+        <div style="flex:1;min-width:0">
+          ${isWf && item.dim?`<div style="font-size:12.5px;font-weight:700;color:#F5762A;margin-bottom:5px">${esc(item.dim)}</div>`:''}
+          <div style="font-size:13px;color:#1A1614;line-height:1.75">${esc(item.text||'')}</div>
+          ${!isWf && item.dim?`<div style="font-size:11px;color:#B0AA9F;margin-top:3px">${esc(item.dim)}${item.freq?' · '+esc(item.freq):''}</div>`:''}
+        </div>
       </div>`).join('');
     const rulesBlock = rules.length?`
       <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #F0EDE8">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div style="font-size:13px;font-weight:700;color:#1A1614">可写入规律（${rules.length} 条）</div><span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span></div>
-        <div style="font-size:11px;color:#B0AA9F;line-height:1.5;margin-bottom:12px">${result.refined?`已把 ${result.rawCount} 条零散规律合并精炼为 ${rules.length} 条。`:''}勾选要沉淀的规律，融进 Skill 后所有项目写作时自动遵循。建议每个维度挑最戳的 2-3 条，少而精。</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div style="font-size:13px;font-weight:700;color:#1A1614">${result.isWorkflow?`提炼出的创作流程经验（${rules.length} 步）`:`可写入规律（${rules.length} 条）`}</div><span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 项</span></div>
+        <div style="font-size:11px;color:#B0AA9F;line-height:1.5;margin-bottom:12px">${result.isWorkflow?`已把 ${result.rawCount} 条零散规律综合成一套从选题到结尾的流程经验。勾选要沉淀的环节，写入后会融进 Skill 的对应流程节点，写作时自动遵循。`:'勾选要沉淀的规律，融进 Skill 后所有项目写作时自动遵循。'}</div>
         <div style="display:flex;flex-direction:column;gap:8px">${ruleCards}</div>
       </div>
       <button class="do-btn do-btn-pri" style="width:100%;padding:13px" ${(checkedCount===0||dS.oLearnWriting)?'disabled':''} onclick="dOLearnWrite()">
@@ -5036,7 +5041,7 @@ async function dOLearnWrite(){
   const scope = dS.oLearnScope||'global';
   dS.oLearnWriting=true; dRender();
   const projectId = scope==='project' && dS.oProject ? dS.oProject.id : null;
-  const r = await dHttp.post('/original/learning/write', { insights:selected.map(s=>({text:s.text,freq:s.freq})), scope, projectId });
+  const r = await dHttp.post('/original/learning/write', { insights:selected.map(s=>({text:s.text,dim:s.dim,freq:s.freq})), scope, projectId });
   dS.oLearnWriting=false;
   if(r.code===200){
     if(r.data && r.data.skill) dS.oSkill = r.data.skill;

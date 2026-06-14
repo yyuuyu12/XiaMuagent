@@ -1901,31 +1901,41 @@ ${scriptForAI}
 
 // POST /api/original/learning/analyze —【阶段二】对用户选中的原文做逐句深拆
 // 支持两种来源：items（旧，带 awemeId/script）或 materialIds（从素材库选）
-// 规律精炼：同维度近似合并，压缩成少而精的可执行规则（规律太多会冲淡 Skill）
-async function _refineRules(rules) {
-  if (rules.length <= 16) return rules; // 本就不多，不折腾
-  const byDim = {};
-  rules.forEach(r => { (byDim[r.dim] = byDim[r.dim] || []).push(r.text); });
-  const listText = Object.entries(byDim).map(([d, arr]) => `【${d}】\n` + arr.map(t => '- ' + t).join('\n')).join('\n\n');
-  const prompt = `你是创作 Skill 策展人。下面是从爆款视频拆出的规律，偏多偏散、同维度有重复。请合并精炼成一套【少而精、可直接执行】的规则。
+// 流程化综合：把零散规律综合成「从选题到结尾按创作流程串起来的成体系经验」，
+// 每个节点是一段融会贯通的可执行经验，而非一条条罗列。这是 Skill 真正该有的形态。
+async function _synthesizeWorkflow(rules) {
+  if (rules.length < 4) return null; // 太少不值得综合
+  const listText = rules.map(r => `[${r.dim || '其他'}] ${r.text}`).join('\n');
+  const prompt = `你是顶级短视频操盘手。下面是从几条同类爆款里拆出的零散规律。
+请把它们综合成一套【从选题到结尾、按创作流程串起来的可复用经验】——
+目标是让另一个创作者照着这套流程，就能写出同类爆款。
+
+【拆出的零散规律】
 ${listText}
 
-要求：
-- 同一维度里意思相近的合并成一条更完整的；删掉空泛、不可执行的
-- 每个维度最多保留 2-3 条最具操作性的
-- 全部控制在 12-16 条以内
-- 每条 25-55 字，尽量用「写…（场景）时，…，而不是…」或明确动作
-只输出 JSON 数组：[{"text":"规则","dim":"所属维度"}]`;
+按下面固定的创作流程节点输出，每个节点写成 2-4 句【连贯、具体、可执行】的经验，
+把相关的零散规律融会进去，形成"这一步该怎么做、为什么"的方法，而不是罗列"-"条目。
+只输出 JSON 数组（没有对应内容的节点可省略，顺序保持创作流程）：
+[
+  {"stage":"选题方向","exp":"这类爆款怎么定选题、锁定什么人群和痛点…"},
+  {"stage":"开场钩子","exp":"前3秒怎么抓住人、用什么结构…"},
+  {"stage":"内容展开","exp":"主体怎么讲、每个点怎么落地…"},
+  {"stage":"节奏与转折","exp":"怎么控制节奏、在哪反转…"},
+  {"stage":"结尾收束","exp":"怎么收尾、怎么引导…"},
+  {"stage":"语言风格","exp":"用词、语气、句式的特点…"}
+]`;
   try {
-    const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 1500, bypassCap: true });
+    const raw = await callAI(prompt, { temperature: 0.4, maxTokens: 2000, bypassCap: true });
     const jm = raw.match(/\[[\s\S]*\]/);
-    if (!jm) return rules;
-    const refined = JSON.parse(jm[0]).filter(r => r && r.text).map(r => ({ text: String(r.text), freq: '', dim: r.dim || '其他', checked: true }));
-    return refined.length ? refined : rules;
-  } catch (e) { console.warn('[refineRules]', e.message); return rules; }
+    if (!jm) return null;
+    const arr = JSON.parse(jm[0]).filter(x => x && x.exp && x.stage);
+    if (!arr.length) return null;
+    // 转成与 rules 同结构（text=经验段落，dim=流程节点），复用前端勾选/写入
+    return arr.map(x => ({ text: String(x.exp), dim: String(x.stage), freq: '', checked: true }));
+  } catch (e) { console.warn('[synthesizeWorkflow]', e.message); return null; }
 }
 
-// 逐条深拆 + 汇总去重 + 精炼合并。供异步任务调用。
+// 逐条深拆 + 汇总 + 流程化综合。供异步任务调用。
 async function _runLearningAnalyze(picked, tikhubKey, type) {
   const videos = [];
   for (const it of picked) {
@@ -1933,19 +1943,20 @@ async function _runLearningAnalyze(picked, tikhubKey, type) {
     if (one) videos.push(one);
   }
   const seen = new Set();
-  let rules = [];
+  const rawRules = [];
   for (const v of videos) {
     for (const r of v.rules) {
       const key = r.text.replace(/\s+/g, '');
       if (key && !seen.has(key)) {
         seen.add(key);
-        rules.push({ text: r.text, freq: r.freq, dim: r.dim || '其他', checked: true });
+        rawRules.push({ text: r.text, freq: r.freq, dim: r.dim || '其他', checked: true });
       }
     }
   }
-  const rawCount = rules.length;
-  rules = await _refineRules(rules); // 太多则按维度合并精炼
-  return { type, videos, rules, rawCount, refined: rules.length < rawCount };
+  // 综合成流程化经验；失败则回退到原始去重规律
+  const workflow = await _synthesizeWorkflow(rawRules);
+  if (workflow) return { type, videos, rules: workflow, rawCount: rawRules.length, isWorkflow: true };
+  return { type, videos, rules: rawRules, rawCount: rawRules.length, isWorkflow: false };
 }
 
 // worker 调用：拆解为异步任务（逐条 AI 深拆很慢，同步会被网关超时返 504 HTML）
