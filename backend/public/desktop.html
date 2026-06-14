@@ -3720,6 +3720,7 @@ function dRenderOriginal(){
   if(dS.oView==='workspace') return dOWorkspace();
   if(dS.oView==='new')       return dONew();
   if(dS.oView==='materials') return dOMaterials();
+  if(dS.oView==='accimport') return dOAccountImport();
   if(dS.oView==='learning')  return dOLearning();
   if(dS.oView==='skill')     return dOSkillPage();
   return dOHome();
@@ -4661,6 +4662,7 @@ function dOMaterials(){
     </div>
     <div style="display:flex;gap:10px">
       ${selCount>0?`<button class="do-btn do-btn-pri" onclick="dOMatGoLearn()">学习已选 ${selCount} 条</button>`:''}
+      <button class="do-btn do-btn-gho" onclick="dOAccOpen()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 19c0-3 2.7-5 6-5"/><path d="M16 11l2 2 4-4"/></svg> 从账号批量学</button>
       <button class="do-btn do-btn-gho" onclick="dOMatOpenModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="#6E6860" stroke-width="2.5" stroke-linecap="round"/></svg> 添加素材</button>
     </div>
   </div>
@@ -4673,7 +4675,6 @@ function dOMatModalHtml(){
   const seg = `<div class="do-seg" style="margin-bottom:16px">
     <div class="do-seg-i ${tab==='text'?'on':''}" onclick="dS.oMatTab='text';dS.oMatUrlResult=null;dRender()">粘贴文字</div>
     <div class="do-seg-i ${tab==='url'?'on':''}" onclick="dS.oMatTab='url';dRender()">视频链接</div>
-    <div class="do-seg-i ${tab==='account'?'on':''}" onclick="dS.oMatTab='account';dRender()">账号主页</div>
   </div>`;
   let body;
   if(tab==='text'){
@@ -4681,32 +4682,6 @@ function dOMatModalHtml(){
       <input class="do-input" placeholder="素材标题（可选），如：某博主·副业选题" value="${esc(dS.oMatTitle)}" oninput="dS.oMatTitle=this.value" style="margin-bottom:12px">
       <textarea class="do-input" rows="8" style="resize:vertical;line-height:1.7" placeholder="把竞品视频的口播原文、文案文字粘贴到这里…" oninput="dS.oMatContent=this.value">${esc(dS.oMatContent)}</textarea>
       <button class="do-btn do-btn-pri" style="width:100%;margin-top:14px;padding:11px" ${dS.oMatSaving?'disabled':''} onclick="dOMatSaveText()">${dS.oMatSaving?'保存中…':'保存到素材库'}</button>`;
-  } else if(tab==='account'){
-    const vids = dS.oMatAccVideos;
-    const selCount = (vids||[]).filter(v=>v.sel).length;
-    const ckSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    const fmtLikes = n => n>=10000 ? (n/10000).toFixed(1)+'万' : (n||0);
-    const listHtml = vids ? `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 2px 8px">
-        <span style="font-size:12px;color:#9E9890">共 ${vids.length} 条 · 已选 ${selCount}（默认勾选热门前 3 条）</span>
-      </div>
-      <div style="max-height:260px;overflow-y:auto;border:1px solid #EDE9E3;border-radius:12px">
-        ${vids.length===0?'<div class="do-empty" style="padding:24px">没拉到视频</div>':vids.map(v=>`
-          <div onclick="dOMatAccToggle('${v.awemeId}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #F2EFEA;cursor:pointer">
-            <div class="do-mat-check ${v.sel?'on':''}" style="flex-shrink:0">${v.sel?ckSvg:''}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:13px;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.desc||'（无标题）')}</div>
-              <div style="font-size:11px;color:#B0AA9F;margin-top:2px">${fmtLikes(v.likes)} 赞</div>
-            </div>
-          </div>`).join('')}
-      </div>
-      <button class="do-btn do-btn-pri" style="width:100%;margin-top:12px;padding:11px" ${(selCount===0||dS.oMatAccImporting)?'disabled':''} onclick="dOMatAccImport()">
-        ${dS.oMatAccImporting?('导入中 '+(dS.oMatAccProgress||'')+'…'):('导入选中的 '+selCount+' 条到素材库')}</button>
-      <div style="font-size:11px;color:#B0AA9F;margin-top:8px;line-height:1.5">逐条提取原文（每条需转录，较慢），建议一次勾 3-5 条。无内置字幕的视频会自动跳过。</div>` : '';
-    body = `
-      <textarea class="do-input" rows="2" style="resize:none;line-height:1.6" placeholder="粘贴抖音账号主页链接（打开对方主页 → 右上角分享 → 复制链接）…" oninput="dS.oMatAccUrl=this.value">${esc(dS.oMatAccUrl||'')}</textarea>
-      <button class="do-btn ${vids?'do-btn-gho':'do-btn-pri'}" style="width:100%;margin-top:12px;padding:11px" ${(dS.oMatAccLoading||dS.oMatAccImporting)?'disabled':''} onclick="dOMatAccFetch()">${dS.oMatAccLoading?'拉取中…':(vids?'重新拉取':'拉取该账号的视频')}</button>
-      ${listHtml}`;
   } else {
     const extracted = ur ? `
       <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:13px;margin-top:14px">
@@ -4729,7 +4704,7 @@ function dOMatModalHtml(){
     </div>
   </div>`;
 }
-function dOMatOpenModal(){ dS.oMatModal=true; dS.oMatTab='text'; dS.oMatTitle=''; dS.oMatContent=''; dS.oMatUrl=''; dS.oMatUrlResult=null; dS.oMatAccUrl=''; dS.oMatAccVideos=null; dS.oMatAccImporting=false; dS.oMatAccProgress=''; dRender(); }
+function dOMatOpenModal(){ dS.oMatModal=true; dS.oMatTab='text'; dS.oMatTitle=''; dS.oMatContent=''; dS.oMatUrl=''; dS.oMatUrlResult=null; dRender(); }
 function dOMatCloseModal(){ dS.oMatModal=false; dRender(); }
 function dOMatToggleSel(id){
   const i = dS.oMatSel.indexOf(id);
@@ -4769,40 +4744,91 @@ async function dOMatSaveUrl(){
   if(r.code===200){ dS.oMatModal=false; dS.oMatUrlResult=null; dS.oMatUrl=''; dToast('已保存到素材库'); await dOLoadMaterials(true); }
   else { dToast(r.msg||'保存失败'); dRender(); }
 }
-/* 账号主页：拉视频列表 → 勾选 → 逐条提取原文入素材库（复用 /learning/extract） */
-async function dOMatAccFetch(){
-  const url = (dS.oMatAccUrl||'').trim(); if(!url){ dToast('请先粘贴账号主页链接'); return; }
-  dS.oMatAccLoading=true; dS.oMatAccVideos=null; dRender();
+/* ===== 从账号批量学习（独立全屏页：输入 → 勾选 → 逐条导入实时状态 → 结果） ===== */
+function dOAccOpen(){ dS.oView='accimport'; dS.oAccUrl=''; dS.oAccVideos=null; dS.oAccLoading=false; dS.oAccImporting=false; dS.oAccTotal=0; dRender(); }
+async function dOAccFetch(){
+  const url = (dS.oAccUrl||'').trim(); if(!url){ dToast('请先粘贴账号主页链接'); return; }
+  dS.oAccLoading=true; dS.oAccVideos=null; dRender();
   const r = await dHttp.post('/original/learning/extract', { url, type:'account' });
-  dS.oMatAccLoading=false;
+  dS.oAccLoading=false;
   if(r.code===200 && r.data && r.data.items){
-    dS.oMatAccVideos = r.data.items.map(v=>({ awemeId:v.awemeId, desc:v.desc, likes:v.likes, sel:!!v.selected }));
+    dS.oAccVideos = r.data.items.map(v=>({ awemeId:v.awemeId, desc:v.desc, likes:v.likes, sel:!!v.selected, status:'idle', chars:0 }));
   } else dToast(r.msg||'拉取失败');
   dRender();
 }
-function dOMatAccToggle(awemeId){
-  const v = (dS.oMatAccVideos||[]).find(x=>x.awemeId===awemeId);
-  if(v) v.sel = !v.sel;
+function dOAccToggle(id){ if(dS.oAccImporting) return; const v=(dS.oAccVideos||[]).find(x=>x.awemeId===id); if(v) v.sel=!v.sel; dRender(); }
+function dOAccSelectAll(on){ if(dS.oAccImporting) return; (dS.oAccVideos||[]).forEach(v=>v.sel=on); dRender(); }
+async function dOAccImport(){
+  const sel = (dS.oAccVideos||[]).filter(v=>v.sel);
+  if(!sel.length || dS.oAccImporting) return;
+  dS.oAccImporting=true; dS.oAccTotal=sel.length;
+  sel.forEach(v=>{ v.status='idle'; v.chars=0; });
   dRender();
-}
-async function dOMatAccImport(){
-  const sel = (dS.oMatAccVideos||[]).filter(v=>v.sel);
-  if(!sel.length || dS.oMatAccImporting) return;
-  dS.oMatAccImporting=true; let ok=0;
-  for(let i=0;i<sel.length;i++){
-    dS.oMatAccProgress = (i+1)+'/'+sel.length; dRender();
-    const vurl = 'https://www.douyin.com/video/'+sel[i].awemeId;
+  for(const v of sel){
+    v.status='doing'; dRender();
+    const vurl = 'https://www.douyin.com/video/'+v.awemeId;
     const ex = await dHttp.post('/original/learning/extract', { url:vurl, type:'video' });
     const it = ex.code===200 && ex.data && ex.data.items && ex.data.items[0];
     if(it && (it.script||'').trim()){
-      await dHttp.post('/original/materials', { title:it.desc||sel[i].desc||null, rawContent:it.script, sourceUrl:vurl, sourceType:'video' });
-      ok++;
-    }
+      await dHttp.post('/original/materials', { title:it.desc||v.desc||null, rawContent:it.script, sourceUrl:vurl, sourceType:'video' });
+      v.status='done'; v.chars = it.script.replace(/\s/g,'').length;
+    } else { v.status='skip'; }
+    dRender();
   }
-  dS.oMatAccImporting=false; dS.oMatAccProgress='';
-  dS.oMatModal=false;
-  dToast(ok>0 ? ('已导入 '+ok+' 条到素材库') : '未提取到原文（可能纯画面/BGM，或转录服务离线）');
+  dS.oAccImporting=false;
   await dOLoadMaterials(true);
+  dRender();
+}
+function dOAccGoLearn(){ dS.oView='learning'; dS.oLearnPhase='input'; dS.oLearnResult=null; dRender(); }
+function dOAccountImport(){
+  const vids = dS.oAccVideos;
+  const selCount = (vids||[]).filter(v=>v.sel).length;
+  const doneCount = (vids||[]).filter(v=>v.status==='done').length;
+  const skipCount = (vids||[]).filter(v=>v.status==='skip').length;
+  const finished = vids && !dS.oAccImporting && (doneCount>0||skipCount>0);
+  const ckSvg='<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const fmtLikes=n=>n>=10000?(n/10000).toFixed(1)+'万':(n||0);
+  const badge=v=>{
+    if(v.status==='doing') return '<span style="font-size:11px;color:#F5762A;font-weight:600">提取中…</span>';
+    if(v.status==='done') return `<span style="font-size:11px;color:#16A34A;font-weight:600">✓ 已提取 ${v.chars} 字</span>`;
+    if(v.status==='skip') return '<span style="font-size:11px;color:#E5534B">跳过 · 无字幕/转录失败</span>';
+    return '<span style="font-size:11px;color:#B0AA9F">待导入</span>';
+  };
+  const listHtml = vids ? `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px">
+      <div style="font-size:13px;color:#6E6860">共 ${vids.length} 条 · 已选 ${selCount}${(doneCount||skipCount)?` · 已导入 ${doneCount}，跳过 ${skipCount}`:''}</div>
+      ${dS.oAccImporting?'':`<div style="display:flex;gap:12px"><span class="do-link" onclick="dOAccSelectAll(true)">全选</span><span class="do-link" onclick="dOAccSelectAll(false)">清空</span></div>`}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${vids.map(v=>`
+        <div class="do-mat-row ${v.sel?'bound':''}" style="align-items:center;${dS.oAccImporting?'':'cursor:pointer'}" ${dS.oAccImporting?'':`onclick="dOAccToggle('${v.awemeId}')"`}>
+          <div class="do-mat-check ${v.sel?'on':''}" style="flex-shrink:0">${v.sel?ckSvg:''}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13.5px;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.desc||'（无标题）')}</div>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:3px"><span style="font-size:11px;color:#B0AA9F">${fmtLikes(v.likes)} 赞</span>${badge(v)}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    ${(!dS.oAccImporting && !finished && selCount>0)?`<button class="do-btn do-btn-pri" style="width:100%;margin-top:14px;padding:12px" onclick="dOAccImport()">开始导入选中的 ${selCount} 条</button>`:''}
+    ${dS.oAccImporting?`<div style="margin-top:14px"><div class="d-progress-bar" style="height:6px"><div class="d-progress-fill" style="width:${Math.round(((doneCount+skipCount)/Math.max(dS.oAccTotal||1,1))*100)}%"></div></div><div style="text-align:center;font-size:12px;color:#9E9890;margin-top:6px">导入中… ${doneCount+skipCount}/${dS.oAccTotal}（每条需转录，请耐心等待）</div></div>`:''}
+    ${finished?`<div class="d-card" style="padding:14px 16px;margin-top:14px;background:#F0FDF4;border:1px solid #BBF7D0">
+      <div style="font-size:13px;color:#16A34A;font-weight:700;margin-bottom:8px">导入完成：成功 ${doneCount} 条，跳过 ${skipCount} 条</div>
+      <div style="display:flex;gap:8px"><button class="do-btn do-btn-pri" style="padding:8px 16px;font-size:12.5px" onclick="dOAccGoLearn()">去学习中心拆解</button><button class="do-btn do-btn-gho" style="padding:8px 16px;font-size:12.5px" onclick="dOSetView('materials')">回素材库查看</button></div>
+    </div>`:''}
+    <div style="font-size:11px;color:#B0AA9F;margin-top:12px;line-height:1.6">逐条提取口播原文（每条需下载+转录，较慢），建议一次勾 3-5 条。无内置字幕或转录失败的视频会自动跳过。</div>` : '';
+  return `
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <div onclick="dOSetView('materials')" class="hov-back-btn" style="width:38px;height:38px;border-radius:11px;background:#F7F5F1;border:1px solid #EDE9E3;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="#6E6860" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div><div style="font-size:20px;font-weight:700;color:#1A1614;line-height:1.2">从账号批量学习</div>
+      <div style="font-size:12.5px;color:#9E9890;margin-top:3px">贴账号主页链接，挑选视频，AI 逐条提取口播原文存进素材库</div></div>
+  </div>
+  <div class="d-card" style="padding:18px 20px">
+    <div class="flbl" style="margin-bottom:6px">账号主页链接</div>
+    <textarea class="do-input" rows="2" style="resize:none;line-height:1.6" placeholder="打开对方抖音主页 → 右上角分享 → 复制链接，粘到这里…" ${dS.oAccImporting?'disabled':''} oninput="dS.oAccUrl=this.value">${esc(dS.oAccUrl||'')}</textarea>
+    <button class="do-btn ${vids?'do-btn-gho':'do-btn-pri'}" style="width:100%;margin-top:10px;padding:11px" ${(dS.oAccLoading||dS.oAccImporting)?'disabled':''} onclick="dOAccFetch()">${dS.oAccLoading?'拉取中…':(vids?'重新拉取':'拉取该账号的视频')}</button>
+    ${listHtml}
+  </div>`;
 }
 async function dOMatDelete(id){
   if(!confirm('确认删除这条素材？')) return;
