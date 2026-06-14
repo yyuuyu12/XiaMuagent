@@ -2174,6 +2174,18 @@ router.get('/materials', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/original/materials/:id — 单条素材全文（查看用）
+router.get('/materials/:id', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, title, raw_content, source_url, source_type, created_at FROM cw_materials WHERE id = ? AND user_id = ?',
+      [parseInt(req.params.id), req.userId]
+    );
+    if (!rows?.length) return res.status(404).json({ code: 404, msg: '素材不存在' });
+    res.json({ code: 200, data: rows[0] });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
 // POST /api/original/materials — 保存素材（文字直存 or URL提取后存）
 router.post('/materials', requireAuth, async (req, res) => {
   const { title, rawContent, sourceUrl, sourceType = 'text' } = req.body;

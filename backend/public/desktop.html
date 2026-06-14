@@ -4638,12 +4638,12 @@ function dOMaterials(){
         ? `<div class="do-empty">还没有素材。点右上角「添加素材」收集竞品爆款原文，长期积累成你的学习库。</div>`
         : `<div class="do-proj-grid">${mats.map(m=>{
             const on = selSet.has(m.id);
-            return `<div class="do-mat-row ${on?'bound':''}" style="cursor:pointer;align-items:flex-start" onclick="dOMatToggleSel(${m.id})">
-              <div class="do-mat-check ${on?'on':''}">${on?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
+            return `<div class="do-mat-row ${on?'bound':''}" style="cursor:pointer;align-items:flex-start" onclick="dOMatView(${m.id})" title="点击查看全文">
+              <div class="do-mat-check ${on?'on':''}" onclick="event.stopPropagation();dOMatToggleSel(${m.id})" title="勾选送学习">${on?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12L10 17L19 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">${typeBadge(m.source_type)}<span style="font-size:13.5px;font-weight:600;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.title||'未命名素材')}</span></div>
-                <div style="font-size:12px;color:#9E9890;line-height:1.55;max-height:36px;overflow:hidden">${esc((m.preview||'').replace(/\n/g,' '))}</div>
-                <div style="font-size:11px;color:#C0B8B0;margin-top:5px">${dFmtTime(m.created_at)} · 约${Math.max(1,Math.round((m.content_len||0)/300))}分钟素材</div>
+                <div style="font-size:12px;color:#9E9890;line-height:1.55;max-height:36px;overflow:hidden">${esc((m.preview||'').replace(/\n/g,' '))}…</div>
+                <div style="font-size:11px;color:#C0B8B0;margin-top:5px">${dFmtTime(m.created_at)} · 约${Math.max(1,Math.round((m.content_len||0)/300))}分钟素材 · 点击看全文</div>
               </div>
               <button class="do-mat-del" onclick="event.stopPropagation();dOMatDelete(${m.id})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6E6860" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6m4-6v6"/></svg></button>
             </div>`;
@@ -4667,7 +4667,37 @@ function dOMaterials(){
     </div>
   </div>
   ${list}
-  ${dS.oMatModal?dOMatModalHtml():''}`;
+  ${dS.oMatModal?dOMatModalHtml():''}
+  ${dS.oMatViewing?dOMatViewModalHtml():''}`;
+}
+// 查看素材全文
+async function dOMatView(id){
+  dS.oMatViewing = { loading:true }; dRender();
+  const r = await dApi('GET','/original/materials/'+id);
+  if(r.code===200 && r.data){ dS.oMatViewing = r.data; }
+  else { dS.oMatViewing = null; dToast(r.msg||'加载失败'); }
+  dRender();
+}
+function dOMatViewClose(){ dS.oMatViewing = null; dRender(); }
+function dOMatViewCopy(){ const m=dS.oMatViewing; if(m&&m.raw_content) navigator.clipboard.writeText(m.raw_content).then(()=>dToast('已复制全文')); }
+function dOMatViewModalHtml(){
+  const m = dS.oMatViewing;
+  if(m.loading) return `<div class="d-modal-overlay" style="display:flex"><div class="d-modal" style="text-align:center;color:#9E9890">加载中…</div></div>`;
+  const len = (m.raw_content||'').replace(/\s/g,'').length;
+  return `<div class="d-modal-overlay" style="display:flex" onclick="if(event.target===this)dOMatViewClose()">
+    <div class="d-modal" style="max-width:640px;width:90%;text-align:left;max-height:82vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">
+        <div class="d-modal-title" style="margin:0;font-size:17px;line-height:1.4">${esc(m.title||'未命名素材')}</div>
+        <button style="background:none;border:none;font-size:24px;color:#B0AA9F;cursor:pointer;line-height:1;flex-shrink:0" onclick="dOMatViewClose()">×</button>
+      </div>
+      <div style="font-size:11px;color:#B0AA9F;margin-bottom:12px">${m.source_type==='video'?'视频素材':'文字素材'} · ${dFmtTime(m.created_at)} · 约 ${len} 字${m.source_url?` · <a href="${esc(m.source_url)}" target="_blank" style="color:#F5762A;text-decoration:none">原视频 ↗</a>`:''}</div>
+      <div style="flex:1;overflow-y:auto;font-size:14px;line-height:1.9;color:#2A241E;white-space:pre-wrap;word-break:break-word;background:#FBFAF7;border-radius:12px;padding:16px 18px">${esc(m.raw_content||'（空）')}</div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="do-btn do-btn-gho" style="flex:1;justify-content:center" onclick="dOMatViewCopy()">复制全文</button>
+        <button class="do-btn do-btn-pri" style="flex:1;justify-content:center" onclick="dOMatViewClose()">关闭</button>
+      </div>
+    </div>
+  </div>`;
 }
 function dOMatModalHtml(){
   const tab = dS.oMatTab||'text';
