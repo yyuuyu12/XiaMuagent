@@ -1017,17 +1017,33 @@ function dNvProjectView() {
     </div>
   </div>`;
 
-  /* 中栏：创作对话 */
+  /* 中栏：创作搭档——根据右侧当前面板，自动对应改 章节正文 / 大纲 / 设定集 / 人物 */
   const ch = dS.nvChapter;
-  const msgs = ch ? (ch.messages||[]).map(m => `
-    <div class="do-msg ${m.role==='user'?'user':'ai'}"><div class="do-bubble ${m.role==='user'?'user':'ai'}">${esc(m.content)}</div></div>`).join('') : '';
+  const rv = dS.nvRight;
+  // 决定当前作用对象
+  let cpTarget, cpLabel, cpHint, cpPh;
+  if (rv === 'outline')        { cpTarget='outline';    cpLabel='全书大纲'; cpHint='说一句怎么调整，AI 改大纲'; cpPh='如：第2卷节奏太慢，加个反转；第一卷再紧凑些…'; }
+  else if (rv === 'cards')     { cpTarget='cards';      cpLabel='设定集';   cpHint='说一句怎么调整，AI 改设定卡'; cpPh='如：世界观补充修真等级体系；给XX势力加段背景…'; }
+  else if (rv === 'characters'){ cpTarget='characters'; cpLabel='人物关系'; cpHint='说一句怎么调整，AI 改人物'; cpPh='如：把女主性格改得更强势；给男二加个反转身份…'; }
+  else if (ch)                 { cpTarget='chapter';    cpLabel='第'+ch.chapter.seq+'章 · 正文'; cpHint='讨论剧情，或让它改这章正文'; cpPh='说说你的想法…'; }
+  else                         { cpTarget=null;         cpLabel=''; cpHint='选择左侧章节，或右侧大纲/设定/人物面板'; cpPh='先在左侧选章节，或右侧选面板'; }
+  const busy = cpTarget==='chapter' ? dS.nvBusy : dS.nvReviseBusy;
+  let bodyInner;
+  if (cpTarget === 'chapter') {
+    const msgs = (ch.messages||[]).map(m => `<div class="do-msg ${m.role==='user'?'user':'ai'}"><div class="do-bubble ${m.role==='user'?'user':'ai'}">${esc(m.content)}</div></div>`).join('');
+    bodyInner = (msgs || '<div style="font-size:12px;color:#B0AA9F;line-height:1.7">这一章想怎么写？可以：<br>· 点右侧「生成本章」直接出稿<br>· 先在这聊剧情方向<br>· 出稿后说「打斗再激烈点」之类直接改</div>') + (dS.nvBusy?'<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">思考中…</div></div>':'');
+  } else if (cpTarget) {
+    bodyInner = `<div style="font-size:12.5px;color:#6E6860;line-height:1.8">正在编辑：<b style="color:#1A1614">${cpLabel}</b><br><span style="color:#9E9890">${cpHint}，改完自动刷新右侧面板。也可在右侧直接手动改。</span></div>${busy?'<div class="do-msg ai" style="margin-top:12px"><div class="do-bubble ai" style="color:#9E9890">调整中，约 20–40 秒…</div></div>':''}`;
+  } else {
+    bodyInner = `<div style="font-size:12px;color:#B0AA9F;line-height:1.7">${cpHint}，就能在这里用对话让 AI 修改它。</div>`;
+  }
   const chatCol = `<div class="do-col" style="width:340px;flex-shrink:0">
-    <div class="do-col-head"><div><div class="do-col-h-title">创作搭档</div><div class="do-col-h-sub">${ch?('第'+ch.chapter.seq+'章 · 讨论剧情或让它改正文'):'选择左侧章节后可对话'}</div></div></div>
-    <div class="do-col-body" id="nvChatBody">${ch?(msgs||'<div style="font-size:12px;color:#B0AA9F;line-height:1.7">这一章想怎么写？可以：<br>· 点右侧「生成本章」直接出稿<br>· 先在这聊剧情方向<br>· 出稿后说「打斗再激烈点」之类直接改</div>'):''}${dS.nvBusy?'<div class="do-msg ai"><div class="do-bubble ai" style="color:#9E9890">思考中…</div></div>':''}</div>
+    <div class="do-col-head"><div><div class="do-col-h-title">创作搭档</div><div class="do-col-h-sub">${cpLabel?('改 '+cpLabel):'选择要改的内容'}</div></div></div>
+    <div class="do-col-body" id="nvChatBody">${bodyInner}</div>
     <div class="do-chat-foot">
       <div style="display:flex;gap:8px;align-items:flex-end">
-        <textarea class="do-chat-input" id="nvInput" rows="2" style="flex:1;min-width:0" placeholder="${ch?'说说你的想法…':'先选择一个章节'}" ${ch?'':'disabled'} oninput="dS.nvInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dNvChat();}">${esc(dS.nvInput||'')}</textarea>
-        <button class="do-btn do-btn-pri" style="padding:9px 16px;flex-shrink:0" ${(!ch||dS.nvBusy)?'disabled':''} onclick="dNvChat()">发送</button>
+        <textarea class="do-chat-input" id="nvInput" rows="2" style="flex:1;min-width:0" placeholder="${cpPh}" ${cpTarget?'':'disabled'} oninput="dS.nvInput=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();dNvChat();}">${esc(dS.nvInput||'')}</textarea>
+        <button class="do-btn do-btn-pri" style="padding:9px 16px;flex-shrink:0" ${(!cpTarget||busy)?'disabled':''} onclick="dNvChat()">发送</button>
       </div>
     </div>
   </div>`;
@@ -1039,11 +1055,7 @@ function dNvProjectView() {
       <div class="do-col-head"><div><div class="do-col-h-title">全书大纲</div><div class="do-col-h-sub">卷级结构，章节细纲据此生成</div></div>
         <button class="do-btn do-btn-pri" style="padding:6px 14px;font-size:12px" ${dS.nvOutlineBusy?'disabled':''} onclick="dNvGenOutline()">${dS.nvOutlineBusy?'生成中…':((proj.outline||'').trim()?'重新生成':'生成大纲')}</button></div>
       <textarea class="do-doc-edit" placeholder="点右上角生成全书大纲，或自己写。" oninput="dS.nvProject.project.outline=this.value">${esc(proj.outline||'')}</textarea>
-      <div class="do-doc-foot" style="flex-wrap:wrap;gap:8px">
-        <input id="nvOutlineRevise" class="inp" style="flex:1;min-width:200px" placeholder="让 AI 调整大纲，如：第2卷节奏太慢，加个反转…" ${dS.nvOutlineBusy?'disabled':''}>
-        <button class="do-btn do-btn-pri" style="flex-shrink:0" ${dS.nvOutlineBusy?'disabled':''} onclick="dNvReviseOutline()">${dS.nvOutlineBusy?'AI 调整中…':'✨ AI 改'}</button>
-        <button class="do-btn do-btn-gho" style="flex-shrink:0" onclick="dNvSaveOutline()">保存手改</button>
-      </div>
+      <div class="do-doc-foot"><span style="font-size:11px;color:#B0AA9F;flex:1">想让 AI 调整？在左侧「创作搭档」直接说，如"第2卷节奏太慢"</span><button class="do-btn do-btn-gho" onclick="dNvSaveOutline()">保存手改</button></div>
     </div>`;
   } else if (dS.nvRight === 'cards') {
     const kindLabel = { world:'世界观', character:'角色', faction:'势力', style:'文风' };
@@ -1112,21 +1124,6 @@ async function dNvGenOutline() {
 async function dNvSaveOutline() {
   const r = await dApi('PATCH', '/novel/projects/'+dS.nvProject.project.id, { outline: dS.nvProject.project.outline||'' });
   dToast(r.code===200?'已保存':(r.msg||'保存失败'));
-}
-async function dNvReviseOutline() {
-  const el = document.getElementById('nvOutlineRevise');
-  const inst = (el ? el.value : '').trim();
-  if (!inst) { dToast('说一下想怎么调整'); return; }
-  if (!(dS.nvProject.project.outline||'').trim()) { dToast('先生成或写一版大纲，再让 AI 调整'); return; }
-  dS.nvOutlineBusy = true; dRender();
-  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/outline/revise', { instruction: inst });
-  if (r.code !== 200) { dS.nvOutlineBusy=false; dToast(r.msg||'提交失败'); dRender(); return; }
-  const pid = dS.nvProject.project.id;
-  dNvPollTask(r.data.taskId, async () => {
-    const pr = await dHttp.get('/novel/projects/'+pid);
-    if (pr.code===200 && dS.nvProject && dS.nvProject.project.id===pid) dS.nvProject = pr.data;
-    dS.nvOutlineBusy=false; dToast('大纲已按要求调整 ✓'); dRender();
-  }, (msg) => { dS.nvOutlineBusy=false; dToast('调整失败：'+msg); dRender(); });
 }
 async function dNvGenToc() {
   if (!(dS.nvProject.project.outline||'').trim()) { dToast('先生成全书大纲'); dS.nvRight='outline'; dRender(); return; }
@@ -1199,23 +1196,45 @@ async function dNvGenerate() {
 
 /* ---------- 对话修改 ---------- */
 async function dNvChat() {
-  const c = dS.nvChapter && dS.nvChapter.chapter;
   const v = (dS.nvInput||'').trim();
-  if (!c || !v || dS.nvBusy) return;
-  dS.nvChapter.messages.push({ role:'user', content:v });
-  dS.nvInput = ''; dS.nvBusy = true; dRender();
-  const el = document.getElementById('nvChatBody'); if (el) el.scrollTop = el.scrollHeight;
-  const r = await dHttp.post('/novel/chapters/'+c.id+'/chat', { message: v });
-  dS.nvBusy = false;
-  if (r.code === 200) {
-    dS.nvChapter.messages.push(r.data.message);
-    if (r.data.content !== null && r.data.content !== undefined) {
-      dS.nvChapter.chapter.content = r.data.content;
-      dS.nvChapter.chapter.word_count = r.data.content.replace(/\s/g,'').length;
-    }
-  } else dToast(r.msg||'失败，请重试');
-  dRender();
-  const el2 = document.getElementById('nvChatBody'); if (el2) el2.scrollTop = el2.scrollHeight;
+  if (!v) return;
+  const rv = dS.nvRight;
+  const target = rv==='outline'?'outline' : rv==='cards'?'cards' : rv==='characters'?'characters' : (dS.nvChapter?'chapter':null);
+  if (!target) return;
+
+  // 章节正文：多轮对话，改正文（原逻辑）
+  if (target === 'chapter') {
+    const c = dS.nvChapter.chapter;
+    if (dS.nvBusy) return;
+    dS.nvChapter.messages.push({ role:'user', content:v });
+    dS.nvInput = ''; dS.nvBusy = true; dRender();
+    const el = document.getElementById('nvChatBody'); if (el) el.scrollTop = el.scrollHeight;
+    const r = await dHttp.post('/novel/chapters/'+c.id+'/chat', { message: v });
+    dS.nvBusy = false;
+    if (r.code === 200) {
+      dS.nvChapter.messages.push(r.data.message);
+      if (r.data.content !== null && r.data.content !== undefined) {
+        dS.nvChapter.chapter.content = r.data.content;
+        dS.nvChapter.chapter.word_count = r.data.content.replace(/\s/g,'').length;
+      }
+    } else dToast(r.msg||'失败，请重试');
+    dRender();
+    const el2 = document.getElementById('nvChatBody'); if (el2) el2.scrollTop = el2.scrollHeight;
+    return;
+  }
+
+  // 大纲/设定/人物：异步 revise，改完刷新对应面板
+  if (dS.nvReviseBusy) return;
+  dS.nvInput = ''; dS.nvReviseBusy = true; dRender();
+  const pid = dS.nvProject.project.id;
+  const labelMap = { outline:'大纲', cards:'设定集', characters:'人物' };
+  const r = await dHttp.post('/novel/projects/'+pid+'/revise', { target, instruction: v });
+  if (r.code !== 200) { dS.nvReviseBusy=false; dToast(r.msg||'提交失败'); dRender(); return; }
+  dNvPollTask(r.data.taskId, async () => {
+    const pr = await dHttp.get('/novel/projects/'+pid);
+    if (pr.code===200 && dS.nvProject && dS.nvProject.project.id===pid) dS.nvProject = pr.data;
+    dS.nvReviseBusy=false; dToast(labelMap[target]+'已按要求调整 ✓'); dRender();
+  }, (msg) => { dS.nvReviseBusy=false; dToast('调整失败：'+msg); dRender(); });
 }
 
 /* ---------- 设定卡 ---------- */

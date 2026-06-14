@@ -266,6 +266,72 @@ ${p.outline || '（空）'}
   }
 }
 
+// 对话式修改设定集（世界观/势力/文风卡）：按指令改卡或新增卡
+async function _reviseCards(p, instruction) {
+  const cards = await getCards(p.id);
+  const list = cards.map(c => `[id:${c.id}|${c.kind}] ${c.title}\n${(c.content || '').slice(0, 800)}`).join('\n\n') || '（暂无设定卡）';
+  const prompt = `你是小说设定管理员。下面是现有设定卡，请按作者要求调整。只输出 JSON 数组。
+【现有设定卡】
+${list}
+
+【作者要求】${instruction}
+
+输出格式（只返回需要改动或新增的卡，没动的不要返回）：
+[{ "id": 要改的现有卡id（新增则不要这个字段）, "kind": "world/faction/style", "title": "卡名", "content": "完整内容" }]`;
+  const raw = await callAI(prompt, { temperature: 0.5, maxTokens: 2000, bypassCap: true });
+  const jm = raw.match(/\[[\s\S]*\]/);
+  if (!jm) return;
+  const arr = JSON.parse(jm[0]);
+  for (const c of arr) {
+    if (!c || !c.content) continue;
+    if (c.id) {
+      await db.query('UPDATE nv_kb_cards SET title = ?, content = ? WHERE id = ? AND project_id = ?',
+        [String(c.title || '设定').slice(0, 200), String(c.content), parseInt(c.id), p.id]).catch(() => {});
+    } else {
+      await db.query('INSERT INTO nv_kb_cards (project_id, kind, title, content) VALUES (?,?,?,?)',
+        [p.id, ['world', 'faction', 'style'].includes(c.kind) ? c.kind : 'world', String(c.title || '新设定').slice(0, 200), String(c.content)]).catch(() => {});
+    }
+  }
+}
+
+// 对话式修改人物（结构化补丁：改角色字段 / 新增角色 / 改关系）
+async function _reviseChars(p, instruction) {
+  const { rows: chars } = await db.query('SELECT id, name, role_type, identity, persona FROM nv_characters WHERE project_id = ?', [p.id]);
+  const roster = (chars || []).map(c => `${c.name}（${c.role_type}）烙印：${(c.persona || '').slice(0, 60)}`).join('\n') || '（暂无角色）';
+  const nameToId = {}; (chars || []).forEach(c => { nameToId[c.name] = c.id; });
+  const prompt = `你是小说设定管理员。下面是现有角色，请按作者要求调整。只输出 JSON。
+【现有角色】
+${roster}
+
+【作者要求】${instruction}
+
+输出格式（只写要改/新增的）：
+{
+  "character_updates": [{ "name":"已有角色名", "persona":"新烙印(可选)", "goals":"(可选)", "identity":"(可选)", "abilities":"(可选)", "role_type":"lead/antagonist/supporting/love(可选)" }],
+  "new_characters": [{ "name":"", "role_type":"", "identity":"", "persona":"", "goals":"", "abilities":"" }]
+}`;
+  const raw = await callAI(prompt, { temperature: 0.5, maxTokens: 1500, bypassCap: true });
+  const jm = raw.match(/\{[\s\S]*\}/);
+  if (!jm) return;
+  const patch = JSON.parse(jm[0]);
+  for (const u of (patch.character_updates || [])) {
+    if (!u || !u.name || !nameToId[u.name]) continue;
+    const fields = []; const vals = [];
+    for (const k of ['persona', 'goals', 'identity', 'abilities', 'role_type']) {
+      if (u[k] !== undefined && u[k] !== '') { fields.push(`${k} = ?`); vals.push(String(u[k])); }
+    }
+    if (fields.length) { vals.push(nameToId[u.name]); await db.query(`UPDATE nv_characters SET ${fields.join(', ')} WHERE id = ?`, vals).catch(() => {}); }
+  }
+  let idx = (chars || []).length;
+  for (const c of (patch.new_characters || [])) {
+    if (!c || !c.name || nameToId[c.name]) continue;
+    const rt = ['lead', 'antagonist', 'supporting', 'love'].includes(c.role_type) ? c.role_type : 'supporting';
+    await db.query('INSERT INTO nv_characters (project_id, name, role_type, identity, persona, goals, abilities, color, sort) VALUES (?,?,?,?,?,?,?,?,?)',
+      [p.id, String(c.name).slice(0, 100), rt, String(c.identity || '').slice(0, 255), String(c.persona || ''), String(c.goals || ''), String(c.abilities || ''), CHAR_COLORS[idx % CHAR_COLORS.length], idx]).catch(() => {});
+    idx++;
+  }
+}
+
 async function _genToc(p, params) {
   const volume = parseInt(params.volume) || 1;
   const count = Math.min(parseInt(params.count) || 10, 20);
@@ -406,6 +472,8 @@ async function processNovelGen(taskId) {
     else if (input.action === 'toc') await _genToc(p, input.params || {});
     else if (input.action === 'extract_chars') await _genExtractChars(p);
     else if (input.action === 'revise_outline') await _reviseOutline(p, input.instruction || '');
+    else if (input.action === 'revise_cards') await _reviseCards(p, input.instruction || '');
+    else if (input.action === 'revise_chars') await _reviseChars(p, input.instruction || '');
     else throw new Error('未知生成类型: ' + input.action);
     await db.query("UPDATE tasks SET status = 'done', progress = 100, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
   } catch (e) {
@@ -630,17 +698,21 @@ router.post('/projects/:id/outline', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
-// 对话式修改大纲 — 异步任务
-router.post('/projects/:id/outline/revise', requireAuth, async (req, res) => {
+// 对话式修改（统一入口）：target = outline / cards / characters
+router.post('/projects/:id/revise', requireAuth, async (req, res) => {
   try {
     const p = await getProject(parseInt(req.params.id), req.userId);
     if (!p) return res.status(404).json({ code: 404, msg: '项目不存在' });
-    if (!(p.outline || '').trim()) return res.status(400).json({ code: 400, msg: '还没有大纲，先生成或写一版' });
     const instruction = String(req.body.instruction || '').trim();
     if (!instruction) return res.status(400).json({ code: 400, msg: '请说明怎么调整' });
+    const map = { outline: 'revise_outline', cards: 'revise_cards', characters: 'revise_chars' };
+    const action = map[req.body.target];
+    if (!action) return res.status(400).json({ code: 400, msg: '未知调整对象' });
+    if (action === 'revise_outline' && !(p.outline || '').trim()) return res.status(400).json({ code: 400, msg: '还没有大纲，先生成或写一版' });
+    const labelMap = { outline: '大纲', cards: '设定集', characters: '人物' };
     const taskId = crypto.randomUUID();
     await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
-      [taskId, req.userId, 'novel_gen', `调整大纲：${p.title}`.slice(0, 200), 'pending', 0, JSON.stringify({ projectId: p.id, action: 'revise_outline', instruction })]);
+      [taskId, req.userId, 'novel_gen', `调整${labelMap[req.body.target]}：${p.title}`.slice(0, 200), 'pending', 0, JSON.stringify({ projectId: p.id, action, instruction })]);
     taskRunner.enqueue({ taskId, type: 'novel_gen' });
     res.json({ code: 200, data: { taskId } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
