@@ -5100,7 +5100,8 @@ async function dOLearnWrite(){
   if(r.code!==200){ dS.oLearnWriting=false; dToast(r.msg||'写入失败'); dRender(); return; }
   const finish = () => {
     dS.oLearnWriting=false; dS.oSkill=null; // 让 Skill 下次重新加载最新
-    dToast(scope==='global'?`已融合 ${n} 项进 Skill ✓`:`已记录 ${n} 项`);
+    const base = scope==='global'?`已融合 ${n} 项进 Skill ✓`:`已记录 ${n} 项`;
+    dToast(samples.length ? `${base}，并收录 ${samples.length} 条神句到语感金句库` : base);
     dS.oLearnResult=null; dS.oLearnPhase='input'; dS.oMatSel=[]; dS.oLoaded=false; dS.oView='home';
     dRender();
   };
