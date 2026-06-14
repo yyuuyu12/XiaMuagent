@@ -4939,13 +4939,21 @@ async function dOLearnAnalyze(){
   if(!sel.length || dS.oLearnBusy) return;
   dS.oLearnBusy=true; dS.oLearnResult=null; dRender();
   const r = await dHttp.post('/original/learning/analyze', { materialIds:sel, scope:dS.oLearnScope });
-  dS.oLearnBusy=false;
-  if(r.code===200 && r.data){
-    const data = r.data;
-    data.rules = (data.rules||[]).map(rule=>({ ...rule, checked: rule.checked!==false }));
-    dS.oLearnResult = data; dS.oLearnPhase='result';
-  } else dToast(r.msg||'拆解失败');
-  dRender();
+  if(r.code!==200 || !r.data || !r.data.taskId){ dS.oLearnBusy=false; dToast(r.msg||'提交失败'); dRender(); return; }
+  // 异步轮询（逐条深拆很慢，避免网关超时）
+  const timer = setInterval(async ()=>{
+    const t = await dHttp.get('/tasks/'+r.data.taskId);
+    if(t.code!==200 || !t.data) return;
+    if(t.data.status==='done'){
+      clearInterval(timer); dS.oLearnBusy=false;
+      const data = t.data.result || {};
+      data.rules = (data.rules||[]).map(rule=>({ ...rule, checked: rule.checked!==false }));
+      dS.oLearnResult = data; dS.oLearnPhase='result'; dRender();
+    } else if(t.data.status==='failed'){
+      clearInterval(timer); dS.oLearnBusy=false;
+      dToast('拆解失败：'+(t.data.error_msg||'请重试')); dRender();
+    }
+  }, 3000);
 }
 function dOLearnVideoCard(v, showHead){
   const meta = role => O_LEARN_ROLE[role] || O_LEARN_ROLE.normal;

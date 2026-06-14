@@ -1,10 +1,12 @@
 // routes/original.js — 原创工坊：Skill + 项目 + 对话 + 学习中心
 const express = require('express');
 const https = require('https');
+const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth } = require('./auth');
 const { callAI } = require('../lib/callAI');
 const { getAsrUrl, extractMp4Url, asrTranscribe } = require('../lib/asrHelper');
+const taskRunner = require('../taskRunner');
 const router = express.Router();
 
 /**
@@ -1899,63 +1901,72 @@ ${scriptForAI}
 
 // POST /api/original/learning/analyze —【阶段二】对用户选中的原文做逐句深拆
 // 支持两种来源：items（旧，带 awemeId/script）或 materialIds（从素材库选）
-router.post('/learning/analyze', requireAuth, async (req, res) => {
-  const { type = 'video', items = [], scope = 'global', materialIds = [] } = req.body;
-
-  let picked = [];
-  let tikhubKey = null;
-
-  if (Array.isArray(materialIds) && materialIds.length > 0) {
-    // 从素材库加载
-    const ids = materialIds.slice(0, 4).map(Number).filter(Boolean);
-    if (ids.length) {
-      const { rows: mats } = await db.query(
-        `SELECT id, title, raw_content FROM cw_materials WHERE id IN (${ids.map(()=>'?').join(',')}) AND user_id = ?`,
-        [...ids, req.userId]
-      );
-      picked = mats.map(m => ({ desc: m.title, script: m.raw_content || '', likes: 0 }));
-    }
-  } else {
-    picked = (Array.isArray(items) ? items : []).filter(it => it && (it.script || it.awemeId)).slice(0, 4);
-    if (picked.some(p => !p.script && p.awemeId)) {
-      tikhubKey = await getTikhubKey();
-    }
+// 逐条深拆 + 汇总去重规律。供异步任务调用。
+async function _runLearningAnalyze(picked, tikhubKey, type) {
+  const videos = [];
+  for (const it of picked) {
+    const one = await analyzeOneVideo(it, tikhubKey);
+    if (one) videos.push(one);
   }
-
-  if (!picked.length) return res.status(400).json({ code: 400, msg: '请先选择要学习的素材' });
-
-  try {
-    if (!tikhubKey && picked.some(p => !p.script && p.awemeId)) {
-      tikhubKey = await getTikhubKey();
-      if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员配置 TikHub Key' });
-    }
-
-    // 逐条深拆（串行，避免并发触发 AI 限流）
-    const videos = [];
-    for (const it of picked) {
-      const one = await analyzeOneVideo(it, tikhubKey);
-      if (one) videos.push(one);
-    }
-    if (!videos.length) return res.status(422).json({ code: 422, msg: '所选视频未提取到可分析的文案' });
-
-    // 汇总所有视频的规律，去重后供用户勾选写入 Skill
-    const seen = new Set();
-    const rules = [];
-    for (const v of videos) {
-      for (const r of v.rules) {
-        const key = r.text.replace(/\s+/g, '');
-        if (key && !seen.has(key)) {
-          seen.add(key);
-          rules.push({ text: r.text, freq: r.freq, dim: r.dim || '其他', checked: true });
-        }
+  const seen = new Set();
+  const rules = [];
+  for (const v of videos) {
+    for (const r of v.rules) {
+      const key = r.text.replace(/\s+/g, '');
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        rules.push({ text: r.text, freq: r.freq, dim: r.dim || '其他', checked: true });
       }
     }
-
-    res.json({ code: 200, data: { type, videos, rules } });
-  } catch (err) {
-    console.error('/original/learning/analyze error:', err.message);
-    res.status(500).json({ code: 500, msg: err.message });
   }
+  return { type, videos, rules };
+}
+
+// worker 调用：拆解为异步任务（逐条 AI 深拆很慢，同步会被网关超时返 504 HTML）
+async function processLearningAnalyze(taskId) {
+  const { rows } = await db.query('SELECT * FROM tasks WHERE id = ?', [taskId]);
+  const task = rows?.[0];
+  if (!task || ['done', 'failed'].includes(task.status)) return;
+  const input = typeof task.input_data === 'string' ? JSON.parse(task.input_data) : (task.input_data || {});
+  const { materialIds = [], items = [], type = 'video', userId } = input;
+  try {
+    await db.query("UPDATE tasks SET status = 'running', progress = 20, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
+    let picked = []; let tikhubKey = null;
+    if (Array.isArray(materialIds) && materialIds.length > 0) {
+      const ids = materialIds.slice(0, 4).map(Number).filter(Boolean);
+      if (ids.length) {
+        const { rows: mats } = await db.query(
+          `SELECT id, title, raw_content FROM cw_materials WHERE id IN (${ids.map(() => '?').join(',')}) AND user_id = ?`,
+          [...ids, userId]
+        );
+        picked = mats.map(m => ({ desc: m.title, script: m.raw_content || '', likes: 0 }));
+      }
+    } else {
+      picked = (Array.isArray(items) ? items : []).filter(it => it && (it.script || it.awemeId)).slice(0, 4);
+      if (picked.some(p => !p.script && p.awemeId)) tikhubKey = await getTikhubKey();
+    }
+    if (!picked.length) throw new Error('没有可分析的素材');
+    const result = await _runLearningAnalyze(picked, tikhubKey, type);
+    if (!result.videos.length) throw new Error('所选素材未提取到可分析的文案');
+    await db.query("UPDATE tasks SET status = 'done', progress = 100, result = ?, updated_at = NOW() WHERE id = ?", [JSON.stringify(result), taskId]).catch(() => {});
+  } catch (e) {
+    console.error('[processLearningAnalyze]', e.message);
+    await db.query('UPDATE tasks SET status = ?, error_msg = ?, updated_at = NOW() WHERE id = ?', ['failed', e.message, taskId]).catch(() => {});
+  }
+}
+
+router.post('/learning/analyze', requireAuth, async (req, res) => {
+  const { type = 'video', items = [], materialIds = [] } = req.body;
+  const hasMat = Array.isArray(materialIds) && materialIds.length > 0;
+  const hasItems = Array.isArray(items) && items.length > 0;
+  if (!hasMat && !hasItems) return res.status(400).json({ code: 400, msg: '请先选择要学习的素材' });
+  try {
+    const taskId = crypto.randomUUID();
+    await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+      [taskId, req.userId, 'original_analyze', 'AI 拆解素材规律', 'pending', 0, JSON.stringify({ materialIds, items, type, userId: req.userId })]);
+    taskRunner.enqueue({ taskId, type: 'original_analyze' });
+    res.json({ code: 200, data: { taskId } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
 // POST /api/original/learning/write — 把选中的规律【融合】进 Skill 工作流（非简单追加）
@@ -2215,3 +2226,4 @@ router.delete('/materials/:id', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.processLearningAnalyze = processLearningAnalyze;
