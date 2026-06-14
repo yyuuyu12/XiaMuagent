@@ -543,6 +543,21 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // cw_skill_samples 表：金句样本库（按环节存"神句"原句，传语感不传内容）
+  // stage: hook(开头) / turn(转折) / end(结尾) / golden(金句)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_skill_samples (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      user_id     INT NOT NULL,
+      stage       VARCHAR(20) NOT NULL DEFAULT 'hook',
+      text        VARCHAR(500) NOT NULL,
+      topic       VARCHAR(50) DEFAULT '',
+      source      VARCHAR(50) DEFAULT '',
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // cw_golden_examples 表：范例库（定稿即范例，写剧本时检索 1 条题材相近的注入 prompt）
   await db.query(`
     CREATE TABLE IF NOT EXISTS cw_golden_examples (

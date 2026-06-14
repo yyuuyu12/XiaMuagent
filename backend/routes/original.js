@@ -608,7 +608,20 @@ function extractStageDoc(raw, stage) {
 }
 
 // 构建某阶段的 system prompt（含决策树分支 + 对标素材 + 前序产出）
-function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack }) {
+// 取金句样本：写剧本阶段，随机混搭（保证跨题材）取各环节神句，只传语感
+async function pickSkillSamples(userId, stage) {
+  if (stage !== 'script') return null; // 写正文时语感最关键
+  try {
+    const { rows } = await db.query(
+      "SELECT stage, text FROM cw_skill_samples WHERE user_id = ? ORDER BY RAND() LIMIT 18", [userId]);
+    if (!rows || !rows.length) return null;
+    const by = { hook: [], turn: [], end: [], golden: [] };
+    rows.forEach(r => { if (by[r.stage]) by[r.stage].push(r.text); });
+    return by;
+  } catch (e) { console.warn('[pickSkillSamples]', e.message); return null; }
+}
+
+function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack, samples }) {
   const meta = project.meta || {};
   const durationMap = { '30s': '30秒（约75字）', '1min': '1分钟（约150字）', '3min': '3分钟（约450字）' };
   const styleMap = { informative: '干货讲解', story: '故事叙事', contrast: '对比反差', twist: '悬念反转' };
@@ -660,7 +673,20 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
     : '';
 
   const tag = STAGE_META[stage].tag;
-  const common = `${skillBlock}\n${packBlock}${projectRulesBlock}\n${projInfo}\n${benchmarkBlock}${goldenBlock}${priorBlock}${draftBlock}${histBlock}`;
+  // 金句语感样本（跨题材，只学"劲"不抄内容）
+  let sampleBlock = '';
+  if (samples) {
+    const lab = { hook: '开头钩子', turn: '转折/反差', end: '结尾收束', golden: '金句' };
+    const parts = [];
+    for (const k of ['hook', 'turn', 'end', 'golden']) {
+      const arr = (samples[k] || []).slice(0, 5);
+      if (arr.length) parts.push(`【${lab[k]}的语感】\n${arr.map(t => `- 「${t}」`).join('\n')}`);
+    }
+    if (parts.length) {
+      sampleBlock = `\n## 语感样本（这些金句来自不同领域，只学它们的语气、节奏、句式狠劲；本章内容必须 100% 是本选题原创，严禁出现样本里的领域名词或具体内容，严禁照搬原句）\n${parts.join('\n')}\n`;
+    }
+  }
+  const common = `${skillBlock}\n${packBlock}${projectRulesBlock}\n${projInfo}\n${benchmarkBlock}${goldenBlock}${sampleBlock}${priorBlock}${draftBlock}${histBlock}`;
 
   // ── 决策树：是否已有明确方向 ──
   const hasDirection = !!(meta.angle || project.brief || artifacts.direction);
@@ -762,7 +788,9 @@ async function generateStageReply({ userId, project, skill, stage, boundMaterial
       if (rows && rows[0] && (rows[0].content || '').trim()) topicPack = rows[0];
     } catch (e) { console.warn('[topicPack]', e.message); }
   }
-  const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack });
+  // 金句语感样本：写剧本阶段注入，跨题材混搭只传"劲"不传内容
+  const samples = await pickSkillSamples(userId, stage);
+  const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack, samples });
   // 写稿环节用一线模型（管理后台 ai_model_creation 配置；留空走默认）；bypassCap 避免长稿被中转站默认上限砍断
   const creationModel = (await getConfigVal('ai_model_creation')).trim();
   const callOpts = { maxTokens: 4000, temperature: 0.65, bypassCap: true };
@@ -2007,9 +2035,56 @@ router.post('/learning/analyze', requireAuth, async (req, res) => {
 });
 
 // POST /api/original/learning/write — 把选中的规律【融合】进 Skill 工作流（非简单追加）
+// 金句样本：去重存入（语感资产，4-60 字，单次上限 20 条）
+async function saveSkillSamples(userId, samples) {
+  const { rows } = await db.query('SELECT text FROM cw_skill_samples WHERE user_id = ?', [userId]);
+  const seen = new Set((rows || []).map(r => r.text.replace(/\s+/g, '')));
+  let n = 0;
+  for (const s of samples) {
+    const text = (s && s.text ? String(s.text) : '').trim();
+    const stage = ['hook', 'turn', 'end', 'golden'].includes(s && s.stage) ? s.stage : 'golden';
+    if (text.length < 4 || text.length > 60) continue;
+    const key = text.replace(/\s+/g, '');
+    if (seen.has(key)) continue; seen.add(key);
+    await db.query('INSERT INTO cw_skill_samples (user_id, stage, text, topic, source) VALUES (?,?,?,?,?)',
+      [userId, stage, text, String((s && s.topic) || '').slice(0, 50), '学习']).catch(() => {});
+    if (++n >= 20) break;
+  }
+}
+
+/* ═══════════ 金句样本库 CRUD ═══════════ */
+router.get('/skill/samples', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT id, stage, text, topic, source, created_at FROM cw_skill_samples WHERE user_id = ? ORDER BY stage, id DESC', [req.userId]);
+    res.json({ code: 200, data: rows || [] });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+router.post('/skill/samples', requireAuth, async (req, res) => {
+  const { stage = 'golden', text, topic } = req.body;
+  const t = (text || '').trim();
+  if (!t) return res.status(400).json({ code: 400, msg: '请输入金句' });
+  try {
+    const st = ['hook', 'turn', 'end', 'golden'].includes(stage) ? stage : 'golden';
+    const { rows } = await db.query('INSERT INTO cw_skill_samples (user_id, stage, text, topic, source) VALUES (?,?,?,?,?)',
+      [req.userId, st, t.slice(0, 500), String(topic || '').slice(0, 50), '手动']);
+    res.json({ code: 200, data: { id: rows?.[0]?.id } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+router.delete('/skill/samples/:id', requireAuth, async (req, res) => {
+  try {
+    await db.query('DELETE FROM cw_skill_samples WHERE id = ? AND user_id = ?', [parseInt(req.params.id), req.userId]);
+    res.json({ code: 200, msg: '已删除' });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
 router.post('/learning/write', requireAuth, async (req, res) => {
-  const { insights, scope = 'global', projectId } = req.body;
+  const { insights, scope = 'global', projectId, samples } = req.body;
   if (!insights || !insights.length) return res.status(400).json({ code: 400, msg: '没有选中规律' });
+
+  // 收录金句样本（全局语感资产，与 scope 无关；去重、限长）
+  if (Array.isArray(samples) && samples.length) {
+    await saveSkillSamples(req.userId, samples).catch(e => console.warn('[saveSkillSamples]', e.message));
+  }
 
   // 仅用于本项目：真实写入该项目 meta.projectRules，之后本项目对话生成都会带上
   if (scope !== 'global') {

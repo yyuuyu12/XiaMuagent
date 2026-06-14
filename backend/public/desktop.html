@@ -4340,6 +4340,53 @@ async function dODeleteExample(id){
   else if(r.code!==200) dToast(r.msg||'删除失败');
   dRender();
 }
+/* ---------- 语感金句库 ---------- */
+const NV_SAMPLE_STAGE = { hook:'开头钩子', turn:'转折/反差', end:'结尾收束', golden:'金句' };
+async function dOOpenSamples(){ dS.oSamplesModal=true; dS.oSamples=null; dS.oSampleStage='hook'; dS.oSampleText=''; dRender(); const r=await dHttp.get('/original/skill/samples'); dS.oSamples=r.code===200?(r.data||[]):[]; dRender(); }
+function dOCloseSamples(){ dS.oSamplesModal=false; dRender(); }
+async function dOAddSample(){
+  const text=(dS.oSampleText||'').trim(); if(!text){ dToast('请输入金句'); return; }
+  const r=await dHttp.post('/original/skill/samples',{ stage:dS.oSampleStage||'hook', text });
+  if(r.code===200){ dS.oSampleText=''; const lr=await dHttp.get('/original/skill/samples'); dS.oSamples=lr.code===200?(lr.data||[]):dS.oSamples; dToast('已添加'); dRender(); }
+  else dToast(r.msg||'添加失败');
+}
+async function dODelSample(id){
+  const r=await dApi('DELETE','/original/skill/samples/'+id);
+  if(r.code===200){ dS.oSamples=(dS.oSamples||[]).filter(s=>s.id!==id); dRender(); }
+  else dToast(r.msg||'删除失败');
+}
+function dOSamplesModalHtml(){
+  const list=dS.oSamples;
+  const byStage={hook:[],turn:[],end:[],golden:[]};
+  (list||[]).forEach(s=>{ if(byStage[s.stage]) byStage[s.stage].push(s); });
+  const body = list===null ? '<div class="do-empty" style="padding:30px">加载中…</div>'
+    : ((list.length===0) ? '<div class="do-empty" style="padding:24px">还没有金句。学习中心写入时会自动收录拆解出的神句，也可在下方手动添加。<br>写剧本时会跨题材抽取这些金句当"语感标尺"，只学语气节奏、不抄内容。</div>'
+      : ['hook','turn','end','golden'].map(k=>{
+          const arr=byStage[k]; if(!arr.length) return '';
+          return `<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#F5762A;margin-bottom:6px">${NV_SAMPLE_STAGE[k]}（${arr.length}）</div>
+            ${arr.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F2EFEA">
+              <div style="flex:1;font-size:13px;color:#2A241E;line-height:1.5">「${esc(s.text)}」${s.topic?`<span style="font-size:10px;color:#B0AA9F;margin-left:6px">${esc(s.topic)}</span>`:''}</div>
+              <span class="do-link" style="color:#E5534B;font-size:11px;flex-shrink:0" onclick="dODelSample(${s.id})">删</span>
+            </div>`).join('')}</div>`;
+        }).join(''));
+  return `<div class="d-modal-overlay" style="display:flex" onclick="if(event.target===this)dOCloseSamples()">
+    <div class="d-modal" style="width:600px;max-width:92%;text-align:left;max-height:84vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="d-modal-title" style="margin:0;font-size:17px">语感金句库</div>
+        <button style="background:none;border:none;font-size:24px;color:#B0AA9F;cursor:pointer;line-height:1" onclick="dOCloseSamples()">×</button>
+      </div>
+      <div style="font-size:11.5px;color:#B0AA9F;margin-bottom:14px;line-height:1.6">写剧本时，AI 会跨题材抽取这些金句当"语感标尺"——只学它们的语气、节奏、句式狠劲，内容仍是本选题原创。故意混不同领域，所以抄不了也跑不偏。</div>
+      <div style="flex:1;overflow-y:auto">${body}</div>
+      <div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid #F0EDE8;padding-top:14px">
+        <select class="sel" style="width:110px;flex-shrink:0" onchange="dS.oSampleStage=this.value">
+          ${['hook','turn','end','golden'].map(k=>`<option value="${k}" ${dS.oSampleStage===k?'selected':''}>${NV_SAMPLE_STAGE[k]}</option>`).join('')}
+        </select>
+        <input class="inp" style="flex:1" placeholder="粘一句你觉得有"劲"的神句（来自任何领域）…" value="${esc(dS.oSampleText||'')}" oninput="dS.oSampleText=this.value" onkeydown="if(event.key==='Enter')dOAddSample()">
+        <button class="do-btn do-btn-pri" style="flex-shrink:0" onclick="dOAddSample()">添加</button>
+      </div>
+    </div>
+  </div>`;
+}
 function dOStatsModalHtml(){
   const st = dS.oStats;
   const statCard = (num,lab,c)=>`<div style="flex:1;background:#FBFAF7;border:1px solid #EDE9E3;border-radius:11px;padding:12px 0;text-align:center"><div style="font-size:20px;font-weight:700;color:${c||'#1A1614'}">${num}</div><div style="font-size:11px;color:#9E9890;margin-top:2px">${lab}</div></div>`;
@@ -5042,7 +5089,14 @@ async function dOLearnWrite(){
   dS.oLearnWriting=true; dRender();
   const projectId = scope==='project' && dS.oProject ? dS.oProject.id : null;
   const n = selected.length;
-  const r = await dHttp.post('/original/learning/write', { insights:selected.map(s=>({text:s.text,dim:s.dim,freq:s.freq})), scope, projectId });
+  // 提取金句样本（逐句标注里 hook/turn/cta 的原句，传语感不传内容）
+  const roleMap = { hook:'hook', turn:'turn', cta:'end' };
+  const samples = [];
+  (result.videos||[]).forEach(v=>{ (v.segments||[]).forEach(seg=>{
+    const st = roleMap[seg.role]; const t = (seg.text||'').trim();
+    if(st && t.length>=4 && t.length<=60) samples.push({ stage:st, text:t });
+  }); });
+  const r = await dHttp.post('/original/learning/write', { insights:selected.map(s=>({text:s.text,dim:s.dim,freq:s.freq})), scope, projectId, samples });
   if(r.code!==200){ dS.oLearnWriting=false; dToast(r.msg||'写入失败'); dRender(); return; }
   const finish = () => {
     dS.oLearnWriting=false; dS.oSkill=null; // 让 Skill 下次重新加载最新
@@ -5195,6 +5249,7 @@ function dOSkillPage(){
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
         ${cur.id==='main'?`<button class="do-btn do-btn-gho" onclick="dOOpenStats()">效果数据</button>`:''}
+        ${cur.id==='main'?`<button class="do-btn do-btn-gho" onclick="dOOpenSamples()">语感金句</button>`:''}
         ${cur.id==='main'?`<button class="do-btn do-btn-gho" ${dS.oCompacting?'disabled':''} onclick="dOCompactSkill()">${dS.oCompacting?'整理中…':'整理自动学习记录'}</button>`:''}
         ${cur.id==='main'?`<button class="do-btn do-btn-gho" onclick="dS.oSkillHistoryOpen=true;dRender()">历史记录</button>`:''}
         ${isPack?`<button class="do-btn" style="background:#FFF0EF;color:#E5534B" onclick="dODeletePackById(${cur.packId})">删除此包</button>`:''}
@@ -5222,7 +5277,7 @@ function dOSkillPage(){
     <div style="display:flex;height:calc(100vh - 120px);border-radius:16px;overflow:hidden;border:1px solid #EFEAE2;box-shadow:0 2px 16px rgba(0,0,0,0.06)">
       ${sidebar}${editor}
     </div>
-    ${historySheet}${dS.oStatsOpen?dOStatsModalHtml():''}${dS.oPackEdit?dOPackModalHtml():''}`;
+    ${historySheet}${dS.oStatsOpen?dOStatsModalHtml():''}${dS.oPackEdit?dOPackModalHtml():''}${dS.oSamplesModal?dOSamplesModalHtml():''}`;
 }
 async function dOSkillSave(){
   if(dS.oSkillSaving) return;
