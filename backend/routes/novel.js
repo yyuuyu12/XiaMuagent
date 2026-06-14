@@ -248,6 +248,24 @@ ${p.brief ? `【作者意图】${p.brief}` : ''}
   await db.query('UPDATE nv_projects SET outline = ? WHERE id = ?', [outline, p.id]);
 }
 
+// 对话式修改大纲：在现有大纲基础上按作者指令调整，返回完整大纲
+async function _reviseOutline(p, instruction) {
+  const prompt = `你是资深网文主编。下面是当前全书大纲，请按作者的要求调整，输出【完整的】修改后大纲。
+【当前大纲】
+${p.outline || '（空）'}
+
+【作者要求】${instruction}
+
+要求：
+- 只改作者要求的部分，没提到的卷/内容原样保留，不要删减或省略
+- 保持 Markdown 卷级结构（## 第N卷·卷名）
+- 直接输出完整大纲，不要解释、不要前后缀`;
+  const outline = await callAI(prompt, { temperature: 0.6, maxTokens: 3500, bypassCap: true });
+  if (outline && outline.trim().length > 20) {
+    await db.query('UPDATE nv_projects SET outline = ? WHERE id = ?', [outline.trim(), p.id]);
+  }
+}
+
 async function _genToc(p, params) {
   const volume = parseInt(params.volume) || 1;
   const count = Math.min(parseInt(params.count) || 10, 20);
@@ -387,6 +405,7 @@ async function processNovelGen(taskId) {
     else if (input.action === 'outline') await _genOutline(p);
     else if (input.action === 'toc') await _genToc(p, input.params || {});
     else if (input.action === 'extract_chars') await _genExtractChars(p);
+    else if (input.action === 'revise_outline') await _reviseOutline(p, input.instruction || '');
     else throw new Error('未知生成类型: ' + input.action);
     await db.query("UPDATE tasks SET status = 'done', progress = 100, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
   } catch (e) {
@@ -606,6 +625,22 @@ router.post('/projects/:id/outline', requireAuth, async (req, res) => {
     const taskId = crypto.randomUUID();
     await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
       [taskId, req.userId, 'novel_gen', `生成大纲：${p.title}`.slice(0, 200), 'pending', 0, JSON.stringify({ projectId: p.id, action: 'outline' })]);
+    taskRunner.enqueue({ taskId, type: 'novel_gen' });
+    res.json({ code: 200, data: { taskId } });
+  } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// 对话式修改大纲 — 异步任务
+router.post('/projects/:id/outline/revise', requireAuth, async (req, res) => {
+  try {
+    const p = await getProject(parseInt(req.params.id), req.userId);
+    if (!p) return res.status(404).json({ code: 404, msg: '项目不存在' });
+    if (!(p.outline || '').trim()) return res.status(400).json({ code: 400, msg: '还没有大纲，先生成或写一版' });
+    const instruction = String(req.body.instruction || '').trim();
+    if (!instruction) return res.status(400).json({ code: 400, msg: '请说明怎么调整' });
+    const taskId = crypto.randomUUID();
+    await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+      [taskId, req.userId, 'novel_gen', `调整大纲：${p.title}`.slice(0, 200), 'pending', 0, JSON.stringify({ projectId: p.id, action: 'revise_outline', instruction })]);
     taskRunner.enqueue({ taskId, type: 'novel_gen' });
     res.json({ code: 200, data: { taskId } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }

@@ -1039,7 +1039,11 @@ function dNvProjectView() {
       <div class="do-col-head"><div><div class="do-col-h-title">全书大纲</div><div class="do-col-h-sub">卷级结构，章节细纲据此生成</div></div>
         <button class="do-btn do-btn-pri" style="padding:6px 14px;font-size:12px" ${dS.nvOutlineBusy?'disabled':''} onclick="dNvGenOutline()">${dS.nvOutlineBusy?'生成中…':((proj.outline||'').trim()?'重新生成':'生成大纲')}</button></div>
       <textarea class="do-doc-edit" placeholder="点右上角生成全书大纲，或自己写。" oninput="dS.nvProject.project.outline=this.value">${esc(proj.outline||'')}</textarea>
-      <div class="do-doc-foot"><div style="flex:1"></div><button class="do-btn do-btn-gho" onclick="dNvSaveOutline()">保存大纲</button></div>
+      <div class="do-doc-foot" style="flex-wrap:wrap;gap:8px">
+        <input id="nvOutlineRevise" class="inp" style="flex:1;min-width:200px" placeholder="让 AI 调整大纲，如：第2卷节奏太慢，加个反转…" ${dS.nvOutlineBusy?'disabled':''}>
+        <button class="do-btn do-btn-pri" style="flex-shrink:0" ${dS.nvOutlineBusy?'disabled':''} onclick="dNvReviseOutline()">${dS.nvOutlineBusy?'AI 调整中…':'✨ AI 改'}</button>
+        <button class="do-btn do-btn-gho" style="flex-shrink:0" onclick="dNvSaveOutline()">保存手改</button>
+      </div>
     </div>`;
   } else if (dS.nvRight === 'cards') {
     const kindLabel = { world:'世界观', character:'角色', faction:'势力', style:'文风' };
@@ -1108,6 +1112,21 @@ async function dNvGenOutline() {
 async function dNvSaveOutline() {
   const r = await dApi('PATCH', '/novel/projects/'+dS.nvProject.project.id, { outline: dS.nvProject.project.outline||'' });
   dToast(r.code===200?'已保存':(r.msg||'保存失败'));
+}
+async function dNvReviseOutline() {
+  const el = document.getElementById('nvOutlineRevise');
+  const inst = (el ? el.value : '').trim();
+  if (!inst) { dToast('说一下想怎么调整'); return; }
+  if (!(dS.nvProject.project.outline||'').trim()) { dToast('先生成或写一版大纲，再让 AI 调整'); return; }
+  dS.nvOutlineBusy = true; dRender();
+  const r = await dHttp.post('/novel/projects/'+dS.nvProject.project.id+'/outline/revise', { instruction: inst });
+  if (r.code !== 200) { dS.nvOutlineBusy=false; dToast(r.msg||'提交失败'); dRender(); return; }
+  const pid = dS.nvProject.project.id;
+  dNvPollTask(r.data.taskId, async () => {
+    const pr = await dHttp.get('/novel/projects/'+pid);
+    if (pr.code===200 && dS.nvProject && dS.nvProject.project.id===pid) dS.nvProject = pr.data;
+    dS.nvOutlineBusy=false; dToast('大纲已按要求调整 ✓'); dRender();
+  }, (msg) => { dS.nvOutlineBusy=false; dToast('调整失败：'+msg); dRender(); });
 }
 async function dNvGenToc() {
   if (!(dS.nvProject.project.outline||'').trim()) { dToast('先生成全书大纲'); dS.nvRight='outline'; dRender(); return; }
