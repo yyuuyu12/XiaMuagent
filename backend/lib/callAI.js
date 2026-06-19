@@ -1,5 +1,20 @@
 const db = require('../db');
 
+// 记录一次 AI 调用的 token 用量（异步、不阻塞、不抛错）
+// 兼容 OpenAI 风格(prompt_tokens/completion_tokens) 与 Claude 风格(input_tokens/output_tokens)
+function logTokens(model, usage, opts) {
+  try {
+    if (!usage) return;
+    const pt = usage.prompt_tokens ?? usage.input_tokens ?? 0;
+    const ct = usage.completion_tokens ?? usage.output_tokens ?? 0;
+    if (!pt && !ct) return;
+    db.query(
+      'INSERT INTO ai_token_logs (user_id, module, model, prompt_tokens, completion_tokens) VALUES (?,?,?,?,?)',
+      [parseInt(opts.userId) || 0, String(opts.module || '').slice(0, 30), String(model || '').slice(0, 60), pt, ct]
+    ).catch(() => {});
+  } catch {}
+}
+
 async function getAIConfig() {
   const keys = [
     'ai_provider', 'openai_api_key', 'openai_base_url', 'openai_model',
@@ -44,6 +59,7 @@ async function callAI(prompt, opts = {}) {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new Error(`AI 返回内容异常: ${JSON.stringify(data).slice(0, 200)}`);
+    logTokens(model, data.usage, opts);
     return content;
   }
 
@@ -60,6 +76,7 @@ async function callAI(prompt, opts = {}) {
     const data = await response.json();
     const text = data.content?.[0]?.text;
     if (!text) throw new Error(`Claude 返回内容异常`);
+    logTokens(model, data.usage, opts);
     return text;
   }
 
@@ -76,6 +93,7 @@ async function callAI(prompt, opts = {}) {
     const data = await response.json();
     const zc = data.choices?.[0]?.message?.content;
     if (!zc) throw new Error(`智谱返回内容异常`);
+    logTokens(model, data.usage, opts);
     return zc;
   }
 
@@ -92,6 +110,7 @@ async function callAI(prompt, opts = {}) {
     const data = await response.json();
     const dc = data.choices?.[0]?.message?.content;
     if (!dc) throw new Error(`DeepSeek 返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
+    logTokens(model, data.usage, opts);
     return dc;
   }
 

@@ -543,6 +543,22 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // ai_token_logs 表：AI token 用量日志（用于后台报表统计花费）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS ai_token_logs (
+      id                BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id           INT DEFAULT 0,
+      module            VARCHAR(30) DEFAULT '',
+      model             VARCHAR(60) DEFAULT '',
+      prompt_tokens     INT DEFAULT 0,
+      completion_tokens INT DEFAULT 0,
+      created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_created (created_at),
+      INDEX idx_module (module),
+      INDEX idx_model (model)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // cw_skill_samples 表：金句样本库（按环节存"神句"原句，传语感不传内容）
   // stage: hook(开头) / turn(转折) / end(结尾) / golden(金句)
   await db.query(`

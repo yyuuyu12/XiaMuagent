@@ -30,7 +30,8 @@ router.post('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
     'claude_api_key','claude_model','qwen_api_key','qwen_model','zhipu_api_key','zhipu_model',
     'deepseek_api_key','deepseek_model','tikhub_api_key','asr_url','video_url','fish_audio_api_key',
     'oss_region','oss_access_key_id','oss_access_key_secret','oss_bucket','oss_cdn_domain','oss_video_limit',
-    'max_tokens_cap','ai_model_creation','critic_enabled'];
+    'max_tokens_cap','ai_model_creation','critic_enabled','ai_model_novel',
+    'token_price_in','token_price_out'];
   for (const [k, v] of Object.entries(req.body)) {
     if (allowedKeys.includes(k) && v !== undefined) {
       if (typeof v === 'string' && v.includes('****')) continue;
@@ -42,6 +43,37 @@ router.post('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
     }
   }
   res.json({ code: 200, msg: '配置已保存' });
+});
+
+// ==================== Token 用量报表 ====================
+router.get('/token-stats', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const q = (sql, params = []) => db.query(sql, params).then(r => r.rows);
+    const [tot, today, month, byModel, byModule, trend, priceRows] = await Promise.all([
+      q(`SELECT COUNT(*) AS calls, COALESCE(SUM(prompt_tokens),0) AS pt, COALESCE(SUM(completion_tokens),0) AS ct FROM ai_token_logs`),
+      q(`SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= CURDATE()`),
+      q(`SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01')`),
+      q(`SELECT model, COUNT(*) AS calls, SUM(prompt_tokens) AS pt, SUM(completion_tokens) AS ct FROM ai_token_logs GROUP BY model ORDER BY (SUM(prompt_tokens)+SUM(completion_tokens)) DESC LIMIT 20`),
+      q(`SELECT CASE WHEN module='' OR module IS NULL THEN '未分类' ELSE module END AS module, COUNT(*) AS calls, SUM(prompt_tokens+completion_tokens) AS t FROM ai_token_logs GROUP BY module ORDER BY t DESC`),
+      q(`SELECT DATE(created_at) AS d, SUM(prompt_tokens+completion_tokens) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) GROUP BY DATE(created_at) ORDER BY d`),
+      q(`SELECT config_key, value FROM system_config WHERE config_key IN ('token_price_in','token_price_out')`),
+    ]);
+    const price = {}; (priceRows || []).forEach(r => { price[r.config_key] = parseFloat(r.value) || 0; });
+    const t = tot[0] || { calls: 0, pt: 0, ct: 0 };
+    const cost = (Number(t.pt) / 1e6) * (price.token_price_in || 0) + (Number(t.ct) / 1e6) * (price.token_price_out || 0);
+    res.json({ code: 200, data: {
+      total: { calls: Number(t.calls), promptTokens: Number(t.pt), completionTokens: Number(t.ct), totalTokens: Number(t.pt) + Number(t.ct), cost },
+      today: { tokens: Number(today[0]?.t || 0), calls: Number(today[0]?.c || 0) },
+      month: { tokens: Number(month[0]?.t || 0), calls: Number(month[0]?.c || 0) },
+      byModel: (byModel || []).map(r => ({ model: r.model || '(未知)', calls: Number(r.calls), tokens: Number(r.pt) + Number(r.ct) })),
+      byModule: (byModule || []).map(r => ({ module: r.module, calls: Number(r.calls), tokens: Number(r.t) })),
+      trend: (trend || []).map(r => ({ date: (r.d instanceof Date ? r.d.toISOString().slice(0,10) : String(r.d).slice(0,10)), tokens: Number(r.t), calls: Number(r.c) })),
+      price: { in: price.token_price_in || 0, out: price.token_price_out || 0 },
+    }});
+  } catch (err) {
+    console.error('/config/token-stats error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
 });
 
 // ==================== 调试接口（临时） ====================
