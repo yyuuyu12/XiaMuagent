@@ -332,38 +332,69 @@ ${roster}
   }
 }
 
+// 健壮解析 AI 返回的章节 JSON 数组：去 markdown 围栏 → 整体解析 → 兜底逐对象解析（应对截断/夹带解释文字）
+function _parseChapterArray(raw) {
+  if (!raw) return [];
+  const s = String(raw).replace(/```json/gi, '').replace(/```/g, '').trim();
+  const m = s.match(/\[[\s\S]*\]/);
+  if (m) { try { const a = JSON.parse(m[0]); if (Array.isArray(a)) return a; } catch {} }
+  // 整体解析失败（多为输出被截断少了结尾 ]）→ 把每个完整的 {…} 对象单独抠出来解析，能救回多少算多少
+  const src = m ? m[0] : s;
+  const objs = []; const re = /\{[^{}]*\}/g; let mm;
+  while ((mm = re.exec(src))) { try { objs.push(JSON.parse(mm[0])); } catch {} }
+  return objs;
+}
+
 async function _genToc(p, params) {
   const volume = parseInt(params.volume) || 1;
   const count = Math.min(parseInt(params.count) || 10, 20);
-  const { rows: existRows } = await db.query('SELECT MAX(seq) AS maxSeq FROM nv_chapters WHERE project_id = ?', [p.id]);
-  const startSeq = (existRows?.[0]?.maxSeq || 0) + 1;
-  const { rows: recentRows } = await db.query(
-    'SELECT seq, title, outline FROM nv_chapters WHERE project_id = ? ORDER BY seq DESC LIMIT 5', [p.id]);
-  const recentBlock = (recentRows || []).reverse().map(r => `第${r.seq}章 ${r.title}：${r.outline}`).join('\n');
   const cw = p.chapter_words || 2500;
-  const prompt = `你是资深网文主编。基于全书大纲，为第 ${volume} 卷规划第 ${startSeq} 到 ${startSeq + count - 1} 章的细纲。只输出 JSON 数组。
+  // ⚠️ 分小批生成（每批 ≤ CHUNK 章）：单次只让 AI 写少量章，每章细纲才有充足 token 预算。
+  // 否则一次性要 10+ 章时，模型会为了把所有章塞进 max_tokens 上限，把每章细纲压成一句话/等同标题；
+  // 中转站还可能静默砍断长输出（见 lib/callAI.js 注释）。降低「章节数 ÷ token 上限」的比值是关键。
+  const CHUNK = 4;
+  let made = 0, guard = 0;
+  while (made < count && guard < count + 4) {
+    guard++;
+    const batch = Math.min(CHUNK, count - made);
+    // 每批都重新取当前最大 seq，保证续写延续、seq 连续不冲突
+    const { rows: existRows } = await db.query('SELECT MAX(seq) AS maxSeq FROM nv_chapters WHERE project_id = ?', [p.id]);
+    let seqCursor = (existRows?.[0]?.maxSeq || 0) + 1;
+    // 最近 5 章（含本轮刚生成的）作为延续上下文
+    const { rows: recentRows } = await db.query(
+      'SELECT seq, title, outline FROM nv_chapters WHERE project_id = ? ORDER BY seq DESC LIMIT 5', [p.id]);
+    const recentBlock = (recentRows || []).reverse()
+      .map(r => `第${r.seq}章 ${r.title}：${(r.outline || '').split('\n')[0]}`).join('\n');
+    const prompt = `你是资深网文主编。基于全书大纲与已有章节，为第 ${volume} 卷规划第 ${seqCursor} 到 ${seqCursor + batch - 1} 章的细纲，共 ${batch} 章。只输出 JSON 数组。
 【全书大纲】
 ${(p.outline || '').slice(0, 3000)}
 ${recentBlock ? `【已有章节（必须延续，不要重复剧情）】\n${recentBlock}` : '【这是全书开头，第一章必须快速进入核心冲突】'}
 
-每章要求（关键——细颗粒度切分）：
-- **每章只承载一个小情节/一个场景/一次冲突**，是 ${cw} 字左右能写完的量。宁可把一段剧情拆成两三章，也不要一章塞多个情节。
-- 不要删剧情、不要跳过情节——只是把同样的故事切得更细、章节更多。相邻章节自然衔接、推进连贯。
-- outline：本章发生什么（2-3句，具体到场景和动作）；hook：章末钩子（一句话）。
+每章要求：
+- 每章只承载一个小情节/一个场景/一次冲突，约 ${cw} 字能写完。宁可拆细成多章，也不要一章塞多个情节；不删剧情、不跳情节，相邻章节自然衔接。
+- outline 必须是 2-3 个完整句子、不少于 50 字，写清【场景在哪 + 谁做了什么 + 本章的冲突或转折】。严禁只写一句话、严禁与 title 雷同、严禁笼统空话（如"主角继续修炼""剧情进一步推进"）。
+- hook：章末钩子，一句话制造悬念。
 - 节奏：每 3-4 章一个小高潮，本批最后一章留较大悬念。
 
-输出格式（严格 JSON 数组，不要其他文字）：
-[{ "seq": ${startSeq}, "title": "章名", "outline": "细纲…", "hook": "章末钩子" }]`;
-  const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 3500, bypassCap: true });
-  const jm = raw.match(/\[[\s\S]*\]/);
-  if (!jm) throw new Error('AI 输出解析失败');
-  const list = JSON.parse(jm[0]);
-  for (const ch of list) {
-    if (!ch || !ch.outline) continue;
-    await db.query('INSERT INTO nv_chapters (project_id, volume, seq, title, outline, status) VALUES (?,?,?,?,?,?)',
-      [p.id, volume, parseInt(ch.seq) || startSeq, String(ch.title || `第${ch.seq}章`).slice(0, 200),
-       String(ch.outline) + (ch.hook ? `\n章末钩子：${ch.hook}` : ''), 'todo']);
+示例（请照此颗粒度写 outline，不要比这更短）：
+{"seq":2,"title":"被退掉的婚纱单","outline":"沈清冒雨赶到婚纱店挽回客户，拿出重新设计的方案和样片极力说服，却被准新娘的母亲当众以「婚姻不顺的人拍不出好兆头」羞辱，客户当场要求退单。她强压委屈走出店门，发现路边的车被划了一道长痕。","hook":"手机突然响起，来电显示是三年没联系的前夫。"}
+
+输出格式（严格 JSON 数组，正好 ${batch} 个对象，不要任何解释文字）：
+[{ "seq": ${seqCursor}, "title": "章名", "outline": "详细细纲…", "hook": "章末钩子" }]`;
+    const raw = await callAI(prompt, { temperature: 0.7, maxTokens: batch * 600 + 1000, bypassCap: true });
+    const list = _parseChapterArray(raw);
+    let inserted = 0;
+    for (const ch of list) {
+      if (!ch || !ch.outline || !String(ch.outline).trim()) continue;
+      await db.query('INSERT INTO nv_chapters (project_id, volume, seq, title, outline, status) VALUES (?,?,?,?,?,?)',
+        [p.id, volume, seqCursor, String(ch.title || `第${seqCursor}章`).slice(0, 200),
+         String(ch.outline).trim() + (ch.hook ? `\n章末钩子：${ch.hook}` : ''), 'todo']);
+      seqCursor++; made++; inserted++;
+      if (made >= count) break;
+    }
+    if (inserted === 0) break; // 本批一章都没产出，停止避免死循环
   }
+  if (made === 0) throw new Error('AI 细纲生成失败，请重试');
 }
 
 // AI 识别角色：扫描现有设定卡+大纲+已写章节，提取角色与关系，批量建档（去重已有）
