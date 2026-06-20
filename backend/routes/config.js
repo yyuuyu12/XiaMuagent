@@ -81,7 +81,7 @@ async function buildTokenStats({ userId = null, days = 7 }) {
     price,
     // —— 兼容旧 admin 报表的字段 ——
     total: { calls: Number(t.calls), promptTokens: Number(t.pt), completionTokens: Number(t.ct), totalTokens: Number(t.pt) + Number(t.ct), tokens: Number(t.pt) + Number(t.ct), cost: costOf(t.pt, t.ct) },
-    today: { tokens: Number(today[0]?.t || 0) },
+    today: { tokens: Number(today[0]?.t || 0), calls: Number(today[0]?.c || 0) },
     month: { tokens: Number(mo.pt) + Number(mo.ct), calls: Number(mo.c), cost: costOf(mo.pt, mo.ct) },
     byModel: (byModel || []).map(r => ({ model: r.model || '(未知)', calls: Number(r.calls), tokens: Number(r.t) })),
     byModule: (byModule || []).map(r => ({ module: r.module, calls: Number(r.calls), tokens: Number(r.t) })),

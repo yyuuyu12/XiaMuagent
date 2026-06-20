@@ -711,6 +711,58 @@ html, body { background: linear-gradient(135deg,#F5F2EC 0%,#F0ECF4 100%) fixed; 
 .d-card:hover, .scard:hover, .do-proj-card:hover, .do-entry:hover { background: rgba(255,255,255,0.68) !important; box-shadow: 0 12px 36px rgba(28,22,16,0.1), inset 0 1px 0 rgba(255,255,255,0.7) !important; }
 /* 顶部面包屑/对话气泡也透一点 */
 .do-bubble.ai { background: rgba(255,255,255,0.6) !important; backdrop-filter:blur(10px); }
+
+/* ============================================================
+   CSS · Token 用量统计页
+   ============================================================ */
+.tk-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.tk-title{font-size:18px;font-weight:700;color:#1A1614;letter-spacing:-0.3px;}
+.tk-range-tabs{display:flex;gap:3px;background:#F0EDE8;border-radius:10px;padding:3px;}
+.tk-range-tab{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;color:#9E9890;cursor:pointer;transition:all .15s;user-select:none;}
+.tk-range-tab.active{background:#fff;color:#1A1614;box-shadow:0 1px 6px rgba(0,0,0,0.08);}
+.tk-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+.tk-metric{background:rgba(255,255,255,0.72);border-radius:16px;border:1px solid rgba(255,255,255,0.9);box-shadow:0 2px 16px rgba(0,0,0,0.06);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);padding:16px 18px;display:flex;flex-direction:column;gap:9px;transition:box-shadow .2s,transform .2s;}
+.tk-metric:hover{box-shadow:0 8px 28px rgba(0,0,0,0.1);transform:translateY(-2px);}
+.tk-metric-top{display:flex;align-items:center;justify-content:space-between;}
+.tk-metric-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.tk-metric-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.tk-metric-val{font-size:26px;font-weight:700;letter-spacing:-1px;line-height:1.1;}
+.tk-metric-label{font-size:12px;color:#9E9890;font-weight:500;}
+.tk-metric-sub{font-size:11.5px;font-weight:500;}
+.tk-o .tk-metric-icon{background:#FFF3E8;} .tk-o .tk-metric-val{color:#F5762A;} .tk-o .tk-metric-badge{background:#FFF3E8;color:#F5762A;}
+.tk-g .tk-metric-icon{background:#F0FDF4;} .tk-g .tk-metric-val{color:#16A34A;} .tk-g .tk-metric-badge{background:#F0FDF4;color:#16A34A;}
+.tk-p .tk-metric-icon{background:#FAF0FF;} .tk-p .tk-metric-val{color:#9333EA;} .tk-p .tk-metric-badge{background:#FAF0FF;color:#9333EA;}
+.tk-b .tk-metric-icon{background:#EEF4FF;} .tk-b .tk-metric-val{color:#2A7DE1;} .tk-b .tk-metric-badge{background:#EEF4FF;color:#2A7DE1;}
+.tk-charts{display:grid;grid-template-columns:300px 1fr;gap:12px;margin-bottom:14px;}
+.tk-card{background:rgba(255,255,255,0.68);border-radius:16px;border:1px solid rgba(255,255,255,0.88);box-shadow:0 2px 16px rgba(0,0,0,0.06);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);padding:18px 20px;}
+.tk-card-title{font-size:13px;font-weight:700;color:#1A1614;margin-bottom:3px;}
+.tk-card-sub{font-size:11px;color:#B0AA9F;margin-bottom:14px;}
+.tk-donut-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;}
+.tk-donut-svg{position:relative;width:160px;height:160px;}
+.tk-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.tk-donut-val{font-size:20px;font-weight:700;color:#1A1614;letter-spacing:-0.5px;}
+.tk-donut-lbl{font-size:10px;color:#B0AA9F;margin-top:1px;}
+.tk-legend{display:flex;flex-direction:column;gap:7px;width:100%;}
+.tk-legend-i{display:flex;align-items:center;justify-content:space-between;}
+.tk-legend-l{display:flex;align-items:center;gap:8px;}
+.tk-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.tk-legend-nm{font-size:12px;color:#6E6860;}
+.tk-legend-pct{font-size:12px;font-weight:700;color:#1A1614;}
+.tk-table-card{background:rgba(255,255,255,0.68);border-radius:16px;border:1px solid rgba(255,255,255,0.88);box-shadow:0 2px 16px rgba(0,0,0,0.06);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);overflow:hidden;}
+.tk-table-head{padding:15px 20px;border-bottom:1px solid #F2EFEA;display:flex;align-items:center;justify-content:space-between;}
+.tk-table-title{font-size:13px;font-weight:700;color:#1A1614;}
+.tk-table-meta{font-size:11px;color:#B0AA9F;}
+.tk-table{width:100%;border-collapse:collapse;}
+.tk-table thead tr{background:#F7F5F1;}
+.tk-table th{padding:10px 18px;text-align:left;font-size:11px;font-weight:600;color:#9E9890;white-space:nowrap;}
+.tk-table td{padding:11px 18px;font-size:12.5px;color:#1A1614;border-top:1px solid #F4F1EC;white-space:nowrap;}
+.tk-table tbody tr:hover{background:#FAFAF8;}
+.tk-mod{display:flex;align-items:center;gap:7px;}
+.tk-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.tk-badge{font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;}
+.tk-ok{background:#F0FDF4;color:#16A34A;}
+.tk-err{background:#FFF0EF;color:#E5534B;}
+.tk-empty{padding:28px;text-align:center;color:#B0AA9F;font-size:13px;}
 </style>
 </head>
 <body>
@@ -791,6 +843,10 @@ html, body { background: linear-gradient(135deg,#F5F2EC 0%,#F0ECF4 100%) fixed; 
     </div>
     <div class="d-sidebar-bottom">
       <div class="d-nav-label" style="padding:0 0 6px">账号</div>
+      <div class="d-nav-item" id="dNavTokens" onclick="dGoPage('tokens')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h2.5M18.5 12H21M12 3v2.5M12 18.5V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Token 统计</span>
+      </div>
       <div class="d-user-chip" onclick="dGoPage('profile')">
         <div class="d-avatar-circle" id="dSideAvatar">我</div>
         <div style="flex:1;min-width:0">
@@ -1583,6 +1639,7 @@ function dRender() {
     case 'novel':   el.innerHTML = dRenderNovel(); break;
     case 'original': el.innerHTML = dRenderOriginal(); dBindOriginal(); break;
     case 'profile': el.innerHTML = dRenderProfile(); dBindProfile(); break;
+    case 'tokens':  el.innerHTML = dRenderTokenStats(); dBindTokenStats(); break;
     default:        el.innerHTML = dKouboTabbar('make') + dRenderHome(); dBindHome();
   }
 }
@@ -1591,10 +1648,131 @@ function dGoPage(page) {
   dS.page = page;
   document.querySelectorAll('.d-nav-item').forEach(el => el.classList.remove('active'));
   // 口播区四个页面（制作/任务/声音库/数字人库）侧边栏统一高亮「数字人口播」
-  const navMap = { home:'dNavHome', tasks:'dNavHome', voices:'dNavHome', avatars:'dNavHome', novel:'dNavNovel', original:'dNavOriginal', profile:'' };
+  const navMap = { home:'dNavHome', tasks:'dNavHome', voices:'dNavHome', avatars:'dNavHome', novel:'dNavNovel', original:'dNavOriginal', tokens:'dNavTokens', profile:'' };
   if (navMap[page]) document.getElementById(navMap[page])?.classList.add('active');
   if (page === 'home') dProbeServices();
   dRender();
+}
+
+/* ============================================================
+   JS · Token 用量统计页
+   ============================================================ */
+const TK_MODULES = {
+  novel:    { name:'AI 写小说',  color:'#F5762A' },
+  original: { name:'原创工坊',   color:'#2A7DE1' },
+  video:    { name:'短视频文案', color:'#16A34A' },
+  inspire:  { name:'灵感发现',   color:'#9333EA' },
+};
+function tkMod(k){ return TK_MODULES[k] || { name:(k && k!=='未分类'?k:'未分类'), color:'#B0AA9F' }; }
+function tkFmtK(n){ n=Number(n)||0; if(n>=10000) return (n/10000).toFixed(1)+'万'; if(n>=1000) return (n/1000).toFixed(1)+'k'; return String(n); }
+function dTokenSetRange(n){ dS.tokenRange=n; dRender(); }
+
+function dRenderTokenStats(){
+  const range = dS.tokenRange || 7;
+  const tab = (n,l)=>`<div class="tk-range-tab ${range===n?'active':''}" onclick="dTokenSetRange(${n})">${l}</div>`;
+  return `
+  <div class="tk-topbar">
+    <div class="tk-title">Token 用量统计</div>
+    <div class="tk-range-tabs">${tab(7,'近7天')}${tab(30,'近30天')}${tab(90,'近3月')}</div>
+  </div>
+  <div class="tk-metrics" id="tkMetrics"><div class="tk-empty" style="grid-column:1/-1">加载中…</div></div>
+  <div class="tk-charts">
+    <div class="tk-card"><div class="tk-card-title">模块消耗占比</div><div class="tk-card-sub">本期各功能 Token 分布</div><div id="tkDonut" class="tk-empty">加载中…</div></div>
+    <div class="tk-card"><div class="tk-card-title">Token 消耗趋势</div><div class="tk-card-sub">每日消耗 · 各模块叠加</div><div id="tkLine" class="tk-empty">加载中…</div></div>
+  </div>
+  <div class="tk-table-card">
+    <div class="tk-table-head"><div class="tk-table-title">最近使用记录</div><div class="tk-table-meta" id="tkTableMeta">—</div></div>
+    <div style="overflow-x:auto"><table class="tk-table">
+      <thead><tr><th>时间</th><th>功能模块</th><th>操作</th><th>描述</th><th style="text-align:right">消耗 Token</th><th style="text-align:right">折算费用</th><th>状态</th></tr></thead>
+      <tbody id="tkTbody"><tr><td colspan="7" class="tk-empty">加载中…</td></tr></tbody>
+    </table></div>
+  </div>`;
+}
+
+async function dBindTokenStats(){
+  const range = dS.tokenRange || 7;
+  let r;
+  try { r = await dApi('GET', '/config/my-token-stats?days='+range); }
+  catch(e){ r = { code:500, msg:e.message }; }
+  const set = (id,html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
+  if (!r || r.code !== 200) { set('tkMetrics', `<div class="tk-empty" style="grid-column:1/-1">加载失败：${esc((r&&r.msg)||'请重试')}</div>`); return; }
+  const d = r.data; dS.tokenData = d;
+  set('tkMetrics', tkRenderMetrics(d, range));
+  set('tkDonut', tkRenderDonut(d.byModule||[]));
+  set('tkLine', tkRenderLine(d.trendByModule||[], range));
+  set('tkTbody', tkRenderRows(d.recent||[]));
+  const meta = document.getElementById('tkTableMeta');
+  if(meta) meta.textContent = `近${range}天 · ${(d.recent||[]).length} 条 · 成功 ${(d.statusCount&&d.statusCount.success)||0} / 失败 ${(d.statusCount&&d.statusCount.error)||0}`;
+}
+
+function tkMetric(cls, icon, val, label, badge, sub, subColor){
+  return `<div class="tk-metric ${cls}">
+    <div class="tk-metric-top"><div class="tk-metric-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none">${icon}</svg></div><div class="tk-metric-badge">${badge}</div></div>
+    <div class="tk-metric-val">${val}</div>
+    <div class="tk-metric-label">${label}</div>
+    <div class="tk-metric-sub" style="color:${subColor}">${sub}</div>
+  </div>`;
+}
+function tkRenderMetrics(d, range){
+  const today = (d.today&&d.today.tokens)||0, yest = (d.yesterday&&d.yesterday.tokens)||0;
+  const diff = yest>0 ? Math.round((today-yest)/yest*100) : (today>0?100:0);
+  const diffTxt = yest>0 ? (diff>=0?`较昨日 ↑ ${diff}%`:`较昨日 ↓ ${Math.abs(diff)}%`) : '昨日无消耗';
+  const period = (d.period&&d.period.tokens)||0;
+  const avg = Math.round(period/range);
+  const hasPrice = d.price && (d.price.in||d.price.out);
+  const costTxt = hasPrice ? ('本月 '+tkFmtK((d.month&&d.month.tokens)||0)+' tokens') : '后台未配置单价';
+  return [
+    tkMetric('tk-o','<path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 5v5l3.5 3.5" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round"/>', tkFmtK((d.total&&d.total.tokens)||0), '累计消耗 Token', '全部', '共 '+((d.total&&d.total.calls)||0)+' 次调用', '#F5762A'),
+    tkMetric('tk-g','<path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 5h12" stroke="#16A34A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>', tkFmtK(period), '本期消耗 Token', '近'+range+'天', '日均 '+tkFmtK(avg), '#16A34A'),
+    tkMetric('tk-p','<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#9333EA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>', tkFmtK(today), '今日消耗 Token', '今日', diffTxt, '#9333EA'),
+    tkMetric('tk-b','<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#2A7DE1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>', '¥'+(Number(d.monthCost)||0).toFixed(2), '本月成本', '本月', costTxt, '#2A7DE1'),
+  ].join('');
+}
+
+function tkRenderDonut(byModule){
+  const data = (byModule||[]).filter(m=>m.tokens>0);
+  const grand = data.reduce((s,m)=>s+m.tokens,0);
+  if(!grand) return '<div class="tk-empty">本期暂无消耗</div>';
+  const R=62, C=2*Math.PI*R; let off=0;
+  const arcs = data.map(m=>{ const len=m.tokens/grand*C; const el=`<circle cx="80" cy="80" r="${R}" fill="none" stroke="${tkMod(m.module).color}" stroke-width="17" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 80 80)"/>`; off+=len; return el; }).join('');
+  const legend = data.map(m=>{ const pct=Math.round(m.tokens/grand*100); return `<div class="tk-legend-i"><div class="tk-legend-l"><span class="tk-legend-dot" style="background:${tkMod(m.module).color}"></span><span class="tk-legend-nm">${tkMod(m.module).name}</span></div><div class="tk-legend-pct">${pct}%</div></div>`; }).join('');
+  return `<div class="tk-donut-wrap">
+    <div class="tk-donut-svg"><svg viewBox="0 0 160 160" width="160" height="160">${arcs}</svg>
+      <div class="tk-donut-center"><div class="tk-donut-val">${tkFmtK(grand)}</div><div class="tk-donut-lbl">总消耗</div></div></div>
+    <div class="tk-legend">${legend}</div>
+  </div>`;
+}
+
+function tkRenderLine(trendByModule, range){
+  const byDate={}; (trendByModule||[]).forEach(r=>{ (byDate[r.date]=byDate[r.date]||{})[r.module]=((byDate[r.date]||{})[r.module]||0)+r.tokens; });
+  const mods={}; (trendByModule||[]).forEach(r=>{ mods[r.module]=true; });
+  const modKeys=Object.keys(mods);
+  if(!modKeys.length) return '<div class="tk-empty">本期暂无消耗</div>';
+  const dates=[]; const today=new Date();
+  for(let i=range-1;i>=0;i--){ const dt=new Date(today); dt.setDate(dt.getDate()-i); dates.push(dt.toISOString().slice(0,10)); }
+  const totals=dates.map(d=>{ const day=byDate[d]||{}; return modKeys.reduce((s,k)=>s+(day[k]||0),0); });
+  const maxT=Math.max(1,...totals);
+  const W=600,H=180,padB=22,padT=8,innerH=H-padB-padT;
+  const bw=W/dates.length, barW=Math.max(3,Math.min(bw*0.62,26));
+  let bars='';
+  dates.forEach((d,i)=>{ const day=byDate[d]||{}; const cx=i*bw+bw/2; let y=H-padB;
+    modKeys.forEach(k=>{ const v=day[k]||0; if(!v) return; const h=v/maxT*innerH; y-=h; bars+=`<rect x="${(cx-barW/2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${tkMod(k).color}" opacity="0.92"><title>${d} ${tkMod(k).name}: ${v}</title></rect>`; }); });
+  let labels=''; const step=Math.max(1,Math.ceil(dates.length/7));
+  dates.forEach((d,i)=>{ if(i%step!==0 && i!==dates.length-1) return; const cx=i*bw+bw/2; labels+=`<text x="${cx.toFixed(1)}" y="${H-6}" font-size="10" fill="#B0AA9F" text-anchor="middle">${d.slice(5).replace('-','/')}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="190" preserveAspectRatio="none">${bars}${labels}</svg>`;
+}
+
+function tkRenderRows(recent){
+  if(!recent || !recent.length) return '<tr><td colspan="7" class="tk-empty">本期暂无使用记录</td></tr>';
+  return recent.map(r=>`<tr>
+    <td style="color:#B0AA9F">${r.time}</td>
+    <td><span class="tk-mod"><span class="tk-dot" style="background:${tkMod(r.module).color}"></span>${tkMod(r.module).name}</span></td>
+    <td>${esc(r.action||'—')}</td>
+    <td style="color:#9E9890;max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.context||'—')}</td>
+    <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${(Number(r.tokens)||0).toLocaleString()}</td>
+    <td style="text-align:right;color:#9E9890;font-variant-numeric:tabular-nums">${r.cost>0?('¥'+Number(r.cost).toFixed(4)):'—'}</td>
+    <td>${r.status==='success'?'<span class="tk-badge tk-ok">成功</span>':'<span class="tk-badge tk-err">失败</span>'}</td>
+  </tr>`).join('');
 }
 
 /* ============================================================
