@@ -194,7 +194,7 @@ ${videosText}
 只输出JSON：
 {"account_positioning":"账号定位(30字内)","target_audience":"目标受众(20字内)","content_patterns":["规律1","规律2"],"hook_types":["钩子类型"],"tone":"语言风格"}`;
 
-  const analyzeRaw = await callAI(analyzePrompt, { temperature: 0.3 });
+  const analyzeRaw = await callAI(analyzePrompt, { temperature: 0.3, module: 'inspire', userId: task.user_id, action: '账号分析' });
   let analysis = {};
   try {
     const cleaned = analyzeRaw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -225,7 +225,7 @@ ${JSON.stringify(analysis)}
 只输出JSON数组：
 [{"id":1,"hook_type":"痛点提问","content":"完整文案"}]`;
 
-  const scriptsRaw = await callAI(scriptsPrompt, { temperature: 0.8, maxTokens: 2000 });
+  const scriptsRaw = await callAI(scriptsPrompt, { temperature: 0.8, maxTokens: 2000, module: 'inspire', userId: task.user_id, action: '灵感脚本' });
   let scripts = [];
   try {
     const cleaned = scriptsRaw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -286,7 +286,7 @@ async function processSingleVideoAnalyze(taskId) {
   const { rows: tplRows } = await db.query("SELECT content FROM prompt_templates WHERE type = 'rewrite' AND is_default = 1");
   const tpl = tplRows[0]?.content || '请将以下文案改写为抖音爆款风格：\n{input}';
   const rewritePrompt = tpl.replace('{input}', transcript || '(无口播内容)');
-  const rewritten = await callAI(rewritePrompt);
+  const rewritten = await callAI(rewritePrompt, { module: 'inspire', userId: task.user_id, action: '单视频改写' });
 
   await db.query(
     'UPDATE tasks SET status = $1, progress = $2, thinking = $3, result = $4, stage = $5, updated_at = NOW() WHERE id = $6',
@@ -376,7 +376,7 @@ async function processCloneRewritePhase(taskId, existing) {
 
   const { rows: tplRows } = await db.query("SELECT content FROM prompt_templates WHERE type = 'rewrite' AND is_default = 1");
   const tpl = tplRows[0]?.content || '请将以下文案改写为抖音爆款风格：\n{input}';
-  const rewritten = await callAI(tpl.replace('{input}', transcript || '(无口播内容)'));
+  const rewritten = await callAI(tpl.replace('{input}', transcript || '(无口播内容)'), { module: 'video', action: '口播改写' });
 
   await db.query(
     'UPDATE tasks SET status=$1, progress=$2, thinking=$3, result=$4, stage=$5, updated_at=NOW() WHERE id=$6',

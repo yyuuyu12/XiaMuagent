@@ -1,7 +1,9 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('./auth');
-const { callAI } = require('../lib/callAI');
+const { callAI: _inspAI } = require('../lib/callAI');
+// 本模块 AI 调用默认打 module='inspire' 标签（灵感发现）
+const callAI = (prompt, opts = {}) => _inspAI(prompt, { module: 'inspire', ...opts });
 const crypto = require('crypto');
 
 const router = express.Router();
@@ -237,7 +239,7 @@ router.post('/clarify', requireAuth, async (req, res) => {
 只输出JSON，不要任何解释：
 {"questions":[{"id":"q1","question":"问题","type":"single","options":["选项1","选项2","选项3"]}]}`;
 
-    const raw = await callAI(prompt, { temperature: 0.3 });
+    const raw = await callAI(prompt, { temperature: 0.3, userId: req.userId, action: '灵感澄清' });
     let questions = [];
     try {
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -285,7 +287,7 @@ ${answersText}
 只输出JSON数组：
 [{"id":1,"hook_type":"痛点提问","content":"完整文案"}]`;
 
-    const raw = await callAI(prompt, { temperature: 0.8, maxTokens: 2000 });
+    const raw = await callAI(prompt, { temperature: 0.8, maxTokens: 2000, userId: req.userId, action: '灵感生成' });
     let scripts = [];
     try {
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

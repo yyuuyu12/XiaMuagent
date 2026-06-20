@@ -202,7 +202,7 @@ async function _genBootstrap(p) {
   "protagonist": { "name":"主角名", "identity":"身份与处境(一句话)", "persona":"灵魂烙印：性格底色+核心缺陷，决定他一切行为的根源", "goals":"核心欲望与最深恐惧", "abilities":"开篇时的能力边界/金手指" },
   "antagonist": { "name":"对手名", "identity":"身份(一句话)", "persona":"灵魂烙印+行事逻辑(要让人理解他为何这么做)", "goals":"他要什么", "abilities":"优势与软肋", "rel_to_lead":"与主角的核心冲突是什么" }
 }`;
-  const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 2000, bypassCap: true });
+  const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 2000, bypassCap: true, module: 'novel', userId: p.user_id, action: '生成设定卡', context: p.title });
   const jm = raw.match(/\{[\s\S]*\}/);
   if (!jm) throw new Error('AI 输出解析失败');
   const data = JSON.parse(jm[0]);
@@ -244,7 +244,7 @@ ${p.brief ? `【作者意图】${p.brief}` : ''}
 - 整体要有递进：势力/舞台逐卷扩大，每卷结尾比开头的赌注更大
 - 第一卷前三章必须能立住主角和核心冲突
 - 用 Markdown 输出，## 第N卷·卷名 作为标题`;
-  const outline = await callAI(prompt, { temperature: 0.7, maxTokens: 3000, bypassCap: true });
+  const outline = await callAI(prompt, { temperature: 0.7, maxTokens: 3000, bypassCap: true, module: 'novel', userId: p.user_id, action: '生成大纲', context: p.title });
   await db.query('UPDATE nv_projects SET outline = ? WHERE id = ?', [outline, p.id]);
 }
 
@@ -260,7 +260,7 @@ ${p.outline || '（空）'}
 - 只改作者要求的部分，没提到的卷/内容原样保留，不要删减或省略
 - 保持 Markdown 卷级结构（## 第N卷·卷名）
 - 直接输出完整大纲，不要解释、不要前后缀`;
-  const outline = await callAI(prompt, { temperature: 0.6, maxTokens: 3500, bypassCap: true });
+  const outline = await callAI(prompt, { temperature: 0.6, maxTokens: 3500, bypassCap: true, module: 'novel', userId: p.user_id, action: '修改大纲', context: p.title });
   if (outline && outline.trim().length > 20) {
     await db.query('UPDATE nv_projects SET outline = ? WHERE id = ?', [outline.trim(), p.id]);
   }
@@ -278,7 +278,7 @@ ${list}
 
 输出格式（只返回需要改动或新增的卡，没动的不要返回）：
 [{ "id": 要改的现有卡id（新增则不要这个字段）, "kind": "world/faction/style", "title": "卡名", "content": "完整内容" }]`;
-  const raw = await callAI(prompt, { temperature: 0.5, maxTokens: 2000, bypassCap: true });
+  const raw = await callAI(prompt, { temperature: 0.5, maxTokens: 2000, bypassCap: true, module: 'novel', userId: p.user_id, action: '修改设定集', context: p.title });
   const jm = raw.match(/\[[\s\S]*\]/);
   if (!jm) return;
   const arr = JSON.parse(jm[0]);
@@ -310,7 +310,7 @@ ${roster}
   "character_updates": [{ "name":"已有角色名", "persona":"新烙印(可选)", "goals":"(可选)", "identity":"(可选)", "abilities":"(可选)", "role_type":"lead/antagonist/supporting/love(可选)" }],
   "new_characters": [{ "name":"", "role_type":"", "identity":"", "persona":"", "goals":"", "abilities":"" }]
 }`;
-  const raw = await callAI(prompt, { temperature: 0.5, maxTokens: 1500, bypassCap: true });
+  const raw = await callAI(prompt, { temperature: 0.5, maxTokens: 1500, bypassCap: true, module: 'novel', userId: p.user_id, action: '修改人物', context: p.title });
   const jm = raw.match(/\{[\s\S]*\}/);
   if (!jm) return;
   const patch = JSON.parse(jm[0]);
@@ -381,7 +381,7 @@ ${recentBlock ? `【已有章节（必须延续，不要重复剧情）】\n${re
 
 输出格式（严格 JSON 数组，正好 ${batch} 个对象，不要任何解释文字）：
 [{ "seq": ${seqCursor}, "title": "章名", "outline": "详细细纲…", "hook": "章末钩子" }]`;
-    const raw = await callAI(prompt, { temperature: 0.7, maxTokens: batch * 600 + 1000, bypassCap: true });
+    const raw = await callAI(prompt, { temperature: 0.7, maxTokens: batch * 600 + 1000, bypassCap: true, module: 'novel', userId: p.user_id, action: '生成细纲', context: p.title });
     const list = _parseChapterArray(raw);
     let inserted = 0;
     for (const ch of list) {
@@ -435,7 +435,7 @@ ${exF.length ? `【已登记组织，不要重复】${exF.join('、')}` : ''}
   "faction_relations": [{ "from":"组织A", "to":"组织B", "rel_type":"联盟/敌对/从属", "affinity":0到100整数, "description":"现状" }]
 }
 全书最多 1 个 lead。没有的项给空数组。`;
-  const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 3000, bypassCap: true });
+  const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 3000, bypassCap: true, module: 'novel', userId: p.user_id, action: '识别角色', context: p.title });
   const jm = raw.match(/\{[\s\S]*\}/);
   if (!jm) throw new Error('AI 输出解析失败');
   const data = JSON.parse(jm[0]);
@@ -845,7 +845,7 @@ async function commitChapter(chapterId, userId) {
 - relation_updates 的 from/to 可以用 new_characters 里刚出现的新角色名。
 - 都只写本章真正发生的，没有就给空数组。`;
   try {
-    const raw = await callAI(prompt, { temperature: 0.2, maxTokens: 1200 });
+    const raw = await callAI(prompt, { temperature: 0.2, maxTokens: 1200, module: 'novel', userId, action: '定稿登记' });
     const jm = raw.match(/\{[\s\S]*\}/);
     if (!jm) return;
     const patch = JSON.parse(jm[0]);
@@ -954,7 +954,7 @@ ${NOVEL_EDICTS}
 - 写到本章该停的钩子处就收尾——后面的事留给下一章。
 
 【任务】写出本章完整正文，约 ${targetWords} 字。直接输出正文，不要任何解释、标题或元信息。`;
-    let content = (await callAI(writePrompt, { temperature: 0.75, maxTokens: Math.min(upper * 3, 7000), bypassCap: true, model: (await getConfigVal('ai_model_novel')) || undefined })).trim();
+    let content = (await callAI(writePrompt, { temperature: 0.75, maxTokens: Math.min(upper * 3, 7000), bypassCap: true, model: (await getConfigVal('ai_model_novel')) || undefined, module: 'novel', userId: ch.user_id, action: '生成正文', context: `${ch.book_title}·第${ch.seq}章` })).trim();
     await upd('running', 60);
 
     // ③ critic 审查（字数过短/过长/AI腔）→ 不过自动重写一轮
@@ -967,7 +967,7 @@ ${NOVEL_EDICTS}
     if (needRewrite) {
       await upd('running', 70);
       const rewriteRaw = await callAI(writePrompt + `\n\n【上一版存在以下问题，必须全部修正后重新输出完整正文】\n${issues.map((s, i) => `${i + 1}. ${s}`).join('\n')}`,
-        { temperature: 0.75, maxTokens: Math.min(targetWords * 3, 8000), bypassCap: true });
+        { temperature: 0.75, maxTokens: Math.min(targetWords * 3, 8000), bypassCap: true, module: 'novel', userId: ch.user_id, action: '生成正文(重写)', context: `${ch.book_title}·第${ch.seq}章` });
       if (rewriteRaw.trim().length > content.length * 0.6) content = rewriteRaw.trim();
     }
 
@@ -1016,7 +1016,7 @@ ${NOVEL_EDICTS}
 - 如果作者要求修改正文 → 输出修改后的【完整正文】，用标签包裹：【新正文】…【/新正文】，标签前用一句话（≤30字）说明你改了什么
 - 如果作者只是讨论剧情/要建议 → 直接回答，不要输出正文标签
 - 修改时保持未被点名部分原样不动`;
-    const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 8000, bypassCap: true });
+    const raw = await callAI(prompt, { temperature: 0.7, maxTokens: 8000, bypassCap: true, module: 'novel', userId: req.userId, action: '对话改稿', context: ch.title ? `第${ch.seq}章 ${ch.title}` : p.title });
     const m = raw.match(/【新正文】([\s\S]*?)【\/新正文】/);
     let aiSummary = raw, newContent = null;
     if (m) {

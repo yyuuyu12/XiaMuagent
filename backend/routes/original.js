@@ -4,7 +4,9 @@ const https = require('https');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth } = require('./auth');
-const { callAI } = require('../lib/callAI');
+const { callAI: _origAI } = require('../lib/callAI');
+// 本模块所有 AI 调用默认打 module='original' 标签（原创工坊）；逐处再补 userId/action
+const callAI = (prompt, opts = {}) => _origAI(prompt, { module: 'original', ...opts });
 const { getAsrUrl, extractMp4Url, asrTranscribe } = require('../lib/asrHelper');
 const taskRunner = require('../taskRunner');
 const router = express.Router();
@@ -436,7 +438,7 @@ async function extractEditDiffRules(project, userId) {
 4. 每条 40~80 字，一行一条，以 - 开头
 - 差异若只是错别字或事实修正，输出 SKIP
 只输出规则行或 SKIP。`;
-    const raw = (await callAI(prompt, { temperature: 0.3, maxTokens: 450 })).trim();
+    const raw = (await callAI(prompt, { temperature: 0.3, maxTokens: 450, userId, action: '规则提取' })).trim();
     if (!raw || /^SKIP/i.test(raw)) return;
     const lines = raw.split('\n').map(l => l.trim()).filter(l => l.startsWith('-'));
     for (const line of lines) {
@@ -492,7 +494,7 @@ ${lines.join('\n')}
 每条提案是一句可直接执行的新规则（40-80字），格式「写……（场景）时，……（怎么做），而不是……」，末尾用括号注明（替代：原规则前8个字…）。
 若规则整体健康无需修订，只输出：SKIP
 否则每行一条提案，以"-"开头，不要其他文字。`;
-    const out = (await callAI(prompt, { temperature: 0.3, maxTokens: 400 })).trim();
+    const out = (await callAI(prompt, { temperature: 0.3, maxTokens: 400, userId, action: 'Skill反思' })).trim();
     if (!out || out.startsWith('SKIP')) return;
     const proposals = out.split('\n').map(s => s.replace(/^[-\s]+/, '').trim()).filter(s => s.length >= 10).slice(0, 3);
     for (const p of proposals) {
@@ -807,7 +809,7 @@ async function generateStageReply({ userId, project, skill, stage, boundMaterial
   const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack, samples });
   // 写稿环节用一线模型（管理后台 ai_model_creation 配置；留空走默认）；bypassCap 避免长稿被中转站默认上限砍断
   const creationModel = (await getConfigVal('ai_model_creation')).trim();
-  const callOpts = { maxTokens: 4000, temperature: 0.65, bypassCap: true };
+  const callOpts = { maxTokens: 4000, temperature: 0.65, bypassCap: true, userId, action: '阶段对话', context: project?.title };
   if (creationModel) callOpts.model = creationModel;
   const aiRaw = await callAI(systemPrompt + '\n\n用户：' + userMessage, callOpts);
 
@@ -875,7 +877,7 @@ async function generateStageReply({ userId, project, skill, stage, boundMaterial
 3. 开场前两句必须有钩子（数字/反差/悬念/动作之一），不得自我介绍
 4. 口语化：不出现"首先/其次/综上所述"等书面框架词${checkExtra}
 输出：{"pass": true/false, "issues": ["不通过的具体问题，每条≤30字"]}`;
-        const criticRaw = await callAI(criticPrompt, { temperature: 0.2, maxTokens: 500, bypassCap: true });
+        const criticRaw = await callAI(criticPrompt, { temperature: 0.2, maxTokens: 500, bypassCap: true, userId, action: '剧本质检' });
         let verdict = null;
         const jm = criticRaw.match(/\{[\s\S]*\}/);
         if (jm) { try { verdict = JSON.parse(jm[0]); } catch { verdict = null; } }
@@ -1194,7 +1196,7 @@ ${autoItems.map(t => '- ' + t).join('\n')}
 
     let merged = [];
     try {
-      const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 800 });
+      const raw = await callAI(prompt, { temperature: 0.3, maxTokens: 800, userId: req.userId, action: 'Skill压缩' });
       merged = (raw || '').split('\n')
         .map(l => l.trim().replace(/^[-*]\s*/, '').trim())
         .filter(l => l.length > 0 && !/^[#【]/.test(l));
@@ -1461,7 +1463,7 @@ ${docSnippet}
 如果反馈只是新的修改指令而非质量评价 → 只输出：SKIP
 只输出一行规则或SKIP，不要其他文字。`;
 
-          const extracted = (await callAI(extractPrompt, { maxTokens: 200, temperature: 0.3 })).trim();
+          const extracted = (await callAI(extractPrompt, { maxTokens: 200, temperature: 0.3, userId: req.userId, action: '角色提取' })).trim();
 
           if (extracted && !extracted.startsWith('SKIP') && (extracted.startsWith('-') || extracted.length > 5)) {
             autoLearnRule = extracted.startsWith('-') ? extracted.slice(1).trim() : extracted;
@@ -1503,7 +1505,7 @@ ${rulesText ? '用户风格参考（Skill）：\n' + rulesText + '\n' : ''}当�
 ${Object.keys(artifacts).length ? '已确认产出：' + Object.keys(artifacts).map(k => k).join('、') : ''}
 对话历史：
 ${history}`;
-      const aiRaw = await callAI(freePrompt + '\n\n用户：' + message.trim(), { maxTokens: 800, temperature: 0.85 });
+      const aiRaw = await callAI(freePrompt + '\n\n用户：' + message.trim(), { maxTokens: 800, temperature: 0.85, userId: req.userId, action: '自由对话' });
       aiSummary = aiRaw.trim();
       newDoc = project.doc || '';
       hasDocUpdate = 0;
@@ -1905,7 +1907,7 @@ ${scriptForAI}
   8.「结尾收束」怎么收尾、留什么悬念或引导动作
 - 每条 text 要写成"换个选题也能照着执行"的通用指令，不要只描述这一条视频的具体内容`;
 
-  const aiResult = await callAI(prompt, { maxTokens: 3500, temperature: 0.5 });
+  const aiResult = await callAI(prompt, { maxTokens: 3500, temperature: 0.5, action: '视频分析' });
   let parsed = extractJson(aiResult);
 
   // 降级：解析失败时，按句切分原文当作 segments，AI 文本塞进 rules
@@ -1967,7 +1969,7 @@ ${listText}
   {"stage":"语言风格","exp":"用词、语气、句式的特点…"}
 ]`;
   try {
-    const raw = await callAI(prompt, { temperature: 0.4, maxTokens: 2000, bypassCap: true });
+    const raw = await callAI(prompt, { temperature: 0.4, maxTokens: 2000, bypassCap: true, action: 'Skill合成' });
     const jm = raw.match(/\[[\s\S]*\]/);
     if (!jm) return null;
     const arr = JSON.parse(jm[0]).filter(x => x && x.exp && x.stage);
@@ -2179,7 +2181,7 @@ ${insightText}
 
   let mergedRules = null;
   try {
-    const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.4, bypassCap: true });
+    const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.4, bypassCap: true, userId, action: '学习仿写' });
     const parsed = extractJson(aiResult);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const oldFlat = {};
@@ -2280,7 +2282,7 @@ ${recentTitles}
   }
 ]`;
 
-    const raw = await callAI(prompt, { maxTokens: 800, temperature: 0.9 });
+    const raw = await callAI(prompt, { maxTokens: 800, temperature: 0.9, userId: req.userId, action: '选题建议' });
 
     // 解析 JSON
     let topics = [];

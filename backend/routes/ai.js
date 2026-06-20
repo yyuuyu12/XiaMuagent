@@ -75,80 +75,10 @@ async function checkAndRecordUsage(userId, action) {
 }
 
 // ==================== 调用 AI ====================
-async function callAI(prompt) {
-  const cfg = await getAIConfig();
-  const provider = cfg.ai_provider || 'openai';
-
-  if (provider === 'openai' || provider === 'qwen') {
-    const apiKey = provider === 'openai' ? cfg.openai_api_key : cfg.qwen_api_key;
-    const baseUrl = cfg.openai_base_url || 'https://api.openai.com/v1';
-    const model = provider === 'openai' ? (cfg.openai_model || 'gpt-3.5-turbo') : (cfg.qwen_model || 'qwen-turbo');
-    if (!apiKey) throw new Error('AI Key 未配置，请联系管理员');
-
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.8, max_tokens: 1000 })
-    });
-    if (!response.ok) throw new Error(`AI 接口错误: ${await response.text()}`);
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new Error(`AI 返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
-    return content;
-  }
-
-  if (provider === 'claude') {
-    const apiKey = cfg.claude_api_key;
-    const model = cfg.claude_model || 'claude-3-5-haiku-20241022';
-    if (!apiKey) throw new Error('Claude Key 未配置，请联系管理员');
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
-    });
-    if (!response.ok) throw new Error(`Claude 接口错误: ${await response.text()}`);
-    const data = await response.json();
-    const text = data.content?.[0]?.text;
-    if (!text) throw new Error(`Claude 返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
-    return text;
-  }
-
-  if (provider === 'zhipu' || provider === 'glm') {
-    const apiKey = cfg.zhipu_api_key;
-    const model = cfg.zhipu_model || 'glm-4-flash';
-    if (!apiKey) throw new Error('智谱 AI Key 未配置，请在后台填写 zhipu_api_key');
-
-    const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] })
-    });
-    if (!response.ok) throw new Error(`智谱接口错误: ${await response.text()}`);
-    const data = await response.json();
-    const zc = data.choices?.[0]?.message?.content;
-    if (!zc) throw new Error(`智谱返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
-    return zc;
-  }
-
-  if (provider === 'deepseek') {
-    const apiKey = cfg.deepseek_api_key;
-    const model = cfg.deepseek_model || 'deepseek-chat';
-    if (!apiKey) throw new Error('DeepSeek Key 未配置，请在后台填写 deepseek_api_key');
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.8, max_tokens: 1000 })
-    });
-    if (!response.ok) throw new Error(`DeepSeek 接口错误: ${await response.text()}`);
-    const data = await response.json();
-    const dc = data.choices?.[0]?.message?.content;
-    if (!dc) throw new Error(`DeepSeek 返回内容异常: ${JSON.stringify(data).slice(0, 400)}`);
-    return dc;
-  }
-
-  throw new Error(`不支持的 AI 提供商: ${provider}，请在后台选择 openai / qwen / claude / zhipu / deepseek 并配置对应 Key`);
-}
+// 文案模块统一走 lib/callAI（带 token 用量日志）。默认 module='video'（短视频文案）。
+// 旧的本地实现（无日志、max_tokens 写死 1000）已下线，避免该模块用量统计丢失。
+const { callAI: _libCallAI } = require('../lib/callAI');
+function callAI(prompt, opts = {}) { return _libCallAI(prompt, { module: 'video', ...opts }); }
 
 // ==================== 文案改写 ====================
 router.post('/rewrite', requireAuth, async (req, res) => {
@@ -163,7 +93,7 @@ router.post('/rewrite', requireAuth, async (req, res) => {
       `SELECT content FROM prompt_templates WHERE type = 'rewrite' AND is_default = 1`
     );
     const prompt = (rows[0]?.content || '请将以下文案改写为抖音爆款风格：\n{input}').replace('{input}', text);
-    const result = await callAI(prompt);
+    const result = await callAI(prompt, { userId: req.userId, action: '文案改写' });
 
     await db.query('INSERT INTO history (user_id, type, input, result) VALUES ($1,$2,$3,$4)',
       [req.userId, 'rewrite', text.slice(0, 200), JSON.stringify(result)]);
@@ -195,7 +125,7 @@ router.post('/inspire', requireAuth, async (req, res) => {
       if (industries.length > 0) {
         const names = industries.map(i => i.name).join('、');
         const matchPrompt = `行业列表：${names}\n\n用户输入："${inputTrack}"\n\n判断最匹配哪个行业，只回复行业名称。不匹配则回复"无"。`;
-        const matchResult = (await callAI(matchPrompt)).trim().replace(/[。，,.！!]/g, '');
+        const matchResult = (await callAI(matchPrompt, { module: 'inspire', userId: req.userId, action: '行业匹配' })).trim().replace(/[。，,.！!]/g, '');
         const matched = industries.find(i => i.name === matchResult);
         if (matched) { styleHint = matched.style_hint || ''; matchedIndustry = matched.name; }
       }
@@ -221,7 +151,7 @@ ${styleSection}
 - 适当使用emoji增加活泼感
 - 只返回JSON数组，不要markdown代码块，不要其他文字`;
 
-    const raw = await callAI(prompt);
+    const raw = await callAI(prompt, { module: 'inspire', userId: req.userId, action: '灵感生成' });
     let scripts = [];
     try {
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -258,7 +188,7 @@ router.post('/inspire-expand', requireAuth, async (req, res) => {
 严格按JSON格式返回，不要其他内容：
 [{"hook": "...", "content": "..."}]`;
 
-    const raw = await callAI(prompt);
+    const raw = await callAI(prompt, { module: 'inspire', userId: req.userId, action: '灵感扩展' });
     let scripts = [];
     try {
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -472,7 +402,7 @@ router.post('/cover-title', requireAuth, async (req, res) => {
   if (!script?.trim()) return res.json({ code: 400, msg: '文案不能为空' });
   try {
     const prompt = `根据以下短视频文案，生成一句封面标题。要求：不超过18个字，无标点符号，吸引眼球，直击核心价值点，适合放在视频封面上。只输出标题文字本身，不要引号和解释。\n\n文案：${script.slice(0, 400)}`;
-    const raw = await callAI(prompt);
+    const raw = await callAI(prompt, { userId: req.userId, action: '封面标题' });
     const title = raw.trim().replace(/["""''《》【】「」\n\r]/g, '').slice(0, 18);
     return res.json({ code: 200, data: { title } });
   } catch (e) {
@@ -496,7 +426,7 @@ ${script.slice(0, 800)}
 严格按JSON格式返回，不要其他内容：
 {"title": "...", "description": "...", "tags": ["标签1", "标签2", "标签3", "标签4"]}`;
 
-    const raw = await callAI(prompt);
+    const raw = await callAI(prompt, { userId: req.userId, action: '发布信息' });
     let result = {};
     try {
       const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
