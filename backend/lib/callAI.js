@@ -2,15 +2,16 @@ const db = require('../db');
 
 // 记录一次 AI 调用的 token 用量（异步、不阻塞、不抛错）
 // 兼容 OpenAI 风格(prompt_tokens/completion_tokens) 与 Claude 风格(input_tokens/output_tokens)
-function logTokens(model, usage, opts) {
+function logTokens(model, usage, opts, status = 'success') {
   try {
-    if (!usage) return;
-    const pt = usage.prompt_tokens ?? usage.input_tokens ?? 0;
-    const ct = usage.completion_tokens ?? usage.output_tokens ?? 0;
-    if (!pt && !ct) return;
+    const pt = usage ? (usage.prompt_tokens ?? usage.input_tokens ?? 0) : 0;
+    const ct = usage ? (usage.completion_tokens ?? usage.output_tokens ?? 0) : 0;
+    // 成功行要求至少有 token 数；失败行(status=error)即使无 token 也记一条，供报表统计成功/失败率
+    if (status === 'success' && !pt && !ct) return;
     db.query(
-      'INSERT INTO ai_token_logs (user_id, module, model, prompt_tokens, completion_tokens) VALUES (?,?,?,?,?)',
-      [parseInt(opts.userId) || 0, String(opts.module || '').slice(0, 30), String(model || '').slice(0, 60), pt, ct]
+      'INSERT INTO ai_token_logs (user_id, module, action, context, model, prompt_tokens, completion_tokens, status) VALUES (?,?,?,?,?,?,?,?)',
+      [parseInt(opts.userId) || 0, String(opts.module || '').slice(0, 30), String(opts.action || '').slice(0, 40),
+       String(opts.context || '').slice(0, 120), String(model || '').slice(0, 60), pt, ct, status]
     ).catch(() => {});
   } catch {}
 }
@@ -32,7 +33,7 @@ async function getAIConfig() {
   return cfg;
 }
 
-async function callAI(prompt, opts = {}) {
+async function _callAIImpl(prompt, opts = {}) {
   const cfg = await getAIConfig();
   const provider = cfg.ai_provider || 'openai';
   // max_tokens_cap: 管理后台可配置各服务商上限（如 xcode.best gpt-5.5 限制 1200）
@@ -115,6 +116,16 @@ async function callAI(prompt, opts = {}) {
   }
 
   throw new Error(`不支持的 AI 提供商: ${provider}，请在后台选择并配置 Key`);
+}
+
+// 对外入口：包一层，调用失败也记一条 status=error 日志（供报表统计成功/失败），再抛出异常
+async function callAI(prompt, opts = {}) {
+  try {
+    return await _callAIImpl(prompt, opts);
+  } catch (e) {
+    logTokens('', null, opts, 'error');
+    throw e;
+  }
 }
 
 module.exports = { callAI };

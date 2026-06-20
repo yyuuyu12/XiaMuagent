@@ -549,15 +549,24 @@ async function initDb() {
       id                BIGINT AUTO_INCREMENT PRIMARY KEY,
       user_id           INT DEFAULT 0,
       module            VARCHAR(30) DEFAULT '',
+      action            VARCHAR(40) DEFAULT '',
+      context           VARCHAR(120) DEFAULT '',
       model             VARCHAR(60) DEFAULT '',
       prompt_tokens     INT DEFAULT 0,
       completion_tokens INT DEFAULT 0,
+      status            VARCHAR(10) DEFAULT 'success',
       created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_created (created_at),
       INDEX idx_module (module),
-      INDEX idx_model (model)
+      INDEX idx_model (model),
+      INDEX idx_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // ai_token_logs 补字段（老库）：操作/描述/状态
+  try { await db.query("ALTER TABLE ai_token_logs ADD COLUMN action VARCHAR(40) DEFAULT ''"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] action:', e.message||e); }
+  try { await db.query("ALTER TABLE ai_token_logs ADD COLUMN context VARCHAR(120) DEFAULT ''"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] context:', e.message||e); }
+  try { await db.query("ALTER TABLE ai_token_logs ADD COLUMN status VARCHAR(10) DEFAULT 'success'"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] status:', e.message||e); }
+  try { await db.query("ALTER TABLE ai_token_logs ADD INDEX idx_user (user_id)"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] idx_user:', e.message||e); }
 
   // cw_skill_samples 表：金句样本库（按环节存"神句"原句，传语感不传内容）
   // stage: hook(开头) / turn(转折) / end(结尾) / golden(金句)
