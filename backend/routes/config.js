@@ -46,34 +46,69 @@ router.post('/ai-keys', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ==================== Token 用量报表 ====================
+// 共用构建：userId=null → 全站（管理端）；传 userId → 只看该用户（用户端）。
+// userId/days 都按整数清洗后直接拼接（无外部字符串注入风险），与本文件既有写法一致。
+async function buildTokenStats({ userId = null, days = 7 }) {
+  const q = (sql) => db.query(sql).then(r => r.rows);
+  const D = Math.max(1, Math.min(parseInt(days) || 7, 365));
+  const uid = userId != null ? (parseInt(userId) || 0) : null;
+  const uw = uid != null ? ` AND user_id = ${uid}` : '';
+  const ok = ` AND status = 'success'`;
+  const [tot, today, yest, month, period, byModule, dayMod, byModel, trend30, recent, statusAgg, priceRows] = await Promise.all([
+    q(`SELECT COUNT(*) AS calls, COALESCE(SUM(prompt_tokens),0) AS pt, COALESCE(SUM(completion_tokens),0) AS ct FROM ai_token_logs WHERE 1=1${ok}${uw}`),
+    q(`SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= CURDATE()${ok}${uw}`),
+    q(`SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL 1 DAY) AND created_at < CURDATE()${ok}${uw}`),
+    q(`SELECT COALESCE(SUM(prompt_tokens),0) AS pt, COALESCE(SUM(completion_tokens),0) AS ct, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01')${ok}${uw}`),
+    q(`SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL ${D} DAY)${ok}${uw}`),
+    q(`SELECT CASE WHEN module='' OR module IS NULL THEN '未分类' ELSE module END AS module, COUNT(*) AS calls, COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL ${D} DAY)${ok}${uw} GROUP BY module ORDER BY t DESC`),
+    q(`SELECT DATE(created_at) AS d, CASE WHEN module='' OR module IS NULL THEN '未分类' ELSE module END AS module, COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL ${D - 1} DAY)${ok}${uw} GROUP BY d, module ORDER BY d`),
+    q(`SELECT model, COUNT(*) AS calls, COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL ${D} DAY)${ok}${uw} GROUP BY model ORDER BY t DESC LIMIT 20`),
+    q(`SELECT DATE(created_at) AS d, SUM(prompt_tokens+completion_tokens) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL 29 DAY)${ok}${uw} GROUP BY DATE(created_at) ORDER BY d`),
+    q(`SELECT created_at, module, action, context, model, prompt_tokens AS pt, completion_tokens AS ct, status FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL ${D} DAY)${uw} ORDER BY created_at DESC LIMIT 60`),
+    q(`SELECT status, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(),INTERVAL ${D} DAY)${uw} GROUP BY status`),
+    q(`SELECT config_key, value FROM system_config WHERE config_key IN ('token_price_in','token_price_out')`),
+  ]);
+  const price = { in: 0, out: 0 };
+  (priceRows || []).forEach(r => { if (r.config_key === 'token_price_in') price.in = parseFloat(r.value) || 0; if (r.config_key === 'token_price_out') price.out = parseFloat(r.value) || 0; });
+  const costOf = (pt, ct) => (Number(pt) / 1e6) * price.in + (Number(ct) / 1e6) * price.out;
+  const t = tot[0] || { calls: 0, pt: 0, ct: 0 };
+  const mo = month[0] || { pt: 0, ct: 0, c: 0 };
+  const pad = (n) => String(n).padStart(2, '0');
+  const statusMap = {}; (statusAgg || []).forEach(r => { statusMap[r.status || 'success'] = Number(r.c); });
+  const fmtDate = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
+  return {
+    range: D,
+    price,
+    // —— 兼容旧 admin 报表的字段 ——
+    total: { calls: Number(t.calls), promptTokens: Number(t.pt), completionTokens: Number(t.ct), totalTokens: Number(t.pt) + Number(t.ct), tokens: Number(t.pt) + Number(t.ct), cost: costOf(t.pt, t.ct) },
+    today: { tokens: Number(today[0]?.t || 0) },
+    month: { tokens: Number(mo.pt) + Number(mo.ct), calls: Number(mo.c), cost: costOf(mo.pt, mo.ct) },
+    byModel: (byModel || []).map(r => ({ model: r.model || '(未知)', calls: Number(r.calls), tokens: Number(r.t) })),
+    byModule: (byModule || []).map(r => ({ module: r.module, calls: Number(r.calls), tokens: Number(r.t) })),
+    trend: (trend30 || []).map(r => ({ date: fmtDate(r.d), tokens: Number(r.t), calls: Number(r.c) })),
+    // —— Token 统计新页所需 ——
+    period: { tokens: Number(period[0]?.t || 0), calls: Number(period[0]?.c || 0) },
+    yesterday: { tokens: Number(yest[0]?.t || 0) },
+    monthCost: costOf(mo.pt, mo.ct),
+    trendByModule: (dayMod || []).map(r => ({ date: fmtDate(r.d), module: r.module, tokens: Number(r.t) })),
+    recent: (recent || []).map(r => { const dt = r.created_at instanceof Date ? r.created_at : new Date(r.created_at); return {
+      time: `${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`,
+      module: r.module || '', action: r.action || '', context: r.context || '', model: r.model || '',
+      tokens: Number(r.pt) + Number(r.ct), cost: costOf(r.pt, r.ct), status: r.status || 'success',
+    }; }),
+    statusCount: { success: statusMap.success || 0, error: statusMap.error || 0 },
+  };
+}
+
 router.get('/token-stats', requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const q = (sql, params = []) => db.query(sql, params).then(r => r.rows);
-    const [tot, today, month, byModel, byModule, trend, priceRows] = await Promise.all([
-      q(`SELECT COUNT(*) AS calls, COALESCE(SUM(prompt_tokens),0) AS pt, COALESCE(SUM(completion_tokens),0) AS ct FROM ai_token_logs`),
-      q(`SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= CURDATE()`),
-      q(`SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01')`),
-      q(`SELECT model, COUNT(*) AS calls, SUM(prompt_tokens) AS pt, SUM(completion_tokens) AS ct FROM ai_token_logs GROUP BY model ORDER BY (SUM(prompt_tokens)+SUM(completion_tokens)) DESC LIMIT 20`),
-      q(`SELECT CASE WHEN module='' OR module IS NULL THEN '未分类' ELSE module END AS module, COUNT(*) AS calls, SUM(prompt_tokens+completion_tokens) AS t FROM ai_token_logs GROUP BY module ORDER BY t DESC`),
-      q(`SELECT DATE(created_at) AS d, SUM(prompt_tokens+completion_tokens) AS t, COUNT(*) AS c FROM ai_token_logs WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) GROUP BY DATE(created_at) ORDER BY d`),
-      q(`SELECT config_key, value FROM system_config WHERE config_key IN ('token_price_in','token_price_out')`),
-    ]);
-    const price = {}; (priceRows || []).forEach(r => { price[r.config_key] = parseFloat(r.value) || 0; });
-    const t = tot[0] || { calls: 0, pt: 0, ct: 0 };
-    const cost = (Number(t.pt) / 1e6) * (price.token_price_in || 0) + (Number(t.ct) / 1e6) * (price.token_price_out || 0);
-    res.json({ code: 200, data: {
-      total: { calls: Number(t.calls), promptTokens: Number(t.pt), completionTokens: Number(t.ct), totalTokens: Number(t.pt) + Number(t.ct), cost },
-      today: { tokens: Number(today[0]?.t || 0), calls: Number(today[0]?.c || 0) },
-      month: { tokens: Number(month[0]?.t || 0), calls: Number(month[0]?.c || 0) },
-      byModel: (byModel || []).map(r => ({ model: r.model || '(未知)', calls: Number(r.calls), tokens: Number(r.pt) + Number(r.ct) })),
-      byModule: (byModule || []).map(r => ({ module: r.module, calls: Number(r.calls), tokens: Number(r.t) })),
-      trend: (trend || []).map(r => ({ date: (r.d instanceof Date ? r.d.toISOString().slice(0,10) : String(r.d).slice(0,10)), tokens: Number(r.t), calls: Number(r.c) })),
-      price: { in: price.token_price_in || 0, out: price.token_price_out || 0 },
-    }});
-  } catch (err) {
-    console.error('/config/token-stats error:', err.message);
-    res.status(500).json({ code: 500, msg: err.message });
-  }
+  try { res.json({ code: 200, data: await buildTokenStats({ days: req.query.days }) }); }
+  catch (err) { console.error('/config/token-stats error:', err.message); res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// 用户端：只看自己的用量（无需管理员），供 desktop.html Token 统计页使用
+router.get('/my-token-stats', requireAuth, async (req, res) => {
+  try { res.json({ code: 200, data: await buildTokenStats({ userId: req.userId, days: req.query.days }) }); }
+  catch (err) { console.error('/config/my-token-stats error:', err.message); res.status(500).json({ code: 500, msg: err.message }); }
 });
 
 // ==================== 调试接口（临时） ====================
