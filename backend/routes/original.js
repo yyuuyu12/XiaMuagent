@@ -513,11 +513,14 @@ async function saveGoldenExample(project, userId) {
   try {
     const content = (project.doc || '').trim();
     if (!content || content.length < 80) return; // 过短不具备范例价值
+    let meta = project.meta || {};
+    if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+    const packId = parseInt(meta.packId) || 0; // 定稿归属到该项目所选的分技能
     await db.query(
-      `INSERT INTO cw_golden_examples (user_id, project_id, title, content)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content), created_at = NOW()`,
-      [userId, project.id, (project.title || '').slice(0, 200), content.slice(0, 5000)]
+      `INSERT INTO cw_golden_examples (user_id, project_id, title, content, pack_id)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content), pack_id = VALUES(pack_id), created_at = NOW()`,
+      [userId, project.id, (project.title || '').slice(0, 200), content.slice(0, 5000), packId]
     );
     await db.query(
       `DELETE FROM cw_golden_examples WHERE user_id = ? AND id NOT IN (
@@ -529,12 +532,23 @@ async function saveGoldenExample(project, userId) {
 }
 
 // 检索：取最近 10 条，按「项目标题+简介 vs 范例标题」二元字组重合度选最相近的 1 条
-async function pickGoldenExample(userId, project) {
+async function pickGoldenExample(userId, project, packId = 0) {
   try {
-    const { rows } = await db.query(
-      'SELECT project_id, title, content FROM cw_golden_examples WHERE user_id = ? AND project_id != ? ORDER BY created_at DESC, id DESC LIMIT 10',
-      [userId, project.id]
-    );
+    const pid = parseInt(packId) || 0;
+    // 优先取该分技能的范例；没有再回落到全部范例（主控通用）
+    let rows = [];
+    if (pid) {
+      ({ rows } = await db.query(
+        'SELECT project_id, title, content FROM cw_golden_examples WHERE user_id = ? AND project_id != ? AND pack_id = ? ORDER BY created_at DESC, id DESC LIMIT 10',
+        [userId, project.id, pid]
+      ));
+    }
+    if (!rows || !rows.length) {
+      ({ rows } = await db.query(
+        'SELECT project_id, title, content FROM cw_golden_examples WHERE user_id = ? AND project_id != ? ORDER BY created_at DESC, id DESC LIMIT 10',
+        [userId, project.id]
+      ));
+    }
     if (!rows || !rows.length) return null;
     const grams = (s) => {
       const g = new Set(); const t = String(s || '').replace(/\s/g, '');
@@ -611,11 +625,14 @@ function extractStageDoc(raw, stage) {
 
 // 构建某阶段的 system prompt（含决策树分支 + 对标素材 + 前序产出）
 // 取金句样本：写剧本阶段，随机混搭（保证跨题材）取各环节神句，只传语感
-async function pickSkillSamples(userId, stage) {
+async function pickSkillSamples(userId, stage, packId = 0) {
   if (stage !== 'script') return null; // 写正文时语感最关键
   try {
+    const pid = parseInt(packId) || 0;
+    // 取该分技能金句 + 主控通用金句(pack_id=0)；分技能的优先排前，再随机补全
     const { rows } = await db.query(
-      "SELECT stage, text FROM cw_skill_samples WHERE user_id = ? ORDER BY RAND() LIMIT 18", [userId]);
+      "SELECT stage, text FROM cw_skill_samples WHERE user_id = ? AND pack_id IN (?, 0) ORDER BY (pack_id = ?) DESC, RAND() LIMIT 18",
+      [userId, pid, pid]);
     if (!rows || !rows.length) return null;
     const by = { hook: [], turn: [], end: [], golden: [] };
     rows.forEach(r => { if (by[r.stage]) by[r.stage].push(r.text); });
@@ -661,9 +678,18 @@ function buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, hi
 
   const skillBlock = `## 用户 Skill 规则（始终遵守）\n${rulesText}`;
   // 题材包区块（项目挂载的题材专属规则，优先级高于全局 Skill）
-  const packBlock = (topicPack && topicPack.content)
-    ? `\n## 题材包「${topicPack.name || '未命名'}」（本项目题材专属规则，与全局 Skill 冲突时以本区块为准）\n${String(topicPack.content).slice(0, 2500)}\n`
-    : '';
+  let packBlock = '';
+  if (topicPack && ((topicPack.content || '').trim() || (topicPack.rules && Object.keys(topicPack.rules).length))) {
+    const pkRulesText = topicPack.rules
+      ? Object.entries(topicPack.rules).map(([g, arr]) =>
+          (Array.isArray(arr) && arr.length)
+            ? `〔${g}〕\n${arr.map(r => `- ${typeof r === 'string' ? r : (r && r.text) || ''}`).filter(s => s !== '- ').join('\n')}`
+            : ''
+        ).filter(Boolean).join('\n')
+      : '';
+    const pkContent = (topicPack.content || '').trim();
+    packBlock = `\n## 分技能「${topicPack.name || '未命名'}」（本项目所选内容类型的专属技能，与全局主控 Skill 冲突时以本区块为准）\n${pkRulesText}${pkRulesText && pkContent ? '\n' : ''}${pkContent ? String(pkContent).slice(0, 2000) : ''}\n`;
+  }
   // 本项目专属规律（仅本项目生效，与全局 Skill 冲突时以本区块为准）
   const projectRules = Array.isArray(meta.projectRules) ? meta.projectRules.filter(t => t && String(t).trim()) : [];
   const projectRulesBlock = projectRules.length
@@ -793,19 +819,24 @@ function getDurationLabel(meta) {
 async function generateStageReply({ userId, project, skill, stage, boundMaterials, history, userMessage, currentDraftOverride }) {
   const artifacts = parseArtifacts(project);
   const currentDraft = currentDraftOverride !== undefined ? currentDraftOverride : (project.doc || '');
-  // 仅写剧本阶段注入范例（few-shot 对台词文风收益最大，其余阶段省 token）
-  const goldenExample = stage === 'script' ? await pickGoldenExample(userId, project) : null;
-  // 题材包：项目挂载了哪个包就注入哪个（全阶段有效——题材知识从选题到剧本都用得上）
-  let topicPack = null;
+  // 分技能（题材包）：项目挂载哪个就用哪个——它的规则+神句+范例全程注入（主控全局 Skill 始终在底层）
   const packId = parseInt((project.meta || {}).packId) || 0;
+  let topicPack = null;
   if (packId) {
     try {
-      const { rows } = await db.query('SELECT name, content FROM cw_skill_packs WHERE id = ? AND user_id = ?', [packId, userId]);
-      if (rows && rows[0] && (rows[0].content || '').trim()) topicPack = rows[0];
+      const { rows } = await db.query('SELECT name, content, rules FROM cw_skill_packs WHERE id = ? AND user_id = ?', [packId, userId]);
+      if (rows && rows[0]) {
+        const pk = rows[0];
+        let pkRules = {};
+        try { pkRules = typeof pk.rules === 'string' ? JSON.parse(pk.rules || '{}') : (pk.rules || {}); } catch { pkRules = {}; }
+        if ((pk.content || '').trim() || Object.keys(pkRules).length) topicPack = { name: pk.name, content: pk.content, rules: pkRules };
+      }
     } catch (e) { console.warn('[topicPack]', e.message); }
   }
-  // 金句语感样本：写剧本阶段注入，跨题材混搭只传"劲"不传内容
-  const samples = await pickSkillSamples(userId, stage);
+  // 范例：仅写剧本阶段注入；优先取该分技能的范例，没有再回落主控通用
+  const goldenExample = stage === 'script' ? await pickGoldenExample(userId, project, packId) : null;
+  // 金句语感样本：写剧本阶段注入；取该分技能金句 + 主控通用金句，跨题材混搭只传"劲"不传内容
+  const samples = await pickSkillSamples(userId, stage, packId);
   const systemPrompt = buildStagePrompt({ project, skill, stage, artifacts, boundMaterials, history, currentDraft, goldenExample, topicPack, samples });
   // 写稿环节用一线模型（管理后台 ai_model_creation 配置；留空走默认）；bypassCap 避免长稿被中转站默认上限砍断
   const creationModel = (await getConfigVal('ai_model_creation')).trim();
@@ -923,44 +954,87 @@ async function generateStageReply({ userId, project, skill, stage, boundMaterial
 router.get('/packs', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, name, content, updated_at FROM cw_skill_packs WHERE user_id = ? ORDER BY updated_at DESC, id DESC',
+      'SELECT id, name, brief, content, rules, updated_at FROM cw_skill_packs WHERE user_id = ? ORDER BY updated_at DESC, id DESC',
       [req.userId]
     );
-    res.json({ code: 200, data: rows || [] });
+    const data = (rows || []).map(r => {
+      let ruleCount = 0;
+      try { const ru = typeof r.rules === 'string' ? JSON.parse(r.rules || '{}') : (r.rules || {}); ruleCount = Object.values(ru).reduce((s, a) => s + (Array.isArray(a) ? a.length : 0), 0); } catch {}
+      return { id: r.id, name: r.name, brief: r.brief || '', content: r.content || '', ruleCount, updated_at: r.updated_at };
+    });
+    res.json({ code: 200, data });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
-// POST /api/original/packs — 新建
+// POST /api/original/packs — 新建分技能
 router.post('/packs', requireAuth, async (req, res) => {
-  const { name, content } = req.body;
-  if (!name || !String(name).trim()) return res.status(400).json({ code: 400, msg: '请填写题材包名称' });
+  const { name, content, brief } = req.body;
+  if (!name || !String(name).trim()) return res.status(400).json({ code: 400, msg: '请填写分技能名称' });
   try {
     const { rows } = await db.query(
-      'INSERT INTO cw_skill_packs (user_id, name, content) VALUES (?, ?, ?)',
-      [req.userId, String(name).trim().slice(0, 100), String(content || '').slice(0, 20000)]
+      'INSERT INTO cw_skill_packs (user_id, name, brief, content) VALUES (?, ?, ?, ?)',
+      [req.userId, String(name).trim().slice(0, 100), String(brief || '').slice(0, 300), String(content || '').slice(0, 20000)]
     );
     res.json({ code: 200, msg: '已创建', data: { id: rows?.[0]?.id } });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
-// PUT /api/original/packs/:id — 更新
+// PUT /api/original/packs/:id — 更新（rules 由学习写入，这里不动）
 router.put('/packs/:id', requireAuth, async (req, res) => {
-  const { name, content } = req.body;
+  const { name, content, brief } = req.body;
   try {
     await db.query(
-      'UPDATE cw_skill_packs SET name = ?, content = ?, updated_at = NOW() WHERE id = ? AND user_id = ?',
-      [String(name || '').trim().slice(0, 100), String(content || '').slice(0, 20000), parseInt(req.params.id), req.userId]
+      'UPDATE cw_skill_packs SET name = ?, brief = ?, content = ?, updated_at = NOW() WHERE id = ? AND user_id = ?',
+      [String(name || '').trim().slice(0, 100), String(brief || '').slice(0, 300), String(content || '').slice(0, 20000), parseInt(req.params.id), req.userId]
     );
     res.json({ code: 200, msg: '已保存' });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
 });
 
-// DELETE /api/original/packs/:id — 删除（已挂载它的项目自动回落到全局 Skill）
+// DELETE /api/original/packs/:id — 删除（已挂载它的项目自动回落到主控 Skill）
 router.delete('/packs/:id', requireAuth, async (req, res) => {
   try {
-    await db.query('DELETE FROM cw_skill_packs WHERE id = ? AND user_id = ?', [parseInt(req.params.id), req.userId]);
+    const pid = parseInt(req.params.id);
+    await db.query('DELETE FROM cw_skill_packs WHERE id = ? AND user_id = ?', [pid, req.userId]);
+    // 连带清理该分技能的金句/范例归属（回落主控通用，避免悬挂）
+    await db.query('UPDATE cw_skill_samples SET pack_id = 0 WHERE user_id = ? AND pack_id = ?', [req.userId, pid]).catch(() => {});
+    await db.query('UPDATE cw_golden_examples SET pack_id = 0 WHERE user_id = ? AND pack_id = ?', [req.userId, pid]).catch(() => {});
     res.json({ code: 200, msg: '已删除' });
   } catch (err) { res.status(500).json({ code: 500, msg: err.message }); }
+});
+
+// POST /api/original/skill/route — 主控：按用户创作思路，从分技能里 AI 推荐用哪个（前端让用户确认）
+router.post('/skill/route', requireAuth, async (req, res) => {
+  const idea = String(req.body.idea || '').trim();
+  if (!idea) return res.status(400).json({ code: 400, msg: '请先写一句创作思路' });
+  try {
+    const { rows: packs } = await db.query('SELECT id, name, brief FROM cw_skill_packs WHERE user_id = ? ORDER BY updated_at DESC, id DESC', [req.userId]);
+    if (!packs || !packs.length) {
+      return res.json({ code: 200, data: { packId: 0, name: '', reason: '你还没有分技能，先去建几个并喂样本训练', candidates: [] } });
+    }
+    const list = packs.map((p, i) => `${i + 1}. 「${p.name}」${p.brief ? '：' + p.brief : ''}（id=${p.id}）`).join('\n');
+    const prompt = `你是创作总控。用户有以下几个内容类型「分技能」，各擅长一类内容：
+${list}
+
+用户这次的创作思路：「${idea}」
+
+判断这条思路最该用哪个分技能创作。只返回 JSON：{"packId": 数字id, "reason": "一句话为什么(≤30字)"}。都不太匹配就选最接近的。只输出 JSON。`;
+    let pick = null;
+    try {
+      const raw = await callAI(prompt, { maxTokens: 150, temperature: 0.2, userId: req.userId, action: '分技能路由' });
+      pick = extractJson(raw);
+    } catch (e) { console.warn('[skill/route]', e.message); }
+    const valid = pick && packs.find(p => p.id === parseInt(pick.packId));
+    const chosen = valid || packs[0];
+    res.json({ code: 200, data: {
+      packId: chosen.id, name: chosen.name,
+      reason: (valid && pick.reason) ? String(pick.reason).slice(0, 60) : '默认选最近使用的分技能',
+      candidates: packs.map(p => ({ id: p.id, name: p.name, brief: p.brief || '' })),
+    }});
+  } catch (err) {
+    console.error('/original/skill/route error:', err.message);
+    res.status(500).json({ code: 500, msg: err.message });
+  }
 });
 
 /* ═══════════════════════════════════════
@@ -2052,8 +2126,9 @@ router.post('/learning/analyze', requireAuth, async (req, res) => {
 
 // POST /api/original/learning/write — 把选中的规律【融合】进 Skill 工作流（非简单追加）
 // 金句样本：去重存入（语感资产，4-60 字，单次上限 20 条）
-async function saveSkillSamples(userId, samples) {
-  const { rows } = await db.query('SELECT text FROM cw_skill_samples WHERE user_id = ?', [userId]);
+async function saveSkillSamples(userId, samples, packId = 0) {
+  const pid = parseInt(packId) || 0;
+  const { rows } = await db.query('SELECT text FROM cw_skill_samples WHERE user_id = ? AND pack_id = ?', [userId, pid]);
   const seen = new Set((rows || []).map(r => r.text.replace(/\s+/g, '')));
   let n = 0;
   for (const s of samples) {
@@ -2062,8 +2137,8 @@ async function saveSkillSamples(userId, samples) {
     if (text.length < 4 || text.length > 60) continue;
     const key = text.replace(/\s+/g, '');
     if (seen.has(key)) continue; seen.add(key);
-    await db.query('INSERT INTO cw_skill_samples (user_id, stage, text, topic, source) VALUES (?,?,?,?,?)',
-      [userId, stage, text, String((s && s.topic) || '').slice(0, 50), '学习']).catch(() => {});
+    await db.query('INSERT INTO cw_skill_samples (user_id, stage, text, topic, source, pack_id) VALUES (?,?,?,?,?,?)',
+      [userId, stage, text, String((s && s.topic) || '').slice(0, 50), '学习', pid]).catch(() => {});
     if (++n >= 20) break;
   }
 }
@@ -2094,12 +2169,31 @@ router.delete('/skill/samples/:id', requireAuth, async (req, res) => {
 });
 
 router.post('/learning/write', requireAuth, async (req, res) => {
-  const { insights, scope = 'global', projectId, samples } = req.body;
+  const { insights, scope = 'global', projectId, packId, samples } = req.body;
   if (!insights || !insights.length) return res.status(400).json({ code: 400, msg: '没有选中规律' });
 
-  // 收录金句样本（全局语感资产，与 scope 无关；去重、限长）
+  // 收录金句样本：scope=pack 时归属到该分技能，否则进主控通用(pack_id=0)
   if (Array.isArray(samples) && samples.length) {
-    await saveSkillSamples(req.userId, samples).catch(e => console.warn('[saveSkillSamples]', e.message));
+    const samplePackId = (scope === 'pack') ? (parseInt(packId) || 0) : 0;
+    await saveSkillSamples(req.userId, samples, samplePackId).catch(e => console.warn('[saveSkillSamples]', e.message));
+  }
+
+  // 写入某个分技能：AI 融合较慢，走异步任务
+  if (scope === 'pack') {
+    const pid = parseInt(packId) || 0;
+    if (!pid) return res.status(400).json({ code: 400, msg: '缺少分技能 packId' });
+    const { rows: pk } = await db.query('SELECT id FROM cw_skill_packs WHERE id = ? AND user_id = ?', [pid, req.userId]);
+    if (!pk || !pk[0]) return res.status(400).json({ code: 400, msg: '分技能不存在或无权访问' });
+    try {
+      const taskId = crypto.randomUUID();
+      await db.query('INSERT INTO tasks (id, user_id, type, title, status, progress, input_data) VALUES (?,?,?,?,?,?,?)',
+        [taskId, req.userId, 'original_write_pack', 'AI 融合规律进分技能', 'pending', 0, JSON.stringify({ userId: req.userId, packId: pid, insights })]);
+      taskRunner.enqueue({ taskId, type: 'original_write_pack' });
+      return res.json({ code: 200, data: { taskId } });
+    } catch (err) {
+      console.error('/original/learning/write (pack) error:', err.message);
+      return res.status(500).json({ code: 500, msg: err.message });
+    }
   }
 
   // 仅用于本项目：真实写入该项目 meta.projectRules，之后本项目对话生成都会带上
@@ -2239,6 +2333,72 @@ async function processLearningWrite(taskId) {
   }
 }
 
+// ── 分技能学习写入：把新规律融合进指定分技能的 rules（结构同主控 Skill）──
+async function _runLearningWritePack(userId, packId, insights) {
+  const { rows } = await db.query('SELECT name, rules FROM cw_skill_packs WHERE id = ? AND user_id = ?', [packId, userId]);
+  if (!rows || !rows[0]) throw new Error('分技能不存在');
+  let curRules = {};
+  try { curRules = typeof rows[0].rules === 'string' ? JSON.parse(rows[0].rules || '{}') : (rows[0].rules || {}); } catch { curRules = {}; }
+  const curText = Object.entries(curRules)
+    .map(([g, arr]) => (Array.isArray(arr) && arr.length) ? `〔${g}〕\n${arr.map(r => `- ${typeof r === 'string' ? r : (r && r.text) || ''}`).join('\n')}` : '')
+    .filter(Boolean).join('\n');
+  const insightText = (insights || []).map(i => `- ${i.text || i}`).join('\n');
+  const prompt = `你是创作 Skill 工作流架构师。下面是「${rows[0].name || '某分技能'}」这个内容类型分技能的现有规则，以及本次新学到的规律。请把新规律【融合】进现有工作流（按创作流程节点分组），可新增/改写/合并条目，不要简单堆在最后。
+
+【现有分技能规则】
+${curText || '（暂时为空，请基于新规律搭建工作流骨架）'}
+
+【本次新学规律】
+${insightText}
+
+只返回融合后的【完整】rules JSON（按创作流程节点分组），结构示例：
+{ "选题方向": ["一句话可执行指令"], "开场钩子": ["..."], "内容展开": ["..."], "节奏与转折": ["..."], "结尾引导": ["..."], "语言风格": ["..."] }
+要求：每条是一句可直接执行的创作指令，与现有去重合并、措辞精炼；只输出 JSON。`;
+  let merged = null;
+  try {
+    const aiResult = await callAI(prompt, { maxTokens: 2000, temperature: 0.4, bypassCap: true, userId, action: '分技能融合' });
+    const parsed = extractJson(aiResult);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      merged = {};
+      for (const [g, arr] of Object.entries(parsed)) {
+        if (!Array.isArray(arr)) continue;
+        const list = [];
+        for (const entry of arr) {
+          const text = typeof entry === 'string' ? entry : (entry && entry.text) || '';
+          if (text.trim()) list.push({ text: text.trim(), source: '学习融合', sourceType: 'merge', uses: 0 });
+        }
+        if (list.length) merged[g] = list;
+      }
+      if (!Object.keys(merged).length) merged = null;
+    }
+  } catch (e) { console.warn('[分技能融合 AI 失败，降级追加]', e.message); }
+  if (!merged) {
+    merged = { ...curRules };
+    if (!merged['学习中心']) merged['学习中心'] = [];
+    for (const ins of (insights || [])) {
+      const t = ins.text || ins;
+      if (t && !merged['学习中心'].some(r => (r.text || r) === t)) merged['学习中心'].push({ text: t, source: '学习中心', sourceType: 'feed', uses: 0 });
+    }
+  }
+  await db.query('UPDATE cw_skill_packs SET rules = ?, updated_at = NOW() WHERE id = ? AND user_id = ?', [JSON.stringify(merged), packId, userId]);
+  return { packId };
+}
+
+async function processLearningWritePack(taskId) {
+  const { rows } = await db.query('SELECT * FROM tasks WHERE id = ?', [taskId]);
+  const task = rows?.[0];
+  if (!task || ['done', 'failed'].includes(task.status)) return;
+  const input = typeof task.input_data === 'string' ? JSON.parse(task.input_data) : (task.input_data || {});
+  try {
+    await db.query("UPDATE tasks SET status = 'running', progress = 30, updated_at = NOW() WHERE id = ?", [taskId]).catch(() => {});
+    const result = await _runLearningWritePack(input.userId, input.packId, input.insights || []);
+    await db.query("UPDATE tasks SET status = 'done', progress = 100, result = ?, updated_at = NOW() WHERE id = ?", [JSON.stringify(result), taskId]).catch(() => {});
+  } catch (e) {
+    console.error('[processLearningWritePack]', e.message);
+    await db.query('UPDATE tasks SET status = ?, error_msg = ?, updated_at = NOW() WHERE id = ?', ['failed', e.message, taskId]).catch(() => {});
+  }
+}
+
 /* ═══════════════════════════════════════
    智能选题
 ═══════════════════════════════════════ */
@@ -2372,3 +2532,4 @@ router.delete('/materials/:id', requireAuth, async (req, res) => {
 module.exports = router;
 module.exports.processLearningAnalyze = processLearningAnalyze;
 module.exports.processLearningWrite = processLearningWrite;
+module.exports.processLearningWritePack = processLearningWritePack;

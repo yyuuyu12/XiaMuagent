@@ -613,6 +613,14 @@ async function initDb() {
   // cw_skills 表：补 last_reflect_at 列（月度反思上次执行时间）
   try { await db.query('ALTER TABLE cw_skills ADD COLUMN last_reflect_at DATETIME DEFAULT NULL'); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_skills.last_reflect_at:', e.message||e); }
 
+  // ── 多分技能改造（科技博主多内容类型：每个分技能=一个题材包，各自规则/神句/范例）──
+  // 分技能加结构化 rules（JSON，结构同 cw_skills.rules：{分组:[{text,source,sourceType,uses}]}）+ brief 描述（供主控路由判断）
+  try { await db.query("ALTER TABLE cw_skill_packs ADD COLUMN rules MEDIUMTEXT"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_skill_packs.rules:', e.message||e); }
+  try { await db.query("ALTER TABLE cw_skill_packs ADD COLUMN brief VARCHAR(300) DEFAULT ''"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_skill_packs.brief:', e.message||e); }
+  // 金句库/范例库归属到分技能（pack_id=0 表示主控通用，跨技能共享语感）
+  try { await db.query("ALTER TABLE cw_skill_samples ADD COLUMN pack_id INT DEFAULT 0"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_skill_samples.pack_id:', e.message||e); }
+  try { await db.query("ALTER TABLE cw_golden_examples ADD COLUMN pack_id INT DEFAULT 0"); } catch(e) { if (!String(e.message||e).includes('Duplicate')) console.warn('[initDb] cw_golden_examples.pack_id:', e.message||e); }
+
   // ============ AI 写小说（nv_ 前缀） ============
   // nv_projects：小说项目（state=世界基石动态事实源，outline=全书卷级大纲）
   await db.query(`
