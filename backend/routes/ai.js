@@ -104,6 +104,28 @@ router.post('/rewrite', requireAuth, async (req, res) => {
   }
 });
 
+// ==================== 镶头文案改写（混剪矩阵智能体专用，按人设改写口播文案） ====================
+router.post('/script-rewrite', requireAuth, async (req, res) => {
+  const { persona, original, industry } = req.body;
+  if (!original?.trim()) return res.status(400).json({ code: 400, msg: '缺少原句' });
+
+  const usage = await checkAndRecordUsage(req.userId, 'script-rewrite');
+  if (!usage.ok) return res.status(429).json({ code: 429, msg: usage.msg });
+
+  const prompt = `你是${industry || '本地实体店'}老板「${persona?.name || ''}」的短视频文案助手。
+人设信息：${JSON.stringify(persona || {})}
+请把下面这句镶头模板原句，改写成符合该人设口吻的口播文案（第一人称，自然口语，不要书面语，长度与原句相近）：
+原句：${original}
+直接输出改写后的文案，不要解释。`;
+
+  try {
+    const result = await callAI(prompt, { userId: req.userId, action: '镶头文案改写' });
+    res.json({ code: 200, data: { result, remaining: usage.remaining } });
+  } catch (err) {
+    res.status(500).json({ code: 500, msg: err.message });
+  }
+});
+
 // ==================== 灵感生成 ====================
 router.post('/inspire', requireAuth, async (req, res) => {
   const { track, industryId } = req.body;
