@@ -182,6 +182,11 @@ async function initDb() {
     `INSERT IGNORE INTO system_config (config_key, value) VALUES ('video_url', '')`
   );
 
+  // videomix_url：混剪矩阵智能体本地服务地址（frp穿透域名，同asr_url填法）
+  await db.query(
+    `INSERT IGNORE INTO system_config (config_key, value) VALUES ('videomix_url', '')`
+  );
+
   // AI 默认配置（INSERT IGNORE：仅首次插入，不覆盖管理后台已保存的选择）
   await db.query(
     `INSERT IGNORE INTO system_config (config_key, value) VALUES ('ai_provider', 'deepseek')`

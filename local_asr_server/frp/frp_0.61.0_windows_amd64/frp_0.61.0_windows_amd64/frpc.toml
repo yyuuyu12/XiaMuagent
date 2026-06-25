@@ -18,3 +18,10 @@ type = "http"
 localIP = "127.0.0.1"
 localPort = 7861
 customDomains = ["heygem.yyagent.top"]
+
+[[proxies]]
+name = "videomix"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 8800
+customDomains = ["videomix.yyagent.top"]

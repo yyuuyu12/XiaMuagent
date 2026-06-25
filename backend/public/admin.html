@@ -275,6 +275,11 @@
             <div class="hint">HeyGem / VideoReTalking / SadTalker 的 frp 穿透公网地址。</div>
           </div>
           <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
+            <label>🎬 混剪矩阵智能体服务地址（videomix_url）</label>
+            <input id="videomix_url" placeholder="例如：http://videomix.yyagent.top" />
+            <div class="hint">本地混剪服务的 frp 穿透公网地址，填 http:// 不要填 https://。</div>
+          </div>
+          <div class="form-row" style="padding-top:12px;border-top:1px solid #F0F2FF;margin-top:4px">
             <label>🐟 Fish Audio API Key（音色克隆）</label>
             <input id="fish_audio_api_key" type="password" placeholder="在 fish.audio 注册后获取" />
             <div class="hint">用于用户音色克隆功能。留空则克隆功能不可用。</div>
@@ -666,6 +671,7 @@ async function loadKeys() {
   document.getElementById('tikhub_api_key').value = d.tikhub_api_key || '';
   document.getElementById('asr_url').value = d.asr_url || '';
   document.getElementById('video_url').value = d.video_url || '';
+  document.getElementById('videomix_url').value = d.videomix_url || '';
   document.getElementById('fish_audio_api_key').value = d.fish_audio_api_key || '';
   document.getElementById('oss_region').value = d.oss_region || '';
   document.getElementById('oss_bucket').value = d.oss_bucket || '';
@@ -691,6 +697,7 @@ async function saveKeys() {
     tikhub_api_key: document.getElementById('tikhub_api_key').value,
     asr_url: document.getElementById('asr_url').value,
     video_url: document.getElementById('video_url').value,
+    videomix_url: document.getElementById('videomix_url').value,
     fish_audio_api_key: document.getElementById('fish_audio_api_key').value,
     oss_region: document.getElementById('oss_region').value,
     oss_bucket: document.getElementById('oss_bucket').value,

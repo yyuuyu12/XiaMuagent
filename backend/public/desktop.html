@@ -128,6 +128,38 @@ html, body {
 .d-step-badge.idle { background:#F7F5F1; color:#B0AA9F; }
 .d-card-body { padding:16px 18px; }
 
+/* 混剪矩阵智能体 */
+.vm-quick { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:18px; }
+.vm-quick-card { background:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 2px 12px rgba(0,0,0,0.05); display:flex; gap:12px; cursor:pointer; transition:box-shadow .2s,transform .2s; }
+.vm-quick-card:hover { box-shadow:0 8px 28px rgba(0,0,0,0.1); transform:translateY(-2px); }
+.vm-quick-icon { width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.vm-quick-title { font-size:14px; font-weight:700; color:#1A1614; margin-bottom:3px; }
+.vm-quick-desc { font-size:12px; color:#9E9890; }
+.vm-cat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+.vm-cat-card { background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 2px 12px rgba(0,0,0,0.05); position:relative; }
+.vm-cat-name { font-size:14.5px; font-weight:700; color:#1A1614; }
+.vm-cat-path { font-size:11px; color:#B0AA9F; margin:2px 0; word-break:break-all; }
+.vm-cat-count { font-size:12px; color:#9E9890; margin-bottom:10px; }
+.vm-cat-badge { position:absolute; top:16px; right:16px; font-size:11px; font-weight:600; padding:2px 9px; border-radius:20px; }
+.vm-thumb-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
+.vm-thumb-slot { aspect-ratio:1; border-radius:8px; overflow:hidden; background:#F7F5F1; display:flex; align-items:center; justify-content:center; }
+.vm-thumb-slot img { width:100%; height:100%; object-fit:cover; }
+.vm-thumb-slot.empty { background:#FBFAF7; border:1px dashed #EDE9E3; }
+.vm-cat-actions a { font-size:12px; cursor:pointer; margin-right:12px; }
+.vm-shot-card { border:1px solid #EDE9E3; border-radius:12px; padding:12px; margin-bottom:10px; }
+.vm-shot-orig { color:#B0AA9F; font-size:12px; margin-bottom:6px; }
+.vm-pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11.5px; font-weight:600; }
+.vm-pill.pending { background:#F7F5F1; color:#9E9890; }
+.vm-pill.running { background:#FFF3E8; color:#F5762A; }
+.vm-pill.done { background:#F0FDF4; color:#16A34A; }
+.vm-pill.failed { background:#FEF2F2; color:#DC2626; }
+.vm-progress { width:90px; height:6px; background:#F0EDE8; border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:6px; }
+.vm-progress > div { height:100%; background:#F5762A; }
+.vm-empty { text-align:center; padding:40px 0; color:#9E9890; font-size:13px; }
+.vm-empty .vm-empty-icon { width:36px; height:36px; border:1.5px solid #DDD7CF; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; color:#B0AA9F; }
+.vm-empty a { color:#F5762A; cursor:pointer; font-weight:700; }
+.vm-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; }
+
 /* 步骤进度条 */
 .d-step-bar {
   background:#fff; border-radius:16px; padding:14px 24px;
@@ -838,6 +870,13 @@ html, body { background: linear-gradient(135deg,#F5F2EC 0%,#F0ECF4 100%) fixed; 
         <div class="d-nav-item" id="dNavNovel" onclick="dGoPage('novel')">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 19.5C4 18.12 5.12 17 6.5 17H20V3H6.5C5.12 3 4 4.12 4 5.5V19.5ZM4 19.5C4 20.88 5.12 22 6.5 22H20" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
           <span>AI 写小说</span>
+        </div>
+      </div>
+      <div class="d-nav-group">
+        <div class="d-nav-group-title">视频混剪</div>
+        <div class="d-nav-item" id="dNavVideomix" onclick="dGoPage('vmHome')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M17 10l4-2v8l-4-2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>混剪矩阵智能体</span>
         </div>
       </div>
     </div>
@@ -1640,6 +1679,12 @@ function dRender() {
     case 'original': el.innerHTML = dRenderOriginal(); dBindOriginal(); break;
     case 'profile': el.innerHTML = dRenderProfile(); dBindProfile(); break;
     case 'tokens':  el.innerHTML = dRenderTokenStats(); dBindTokenStats(); break;
+    case 'vmHome':      el.innerHTML = dVmTabbar('home') + dRenderVmHome(); dBindVmHome(); break;
+    case 'vmPersonas':  el.innerHTML = dVmTabbar('personas') + dRenderVmPersonas(); dBindVmPersonas(); break;
+    case 'vmMaterials': el.innerHTML = dVmTabbar('materials') + dRenderVmMaterials(); dBindVmMaterials(); break;
+    case 'vmShots':     el.innerHTML = dVmTabbar('shots') + dRenderVmShots(); dBindVmShots(); break;
+    case 'vmTasks':     el.innerHTML = dVmTabbar('tasks') + dRenderVmTasks(); dBindVmTasks(); break;
+    case 'vmSettings':  el.innerHTML = dVmTabbar('settings') + dRenderVmSettings(); dBindVmSettings(); break;
     default:        el.innerHTML = dKouboTabbar('make') + dRenderHome(); dBindHome();
   }
 }
@@ -1648,10 +1693,416 @@ function dGoPage(page) {
   dS.page = page;
   document.querySelectorAll('.d-nav-item').forEach(el => el.classList.remove('active'));
   // 口播区四个页面（制作/任务/声音库/数字人库）侧边栏统一高亮「数字人口播」
-  const navMap = { home:'dNavHome', tasks:'dNavHome', voices:'dNavHome', avatars:'dNavHome', novel:'dNavNovel', original:'dNavOriginal', tokens:'dNavTokens', profile:'' };
+  const navMap = { home:'dNavHome', tasks:'dNavHome', voices:'dNavHome', avatars:'dNavHome', novel:'dNavNovel', original:'dNavOriginal', tokens:'dNavTokens', profile:'',
+    vmHome:'dNavVideomix', vmPersonas:'dNavVideomix', vmMaterials:'dNavVideomix', vmShots:'dNavVideomix', vmTasks:'dNavVideomix', vmSettings:'dNavVideomix' };
   if (navMap[page]) document.getElementById(navMap[page])?.classList.add('active');
   if (page === 'home') dProbeServices();
   dRender();
+}
+
+/* ============================================================
+   JS · 混剪矩阵智能体（代理到本地 HunjianAgent 服务，端口8800）
+   ============================================================ */
+function vmApi(method, path, data) { return dApi(method, '/videomix' + path, data); }
+
+function dVmTabbar(active) {
+  const tabs = [
+    ['home', '工作台'], ['personas', '账号档案'], ['materials', '素材中心'],
+    ['shots', '镶头剪辑'], ['tasks', '任务中心'], ['settings', '系统设置'],
+  ];
+  return `<div style="margin-bottom:18px">
+    <div style="margin-bottom:12px">
+      <div style="font-size:18px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">混剪矩阵智能体</div>
+      <div style="font-size:12px;color:#9E9890;margin-top:3px">本地素材一键混剪成片，多账号矩阵批量分发</div>
+    </div>
+    <div class="koubo-tabs">
+      ${tabs.map(([k, label]) => `<div class="koubo-tab ${active === k ? 'active' : ''}" onclick="dGoPage('vm${k.charAt(0).toUpperCase() + k.slice(1)}')">${label}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---------- 工作台 ---------- */
+function dRenderVmHome() {
+  return `
+  <div class="tk-metrics">
+    <div class="tk-metric tk-o"><div class="tk-metric-top"><div class="tk-metric-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M17 10l4-2v8l-4-2"/></svg></div></div><div class="tk-metric-val" id="vmStatMaterial">0</div><div class="tk-metric-label">可用素材片段</div></div>
+    <div class="tk-metric tk-b"><div class="tk-metric-top"><div class="tk-metric-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2A7DE1" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 10h6M9 14h6"/></svg></div></div><div class="tk-metric-val" id="vmStatTemplate">0</div><div class="tk-metric-label">可用模板</div></div>
+    <div class="tk-metric tk-g"><div class="tk-metric-top"><div class="tk-metric-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2"><path d="M5 13l4 4L19 7"/></svg></div></div><div class="tk-metric-val" id="vmStatToday">0</div><div class="tk-metric-label">今日成片</div></div>
+    <div class="tk-metric tk-p"><div class="tk-metric-top"><div class="tk-metric-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9333EA" stroke-width="2"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></div></div><div class="tk-metric-val" id="vmStatAccounts">0</div><div class="tk-metric-label">发布账号</div></div>
+  </div>
+  <div class="vm-quick">
+    <div class="vm-quick-card" onclick="dGoPage('vmShots')"><div class="vm-quick-icon" style="background:#FFF3E8"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M17 10l4-2v8l-4-2"/></svg></div><div><div class="vm-quick-title">镶头剪辑</div><div class="vm-quick-desc">选模板、改写文案、配音字幕，一键创建混剪任务</div></div></div>
+    <div class="vm-quick-card" onclick="dGoPage('vmMaterials')"><div class="vm-quick-icon" style="background:#EEF4FF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2A7DE1" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></div><div><div class="vm-quick-title">素材中心</div><div class="vm-quick-desc">管理本地素材文件夹，扫描可用片段</div></div></div>
+    <div class="vm-quick-card" onclick="dToast('多平台账号矩阵规划中，涉及自动化登录风控风险，待确认后再开放')"><div class="vm-quick-icon" style="background:#FAF0FF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9333EA" stroke-width="2"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></div><div><div class="vm-quick-title">发布账号</div><div class="vm-quick-desc">多平台账号矩阵，登录与状态检测（规划中）</div></div></div>
+  </div>
+  <div class="d-card">
+    <div class="d-card-header"><div class="d-card-title">最近混剪任务</div></div>
+    <div class="d-card-body" id="vmRecentTasks"><div class="vm-empty"><div class="vm-empty-icon">▶</div>还没有混剪任务，去 <a onclick="dGoPage('vmShots')">镶头剪辑</a> 创建第一个吧</div></div>
+  </div>`;
+}
+
+async function dBindVmHome() {
+  const r = await vmApi('GET', '/dashboard/stats');
+  if (!r || r.code) { dToast((r && r.msg) || '加载失败'); return; }
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('vmStatMaterial', r.material_total);
+  set('vmStatTemplate', r.template_total);
+  set('vmStatToday', r.today_done);
+  set('vmStatAccounts', r.published_accounts);
+  if (r.recent_tasks && r.recent_tasks.length) {
+    document.getElementById('vmRecentTasks').innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="text-align:left;color:#9E9890;font-size:12px"><th style="padding:6px 8px">任务</th><th style="padding:6px 8px">状态</th><th style="padding:6px 8px">进度</th><th style="padding:6px 8px">时间</th></tr></thead>
+      <tbody>${r.recent_tasks.map(t => `<tr style="border-top:1px solid #F7F5F1"><td style="padding:6px 8px">${t.id.slice(0,8)}</td><td style="padding:6px 8px"><span class="vm-pill ${t.status}">${t.status}</span></td><td style="padding:6px 8px">${t.progress}%</td><td style="padding:6px 8px;color:#9E9890">${t.created_at}</td></tr>`).join('')}</tbody>
+    </table>`;
+  }
+}
+
+/* ---------- 账号档案 ---------- */
+function dRenderVmPersonas() {
+  return `
+  <div class="d-card" style="margin-bottom:16px">
+    <div class="d-card-header"><div class="d-card-title">新建人设</div></div>
+    <div class="d-card-body">
+      <div class="vm-form-grid">
+        <div><div class="d-label">档案名称/称呼</div><input class="d-input" id="vmPName" placeholder="如：红姐鸭血粉丝汤老板"></div>
+        <div><div class="d-label">行业/主营业务</div><input class="d-input" id="vmPIndustry" placeholder="如：餐饮/鸭血粉丝汤"></div>
+        <div><div class="d-label">门店或品牌名称</div><input class="d-input" id="vmPBrand"></div>
+        <div><div class="d-label">门店地址/商圈</div><input class="d-input" id="vmPAddress"></div>
+        <div><div class="d-label">做了多少年</div><input class="d-input" id="vmPYears" placeholder="如：5年"></div>
+        <div><div class="d-label">投了多少钱干了什么</div><input class="d-input" id="vmPInvest"></div>
+        <div style="grid-column:1/-1"><div class="d-label">遇到过什么挫折/怎么解决的</div><input class="d-input" id="vmPStory"></div>
+        <div style="grid-column:1/-1"><div class="d-label">为什么值得信赖</div><input class="d-input" id="vmPTrust"></div>
+      </div>
+      <button class="d-btn d-btn-primary" style="margin-top:14px" onclick="vmSavePersona()">保存人设</button>
+    </div>
+  </div>
+  <div class="d-card">
+    <div class="d-card-header"><div class="d-card-title">已有人设</div></div>
+    <div class="d-card-body"><table style="width:100%;border-collapse:collapse;font-size:13px"><tbody id="vmPersonaList"></tbody></table></div>
+  </div>`;
+}
+
+async function dBindVmPersonas() { await vmLoadPersonas(); }
+
+async function vmLoadPersonas() {
+  const list = await vmApi('GET', '/personas');
+  dS.vm = dS.vm || {}; dS.vm.personas = list || [];
+  const el = document.getElementById('vmPersonaList');
+  if (el) el.innerHTML = (list || []).map(p => `<tr style="border-top:1px solid #F7F5F1"><td style="padding:6px 8px">${esc(p.name)}</td><td style="padding:6px 8px;color:#9E9890">${esc(p.fields_json.industry||'')}</td><td style="padding:6px 8px"><span style="color:#DC2626;cursor:pointer;font-size:12px" onclick="vmDeletePersona('${p.id}')">删除</span></td></tr>`).join('') || '<tr><td class="vm-empty" style="padding:20px">暂无人设</td></tr>';
+}
+
+async function vmSavePersona() {
+  const name = document.getElementById('vmPName').value.trim();
+  if (!name) return dToast('请填写档案名称');
+  const fields_json = {
+    industry: document.getElementById('vmPIndustry').value,
+    brand: document.getElementById('vmPBrand').value,
+    address: document.getElementById('vmPAddress').value,
+    years: document.getElementById('vmPYears').value,
+    invest: document.getElementById('vmPInvest').value,
+    story: document.getElementById('vmPStory').value,
+    trust: document.getElementById('vmPTrust').value,
+  };
+  await vmApi('POST', '/personas', { name, fields_json });
+  ['vmPName','vmPIndustry','vmPBrand','vmPAddress','vmPYears','vmPInvest','vmPStory','vmPTrust'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  dToast('已保存');
+  vmLoadPersonas();
+}
+
+async function vmDeletePersona(id) {
+  await vmApi('DELETE', '/personas/' + id);
+  vmLoadPersonas();
+}
+
+/* ---------- 素材中心 ---------- */
+function dRenderVmMaterials() {
+  return `
+  <div class="d-card" style="margin-bottom:16px">
+    <div class="d-card-body">
+      <div style="background:#EEF4FF;color:#2A6FB8;border-radius:10px;padding:12px 16px;font-size:12.5px;margin-bottom:16px;line-height:1.6">
+        素材中心管理的是<b>本地可重复使用的素材文件夹</b>：请指定混剪根目录，页面会优先显示上次扫描结果；点击"重新扫描"后再统计该目录下的视频片段。
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+        <input class="d-input" id="vmRootDir" style="flex:1;max-width:460px" placeholder="如 F:\\videomix_data\\混剪素材">
+        <button class="d-btn d-btn-primary" onclick="vmScanMaterials()">重新扫描</button>
+      </div>
+      <div class="d-label" id="vmScanResult"></div>
+    </div>
+  </div>
+  <div class="tk-metrics" style="margin-bottom:16px">
+    <div class="tk-metric tk-b"><div class="tk-metric-val" id="vmMsFolders">0</div><div class="tk-metric-label">已接入文件夹</div></div>
+    <div class="tk-metric tk-g"><div class="tk-metric-val" id="vmMsTotal">0</div><div class="tk-metric-label">可用片段总数</div></div>
+    <div class="tk-metric"><div class="tk-metric-val" id="vmMsUnsupported">0</div><div class="tk-metric-label">不支持的文件</div></div>
+    <div class="tk-metric" style="color:#DC2626"><div class="tk-metric-val" id="vmMsLacking">0</div><div class="tk-metric-label">素材不足类别</div></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div class="d-card-title">素材文件夹视图</div><div class="d-label" id="vmMsScannedAt" style="margin:0"></div>
+  </div>
+  <div class="vm-cat-grid" id="vmCategories"></div>`;
+}
+
+async function dBindVmMaterials() {
+  await vmLoadScanStats();
+  await vmLoadCategories();
+}
+
+async function vmLoadScanStats() {
+  const s = await vmApi('GET', '/materials/scan_stats');
+  if (s && s.root_dir) {
+    const inp = document.getElementById('vmRootDir'); if (inp) inp.value = s.root_dir;
+    const u = document.getElementById('vmMsUnsupported'); if (u) u.textContent = s.unsupported || 0;
+    const sc = document.getElementById('vmMsScannedAt'); if (sc) sc.textContent = '最近扫描: ' + (s.scanned_at || '').replace('T', ' ').slice(0, 16).replace(/-/g, '/');
+  }
+}
+
+async function vmScanMaterials() {
+  const root_dir = document.getElementById('vmRootDir').value.trim();
+  if (!root_dir) return dToast('请填写素材根目录');
+  document.getElementById('vmScanResult').textContent = '扫描中...';
+  const r = await vmApi('POST', '/materials/scan', { root_dir });
+  if (r && r.added !== undefined) {
+    document.getElementById('vmScanResult').textContent = `新增${r.added}条，跳过${r.skipped}条(已存在)，失败${r.failed}条`;
+    await vmLoadCategories(); await vmLoadScanStats();
+  } else {
+    document.getElementById('vmScanResult').textContent = '失败: ' + ((r && r.msg) || '未知错误');
+  }
+}
+
+async function vmLoadCategories() {
+  const categories = await vmApi('GET', '/materials/categories');
+  dS.vm = dS.vm || {}; dS.vm.categories = categories || [];
+  const total = (categories || []).reduce((s, c) => s + c.cnt, 0);
+  const lacking = (categories || []).filter(c => c.cnt < 3).length;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('vmMsFolders', (categories || []).length);
+  set('vmMsTotal', total);
+  set('vmMsLacking', lacking);
+
+  const el = document.getElementById('vmCategories');
+  if (!el) return;
+  if (!categories || !categories.length) { el.innerHTML = '<div class="vm-empty">尚未扫描素材</div>'; return; }
+  const root = (document.getElementById('vmRootDir') || {}).value || '';
+  const htmls = await Promise.all(categories.map(async (c, i) => {
+    const mats = await vmApi('GET', '/materials?category=' + encodeURIComponent(c.category));
+    let badge = '';
+    if (c.cnt === 0) badge = '<span class="vm-cat-badge" style="background:#FEF2F2;color:#DC2626">不足类别</span>';
+    else if (c.cnt < 3) badge = '<span class="vm-cat-badge" style="background:#FFF3E8;color:#F5762A">素材较少</span>';
+    const slots = [];
+    for (let s = 0; s < 4; s++) {
+      if (mats[s]) slots.push(`<div class="vm-thumb-slot"><img data-mat-id="${mats[s].id}" style="display:none"></div>`);
+      else slots.push('<div class="vm-thumb-slot empty"></div>');
+    }
+    return `<div class="vm-cat-card">${badge}
+      <div class="vm-cat-name">${esc(c.category)}</div>
+      <div class="vm-cat-path">${esc(root)}\\${esc(c.category)}</div>
+      <div class="vm-cat-count">${c.cnt}个片段</div>
+      <div class="vm-thumb-grid">${slots.join('')}</div>
+      <div class="vm-cat-actions"><a style="color:#2A7DE1" onclick="dToast('详情功能开发中')">查看详情</a><a style="color:#9E9890" onclick="vmScanMaterials()">重新扫描</a></div>
+    </div>`;
+  }));
+  el.innerHTML = htmls.join('');
+  vmLoadThumbnails();
+}
+
+async function vmLoadThumbnails() {
+  const imgs = document.querySelectorAll('#vmCategories img[data-mat-id]');
+  for (const img of imgs) {
+    try {
+      const res = await fetch(API_BASE + '/videomix/files/thumb/' + img.dataset.matId, { headers: { Authorization: 'Bearer ' + dGetToken() } });
+      if (res.ok) { img.src = URL.createObjectURL(await res.blob()); img.style.display = 'block'; }
+    } catch (e) {}
+  }
+}
+
+/* ---------- 镶头剪辑 ---------- */
+function dRenderVmShots() {
+  return `
+  <div class="d-card" style="margin-bottom:16px">
+    <div class="d-card-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <select class="d-select" id="vmShotTemplate" style="max-width:240px" onchange="vmRenderShotCards()"></select>
+      <select class="d-select" id="vmShotPersona" style="max-width:200px"></select>
+    </div>
+  </div>
+  <div class="d-card" style="margin-bottom:16px"><div class="d-card-body" id="vmShotsContainer"></div></div>
+  <div class="d-card"><div class="d-card-body" style="display:flex;gap:10px;align-items:center">
+    生成条数 <input class="d-input" type="number" id="vmShotCount" value="2" min="1" max="20" style="width:80px">
+    <button class="d-btn d-btn-primary" onclick="vmCreateScriptBatch()">创建任务</button>
+    <span class="d-label" id="vmShotBatchResult" style="margin:0"></span>
+  </div></div>`;
+}
+
+async function dBindVmShots() {
+  const [templates, personas, categories] = await Promise.all([
+    vmApi('GET', '/industry_templates'), vmApi('GET', '/personas'), vmApi('GET', '/materials/categories'),
+  ]);
+  dS.vm = dS.vm || {};
+  dS.vm.templates = templates || []; dS.vm.personas = personas || []; dS.vm.categories = categories || [];
+  document.getElementById('vmShotTemplate').innerHTML = (templates || []).map(t => `<option value="${t.id}">${esc(t.group_name)} - ${esc(t.name)}${t.built_in ? '' : '(自定义)'}</option>`).join('');
+  document.getElementById('vmShotPersona').innerHTML = (personas || []).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('') || '<option value="">(无人设)</option>';
+  if ((templates || []).length) vmRenderShotCards();
+}
+
+function vmRenderShotCards() {
+  const tplId = document.getElementById('vmShotTemplate').value;
+  const tpl = (dS.vm.templates || []).find(t => t.id === tplId);
+  if (!tpl) return;
+  document.getElementById('vmShotsContainer').innerHTML = tpl.shots_json.map(s => `
+    <div class="vm-shot-card" data-index="${s.index}">
+      <div class="vm-shot-orig">镶头${s.index + 1} · 模板原句：${esc(s.original_text)}</div>
+      <textarea class="d-textarea vm-shot-text" rows="2" data-original="${esc(s.original_text)}">${esc(s.original_text)}</textarea>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        素材类别
+        <select class="d-select vm-shot-category" style="max-width:160px">
+          ${(dS.vm.categories || []).map(c => `<option value="${esc(c.category)}" ${c.category === s.material_category ? 'selected' : ''}>${esc(c.category)}</option>`).join('')}
+        </select>
+        <button class="d-btn d-btn-ghost" onclick="vmRewriteShot(this)">AI改写</button>
+      </div>
+    </div>`).join('');
+}
+
+async function vmRewriteShot(btn) {
+  const card = btn.closest('.vm-shot-card');
+  const textarea = card.querySelector('.vm-shot-text');
+  const original = textarea.dataset.original || textarea.value;
+  const tpl = (dS.vm.templates || []).find(t => t.id === document.getElementById('vmShotTemplate').value);
+  const persona_id = document.getElementById('vmShotPersona').value || null;
+  btn.textContent = '改写中...';
+  const r = await vmApi('POST', '/shots/rewrite', { persona_id, original, industry: tpl.name });
+  if (r && r.result) textarea.value = r.result; else dToast('改写失败: ' + ((r && r.msg) || '未知错误'));
+  btn.textContent = 'AI改写';
+}
+
+async function vmCreateScriptBatch() {
+  const cards = [...document.querySelectorAll('.vm-shot-card')];
+  if (!cards.length) return dToast('请先选择模板');
+  const shots = cards.map(card => ({
+    index: parseInt(card.dataset.index, 10),
+    text: card.querySelector('.vm-shot-text').value.trim(),
+    material_category: card.querySelector('.vm-shot-category').value,
+  }));
+  const count = parseInt(document.getElementById('vmShotCount').value, 10) || 1;
+  document.getElementById('vmShotBatchResult').textContent = '提交中...';
+  const r = await vmApi('POST', '/mix/script_batch', { shots, count });
+  if (r && r.batch_id) {
+    document.getElementById('vmShotBatchResult').textContent = `已创建批次 ${r.batch_id.slice(0,8)}，去任务中心看进度`;
+    dS.vm.batchId = r.batch_id;
+    dGoPage('vmTasks');
+  } else {
+    document.getElementById('vmShotBatchResult').textContent = '失败: ' + ((r && r.msg) || '未知错误');
+  }
+}
+
+/* ---------- 任务中心 ---------- */
+function dRenderVmTasks() {
+  return `
+  <div class="d-card">
+    <div class="d-card-header"><div class="d-card-title">任务进度</div><div class="d-label" id="vmBatchSummary" style="margin:0"></div></div>
+    <div class="d-card-body" style="display:flex;gap:16px;align-items:flex-start">
+      <table style="flex:1;border-collapse:collapse;font-size:13px">
+        <thead><tr style="text-align:left;color:#9E9890;font-size:12px"><th style="padding:6px 8px">任务</th><th style="padding:6px 8px">状态</th><th style="padding:6px 8px">进度</th><th style="padding:6px 8px">说明/结果</th><th></th></tr></thead>
+        <tbody id="vmTaskList"></tbody>
+      </table>
+      <div><div class="d-label">成片预览</div><video id="vmPreviewPlayer" controls style="max-width:260px;border-radius:10px;background:#000"></video></div>
+    </div>
+  </div>`;
+}
+
+async function dBindVmTasks() {
+  dS.vm = dS.vm || {};
+  if (dS.vm._pollTimer) { clearInterval(dS.vm._pollTimer); dS.vm._pollTimer = null; }
+  await vmPollBatch();
+  dS.vm._pollTimer = setInterval(vmPollBatch, 3000);
+}
+
+async function vmPollBatch() {
+  const batchId = dS.vm && dS.vm.batchId;
+  const summaryEl = document.getElementById('vmBatchSummary');
+  if (!batchId) { if (summaryEl) summaryEl.textContent = '暂无进行中的批次，去镶头剪辑创建任务'; return; }
+  const r = await vmApi('GET', '/mix/batch/' + batchId);
+  if (!r || !r.tasks) return;
+  if (summaryEl) summaryEl.textContent = `批次 ${r.batch_id.slice(0,8)} | 等待${r.summary.pending||0} 进行中${r.summary.running||0} 完成${r.summary.done||0} 失败${r.summary.failed||0}`;
+  const listEl = document.getElementById('vmTaskList');
+  if (listEl) listEl.innerHTML = r.tasks.map(t => {
+    let extra = t.thinking || ''; let previewBtn = '';
+    if (t.status === 'done') {
+      let result = {}; try { result = JSON.parse(t.result_json || '{}'); } catch (e) {}
+      extra = (result.output_path || '').split(/[\\/]/).pop();
+      previewBtn = `<button class="d-btn d-btn-ghost" style="padding:4px 10px;font-size:12px" onclick="vmPreviewTask('${t.id}')">预览</button>`;
+    } else if (t.status === 'failed') { extra = t.error_msg || '未知错误'; }
+    return `<tr style="border-top:1px solid #F7F5F1">
+      <td style="padding:6px 8px">${t.id.slice(0,8)}</td>
+      <td style="padding:6px 8px"><span class="vm-pill ${t.status}">${t.status}</span></td>
+      <td style="padding:6px 8px"><div class="vm-progress"><div style="width:${t.progress}%"></div></div> ${t.progress}%</td>
+      <td style="padding:6px 8px;max-width:260px;overflow:hidden;text-overflow:ellipsis">${esc(extra)}</td>
+      <td style="padding:6px 8px">${previewBtn}</td>
+    </tr>`;
+  }).join('');
+  if (r.summary.pending === 0 && r.summary.running === 0 && dS.vm._pollTimer) { clearInterval(dS.vm._pollTimer); dS.vm._pollTimer = null; }
+}
+
+async function vmPreviewTask(taskId) {
+  try {
+    const res = await fetch(API_BASE + '/videomix/files/output/' + taskId + '.mp4', { headers: { Authorization: 'Bearer ' + dGetToken() } });
+    if (!res.ok) { dToast('预览加载失败'); return; }
+    const blob = await res.blob();
+    const video = document.getElementById('vmPreviewPlayer');
+    video.src = URL.createObjectURL(blob);
+    video.play();
+  } catch (e) { dToast('预览加载失败: ' + e.message); }
+}
+
+/* ---------- 系统设置 ---------- */
+function dRenderVmSettings() {
+  return `
+  <div class="d-card" style="margin-bottom:16px">
+    <div class="d-card-header"><div class="d-card-title">云端账号（用于AI改写文案，复用爆款文案工坊Key）</div></div>
+    <div class="d-card-body" style="display:flex;gap:10px;flex-wrap:wrap">
+      <input class="d-input" id="vmSPhone" style="max-width:200px" placeholder="手机号">
+      <input class="d-input" id="vmSPassword" type="password" style="max-width:200px" placeholder="密码">
+    </div>
+  </div>
+  <div class="d-card" style="margin-bottom:16px">
+    <div class="d-card-header"><div class="d-card-title">IndexTTS 配音声音</div></div>
+    <div class="d-card-body" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input class="d-input" id="vmSVoiceAudio" style="flex:1;max-width:360px" placeholder="参考音频本地路径，如 D:\\voice\\ref.wav">
+      <button class="d-btn d-btn-primary" onclick="vmRegisterVoice()">注册声音</button>
+      <span class="d-label" id="vmSVoiceResult" style="margin:0"></span>
+    </div>
+  </div>
+  <div class="d-card" style="margin-bottom:16px">
+    <div class="d-card-header"><div class="d-card-title">素材根目录</div></div>
+    <div class="d-card-body"><input class="d-input" id="vmSMaterialsRoot" style="max-width:420px"></div>
+  </div>
+  <button class="d-btn d-btn-primary" onclick="vmSaveSettings()">保存设置</button>
+  <span class="d-label" id="vmSSaveResult"></span>`;
+}
+
+async function dBindVmSettings() {
+  const s = await vmApi('GET', '/settings');
+  if (!s) return;
+  document.getElementById('vmSPhone').value = s.cloud_phone || '';
+  document.getElementById('vmSPassword').value = s.cloud_password || '';
+  document.getElementById('vmSMaterialsRoot').value = s.materials_root || '';
+  document.getElementById('vmSVoiceResult').textContent = s.indextts_voice_id ? `已注册: ${s.indextts_voice_id.slice(0,8)}...` : '尚未注册声音';
+}
+
+async function vmRegisterVoice() {
+  const audio_path = document.getElementById('vmSVoiceAudio').value.trim();
+  if (!audio_path) return dToast('请填写参考音频路径');
+  document.getElementById('vmSVoiceResult').textContent = '注册中...';
+  const r = await vmApi('POST', '/settings/register-voice', { audio_path });
+  if (r && r.voice_id) document.getElementById('vmSVoiceResult').textContent = `注册成功: ${r.voice_id.slice(0,8)}...`;
+  else document.getElementById('vmSVoiceResult').textContent = '失败: ' + ((r && r.msg) || '未知错误');
+}
+
+async function vmSaveSettings() {
+  const body = {
+    cloud_phone: document.getElementById('vmSPhone').value,
+    cloud_password: document.getElementById('vmSPassword').value,
+    materials_root: document.getElementById('vmSMaterialsRoot').value,
+  };
+  await vmApi('POST', '/settings', body);
+  document.getElementById('vmSSaveResult').textContent = '已保存';
 }
 
 /* ============================================================
