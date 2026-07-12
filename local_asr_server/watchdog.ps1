@@ -1,8 +1,8 @@
-# XiamuAgent - Service Watchdog
+﻿# XiamuAgent - Service Watchdog
 # Checks every 60s, auto-restarts dead services
 
-$pyExe    = "C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe"
-$hdPyExe  = "C:\ChaojiIP\aigc-human\python-modules\hdModule\venv\python.exe"
+$pyExe    = "F:\qingyuAI\python-modules\voiceV2Module\venv\python.exe"
+$hdPyExe  = "F:\qingyuAI\python-modules\hdModule\venv\python.exe"
 $asrDir   = "C:\AIClaudecode\local_asr_server"
 $frpcExe  = "$asrDir\frp\frp_0.61.0_windows_amd64\frp_0.61.0_windows_amd64\frpc.exe"
 $frpcToml = "$asrDir\frp\frp_0.61.0_windows_amd64\frp_0.61.0_windows_amd64\frpc.toml"

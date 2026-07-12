@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hunjian-agent",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--app-dir", "F:/Projects/HunjianAgent/backend", "--host", "127.0.0.1", "--port", "8800"],
+      "port": 8800
+    },
+    {
+      "name": "xiamu-desktop-local",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--app-dir", "F:/Projects/XiaMuDesktop/backend_local", "--host", "127.0.0.1", "--port", "9101"],
+      "port": 9101
+    },
+    {
+      "name": "desktop-static-preview",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8123", "--directory", "C:/Users/木木/Desktop"],
+      "port": 8123
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# XiamuAgent - Local Services Auto-Start
+﻿# XiamuAgent - Local Services Auto-Start
 # Services: HeyGem(7861) + ASR(8765) + IndexTTS(8766) + frpc(asr.yyagent.top)
 
 $logFile = "$PSScriptRoot\startup.log"
@@ -32,7 +32,7 @@ $env:FOR_IGNORE_EXCEPTIONS = "1"
 $env:PYTHONIOENCODING     = "utf-8"
 $env:PYTHONUNBUFFERED     = "1"
 
-$pyExe    = "C:\ChaojiIP\aigc-human\python-modules\voiceV2Module\venv\python.exe"
+$pyExe    = "F:\qingyuAI\python-modules\voiceV2Module\venv\python.exe"
 $asrDir   = "C:\AIClaudecode\local_asr_server"
 $asrErrLog = "$asrDir\asr_runtime_err.log"
 $ttsErrLog = "$asrDir\tts_runtime_err.log"
@@ -43,7 +43,7 @@ if (IsPortInUse 7861) {
 } else {
     Log "[HeyGem] starting V2 (hdModule)..."
     Start-Process `
-        -FilePath "C:\ChaojiIP\aigc-human\python-modules\hdModule\venv\python.exe" `
+        -FilePath "F:\qingyuAI\python-modules\hdModule\venv\python.exe" `
         -ArgumentList "C:\AIClaudecode\desktop_client\heygem_server_v2.py" `
         -WorkingDirectory "C:\AIClaudecode\desktop_client" `
         -WindowStyle Hidden

@@ -28,3 +28,12 @@ desktop_client/vrt_tmp/
 
 # 测试文件
 local_asr_server/test_*.py
+tianming-skill-参考/
+
+# 运行日志与缓存（2026-07-12 补）
+*.log
+local_asr_server/spk_cache/
+.design_tmp/
+# frp 二进制与含 token 的配置不入库
+local_asr_server/frp/
+.claude/settings.local.json
