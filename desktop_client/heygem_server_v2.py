@@ -65,6 +65,22 @@ for _pat in _FFMPEG_PATTERNS:
 app = FastAPI(title="HeyGem Server V2")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# ===== Token 鉴权（C1：隧道公网可达后必须有）=====
+# 设置环境变量 HEYGEM_TOKEN 后，/video/* 全部要求 Authorization: Bearer <token>；
+# 未设置则完全保持旧行为（本机/内网免鉴权）。/health 永远开放（隧道探活用）。
+HEYGEM_TOKEN = os.environ.get("HEYGEM_TOKEN", "").strip()
+if HEYGEM_TOKEN:
+    print("[HeyGemV2] token 鉴权已启用（/video/* 需 Bearer token）")
+
+@app.middleware("http")
+async def _token_auth(request, call_next):
+    if HEYGEM_TOKEN and request.url.path.startswith("/video/"):
+        from fastapi.responses import JSONResponse
+        auth = request.headers.get("authorization", "")
+        if auth != f"Bearer {HEYGEM_TOKEN}":
+            return JSONResponse({"detail": "unauthorized：缺少或错误的 Bearer token"}, status_code=401)
+    return await call_next(request)
+
 tasks: dict[str, dict] = {}
 _task_lock = threading.Lock()
 _hd_module = None     # hdModule main，主进程初始化后赋值
