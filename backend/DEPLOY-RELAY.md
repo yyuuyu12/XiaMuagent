@@ -3,6 +3,48 @@
 前置：本仓库两个提交已推到 GitHub（`bf84ef4` token 鉴权 + `0651227` 中继路由）；
 家里已跑过 `F:\Projects\setup-remote-heygem.ps1`（token 在剪贴板里）。
 
+## 〇、先修隧道路由（一次性；2026-07-16 实测确认缺失）
+
+现状实测：家里 frpc → frps:7000 连接 Established（frps 活着），但
+`https://heygem.yyagent.top` 和 `asr.` 都落到主站 backend 的 404——
+**nginx 没有这三个子域的 server 块**，证书也不覆盖子域（Windows 端报 TLS 不受信）。
+
+```bash
+# 1. 确认 frps 的 HTTP 虚拟主机端口（frpc 用的是 type="http" 代理，必须有这项）
+grep -ri vhost /etc/frp/frps.toml /opt/frp*/frps.toml 2>/dev/null
+# 若没有任何 vhostHTTPPort，在 frps.toml 加一行： vhostHTTPPort = 8080
+# 然后重启 frps（systemctl restart frps 或对应的启动方式），并确认监听：
+ss -tlnp | grep -E "7000|8080"
+
+# 2. nginx 新增子域路由（把 8080 换成上一步查到的端口）
+cat > /etc/nginx/conf.d/frp-subdomains.conf <<'NGINX'
+server {
+    listen 80;
+    server_name heygem.yyagent.top asr.yyagent.top videomix.yyagent.top;
+    client_max_body_size 200m;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+}
+NGINX
+nginx -t && systemctl reload nginx
+
+# 3. 先验 HTTP 通（家里开机时）：
+curl -s http://heygem.yyagent.top/health
+# 预期 {"status":"ok","model":"heygem-v2","processor_ready":true}
+
+# 4. 补 HTTPS 证书（certbot 会自动改 nginx 配置加 443）
+certbot --nginx -d heygem.yyagent.top -d asr.yyagent.top -d videomix.yyagent.top
+curl -s https://heygem.yyagent.top/health   # 同上预期
+
+# 5. 主站也要放大上传限制（中继提交的 base64 载荷 30-60MB 走 www 域）：
+#    在 www.yyagent.top 的 server 块里加一行  client_max_body_size 200m;
+#    然后 nginx -t && systemctl reload nginx
+```
+
 ## 一、上海机部署（SSH 后照抄，约 2 分钟）
 
 ```bash
