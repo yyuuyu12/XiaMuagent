@@ -12,18 +12,18 @@
 ```bash
 # 1. 确认 frps 的 HTTP 虚拟主机端口（frpc 用的是 type="http" 代理，必须有这项）
 grep -ri vhost /etc/frp/frps.toml /opt/frp*/frps.toml 2>/dev/null
-# 若没有任何 vhostHTTPPort，在 frps.toml 加一行： vhostHTTPPort = 8080
+# 若没有任何 vhostHTTPPort，在 frps.toml 加一行： vhostHTTPPort = 8081  # 注意 8080 已被 pm2 的 wf-api 占用，勿用
 # 然后重启 frps（systemctl restart frps 或对应的启动方式），并确认监听：
-ss -tlnp | grep -E "7000|8080"
+ss -tlnp | grep -E "7000|8081"
 
-# 2. nginx 新增子域路由（把 8080 换成上一步查到的端口）
+# 2. nginx 新增子域路由（把 8081 换成上一步实际的 vhostHTTPPort；8080 被 wf-api 占用）
 cat > /etc/nginx/conf.d/frp-subdomains.conf <<'NGINX'
 server {
     listen 80;
     server_name heygem.yyagent.top asr.yyagent.top videomix.yyagent.top;
     client_max_body_size 200m;
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8081;
         proxy_set_header Host $host;
         proxy_read_timeout 600s;
         proxy_send_timeout 600s;
@@ -61,7 +61,7 @@ mysql -u root -p
 ```
 
 ```sql
-USE xiamuagent;  -- 若库名不同，用 SHOW DATABASES; 确认
+USE zeabur;  -- 库名实测为 zeabur（Zeabur 迁移时保留原名）
 
 -- ① 隧道基址（固定值，照抄）
 INSERT INTO system_config (config_key, value) VALUES ('relay_heygem_url', 'https://heygem.yyagent.top')
