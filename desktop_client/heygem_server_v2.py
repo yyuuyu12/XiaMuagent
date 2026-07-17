@@ -606,7 +606,7 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str,
     except asyncio.TimeoutError:
         with _task_lock:
             if tasks.get(task_id, {}).get("status") != "cancelled":
-                tasks[task_id].update({"status": "error", "error": "V2推理超时（超过10分钟）"})
+                tasks[task_id].update({"status": "error", "error": "V2推理超时（超过30分钟）"})
     except Exception as e:
         import traceback
         traceback.print_exc()
