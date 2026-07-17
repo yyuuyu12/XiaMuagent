@@ -472,7 +472,9 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str,
     try:
         result = await asyncio.wait_for(
             asyncio.to_thread(_do_work_v2, task_id, audio_path, video_path),
-            timeout=600
+            # 2026-07-17：大素材（100MB+ 出镜视频 × 5 分钟以上配音）实测
+            # 超过 10 分钟（115MB 素材推到 28% 被切），上限提到 30 分钟
+            timeout=1800
         )
         if _task_cancelled(task_id):
             return
