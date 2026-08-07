@@ -104,6 +104,7 @@ class GenerateReq(BaseModel):
     audio_fmt:  str = "wav"
     video_fmt:  str = "mp4"
     enhancer:   bool = False
+    output_quality: str = "fast"              # fast keeps legacy 1080-height cap; hd1080 preserves frame size
     oss_config: Optional[OssConfig] = None   # 提供时本地直传 OSS，跳过 Zeabur 中转
     user_id:    Optional[str] = None         # 用于 OSS 路径和 avatar_key 目录
     save_as_avatar: bool = False             # 同时把源视频存为形象库
@@ -163,12 +164,14 @@ async def generate(req: GenerateReq):
     asyncio.create_task(_prepare_and_run(
         task_id, req.audio_b64, audio_path, video_b64, video_path,
         avatar_path, _avatar_save_path, req.oss_config, req.user_id or "unknown",
+        req.output_quality,
     ))
     return {"task_id": task_id, "avatar_key": saved_avatar_key}
 
 
 async def _prepare_and_run(task_id, audio_b64, audio_path, video_b64, video_path,
-                            avatar_path, avatar_save_path, oss_config, user_id):
+                            avatar_path, avatar_save_path, oss_config, user_id,
+                            output_quality="fast"):
     """后台：先写文件，再启动推理。写文件失败直接标 error。"""
     def _write_files():
         audio_path.write_bytes(base64.b64decode(audio_b64))
@@ -190,7 +193,7 @@ async def _prepare_and_run(task_id, audio_b64, audio_path, video_b64, video_path
         return
     asyncio.create_task(_run_heygem_v2(
         task_id, str(audio_path), str(video_path),
-        oss_config=oss_config, user_id=user_id,
+        oss_config=oss_config, user_id=user_id, output_quality=output_quality,
     ))
 
 
@@ -348,7 +351,7 @@ def _try_ffmpeg_video(cmd: list, out_path, timeout=180) -> bool:
     return ok
 
 
-def _normalize_video(task_id: str, video_path: str) -> str:
+def _normalize_video(task_id: str, video_path: str, output_quality: str = "fast") -> str:
     """
     将任意上传视频转为 HeyGem 可用的 H.264 yuv420p 25fps MP4。
     四级降级策略（从原有可靠路径开始，逐步放宽）：
@@ -358,6 +361,7 @@ def _normalize_video(task_id: str, video_path: str) -> str:
       4. 流复制兜底（仅修容器格式）
     """
     def _out(suffix): return TEMP_DIR / f"{task_id}_video_norm{suffix}.mp4"
+    encode_crf = "16" if output_quality == "hd1080" else "20"
 
     # ── 级别1：软件解码 + fps=25 filter（原始方式，对 H.264 最稳定）────────
     p1 = _out("1")
@@ -366,7 +370,7 @@ def _normalize_video(task_id: str, video_path: str) -> str:
         "-i", video_path,
         "-an",
         "-vf", "fps=25,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", encode_crf,
         "-movflags", "+faststart",
         str(p1),
     ], p1):
@@ -380,7 +384,7 @@ def _normalize_video(task_id: str, video_path: str) -> str:
         "-i", video_path,
         "-an",
         "-vf", "fps=25,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", encode_crf,
         "-movflags", "+faststart",
         str(p2),
     ], p2):
@@ -394,7 +398,7 @@ def _normalize_video(task_id: str, video_path: str) -> str:
         "-an",
         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
         "-r", "25",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", encode_crf,
         "-movflags", "+faststart",
         str(p3),
     ], p3):
@@ -426,7 +430,7 @@ def _friendly_error(e: Exception) -> str:
     return f"数字人生成失败：{raw[:260]}"
 
 
-def _do_work_v2(task_id, audio_path, video_path):
+def _do_work_v2(task_id, audio_path, video_path, output_quality="fast"):
     """在线程中调用 hdModule.generateDigitalHuman"""
     with _task_lock:
         tasks[task_id].update({"status": "running", "progress": 10, "msg": "正在检查素材..."})
@@ -439,7 +443,7 @@ def _do_work_v2(task_id, audio_path, video_path):
             tasks[task_id].update({"progress": 18, "msg": "正在整理视频格式..."})
 
         norm_audio = _normalize_audio(task_id, audio_path)
-        norm_video = _normalize_video(task_id, video_path)
+        norm_video = _normalize_video(task_id, video_path, output_quality)
         normalized_paths.extend([norm_audio, norm_video])
 
         if _task_cancelled(task_id):
@@ -467,11 +471,12 @@ def _do_work_v2(task_id, audio_path, video_path):
 
 
 async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str,
-                         oss_config=None, user_id: str = "unknown"):
+                         oss_config=None, user_id: str = "unknown",
+                         output_quality: str = "fast"):
     result = None
     try:
         result = await asyncio.wait_for(
-            asyncio.to_thread(_do_work_v2, task_id, audio_path, video_path),
+            asyncio.to_thread(_do_work_v2, task_id, audio_path, video_path, output_quality),
             # 2026-07-17：大素材（100MB+ 出镜视频 × 5 分钟以上配音）实测
             # 超过 10 分钟（115MB 素材推到 28% 被切），上限提到 30 分钟
             timeout=1800
@@ -515,21 +520,30 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str,
         try:
             faststart_path = OUTPUT_DIR / f"{task_id}_faststart.mp4"
             _compress_ok = False
-            _vf = "scale=-2:'min(ih,1080)',format=yuv420p"
+            preserve_size = output_quality == "hd1080"
+            _vf = "format=yuv420p" if preserve_size else "scale=-2:'min(ih,1080)',format=yuv420p"
 
-            # 尝试 GPU 编码（RTX，速度是 CPU 的 10-20x）
-            _gpu_proc = _run_cmd([
-                "ffmpeg", "-y",
-                "-i", result_path,
-                "-vf", _vf,
-                "-c:v", "h264_nvenc", "-preset", "fast", "-cq", "22",
-                "-c:a", "aac", "-b:a", "128k",
-                "-movflags", "+faststart",
-                str(faststart_path),
-            ], timeout=120)
+            # hd1080 result is already H.264 CRF16 from hdModule. Move moov only;
+            # re-encoding here used to discard detail and cap portrait height at 1080.
+            if preserve_size:
+                _gpu_cmd = [
+                    "ffmpeg", "-y", "-i", result_path,
+                    "-c", "copy", "-movflags", "+faststart", str(faststart_path),
+                ]
+            else:
+                _gpu_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", result_path,
+                    "-vf", _vf,
+                    "-c:v", "h264_nvenc", "-preset", "fast", "-cq", "22",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    str(faststart_path),
+                ]
+            _gpu_proc = _run_cmd(_gpu_cmd, timeout=120)
             if _gpu_proc.returncode == 0 and faststart_path.exists() and faststart_path.stat().st_size > 1000:
                 _compress_ok = True
-                print(f"[HeyGemV2] GPU 压缩完成: {faststart_path}")
+                print(f"[HeyGemV2] 输出整理完成 ({output_quality}): {faststart_path}")
             else:
                 print(f"[HeyGemV2] GPU 编码失败(rc={_gpu_proc.returncode})，降级 CPU libx264")
                 try: faststart_path.unlink(missing_ok=True)
@@ -539,7 +553,7 @@ async def _run_heygem_v2(task_id: str, audio_path: str, video_path: str,
                     "ffmpeg", "-y",
                     "-i", result_path,
                     "-vf", _vf,
-                    "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "16" if preserve_size else "22",
                     "-c:a", "aac", "-b:a", "128k",
                     "-movflags", "+faststart",
                     str(faststart_path),
